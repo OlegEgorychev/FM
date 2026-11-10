@@ -61,6 +61,7 @@ button{ font-family: var(--ui); }
 #scene-office{ background-image: url("assets/office.webp"), linear-gradient(160deg, #26323b, #0d1215); }
 #scene-squad { background-image: url("assets/locker-room.webp"), linear-gradient(160deg, #2b3133, #101414); }
 #scene-match { background-image: url("assets/pitch.webp"), linear-gradient(180deg, #3a4650 0%, #22302a 55%, #1a2a1c 100%); }
+#scene-tactics{ background-image: url("assets/office.webp"), linear-gradient(160deg, #26323b, #0d1215); }
 #scene-notes { background-image: url("assets/notebook-desk.webp"), linear-gradient(160deg, #2c2722, #121110); }
 
 .rain{
@@ -170,9 +171,10 @@ button{ font-family: var(--ui); }
 /* Window placements */
 #win-office{ left: 50%; top: 9%; width: min(440px, 92%); transform: translateX(-10%); }
 #win-squad{ right: 3%; top: 3%; width: min(860px, 95%); }
-#win-match{ left: 50%; bottom: 3%; width: min(980px, 95%); transform: translateX(-50%); max-height: calc(100% - 24px); }
+#win-match{ left: 50%; top: 8px; width: min(1100px, 97%); transform: translateX(-50%); max-height: calc(100% - 16px); }
+#win-tactics{ left: 50%; top: 4%; width: min(1000px, 95%); transform: translateX(-50%); }
 #win-notes{ left: 50%; top: 4%; width: min(860px, 94%); transform: translateX(-50%); }
-#win-office.open, #win-match.open, #win-notes.open{ animation: none; }
+#win-office.open, #win-match.open, #win-notes.open, #win-tactics.open{ animation: none; }
 #dlg{ left: 50%; top: 38%; width: min(360px, 90%); transform: translate(-50%, -50%); z-index: 60; }
 
 /* =========================================================
@@ -424,6 +426,88 @@ body.fx .crt-glare{ display: block; }
 .card .btn.done small{ color: #1f3518; }
 
 /* =========================================================
+   2D RADAR PITCH (match + tactics board)
+   ========================================================= */
+.pitch{
+  position: relative; aspect-ratio: 105 / 68; overflow: hidden; --mv: .5s; --dot: 22px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 9.09%, transparent 9.09% 18.18%),
+    radial-gradient(ellipse at 50% 50%, #3a6b35 0%, #2c5429 70%, #22421f 100%);
+  border: 2px solid #0b0e0c; box-shadow: inset 0 0 0 3px rgba(255,255,255,.12), inset 0 0 50px rgba(0,0,0,.55);
+}
+.pitch.radar{ width: min(100%, calc(36vh * 1.544)); margin: 6px auto 4px; }
+.pl-line{ position: absolute; border: 2px solid rgba(255,255,255,.5); pointer-events: none; }
+.pl-line.half{ left: 50%; top: 0; bottom: 0; width: 0; border-width: 0 0 0 2px; }
+.pl-line.third{ top: 0; bottom: 0; width: 0; border-width: 0 0 0 1px; border-style: dashed; border-color: rgba(255,255,255,.14); }
+.pl-line.t1{ left: 33.33%; } .pl-line.t2{ left: 66.66%; }
+.pl-line.circle{ left: 50%; top: 50%; width: 17.4%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); }
+.pl-line.spot{ left: 50%; top: 50%; width: 5px; height: 5px; border: 0; border-radius: 50%; background: rgba(255,255,255,.6); transform: translate(-50%, -50%); }
+.pl-line.box{ top: 20.4%; height: 59.2%; width: 15.7%; }
+.pl-line.six{ top: 36.8%; height: 26.4%; width: 5.2%; }
+.pl-line.l{ left: 0; border-left: 0; } .pl-line.r{ right: 0; border-right: 0; }
+.pl-goal{ position: absolute; top: 44.6%; height: 10.8%; width: 1.3%; background: repeating-linear-gradient(0deg, rgba(255,255,255,.7) 0 2px, transparent 2px 4px); }
+.pl-goal.l{ left: 0; } .pl-goal.r{ right: 0; }
+.pl{
+  position: absolute; z-index: 2; width: var(--dot); height: var(--dot); padding: 0;
+  transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid #f1f4f6;
+  display: grid; place-items: center; color: #fff; font: bold 11px/1 var(--ui);
+  box-shadow: 0 2px 3px rgba(0,0,0,.6);
+  transition: top var(--mv) ease, left var(--mv) ease, opacity .3s, box-shadow .2s;
+}
+.pl.home{ background: #2f6fd0; } .pl.away{ background: #c7372c; }
+.pl.home.gk{ background: #1d3f7a; border-color: #ffd34d; } .pl.away.gk{ background: #6e1c16; border-color: #ffd34d; }
+.pl.has{ box-shadow: 0 0 0 3px rgba(255,230,120,.9), 0 2px 3px rgba(0,0,0,.6); z-index: 4; }
+.pl.off{ opacity: 0; }
+.ball{
+  position: absolute; z-index: 5; width: 9px; height: 9px; border-radius: 50%; transform: translate(-50%, -50%);
+  background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.9), 0 1px 2px #000;
+  transition: top var(--mv) ease, left var(--mv) ease;
+}
+/* tactics board */
+.pitch.board{ width: 100%; --dot: 28px; }
+.pitch.board .pl{ cursor: pointer; font-size: 12px; transition: box-shadow .15s, transform .15s; }
+.pitch.board .pl:hover{ transform: translate(-50%, -50%) scale(1.12); }
+.pitch.board .pl.sel{ box-shadow: 0 0 0 4px #ffe066, 0 2px 3px rgba(0,0,0,.6); }
+.pitch.board.locked .pl{ cursor: not-allowed; }
+.pl-nm{ position: absolute; top: calc(100% + 2px); left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font: bold 11px/1.2 var(--ui); color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; background: rgba(0,0,0,.35); padding: 0 3px; }
+.tac-grid{ display: grid; grid-template-columns: 270px 1fr; gap: 14px; align-items: start; }
+.tac-side{ display: flex; flex-direction: column; gap: 10px; }
+.fld{ display: flex; flex-direction: column; gap: 4px; font-weight: bold; }
+.sel98{ font: 15px var(--ui); padding: 4px 6px; background: #f3f4f1; color: #111; border: 2px solid; border-color: var(--dark) var(--hi) var(--hi) var(--dark); }
+.tac-warn{ padding: 8px; font-size: 13px; line-height: 1.45; }
+.tac-warn .w{ color: #f0a89d; } .tac-warn .okmsg{ color: #9cc58a; }
+.tac-hint{ margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+/* match layout */
+.match-body{ padding: 8px 10px; }
+.match-top .scoreboard{ padding: 4px 12px; gap: 10px; }
+.match-top .sb-score{ font-size: 44px; }
+.match-top .ctrl .btn{ padding: 8px 14px; }
+.match-bottom{ display: grid; grid-template-columns: 1fr 250px; gap: 10px; }
+.match-bottom{ align-items: start; }
+.match-bottom .log{ height: clamp(100px, calc(100vh - 36vh * 1 - 400px), 300px); resize: none; }
+.side-col .statgrid{ gap: 0 8px; }
+.side-col .groupbox{ padding: 12px 8px 6px; }
+.side-col{ display: flex; flex-direction: column; gap: 4px; }
+.side-col .groupbox{ margin-top: 6px; }
+.side-col .statgrid{ font-size: 13px; line-height: 1.35; }
+.speeds{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.spd{ min-width: 0; padding: 4px 2px; font-size: 11px; line-height: 1.2; white-space: nowrap; }
+.spd b{ display: block; font-size: 15px; }
+.spd.active{ background: #2b4f78; color: #fff; border-color: var(--dark) var(--hi) var(--hi) var(--dark); font-weight: bold; }
+.possession{ margin: 0 0 6px; }
+.num{ display: inline-block; min-width: 22px; margin-right: 7px; padding: 1px 4px; text-align: center; font-size: 11px; font-weight: bold;
+  color: #fff; background: #2f6fd0; border-radius: 9px; }
+.num.dark{ font-size: 12px; vertical-align: 2px; }
+.oop{ margin-left: 8px; font-size: 11px; font-weight: normal; color: #f0a89d; }
+@media (max-width: 820px){
+  .tac-grid, .match-bottom{ grid-template-columns: 1fr; }
+  .pitch.radar{ width: 100%; --dot: 16px; }
+  .pl{ font-size: 9px; }
+  .pitch.board{ --dot: 22px; }
+}
+
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -448,12 +532,14 @@ body.fx .crt-glare{ display: block; }
   <div class="scene" id="scene-squad" aria-hidden="true"></div>
   <div class="scene" id="scene-match" aria-hidden="true"></div>
   <div class="scene" id="scene-notes" aria-hidden="true"></div>
+  <div class="scene" id="scene-tactics" aria-hidden="true"></div>
   <div class="rain" aria-hidden="true"></div>
 
   <div id="desktop">
     <nav class="icons" aria-label="Desktop">
       <button class="icon" data-view="office"><span class="glyph">&#8962;</span><span data-i18n="nav.office">Office</span></button>
       <button class="icon" data-view="squad"><span class="glyph">&#9638;</span><span data-i18n="nav.squad">Squad</span></button>
+      <button class="icon" data-view="tactics"><span class="glyph">&#9783;</span><span data-i18n="nav.tactics">Tactics</span></button>
       <button class="icon" data-view="match"><span class="glyph">&#9673;</span><span data-i18n="nav.matchday">Match Day</span></button>
       <button class="icon" data-view="notes" id="icon-notes"><span class="glyph">&#9998;</span><span data-i18n="nav.notebook">Notebook</span></button>
     </nav>
@@ -471,6 +557,7 @@ body.fx .crt-glare{ display: block; }
         <ol class="memo sunken" id="office-memo" data-i18n="office.memo"></ol>
         <div class="row-btns">
           <button class="btn" data-goto="squad" data-i18n="office.toSquad"></button>
+          <button class="btn" data-goto="tactics" data-i18n="nav.tactics"></button>
           <button class="btn go" data-goto="match" data-i18n="office.toMatch"></button>
         </div>
       </div>
@@ -492,11 +579,32 @@ body.fx .crt-glare{ display: block; }
       <div class="statusbar"><span id="squad-status"></span><span data-i18n="squad.hidden"></span></div>
     </section>
 
+    <!-- TACTICS -->
+    <section class="win" id="win-tactics">
+      <div class="titlebar"><span class="t-ico">&#9783;</span><span class="t-txt" data-i18n="tac.title"></span>
+        <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
+      <div class="win-body">
+        <div class="tac-grid">
+          <div class="tac-side">
+            <label class="fld"><span data-i18n="tac.formation"></span>
+              <select id="formation" class="sel98"></select></label>
+            <button class="btn" id="btn-auto" data-i18n="tac.auto"></button>
+            <div class="groupbox"><span class="gb-label" data-i18n="tac.strength"></span>
+              <dl class="statgrid" id="tac-strength"></dl></div>
+            <div class="tac-warn sunken" id="tac-warn"></div>
+            <p class="tac-hint" data-i18n="tac.hint"></p>
+          </div>
+          <div class="pitch board" id="tac-board"></div>
+        </div>
+      </div>
+      <div class="statusbar"><span id="tac-status"></span><span id="tac-sel"></span></div>
+    </section>
+
     <!-- MATCH -->
     <section class="win" id="win-match">
       <div class="titlebar"><span class="t-ico">&#9673;</span><span class="t-txt" id="match-title">MATCHDAY.EXE</span>
         <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
-      <div class="win-body">
+      <div class="win-body match-body">
         <div class="match-top">
           <div class="scoreboard sunken">
             <div class="sb-team home" id="sb-home">HOME</div>
@@ -510,14 +618,15 @@ body.fx .crt-glare{ display: block; }
             <div class="speed" id="speed"></div>
           </div>
         </div>
-        <div class="zones" id="zones">
-          <div data-z="0" data-i18n="zone.0"></div><div data-z="1" data-i18n="zone.1"></div><div data-z="2" data-i18n="zone.2"></div>
-        </div>
+        <!-- TOP: 2D radar -->
+        <div class="pitch radar" id="radar"></div>
         <div class="possession">
           <span><span data-i18n="match.ball"></span>: <b id="carrier">&mdash;</b></span>
+          <span><span data-i18n="match.forms"></span>: <b id="forms">&mdash;</b></span>
           <span><span data-i18n="match.poss"></span>: <b id="poss">&mdash;</b></span>
         </div>
-        <div class="match-main">
+        <!-- BOTTOM: log, shouts, speed, stats -->
+        <div class="match-bottom">
           <div class="log-col">
             <div class="log sunken" id="log" role="log" aria-live="polite"></div>
             <div class="shouts" role="group">
@@ -526,8 +635,17 @@ body.fx .crt-glare{ display: block; }
               <button class="btn shout" data-shout="balanced" data-i18n="shout.balanced" data-i18n-aria="shout.balancedTip"></button>
             </div>
           </div>
-          <div class="groupbox"><span class="gb-label" data-i18n="match.ourStats"></span>
-            <dl class="statgrid" id="team-stats"></dl>
+          <div class="side-col">
+            <div class="groupbox"><span class="gb-label" data-i18n="match.speedLbl"></span>
+              <div class="speeds" role="group">
+                <button class="btn small spd" data-speed="1" data-i18n="speed.1"></button>
+                <button class="btn small spd" data-speed="2" data-i18n="speed.2"></button>
+                <button class="btn small spd" data-speed="5" data-i18n="speed.5"></button>
+              </div>
+            </div>
+            <div class="groupbox"><span class="gb-label" data-i18n="match.ourStats"></span>
+              <dl class="statgrid" id="team-stats"></dl>
+            </div>
           </div>
         </div>
       </div>
@@ -557,6 +675,7 @@ body.fx .crt-glare{ display: block; }
     <ul>
       <li><button data-goto="office">&#8962;&nbsp; <span data-i18n="nav.office"></span></button></li>
       <li><button data-goto="squad">&#9638;&nbsp; <span data-i18n="nav.squad"></span></button></li>
+      <li><button data-goto="tactics">&#9783;&nbsp; <span data-i18n="nav.tactics"></span></button></li>
       <li><button data-goto="match">&#9673;&nbsp; <span data-i18n="nav.matchday"></span></button></li>
       <li><button data-goto="notes">&#9998;&nbsp; <span data-i18n="nav.notebook"></span></button></li>
       <hr>
@@ -572,6 +691,7 @@ body.fx .crt-glare{ display: block; }
     <div class="tasks">
       <button class="tk" data-view="office">&#8962; <span class="lbl" data-i18n="nav.office"></span></button>
       <button class="tk" data-view="squad">&#9638; <span class="lbl" data-i18n="nav.squad"></span></button>
+      <button class="tk" data-view="tactics">&#9783; <span class="lbl" data-i18n="nav.tactics"></span></button>
       <button class="tk" data-view="match">&#9673; <span class="lbl" data-i18n="nav.match"></span></button>
       <button class="tk" data-view="notes" id="tk-notes">&#9998; <span class="lbl" id="tk-notes-lbl"></span></button>
     </div>
@@ -595,16 +715,20 @@ body.fx .crt-glare{ display: block; }
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const jit = r => (Math.random() * 2 - 1) * r;
 const pad2 = n => String(n).padStart(2, '0');
 const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (tpl, map) => tpl.replace(/\{(\w+)\}/g, (_, k) => map[k] ?? '');
 
 const CLUB_NAME = 'Ashford Rovers U-14';
-const FORMATION = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD'];
-const BENCH = ['GK', 'DEF', 'MID', 'MID', 'FWD'];
+const SQUAD_POS = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'GK', 'DEF', 'MID', 'MID', 'FWD'];
 const POS_ORDER = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
-const ZONE_POS = ['DEF', 'MID', 'FWD']; // zone index -> who naturally plays there (relative to the team in possession)
+const NATURAL_LINE = { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'ATT' };   // player position -> tactical line
+const LINE_POS = { GK: 'GK', DEF: 'DEF', MID: 'MID', ATT: 'FWD' };
+const LINE_IDX = { DEF: 0, MID: 1, ATT: 2 };
+const ZONE_LINE = ['DEF', 'MID', 'ATT'];   // zone index (relative to team in possession) -> line that plays there
 const ATTRS = ['Speed', 'Pass', 'Dribble', 'Shoot', 'Tackle', 'Save'];
 const PROFILES = { // [min, max] per hidden attribute, 1-20
   GK:  { Speed: [6, 12],  Pass: [5, 11],  Dribble: [3, 8],   Shoot: [2, 6],   Tackle: [4, 9],   Save: [10, 18] },
@@ -612,9 +736,54 @@ const PROFILES = { // [min, max] per hidden attribute, 1-20
   MID: { Speed: [8, 15],  Pass: [10, 18], Dribble: [8, 15],  Shoot: [7, 13],  Tackle: [7, 14],  Save: [1, 4] },
   FWD: { Speed: [10, 18], Pass: [7, 13],  Dribble: [10, 17], Shoot: [11, 18], Tackle: [3, 8],   Save: [1, 3] },
 };
-/* Energy economy. WEEK_REST is a small recovery for everyone between fixtures:
-   without it, 16 players can't sustain 11 starters at ±30-40/+30. Tune here. */
+/* Energy economy. WEEK_REST: small recovery for everyone between fixtures. */
 const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 30, WEEK_REST: 15 };
+const OUT_OF_POSITION = 0.85;   // stat multiplier for a player outside his natural line
+
+/* =========================================================
+   FORMATIONS
+   Rows go from the back line to the front line. Each row = [line, players].
+   ========================================================= */
+const FORMATIONS = {
+  '4-4-2':   [['DEF', 4], ['MID', 4], ['ATT', 2]],
+  '4-3-3':   [['DEF', 4], ['MID', 3], ['ATT', 3]],
+  '4-2-3-1': [['DEF', 4], ['MID', 2], ['MID', 3], ['ATT', 1]],
+  '3-5-2':   [['DEF', 3], ['MID', 5], ['ATT', 2]],
+  '5-3-2':   [['DEF', 5], ['MID', 3], ['ATT', 2]],
+  '4-1-4-1': [['DEF', 4], ['MID', 1], ['MID', 4], ['ATT', 1]],
+  '4-5-1':   [['DEF', 4], ['MID', 5], ['ATT', 1]],
+  '3-4-3':   [['DEF', 3], ['MID', 4], ['ATT', 3]],
+  '4-4-1-1': [['DEF', 4], ['MID', 4], ['ATT', 1], ['ATT', 1]],
+  '4-3-1-2': [['DEF', 4], ['MID', 3], ['MID', 1], ['ATT', 2]],
+};
+const FORMATION_KEYS = Object.keys(FORMATIONS);
+
+/** 11 slots: index 0 = GK, then back-to-front, left-to-right. x/y are % of the pitch for a team attacking left->right. */
+function formationSlots(f) {
+  const rows = FORMATIONS[f] || FORMATIONS['4-4-2'];
+  const slots = [{ line: 'GK', x: 5, y: 50 }];
+  rows.forEach(([line, n], i) => {
+    const x = 18 + i * (28 / (rows.length - 1));
+    const span = Math.min(78, 26 * (n - 1));
+    for (let k = 0; k < n; k++) slots.push({ line, x, y: n === 1 ? 50 : 50 - span / 2 + k * span / (n - 1) });
+  });
+  return slots;
+}
+function lineCounts(f) {
+  const c = { DEF: 0, MID: 0, ATT: 0 };
+  for (const [line, n] of FORMATIONS[f]) c[line] += n;
+  return c;
+}
+/* "Presence" of a team in a third of the pitch (from that team's point of view).
+   Neighbouring lines help a little. Numerical superiority -> roll bonus. */
+function presence(c, zone) {
+  if (zone === 0) return c.DEF + 0.5 * c.MID;
+  if (zone === 1) return c.MID + 0.25 * (c.DEF + c.ATT);
+  return c.ATT + 0.5 * c.MID;
+}
+const SUP_BASE = [2, 0, -2];   // presence difference of 4-4-2 vs 4-4-2 per zone -> normalised to 0
+const SUP_SCALE = 0.8;
+
 const FIRST = ['Tommy', 'Jamie', 'Callum', 'Liam', 'Owen', 'Danny', 'Kieran', 'Ryan', 'Connor', 'Ben', 'Josh', 'Lewis', 'Harvey', 'Alfie', 'Reece', 'Sam', 'Mikey', 'Charlie', 'Ethan', 'Jack', 'Nathan', 'Dylan', 'Kai', 'Robbie', 'Elliot', 'Archie', 'Finn', 'Leo', 'Marcus', 'Theo', 'Aaron', 'Jordan'];
 const LAST = ['Smith', 'Jones', 'Walsh', 'Doyle', 'Carter', 'Hughes', 'Price', 'Barnes', 'Fletcher', 'Kenny', 'Morgan', 'Reid', 'Shaw', 'Harper', 'Quinn', 'Mason', 'Booth', 'Lowe', 'Dunn', 'Pike', 'Holt', 'Riley', 'Webb', 'Nolan', 'Cobb', 'Finch', 'Rowe', 'Sutton', 'Dale', 'Gill', 'Marsh', 'Platt', 'Varley', 'Ashworth', 'Brennan', 'Tully', 'Kemp', 'Oakes', 'Perry', 'Ward'];
 const OPPONENTS = ['Dockside Juniors', "St. Albert's U-14", 'Ironworks Colts', 'Northgate Rangers', 'Millbrook Wanderers', 'Canal Street Youth', 'Fernhill Athletic', 'Gasworks Boys'];
@@ -651,15 +820,15 @@ const TAG_KEYS = Object.keys(TAGS);
 const I18N = {
   en: {
     'doc.title': 'Youth Academy Manager',
-    'nav.office': 'Office', 'nav.squad': 'Squad', 'nav.match': 'Match', 'nav.matchday': 'Match Day',
+    'nav.office': 'Office', 'nav.squad': 'Squad', 'nav.tactics': 'Tactics', 'nav.match': 'Match', 'nav.matchday': 'Match Day',
     'nav.notebook': 'Notebook', 'nav.notebookLocked': 'Notebook (locked)',
     'ui.start': 'Start', 'ui.ok': 'OK', 'ui.close': 'Close', 'ui.min': 'Minimize',
     'ui.newAcademy': 'New Academy (wipe save)', 'ui.fxOn': 'Screen effects: ON', 'ui.fxOff': 'Screen effects: OFF',
     'ui.switchLang': 'Язык: Русский', 'ui.lang': 'Switch to Russian',
     'office.title': 'COACH.EXE — Office', 'office.sub': 'Youth Academy · Sunday League, Division 3',
-    'office.memo': '<li>Ratings are hidden. Watch the log and trust your eyes.</li><li>After the match give lads a ROLE in the Notebook. It changes how they play, for better or worse.</li><li>During the match, shout from the touchline: Attack / Defend / Balanced.</li><li>Rotate the squad: anyone starting under 50% energy plays at half strength.</li>',
+    'office.memo': '<li>Ratings are hidden. Watch the radar and the log, trust your eyes.</li><li>Pick a formation on the Tactics board: numbers in a line win that third of the pitch.</li><li>After the match give lads a ROLE in the Notebook. It changes how they play.</li><li>Shout from the touchline and rotate the squad: under 50% energy = half strength.</li>',
     'office.toSquad': 'Squad Sheet', 'office.toMatch': 'Go to Match Day &#9656;',
-    'office.fixture': 'Fixture', 'office.record': 'Record', 'office.notes': 'Roles', 'office.pitch': 'Pitch', 'office.tired': 'Tired',
+    'office.fixture': 'Fixture', 'office.record': 'Record', 'office.notes': 'Roles', 'office.pitch': 'Pitch', 'office.tired': 'Tired', 'office.formation': 'Formation',
     'office.recordVal': 'W{w} D{d} L{l} &nbsp;(GF {gf} / GA {ga})', 'office.tagsWritten': '{n} roles given',
     'office.tiredVal': '{n} of {t} under 50%',
     'office.live': 'MATCH IN PROGRESS', 'office.pitchStates': ['Waterlogged', 'Heavy', 'Muddy', 'Soaked'],
@@ -667,22 +836,28 @@ const I18N = {
     'squad.title': 'SQUAD.DBF — Locker Room', 'squad.name': 'Name', 'squad.pos': 'Pos', 'squad.energy': 'Energy', 'squad.role': 'Role',
     'squad.xi': 'STARTING XI', 'squad.bench': 'BENCH',
     'squad.out': 'Sub Out ↓', 'squad.in': 'Sub In ↑', 'squad.swap': '⇄ Swap', 'squad.cancel': 'Cancel',
-    'squad.none': '— no role —', 'squad.hidden': 'Ratings: hidden', 'squad.remove': 'Remove role',
+    'squad.none': '— no role —', 'squad.hidden': 'Ratings: hidden', 'squad.remove': 'Remove role', 'squad.oop': 'plays {l} (−15%)',
     'squad.status': '{n} tired in the XI (stats ×0.5)', 'squad.pick': '{name} selected. Now pick a player from the other group.',
     'squad.locked': 'Lineup is locked during the match.',
     'squad.err.gk': 'The starting XI needs exactly one goalkeeper.',
-    'squad.err.lines': 'The starting XI needs at least one defender, one midfielder and one forward.',
+    'tac.title': 'TACTICS.EXE — Tactics Board', 'tac.formation': 'Formation', 'tac.auto': 'Auto-arrange players',
+    'tac.strength': 'Line strength vs 4-4-2', 'tac.z0': 'Own third', 'tac.z1': 'Midfield', 'tac.z2': 'Final third',
+    'tac.hint': 'More players in a line = a bonus to every pass, dribble and tackle in that third. Click two players on the board to swap their places. A player outside his natural line plays at −15%.',
+    'tac.oop': '{n} ({p}) plays as {l}: −15%', 'tac.allGood': 'Everyone is in his natural line.',
+    'tac.status': '{f}: {d} DEF · {m} MID · {a} ATT', 'tac.locked': 'Tactics are locked during the match.',
+    'tac.pick': '{n} selected. Click another player to swap.', 'tac.gk': 'The goalkeeper stays in goal.',
     'match.title': 'MATCHDAY.EXE — Fixture #{n}', 'match.home': 'Home: {c}',
     'match.intro': '{a} vs {b}. Kick-off in the rain. Press Start when the kids are ready.',
-    'match.hintShouts': 'Tip: the shout buttons under the log change our mentality at any time.',
+    'match.hintShouts': 'Tip: shouts and speed can be changed at any time during the match.',
     'match.tiredWarn': 'Tired legs in the XI: {n}. Their stats are halved. Rotate on the Squad screen?',
+    'match.oopWarn': 'Out of position: {n} (−15%).',
     'match.start': '&#9654; Start Match', 'match.inProgress': 'Match in progress…', 'match.next': 'Next Fixture &#9656;',
-    'match.ready': 'READY', 'match.slow': '● SHOT! SLOW-MO', 'match.medium': '▶ BUILD-UP…', 'match.fast': '▶▶▶ {ms}ms / min', 'match.ft': 'FULL-TIME',
+    'match.ready': 'READY', 'match.slow': '● HIGHLIGHT: SHOT!', 'match.run': '▶ {x}× speed', 'match.ft': 'FULL-TIME',
     'match.statusReady': 'Ready.', 'match.statusLive': 'Match in progress...',
     'match.endW': 'Full-time: a win. The Notebook is now open.', 'match.endD': 'Full-time: a draw. The Notebook is now open.', 'match.endL': 'Full-time: a defeat. The Notebook is now open.',
     'period.pre': 'PRE', 'period.h1': '1ST', 'period.h2': '2ND', 'period.ft': 'FT',
-    'zone.0': 'OUR THIRD', 'zone.1': 'MIDFIELD', 'zone.2': 'THEIR THIRD',
-    'match.ball': 'Ball', 'match.poss': 'Possession', 'match.ourStats': 'Our stats',
+    'match.ball': 'Ball', 'match.poss': 'Possession', 'match.forms': 'Formations', 'match.ourStats': 'Our stats', 'match.speedLbl': 'Sim speed',
+    'speed.1': '<b>1×</b>Normal', 'speed.2': '<b>2×</b>Fast', 'speed.5': '<b>5×</b>Skip',
     'shout.attack': '▲ ATTACK', 'shout.defend': '▼ DEFEND', 'shout.balanced': '■ BALANCED',
     'shout.attackTip': '+3 to our attacking rolls, −3 to our defending rolls',
     'shout.defendTip': '+3 to our defending rolls, −3 to our attacking rolls',
@@ -708,15 +883,15 @@ const I18N = {
   },
   ru: {
     'doc.title': 'Менеджер детской академии',
-    'nav.office': 'Кабинет', 'nav.squad': 'Состав', 'nav.match': 'Матч', 'nav.matchday': 'День матча',
+    'nav.office': 'Кабинет', 'nav.squad': 'Состав', 'nav.tactics': 'Тактика', 'nav.match': 'Матч', 'nav.matchday': 'День матча',
     'nav.notebook': 'Блокнот', 'nav.notebookLocked': 'Блокнот (закрыт)',
     'ui.start': 'Пуск', 'ui.ok': 'ОК', 'ui.close': 'Закрыть', 'ui.min': 'Свернуть',
     'ui.newAcademy': 'Новая академия (сброс)', 'ui.fxOn': 'Эффекты экрана: ВКЛ', 'ui.fxOff': 'Эффекты экрана: ВЫКЛ',
     'ui.switchLang': 'Language: English', 'ui.lang': 'Переключить на английский',
     'office.title': 'COACH.EXE — Кабинет', 'office.sub': 'Детская академия · Воскресная лига, 3-й дивизион',
-    'office.memo': '<li>Рейтинги скрыты. Смотри протокол и верь своим глазам.</li><li>После матча дай парням РОЛЬ в Блокноте. Она меняет их игру — к добру или к худу.</li><li>Во время матча кричи с бровки: Атака / Оборона / Баланс.</li><li>Делай ротацию: кто выходит с энергией ниже 50% — играет вполсилы.</li>',
+    'office.memo': '<li>Рейтинги скрыты. Смотри на радар и протокол, верь своим глазам.</li><li>Выбери схему на Тактической доске: численное преимущество в линии выигрывает эту треть поля.</li><li>После матча дай парням РОЛЬ в Блокноте. Она меняет их игру.</li><li>Кричи с бровки и делай ротацию: энергия ниже 50% — игра вполсилы.</li>',
     'office.toSquad': 'Список состава', 'office.toMatch': 'На матч &#9656;',
-    'office.fixture': 'Матч', 'office.record': 'Итоги', 'office.notes': 'Роли', 'office.pitch': 'Поле', 'office.tired': 'Уставшие',
+    'office.fixture': 'Матч', 'office.record': 'Итоги', 'office.notes': 'Роли', 'office.pitch': 'Поле', 'office.tired': 'Уставшие', 'office.formation': 'Схема',
     'office.recordVal': 'В{w} Н{d} П{l} &nbsp;(забито {gf} / пропущено {ga})', 'office.tagsWritten': 'ролей назначено: {n}',
     'office.tiredVal': '{n} из {t} ниже 50%',
     'office.live': 'ИДЁТ МАТЧ', 'office.pitchStates': ['Залито водой', 'Тяжёлое', 'Грязное', 'Раскисшее'],
@@ -724,22 +899,28 @@ const I18N = {
     'squad.title': 'SQUAD.DBF — Раздевалка', 'squad.name': 'Имя', 'squad.pos': 'Поз.', 'squad.energy': 'Энергия', 'squad.role': 'Роль',
     'squad.xi': 'ОСНОВНОЙ СОСТАВ', 'squad.bench': 'ЗАПАС',
     'squad.out': 'Убрать ↓', 'squad.in': 'Выпустить ↑', 'squad.swap': '⇄ Заменить', 'squad.cancel': 'Отмена',
-    'squad.none': '— без роли —', 'squad.hidden': 'Рейтинги: скрыты', 'squad.remove': 'Убрать роль',
+    'squad.none': '— без роли —', 'squad.hidden': 'Рейтинги: скрыты', 'squad.remove': 'Убрать роль', 'squad.oop': 'играет {l} (−15%)',
     'squad.status': 'Уставших в основе: {n} (параметры ×0.5)', 'squad.pick': 'Выбран {name}. Теперь выберите игрока из другой группы.',
     'squad.locked': 'Во время матча состав заблокирован.',
     'squad.err.gk': 'В основе должен быть ровно один вратарь.',
-    'squad.err.lines': 'В основе нужен хотя бы один защитник, один полузащитник и один нападающий.',
+    'tac.title': 'TACTICS.EXE — Тактическая доска', 'tac.formation': 'Схема', 'tac.auto': 'Расставить автоматически',
+    'tac.strength': 'Сила линий относительно 4-4-2', 'tac.z0': 'Своя треть', 'tac.z1': 'Центр поля', 'tac.z2': 'Чужая треть',
+    'tac.hint': 'Больше игроков в линии — бонус к каждому пасу, обводке и отбору в этой трети поля. Щёлкни двух игроков на доске, чтобы поменять их местами. Игрок не в своей линии теряет 15%.',
+    'tac.oop': '{n} ({p}) играет как {l}: −15%', 'tac.allGood': 'Все игроки в своих линиях.',
+    'tac.status': '{f}: защ {d} · пз {m} · нап {a}', 'tac.locked': 'Во время матча тактика заблокирована.',
+    'tac.pick': 'Выбран {n}. Щёлкни другого игрока для обмена.', 'tac.gk': 'Вратарь остаётся в воротах.',
     'match.title': 'MATCHDAY.EXE — Матч №{n}', 'match.home': 'Хозяева: {c}',
     'match.intro': '{a} — {b}. Стартовый свисток под дождём. Жми «Начать», когда ребята готовы.',
-    'match.hintShouts': 'Подсказка: кнопки под протоколом меняют настрой команды в любой момент.',
+    'match.hintShouts': 'Подсказка: настрой и скорость можно менять в любой момент матча.',
     'match.tiredWarn': 'Уставшие в основе: {n}. Их параметры урезаны вдвое. Может, ротация в Составе?',
+    'match.oopWarn': 'Не на своей позиции: {n} (−15%).',
     'match.start': '&#9654; Начать матч', 'match.inProgress': 'Идёт матч…', 'match.next': 'Следующий матч &#9656;',
-    'match.ready': 'ГОТОВО', 'match.slow': '● УДАР! ЗАМЕДЛЕНИЕ', 'match.medium': '▶ АТАКА РАЗВИВАЕТСЯ…', 'match.fast': '▶▶▶ {ms} мс / мин', 'match.ft': 'МАТЧ ОКОНЧЕН',
+    'match.ready': 'ГОТОВО', 'match.slow': '● МОМЕНТ: УДАР!', 'match.run': '▶ скорость {x}×', 'match.ft': 'МАТЧ ОКОНЧЕН',
     'match.statusReady': 'Готово.', 'match.statusLive': 'Идёт матч...',
     'match.endW': 'Финальный свисток: победа. Блокнот открыт.', 'match.endD': 'Финальный свисток: ничья. Блокнот открыт.', 'match.endL': 'Финальный свисток: поражение. Блокнот открыт.',
     'period.pre': 'ДО', 'period.h1': '1-Й', 'period.h2': '2-Й', 'period.ft': 'КОН',
-    'zone.0': 'НАША ТРЕТЬ', 'zone.1': 'ЦЕНТР ПОЛЯ', 'zone.2': 'ИХ ТРЕТЬ',
-    'match.ball': 'Мяч', 'match.poss': 'Владение', 'match.ourStats': 'Наша статистика',
+    'match.ball': 'Мяч', 'match.poss': 'Владение', 'match.forms': 'Схемы', 'match.ourStats': 'Наша статистика', 'match.speedLbl': 'Скорость',
+    'speed.1': '<b>1×</b>Обычная', 'speed.2': '<b>2×</b>Быстро', 'speed.5': '<b>5×</b>Пропуск',
     'shout.attack': '▲ АТАКА', 'shout.defend': '▼ ОБОРОНА', 'shout.balanced': '■ БАЛАНС',
     'shout.attackTip': '+3 к нашим броскам в атаке, −3 в обороне',
     'shout.defendTip': '+3 к нашим броскам в обороне, −3 в атаке',
@@ -822,6 +1003,7 @@ class Lang {
   name(full) { return this.code === 'ru' ? full.split(' ').map(w => RU_NAMES[w] || w).join(' ') : full; }
   team(n) { return this.code === 'ru' ? (RU_TEAMS[n] || n) : n; }
   pos(p) { return POS_LABEL[this.code][p] || p; }
+  line(l) { return this.pos(LINE_POS[l]); }
   tag(key) { return TAGS[key] ? TAGS[key][this.code][0] : key; }
   tagDesc(key) { return TAGS[key] ? TAGS[key][this.code][1] : ''; }
   locale() { return this.code === 'ru' ? 'ru-RU' : 'en-GB'; }
@@ -832,10 +1014,11 @@ const L = new Lang();
    PLAYER
    ========================================================= */
 class Player {
-  constructor({ id, name, position, attrs, tags, energy }) {
+  constructor({ id, name, position, attrs, tags, energy, number }) {
     this.id = id;
     this.name = name;
     this.position = position;
+    this.number = number;
     this.attrs = attrs;              // HIDDEN — never rendered
     if (tags) {                      // only the academy squad carries tags + energy
       this.tags = tags;
@@ -844,18 +1027,19 @@ class Player {
   }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
 
-  static generate(id, position, usedSurnames, mod = 0, withTags = false) {
+  static generate(id, position, usedSurnames, mod = 0, withTags = false, number = 0) {
     let last; let guard = 0;
     do { last = pick(LAST); } while (usedSurnames.has(last) && guard++ < 200);
     usedSurnames.add(last);
     const attrs = {};
     for (const a of ATTRS) { const [lo, hi] = PROFILES[position][a]; attrs[a] = clamp(rnd(lo, hi) + mod, 1, 20); }
-    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, tags: withTags ? [] : undefined });
+    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, number, tags: withTags ? [] : undefined });
   }
 }
 
 /* =========================================================
    GAME STATE
+   lineup[i] is the player in formation slot i (slot 0 = goalkeeper).
    ========================================================= */
 class GameState {
   static KEY = 'yam_save_v1';
@@ -869,9 +1053,11 @@ class GameState {
 
   newAcademy() {
     this.clubName = CLUB_NAME;
+    this.formation = '4-4-2';
     const used = new Set();
-    this.squad = [...FORMATION, ...BENCH].map((pos, i) => Player.generate(`a${i}`, pos, used, 0, true));
+    this.squad = SQUAD_POS.map((pos, i) => Player.generate(`a${i}`, pos, used, 0, true, i + 1));
     this.lineup = this.squad.slice(0, 11).map(p => p.id);
+    this.autoArrange();
     this.record = { w: 0, d: 0, l: 0, gf: 0, ga: 0 };
     this.fixture = 1;
     this.save();
@@ -880,9 +1066,11 @@ class GameState {
   makeOpponent() {
     const used = new Set(this.squad.map(p => p.surname));
     const strength = rnd(-2, 2);
+    const formation = pick(FORMATION_KEYS);
     return {
       name: OPPONENTS[(this.fixture - 1) % OPPONENTS.length],
-      players: FORMATION.map((pos, i) => Player.generate(`b${this.fixture}_${i}`, pos, used, strength, false)),
+      formation,
+      players: formationSlots(formation).map((s, i) => Player.generate(`b${this.fixture}_${i}`, LINE_POS[s.line], used, strength, false, i + 1)),
     };
   }
 
@@ -890,35 +1078,67 @@ class GameState {
   isStarter(id) { return this.lineup.includes(id); }
   starters() { return this.lineup.map(id => this.player(id)); }
   bench() { return this.squad.filter(p => !this.isStarter(p.id)); }
+  slots() { return formationSlots(this.formation); }
+  slotLine(id) { const i = this.lineup.indexOf(id); return i < 0 ? null : this.slots()[i].line; }
+  outOfPosition() {
+    const slots = this.slots();
+    return this.starters().map((p, i) => ({ p, line: slots[i].line })).filter(({ p, line }) => NATURAL_LINE[p.position] !== line);
+  }
 
-  static lineupError(players) {
-    const n = pos => players.filter(p => p.position === pos).length;
-    if (n('GK') !== 1) return 'gk';
-    if (!n('DEF') || !n('MID') || !n('FWD')) return 'lines';
+  static gkError(players) { return players.filter(p => p.position === 'GK').length !== 1 ? 'gk' : null; }
+
+  /** Put the GK in slot 0, then fill each slot with the best natural fit (ties: higher energy). */
+  autoArrange() {
+    const slots = this.slots();
+    const pool = this.starters();
+    const gk = pool.find(p => p.position === 'GK') || pool[0];
+    const rest = pool.filter(p => p !== gk).sort((a, b) => b.energy - a.energy);
+    const out = [gk.id];
+    const free = [...rest];
+    const assigned = new Array(slots.length).fill(null);
+    // pass 1: exact matches
+    slots.forEach((s, i) => {
+      if (i === 0) return;
+      const k = free.findIndex(p => NATURAL_LINE[p.position] === s.line);
+      if (k >= 0) assigned[i] = free.splice(k, 1)[0];
+    });
+    // pass 2: nearest line for the rest
+    slots.forEach((s, i) => {
+      if (i === 0 || assigned[i]) return;
+      free.sort((a, b) => Math.abs((LINE_IDX[NATURAL_LINE[a.position]] ?? 1) - LINE_IDX[s.line]) - Math.abs((LINE_IDX[NATURAL_LINE[b.position]] ?? 1) - LINE_IDX[s.line]));
+      assigned[i] = free.shift();
+    });
+    for (let i = 1; i < slots.length; i++) out.push(assigned[i].id);
+    this.lineup = out;
+  }
+
+  setFormation(f) {
+    if (!FORMATIONS[f]) return;
+    this.formation = f;
+    this.autoArrange();
+    this.save();
+  }
+
+  swapSlots(i, j) {
+    if (i === 0 || j === 0) return 'gk';
+    [this.lineup[i], this.lineup[j]] = [this.lineup[j], this.lineup[i]];
+    this.save();
     return null;
   }
 
-  /** Swap one starter with one bench player. Returns an error key or null. */
+  /** Substitution: bench player takes the starter's slot. Returns an error key or null. */
   swap(a, b) {
     const [s, bn] = this.isStarter(a) ? [a, b] : [b, a];
-    if (!this.isStarter(s) || this.isStarter(bn)) return 'lines';
+    if (!this.isStarter(s) || this.isStarter(bn)) return 'gk';
     const next = this.lineup.map(id => (id === s ? bn : id));
-    const err = GameState.lineupError(next.map(id => this.player(id)));
-    if (err) return err;
+    if (GameState.gkError(next.map(id => this.player(id)))) return 'gk';
     this.lineup = next;
     this.save();
     return null;
   }
 
-  /** One role per player: setting a tag replaces the previous one. */
-  setTag(id, tag) {
-    const p = this.player(id);
-    if (p && TAGS[tag]) { p.tags = [tag]; this.save(); }
-  }
-  removeTag(id, tag) {
-    const p = this.player(id);
-    if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); }
-  }
+  setTag(id, tag) { const p = this.player(id); if (p && TAGS[tag]) { p.tags = [tag]; this.save(); } }
+  removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
 
   applyFatigue(playedIds) {
     for (const p of this.squad) {
@@ -938,7 +1158,7 @@ class GameState {
 
   save() {
     try {
-      localStorage.setItem(GameState.KEY, JSON.stringify({ v: 2, clubName: this.clubName, squad: this.squad, lineup: this.lineup, record: this.record, fixture: this.fixture }));
+      localStorage.setItem(GameState.KEY, JSON.stringify({ v: 3, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup, record: this.record, fixture: this.fixture }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
   load() {
@@ -948,14 +1168,20 @@ class GameState {
       const d = JSON.parse(raw);
       if (!Array.isArray(d.squad) || d.squad.length < 11) return false;
       this.clubName = d.clubName || CLUB_NAME;
+      this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
       this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
       if (this.squad.length === 11) { // migrate v1 saves: add a bench
         const used = new Set(this.squad.map(p => p.surname));
-        BENCH.forEach((pos, i) => this.squad.push(Player.generate(`a${11 + i}`, pos, used, 0, true)));
+        SQUAD_POS.slice(11).forEach((pos, i) => this.squad.push(Player.generate(`a${11 + i}`, pos, used, 0, true)));
       }
+      // jersey numbers for older saves
+      const taken = new Set(this.squad.map(p => p.number).filter(Boolean));
+      let n = 1;
+      for (const p of this.squad) if (!p.number) { while (taken.has(n)) n++; p.number = n; taken.add(n); }
       const ok = Array.isArray(d.lineup) && d.lineup.length === 11 && d.lineup.every(id => this.player(id))
-        && !GameState.lineupError(d.lineup.map(id => this.player(id)));
+        && !GameState.gkError(d.lineup.map(id => this.player(id)));
       this.lineup = ok ? d.lineup : this.squad.slice(0, 11).map(p => p.id);
+      if (d.v !== 3 || this.player(this.lineup[0]).position !== 'GK') this.autoArrange();
       this.record = d.record || { w: 0, d: 0, l: 0, gf: 0, ga: 0 };
       this.fixture = d.fixture || 1;
       this.save();
@@ -975,81 +1201,102 @@ class GameState {
    MATCH ENGINE
    Zones are relative to the team in possession:
    0 = own defensive third, 1 = midfield, 2 = attacking third.
-   The opponent defending zone z stands in their own zone (2 - z).
-   Emits language-neutral log entries (template key + variables).
+   Who plays in a zone is decided by the FORMATION slot (DEF/MID/ATT line),
+   not by the player's natural position.
    ========================================================= */
 class MatchEngine {
-  static FAST = 50;     // ms per minute while the ball is in defence / midfield
-  static MEDIUM = 300;  // ms per minute while the ball is in the attacking third
-  static SLOW = 1000;   // ms per log line during a shot sequence (aim -> strike -> outcome)
+  static SPEED = { 1: 600, 2: 200, 5: 20 };  // ms per in-game minute
+  static HIGHLIGHT = 1200;                    // ms per beat of a shot sequence (aim -> strike -> outcome)
 
   constructor(home, away, hooks, opts = {}) {
-    this.sides = [
-      { name: home.name, players: home.players, user: true, score: 0 },
-      { name: away.name, players: away.players, user: false, score: 0 },
-    ];
+    this.sides = [MatchEngine.buildSide(home, true), MatchEngine.buildSide(away, false)];
     this.hooks = hooks;
     this.minute = 0;
     this.stats = new Map();
-    for (const s of this.sides) for (const p of s.players) this.stats.set(p.id, MatchEngine.blankStats());
+    this.lineOf = new Map();
+    for (const s of this.sides) for (const e of s.entries) { this.stats.set(e.p.id, MatchEngine.blankStats()); this.lineOf.set(e.p.id, e.line); }
     // Energy is checked once, at kick-off: under 50% => every hidden stat x0.5 for the whole match
     this.tired = new Set(home.players.filter(p => (p.energy ?? 100) < ENERGY.TIRED).map(p => p.id));
     this.mentality = opts.mentality || 'balanced';
+    this.speed = opts.speed || 1;
     this.sentOff = new Set();
     this.timer = null;
     this.delay = 0;
     this.pendingShot = null;
     this.hold = 0;
     this.boxBonus = 0;
+    this.started = false;
     this.finished = false;
     this.htLogged = false;
     this.possTicks = [0, 0];
+    this.ev = { kind: 'kickoff' };
+    this.seq = 0;
   }
 
+  static buildSide(team, user) {
+    const slots = formationSlots(team.formation);
+    return { name: team.name, formation: team.formation, user, score: 0, players: team.players,
+      entries: slots.map((s, i) => ({ ...s, p: team.players[i] })) };
+  }
   static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0 }; }
   st(p) { return this.stats.get(p.id); }
   active(side) { return this.sides[side].players.filter(p => !this.sentOff.has(p.id)); }
   inZone(side, zone) {
-    const list = this.active(side).filter(p => p.position === ZONE_POS[zone]);
-    return list.length ? list : this.active(side).filter(p => p.position !== 'GK');
+    const line = ZONE_LINE[zone];
+    const list = this.sides[side].entries.filter(e => e.line === line && !this.sentOff.has(e.p.id)).map(e => e.p);
+    return list.length ? list : this.active(side).filter(p => this.lineOf.get(p.id) !== 'GK');
   }
-  keeper(side) { return this.sides[side].players.find(p => p.position === 'GK'); }
+  keeper(side) { return this.sides[side].entries[0].p; }
+  isGK(p) { return this.lineOf.get(p.id) === 'GK'; }
   team(side) { return { team: this.sides[side].name }; }
   scoreVars() { return { h: this.team(0), x: this.sides[0].score, y: this.sides[1].score, a: this.team(1) }; }
+  setEv(ev) { this.ev = ev; this.seq++; }
 
-  /* ---------- the maths behind tags, fatigue and shouts ---------- */
+  /* ---------- the maths: tags, fatigue, position, shouts, numerical superiority ---------- */
   eff(p, attr) {
     let v = p.attrs[attr];
     if (this.tired.has(p.id)) v *= 0.5;
+    if (NATURAL_LINE[p.position] !== this.lineOf.get(p.id)) v *= OUT_OF_POSITION;
     const t = p.tags || [];
     if (t.includes('Aggressive') && attr === 'Tackle') v *= 1.5;
     if (t.includes('Playmaker') && attr === 'Pass') v *= 1.5;
     if (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) v *= 1.5;
     return v;
   }
-  /** Coach shout modifier for a roll. role: 'atk' (we have the ball) or 'def' (we're defending). */
   mod(side, role) {
     if (side !== 0 || this.mentality === 'balanced') return 0;
     const pushing = this.mentality === 'attack';
     return (role === 'atk') === pushing ? 3 : -3;
   }
+  counts(side) {
+    const c = { DEF: 0, MID: 0, ATT: 0 };
+    for (const e of this.sides[side].entries) if (e.line !== 'GK' && !this.sentOff.has(e.p.id)) c[e.line]++;
+    return c;
+  }
+  /** Bonus for the team in possession `side` contesting zone z (red cards count too). */
+  sup(side, z) {
+    const diff = presence(this.counts(side), z) - presence(this.counts(1 - side), 2 - z);
+    return clamp((diff - SUP_BASE[z]) * SUP_SCALE, -4, 4);
+  }
   setMentality(m) {
     if (m === this.mentality) return;
     this.mentality = m;
-    if (!this.finished && this.timer) this.log('coach', 'eng.shout.' + m, {}, 0);
+    if (!this.finished && this.started) this.log('coach', 'eng.shout.' + m, {}, 0);
   }
+  setSpeedMode(s) { this.speed = s; if (this.started && !this.finished) this.updateSpeed(); }
 
   /* ---------- clock & pacing ---------- */
   start() {
+    this.started = true;
     this.kickoff(0);
     this.log('whistle', 'eng.kickoff', { a: this.team(0) }, 0);
     this.updateSpeed();
     this.hooks.onUpdate(this);
   }
+  /* Highlight pacing: a shot sequence is ALWAYS played slowly, whatever the chosen speed. */
   desiredDelay() {
-    if (this.pendingShot || this.hold > 0) return MatchEngine.SLOW;
-    if (this.zone === 2) return MatchEngine.MEDIUM;
-    return MatchEngine.FAST;
+    if (this.pendingShot || this.hold > 0) return MatchEngine.HIGHLIGHT;
+    return MatchEngine.SPEED[this.speed] ?? 600;
   }
   updateSpeed() {
     const d = this.desiredDelay();
@@ -1059,15 +1306,19 @@ class MatchEngine {
     this.timer = setInterval(() => this.tick(), d);
     this.hooks.onSpeed?.(d);
   }
+  get highlight() { return this.delay >= MatchEngine.HIGHLIGHT; }
   stop() { clearInterval(this.timer); this.timer = null; }
 
   tick() {
     if (this.finished) return;
     if (this.hold > 0) this.hold--;
-    if (this.pendingShot) {                 // shot sequence: one log line per slow beat
+    if (this.pendingShot) {
       const ps = this.pendingShot;
-      if (ps.phase === 1) { ps.phase = 2; this.log('shot', 'strike', { a: ps.shooter }, ps.side); }
-      else this.resolveShot();
+      if (ps.phase === 1) {
+        ps.phase = 2;
+        this.setEv({ kind: 'strike', a: ps.shooter, side: ps.side });
+        this.log('shot', 'strike', { a: ps.shooter }, ps.side);
+      } else this.resolveShot();
       this.afterAction();
       return;
     }
@@ -1104,6 +1355,7 @@ class MatchEngine {
     this.zone = 1;
     this.carrier = pick(this.inZone(side, 1));
     this.boxBonus = 0;
+    this.setEv({ kind: 'kickoff' });
   }
   turnover(newCarrier, zone) {
     this.poss = 1 - this.poss;
@@ -1115,11 +1367,11 @@ class MatchEngine {
   /* ---------- decision (tags bend the AI) ---------- */
   chooseAction() {
     const c = this.carrier;
-    if (c.position === 'GK') return 'pass';
+    if (this.isGK(c)) return 'pass';
     const w = { ...[
       { pass: 80, dribble: 20, shoot: 0 },
       { pass: 60, dribble: 32, shoot: 8 },
-      c.position === 'FWD' ? { pass: 28, dribble: 22, shoot: 50 } : { pass: 38, dribble: 27, shoot: 35 },
+      this.lineOf.get(c.id) === 'ATT' ? { pass: 28, dribble: 22, shoot: 50 } : { pass: 38, dribble: 27, shoot: 35 },
     ][this.zone] };
     const t = c.tags || [];
     if (t.includes('Playmaker')) { w.pass *= 2; w.dribble *= 0.4; }
@@ -1137,50 +1389,53 @@ class MatchEngine {
     if (action === 'pass') this.doPass();
     else if (action === 'dribble') this.doDribble();
     else this.startShot(this.carrier, false);
-    if (!this.pendingShot && Math.random() < 0.05) this.log('flavor', 'flavor', {}, -1);
+    if (!this.pendingShot && Math.random() < 0.04) this.log('flavor', 'flavor', {}, -1);
   }
 
-  /* ---------- actions: (attacker stat + rand*10) vs (defender stat + rand*10) ---------- */
+  /* ---------- actions: (attacker stat + rand*10) vs (defender stat + rand*10) + modifiers ---------- */
   doPass() {
     const c = this.carrier, side = this.poss, opp = 1 - side, z = this.zone;
     let tz;
-    if (c.position === 'GK') tz = Math.random() < 0.7 ? 0 : 1;
+    if (this.isGK(c)) tz = Math.random() < 0.7 ? 0 : 1;
     else if (z === 0) tz = Math.random() < 0.65 ? 1 : 0;
     else if (z === 1) tz = Math.random() < 0.6 ? 2 : 1;
     else tz = Math.random() < 0.7 ? 2 : 1;
     let mates = this.inZone(side, tz).filter(p => p !== c);
-    if (!mates.length) { tz = 1; mates = this.active(side).filter(p => p !== c && p.position !== 'GK'); }
+    if (!mates.length) { tz = 1; mates = this.active(side).filter(p => p !== c && !this.isGK(p)); }
     const recv = pick(mates);
     const def = pick(this.inZone(opp, 2 - tz));
     const forward = tz > z;
 
-    const atk = this.eff(c, 'Pass') + Math.random() * 10 + 3 - (forward ? 2 : 0) + (c.position === 'GK' ? 2 : 0) + this.mod(side, 'atk');
+    const atk = this.eff(c, 'Pass') + Math.random() * 10 + 3 - (forward ? 2 : 0) + (this.isGK(c) ? 2 : 0) + this.mod(side, 'atk') + this.sup(side, tz);
     const dfn = this.eff(def, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def');
     const vars = { a: c, b: recv, d: def };
 
     if (atk >= dfn) {
       this.st(c).passOk++;
-      this.carrier = recv; this.zone = recv.position === 'GK' ? 0 : tz;
-      this.log('', c.position === 'GK' ? 'gkPass' : forward ? 'passFwd' : 'passOk', vars, side);
+      this.carrier = recv; this.zone = tz;
+      this.setEv({ kind: 'pass', a: c, b: recv, d: def });
+      this.log('', this.isGK(c) ? 'gkPass' : forward ? 'passFwd' : 'passOk', vars, side);
     } else {
       this.st(c).passFail++;
       this.st(def).tackles++;
       this.log('turn', 'passFail', vars, side);
       this.turnover(def, 2 - tz);
+      this.setEv({ kind: 'intercept', a: c, b: recv, d: def });
     }
   }
 
   doDribble() {
     const c = this.carrier, side = this.poss, opp = 1 - side, z = this.zone;
     const def = pick(this.inZone(opp, 2 - z));
-    const atk = (this.eff(c, 'Dribble') + this.eff(c, 'Speed')) / 2 + Math.random() * 10 + 1 + this.mod(side, 'atk');
+    const atk = (this.eff(c, 'Dribble') + this.eff(c, 'Speed')) / 2 + Math.random() * 10 + 1 + this.mod(side, 'atk') + this.sup(side, z);
     const dfn = this.eff(def, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def');
     const vars = { a: c, d: def };
 
     if (atk >= dfn) {
       this.st(c).dribbleOk++;
       this.st(def).tacklesLost++;
-      if (z < 2) this.zone++; else this.boxBonus = 3; // already in the final third: better shooting angle
+      if (z < 2) this.zone++; else this.boxBonus = 3;
+      this.setEv({ kind: 'dribble', a: c, d: def });
       this.log('', 'drOk', vars, side);
       if ((def.tags || []).includes('Aggressive')) this.commitFoul(def, c, side);
     } else {
@@ -1188,6 +1443,7 @@ class MatchEngine {
       this.st(def).tackles++;
       this.log('turn', 'drFail', vars, side);
       this.turnover(def, 2 - z);
+      this.setEv({ kind: 'tackle', a: c, d: def });
     }
   }
 
@@ -1196,11 +1452,12 @@ class MatchEngine {
     const defSide = 1 - attSide;
     const s = this.st(def);
     s.yellow++;
+    this.setEv({ kind: 'foul', a: victim, d: def });
     this.log('foul', 'foul', { a: victim, d: def }, defSide);
-    this.hold = 1;
     if (s.yellow >= 2) {
       s.red = 1;
       this.sentOff.add(def.id);
+      this.hold = 1;
       this.log('red', 'red', { d: def, n: this.active(defSide).length }, defSide);
     }
     if (this.zone === 2 && Math.random() < 0.5) this.startShot(victim, true);
@@ -1212,13 +1469,13 @@ class MatchEngine {
     this.st(c).shots++;
     this.pendingShot = { shooter: c, side, long, freeKick, bonus: freeKick ? 1 : this.boxBonus, phase: 1 };
     this.boxBonus = 0;
+    this.setEv({ kind: 'aim', a: c, side });
     this.log('shot', freeKick ? 'fkAim' : long ? 'aimLong' : 'aim', { a: c }, side);
   }
 
   resolveShot() {
     const { shooter, side, long, bonus } = this.pendingShot;
     this.pendingShot = null;
-    this.hold = 1;   // let the outcome breathe for one slow beat
     const opp = 1 - side;
     const blocker = pick(this.inZone(opp, 0));
     const keeper = this.keeper(opp);
@@ -1228,6 +1485,7 @@ class MatchEngine {
       this.st(blocker).tackles++;
       this.log('turn', 'block', { d: blocker }, opp);
       this.turnover(blocker, 0);
+      this.setEv({ kind: 'block', d: blocker });
       return;
     }
     const atk = this.eff(shooter, 'Shoot') + Math.random() * 10 + bonus - (long ? 5 : 0) + this.mod(side, 'atk');
@@ -1240,14 +1498,18 @@ class MatchEngine {
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
       this.hooks.onGoal?.(side);
       this.kickoff(opp);
+      this.hold = 1;   // celebration beat
+      this.setEv({ kind: 'goal', side, a: shooter });
     } else if (atk < dfn - 7) {
       this.log('', 'wide', vars, side);
       this.turnover(keeper, 0);
+      this.setEv({ kind: 'wide', side, a: shooter });
     } else {
       this.st(shooter).onTarget++;
       this.st(keeper).saves++;
       this.log('', 'save', vars, opp);
       this.turnover(keeper, 0);
+      this.setEv({ kind: 'save', k: keeper });
     }
   }
 
@@ -1264,6 +1526,106 @@ class MatchEngine {
 }
 
 /* =========================================================
+   RADAR VIEW — 2D pitch with player dots (Subbuteo / classic FM radar)
+   Coordinates are % of the pitch. Home attacks left -> right.
+   ========================================================= */
+class RadarView {
+  static LINES = `
+    <div class="pl-line half"></div><div class="pl-line third t1"></div><div class="pl-line third t2"></div>
+    <div class="pl-line circle"></div><div class="pl-line spot"></div>
+    <div class="pl-line box l"></div><div class="pl-line box r"></div>
+    <div class="pl-line six l"></div><div class="pl-line six r"></div>
+    <div class="pl-goal l"></div><div class="pl-goal r"></div>`;
+
+  constructor(el, { labels = false, onDotClick = null } = {}) {
+    this.el = el;
+    this.labels = labels;
+    this.onDotClick = onDotClick;
+    this.dots = new Map();
+    this.ball = null;
+    this.lastSeq = -1;
+  }
+
+  /** sides: [{ entries: [{p, x, y, line}] }, ...]  (index 0 = home/blue, 1 = away/red) */
+  setup(sides, { board = false } = {}) {
+    this.el.innerHTML = RadarView.LINES;
+    this.dots.clear();
+    this.lastSeq = -1;
+    sides.forEach((side, si) => side.entries.forEach((e, idx) => {
+      const d = document.createElement(this.onDotClick ? 'button' : 'div');
+      d.className = `pl ${si === 0 ? 'home' : 'away'}${e.line === 'GK' ? ' gk' : ''}`;
+      d.innerHTML = `<b>${e.p.number ?? idx + 1}</b>${this.labels ? `<span class="pl-nm">${esc(L.name(e.p.surname))}</span>` : ''}`;
+      d.title = `${L.name(e.p.name)} · ${L.line(e.line === 'GK' ? 'GK' : e.line)}`;
+      if (this.onDotClick) { d.type = 'button'; d.dataset.slot = idx; d.addEventListener('click', () => this.onDotClick(idx)); }
+      this.el.appendChild(d);
+      // base position (away mirrored); the tactics board spreads the shape over the whole pitch
+      const bx = board ? (e.line === 'GK' ? 5 : 5 + (e.x - 5) * 1.9) : e.x;
+      const base = si === 0 ? { x: bx, y: e.y } : { x: 100 - bx, y: 100 - e.y };
+      this.dots.set(e.p.id, { el: d, base, side: si });
+      this.place(d, base.x, base.y);
+    }));
+    if (!board) {
+      this.ball = document.createElement('div');
+      this.ball.className = 'ball';
+      this.el.appendChild(this.ball);
+      this.place(this.ball, 50, 50);
+    } else this.ball = null;
+  }
+
+  place(el, x, y) { el.style.left = x + '%'; el.style.top = y + '%'; }
+  setTransition(sec) { this.el.style.setProperty('--mv', sec + 's'); }
+  select(id) { for (const [pid, d] of this.dots) d.el.classList.toggle('sel', pid === id); }
+
+  /** Called after every engine update. Recomputes positions only when a new event happened. */
+  render(eng) {
+    if (eng.seq === this.lastSeq) return;
+    this.lastSeq = eng.seq;
+    const ev = eng.ev || {};
+    const dir = eng.poss === 0 ? 1 : -1;
+    const carrier = eng.carrier;
+    const cd = this.dots.get(carrier.id);
+
+    // 1) where is the ball?
+    let bx, by;
+    if (ev.kind === 'kickoff') { bx = 50; by = 50; }
+    else if (ev.kind === 'goal') { bx = ev.side === 0 ? 100.6 : -0.6; by = 46 + Math.random() * 8; }
+    else if (ev.kind === 'wide') { bx = ev.side === 0 ? 103 : -3; by = Math.random() < 0.5 ? 30 : 70; }
+    else if (eng.isGK(carrier)) { bx = eng.poss === 0 ? 7 : 93; by = 50 + jit(6); }
+    else {
+      const zx = [20, 50, 78][eng.zone] + jit(7);
+      bx = eng.poss === 0 ? zx : 100 - zx;
+      by = clamp((cd ? cd.base.y : 50) * 0.7 + 15 + jit(6), 8, 92);
+      if (ev.kind === 'aim' || ev.kind === 'strike') bx = eng.poss === 0 ? Math.max(bx, 70) : Math.min(bx, 30);
+    }
+    if (ev.kind === 'strike') { const gx = ev.side === 0 ? 97 : 3; bx = lerp(bx, gx, 0.45); by = lerp(by, 50, 0.4); }
+
+    // 2) whole teams slide with the ball (block shifting)
+    const shift = clamp((clamp(bx, 0, 100) - 50) * 0.4, -14, 14);
+    for (const [id, d] of this.dots) {
+      if (eng.sentOff.has(id)) { d.el.classList.add('off'); continue; }
+      const gk = eng.isGK({ id });
+      let x = d.base.x + (gk ? shift * 0.12 : shift) + jit(1.5);
+      let y = d.base.y + jit(1.5);
+      x = gk ? clamp(x, 2, 98) : clamp(x, 6, 94);
+      d.x = x; d.y = y;
+    }
+    // 3) involved players react
+    const towards = (p, t, off = 0) => { const d = p && this.dots.get(p.id); if (!d || eng.sentOff.has(p.id)) return; d.x = lerp(d.x, bx - off, t); d.y = lerp(d.y, by, t); };
+    if (ev.d) towards(ev.d, ev.kind === 'dribble' || ev.kind === 'pass' ? 0.55 : 0.85, -dir * 2);
+    if (ev.kind === 'intercept' && ev.b) towards(ev.b, 0.35);
+    if (cd && ev.kind !== 'goal' && ev.kind !== 'wide') { cd.x = bx - dir * 1.4; cd.y = by + 1.2; }
+    if (ev.kind === 'goal' || ev.kind === 'wide') towards(ev.a, 0.3);
+
+    for (const [id, d] of this.dots) {
+      if (eng.sentOff.has(id)) continue;
+      this.place(d.el, d.x, d.y);
+      d.el.classList.toggle('has', id === carrier.id && ev.kind !== 'goal' && !eng.finished);
+    }
+    this.place(this.ball, bx, by);
+  }
+}
+
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -1272,20 +1634,32 @@ class UIController {
     this.engine = null;
     this.view = 'office';
     this.logEntries = [];
-    this.selected = null;          // squad screen: player picked for a swap
+    this.selected = null;        // squad screen: player picked for a substitution
+    this.selSlot = null;         // tactics board: slot picked for a swap
     this.mentality = 'balanced';
+    this.speed = 1;
+    try { const s = Number(localStorage.getItem('yam_speed')); if (MatchEngine.SPEED[s]) this.speed = s; } catch (e) {}
     this.pitchIdx = rnd(0, 3);
     this.$ = id => document.getElementById(id);
+    this.radar = new RadarView(this.$('radar'));
+    this.board = new RadarView(this.$('tac-board'), { labels: true, onDotClick: i => this.onBoardClick(i) });
     this.bind();
     this.applyStatic();
+    this.fillFormations();
+    this.renderAll();
+    this.prepareMatch();
+    this.tickClock(); setInterval(() => this.tickClock(), 15000);
+    this.show('office');
+  }
+
+  renderAll() {
     this.renderOffice();
     this.renderSquad();
-    this.prepareMatch();
+    this.renderTactics();
     this.renderNotebook();
     this.syncLocks();
     this.renderShouts();
-    this.tickClock(); setInterval(() => this.tickClock(), 15000);
-    this.show('office');
+    this.renderSpeedBtns();
   }
 
   /* ---------- language ---------- */
@@ -1303,17 +1677,20 @@ class UIController {
   setLang(code) {
     L.set(code);
     this.applyStatic();
-    this.renderOffice();
-    this.renderSquad();
+    this.renderAll();
     this.renderMatchChrome();
-    if (this.engine) this.renderLive(this.engine); else this.renderTeamStats(MatchEngine.blankStats());
+    if (this.engine) { this.renderLive(this.engine); this.relabelRadar(); } else this.prepareRadar();
     this.rerenderLog();
-    this.renderNotebook();
-    this.syncLocks();
     this.tickClock();
   }
 
-  /** Turns a template variable into display text in the current language. */
+  relabelRadar() {
+    for (const s of this.engine.sides) for (const e of s.entries) {
+      const d = this.radar.dots.get(e.p.id);
+      if (d) d.el.title = `${L.name(e.p.name)} · ${L.line(e.line)}`;
+    }
+  }
+
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
@@ -1349,14 +1726,17 @@ class UIController {
     this.$('btn-reset').addEventListener('click', () => {
       this.toggleStart(false);
       if (this.engine && !this.engine.finished) { this.alert(L.t('dlg.finishFirst'), L.t('dlg.academy')); return; }
-      this.state.reset(); this.engine = null; this.selected = null;
-      this.renderOffice(); this.renderSquad(); this.prepareMatch(); this.renderNotebook(); this.syncLocks();
+      this.state.reset(); this.engine = null; this.selected = null; this.selSlot = null;
+      this.renderAll(); this.prepareMatch();
       this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
     });
     const closeDlg = () => this.$('dlg').classList.remove('open');
     this.$('dlg-ok').addEventListener('click', closeDlg);
     this.$('dlg-x').addEventListener('click', closeDlg);
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDlg(); this.toggleStart(false); this.selected = null; this.renderSquad(); } });
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      closeDlg(); this.toggleStart(false); this.selected = null; this.selSlot = null; this.renderSquad(); this.renderTactics();
+    });
 
     // Coach shouts
     document.querySelectorAll('[data-shout]').forEach(b => b.addEventListener('click', () => {
@@ -1364,6 +1744,25 @@ class UIController {
       if (this.engine && !this.engine.finished) this.engine.setMentality(this.mentality);
       this.renderShouts();
     }));
+    // Simulation speed
+    document.querySelectorAll('[data-speed]').forEach(b => b.addEventListener('click', () => {
+      this.speed = Number(b.dataset.speed);
+      try { localStorage.setItem('yam_speed', this.speed); } catch (e) {}
+      if (this.engine && !this.engine.finished) this.engine.setSpeedMode(this.speed);
+      this.renderSpeedBtns();
+    }));
+    // Tactics
+    this.$('formation').addEventListener('change', e => {
+      if (this.engine && !this.engine.finished) { e.target.value = this.state.formation; return; }
+      this.state.setFormation(e.target.value);
+      this.selSlot = null;
+      this.afterLineupChange();
+    });
+    this.$('btn-auto').addEventListener('click', () => {
+      if (this.engine && !this.engine.finished) return;
+      this.state.autoArrange(); this.state.save(); this.selSlot = null;
+      this.afterLineupChange();
+    });
 
     // Squad: remove role / substitutions
     this.$('squad-body').addEventListener('click', e => {
@@ -1380,6 +1779,13 @@ class UIController {
     });
   }
 
+  afterLineupChange() {
+    this.renderTactics();
+    this.renderSquad();
+    this.renderOffice();
+    if (!this.engine) this.prepareMatch();
+  }
+
   toggleStart(force) {
     const m = this.$('startmenu');
     m.classList.toggle('open', force ?? !m.classList.contains('open'));
@@ -1391,7 +1797,7 @@ class UIController {
       return;
     }
     this.view = view;
-    const scenes = { office: 'scene-office', squad: 'scene-squad', match: 'scene-match', notes: 'scene-notes' };
+    const scenes = { office: 'scene-office', squad: 'scene-squad', tactics: 'scene-tactics', match: 'scene-match', notes: 'scene-notes' };
     for (const [v, id] of Object.entries(scenes)) this.$(id).classList.toggle('active', v === view);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
@@ -1419,19 +1825,21 @@ class UIController {
     this.$('office-date').textContent = d.toLocaleDateString(L.locale(), { weekday: 'short', day: 'numeric', month: 'short' });
   }
 
+  get live() { return !!(this.engine && !this.engine.finished); }
+
   /* ---------- OFFICE ---------- */
   renderOffice() {
     const s = this.state, r = s.record;
-    const live = this.engine && !this.engine.finished;
     const tired = s.squad.filter(p => p.energy < ENERGY.TIRED).length;
     this.$('club-name').textContent = L.team(s.clubName);
     this.$('office-kv').innerHTML = `
-      <dt>${L.t('office.fixture')}</dt><dd>#${pad2(s.fixture)} &middot; ${esc(L.team(s.opponent.name))}</dd>
+      <dt>${L.t('office.fixture')}</dt><dd>#${pad2(s.fixture)} &middot; ${esc(L.team(s.opponent.name))} (${s.opponent.formation})</dd>
+      <dt>${L.t('office.formation')}</dt><dd>${s.formation}</dd>
       <dt>${L.t('office.record')}</dt><dd>${L.t('office.recordVal', r)}</dd>
       <dt>${L.t('office.notes')}</dt><dd>${L.t('office.tagsWritten', { n: s.squad.filter(p => p.tags.length).length })}</dd>
       <dt>${L.t('office.tired')}</dt><dd${tired ? ' class="warn"' : ''}>${L.t('office.tiredVal', { n: tired, t: s.squad.length })}</dd>
-      <dt>${L.t('office.pitch')}</dt><dd>${live ? L.t('office.live') : L.t('office.pitchStates')[this.pitchIdx]}</dd>`;
-    this.$('office-status').textContent = live
+      <dt>${L.t('office.pitch')}</dt><dd>${this.live ? L.t('office.live') : L.t('office.pitchStates')[this.pitchIdx]}</dd>`;
+    this.$('office-status').textContent = this.live
       ? L.t('office.liveStatus', { h: L.team(s.clubName), x: this.engine.sides[0].score, y: this.engine.sides[1].score, a: L.team(this.engine.sides[1].name) })
       : L.t('office.rain');
   }
@@ -1439,7 +1847,7 @@ class UIController {
   /* ---------- SQUAD: energy, roles, substitutions (no hidden attributes rendered) ---------- */
   renderSquad() {
     const s = this.state;
-    const live = !!(this.engine && !this.engine.finished);
+    const live = this.live;
     if (live) this.selected = null;
     const byPos = (a, b) => POS_ORDER[a.position] - POS_ORDER[b.position];
     const selStarter = this.selected ? s.isStarter(this.selected) : null;
@@ -1450,8 +1858,10 @@ class UIController {
       const isSel = this.selected === p.id;
       const canSwap = this.selected && selStarter !== starter;
       const label = canSwap ? L.t('squad.swap') : isSel ? L.t('squad.cancel') : L.t(starter ? 'squad.out' : 'squad.in');
+      const line = starter ? s.slotLine(p.id) : null;
+      const oop = line && line !== 'GK' && NATURAL_LINE[p.position] !== line ? `<span class="oop">${L.t('squad.oop', { l: L.line(line) })}</span>` : '';
       return `<tr class="${isSel ? 'sel' : ''}${e < ENERGY.TIRED ? ' tired' : ''}">
-        <td class="nm">${esc(L.name(p.name))}</td>
+        <td class="nm"><span class="num">${p.number}</span>${esc(L.name(p.name))}${oop}</td>
         <td><span class="pos ${p.position}">${L.pos(p.position)}</span></td>
         <td><div class="energy ${cls}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' · ×0.5' : ''}</span></div></td>
         <td>${p.tags.length ? `<div class="tags">${p.tags.map(t => this.tagChip(t, p.id, !live)).join('')}</div>` : `<span class="empty">${L.t('squad.none')}</span>`}</td>
@@ -1459,8 +1869,8 @@ class UIController {
       </tr>`;
     };
     this.$('squad-body').innerHTML =
-      `<tr class="grp"><td colspan="5">${L.t('squad.xi')} (${s.lineup.length})</td></tr>` +
-      s.starters().sort(byPos).map(p => row(p, true)).join('') +
+      `<tr class="grp"><td colspan="5">${L.t('squad.xi')} · ${s.formation}</td></tr>` +
+      s.starters().map(p => row(p, true)).join('') +
       `<tr class="grp"><td colspan="5">${L.t('squad.bench')} (${s.bench().length})</td></tr>` +
       s.bench().sort(byPos).map(p => row(p, false)).join('');
 
@@ -1478,16 +1888,57 @@ class UIController {
       const err = s.swap(this.selected, id);
       this.selected = null;
       if (err) this.alert(L.t('squad.err.' + err), L.t('nav.squad'));
-      if (!this.engine) this.prepareMatch();   // refresh the pre-match fatigue warning
+      this.afterLineupChange();
     }
     this.renderSquad();
-    this.renderOffice();
   }
 
   tagChip(tag, id, removable) {
     const tone = TAGS[tag]?.tone || 'neutral';
     const x = removable ? `<button data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(L.t('squad.remove'))}" title="${esc(L.t('squad.remove'))}">&times;</button>` : '';
     return `<span class="tag ${tone}" title="${esc(L.tagDesc(tag))}">${esc(L.tag(tag))}${x}</span>`;
+  }
+
+  /* ---------- TACTICS ---------- */
+  fillFormations() {
+    this.$('formation').innerHTML = FORMATION_KEYS.map(f => `<option value="${f}">${f}</option>`).join('');
+  }
+
+  renderTactics() {
+    const s = this.state;
+    const sel = this.$('formation');
+    sel.value = s.formation;
+    sel.disabled = this.live;
+    this.$('btn-auto').disabled = this.live;
+
+    const c = lineCounts(s.formation), base = lineCounts('4-4-2');
+    this.$('tac-strength').innerHTML = [0, 1, 2].map(z => {
+      const own = presence(c, z), ref = presence(base, z);
+      const d = own - ref;
+      const cls = d > 0.01 ? 'ok' : d < -0.01 ? 'bad' : '';
+      return `<dt>${L.t('tac.z' + z)}</dt><dd class="${cls}">${own.toFixed(2)} (${d >= 0 ? '+' : ''}${d.toFixed(2)})</dd>`;
+    }).join('');
+
+    const oop = s.outOfPosition();
+    this.$('tac-warn').innerHTML = oop.length
+      ? oop.map(({ p, line }) => `<div class="w">${L.t('tac.oop', { n: esc(L.name(p.name)), p: L.pos(p.position), l: L.line(line) })}</div>`).join('')
+      : `<div class="okmsg">${L.t('tac.allGood')}</div>`;
+
+    this.board.setup([{ entries: s.slots().map((sl, i) => ({ ...sl, p: s.player(s.lineup[i]) })) }], { board: true });
+    if (this.selSlot != null) this.board.select(s.lineup[this.selSlot]);
+    this.$('tac-board').classList.toggle('locked', this.live);
+    this.$('tac-status').textContent = L.t('tac.status', { f: s.formation, d: c.DEF, m: c.MID, a: c.ATT });
+    this.$('tac-sel').textContent = this.live ? L.t('tac.locked')
+      : this.selSlot != null ? L.t('tac.pick', { n: L.name(s.player(s.lineup[this.selSlot]).name) }) : '';
+  }
+
+  onBoardClick(i) {
+    if (this.live) return;
+    if (i === 0) { this.alert(L.t('tac.gk'), L.t('nav.tactics')); this.selSlot = null; this.renderTactics(); return; }
+    if (this.selSlot == null) this.selSlot = i;
+    else if (this.selSlot === i) this.selSlot = null;
+    else { this.state.swapSlots(this.selSlot, i); this.selSlot = null; this.afterLineupChange(); return; }
+    this.renderTactics();
   }
 
   /* ---------- MATCH ---------- */
@@ -1498,6 +1949,23 @@ class UIController {
       b.setAttribute('aria-pressed', on);
     });
   }
+  renderSpeedBtns() {
+    document.querySelectorAll('[data-speed]').forEach(b => {
+      const on = Number(b.dataset.speed) === this.speed;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on);
+    });
+  }
+
+  homeTeam() { return { name: this.state.clubName, players: this.state.starters(), formation: this.state.formation }; }
+
+  /** Pre-match: both teams standing in their formations. */
+  prepareRadar() {
+    const home = MatchEngine.buildSide(this.homeTeam(), true);
+    const away = MatchEngine.buildSide(this.state.opponent, false);
+    this.radar.setup([home, away]);
+    this.radar.setTransition(0.5);
+  }
 
   prepareMatch() {
     this.$('sb-score').textContent = '0 - 0';
@@ -1505,7 +1973,6 @@ class UIController {
     this.$('sb-bar').style.width = '0%';
     this.$('sb-period').textContent = L.t('period.pre');
     this.$('carrier').textContent = '—'; this.$('poss').textContent = '—';
-    this.$('zones').querySelectorAll('div').forEach(d => d.classList.remove('on', 'them'));
     this.logEntries = [];
     this.$('log').innerHTML = '';
     const s = this.state;
@@ -1513,11 +1980,13 @@ class UIController {
     this.appendLog({ minute: 0, type: 'coach', key: 'match.hintShouts', vars: {}, side: -1, r: 0 });
     const tired = s.starters().filter(p => p.energy < ENERGY.TIRED);
     if (tired.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.tiredWarn', vars: { n: { list: tired } }, side: 0, r: 0 });
+    const oop = s.outOfPosition().map(o => o.p);
+    if (oop.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.oopWarn', vars: { n: { list: oop } }, side: 0, r: 0 });
+    this.prepareRadar();
     this.renderMatchChrome();
     this.renderTeamStats(MatchEngine.blankStats());
   }
 
-  /** Title, team names, start button, speed label and status bar — derived from match state. */
   renderMatchChrome() {
     const s = this.state, e = this.engine;
     const fixtureNo = e && e.finished ? s.fixture - 1 : s.fixture;
@@ -1525,15 +1994,16 @@ class UIController {
     this.$('match-fixture').textContent = L.t('match.home', { c: L.team(s.clubName) });
     this.$('sb-home').textContent = L.team(s.clubName).replace(' U-14', '');
     this.$('sb-away').textContent = L.team(s.opponent.name);
+    this.$('forms').textContent = `${e ? e.sides[0].formation : s.formation} vs ${s.opponent.formation}`;
     const btn = this.$('btn-start'), sp = this.$('speed'), st = this.$('match-status');
     let slow = false;
     if (!e) {
       btn.disabled = false; btn.innerHTML = L.t('match.start');
       sp.textContent = L.t('match.ready'); st.textContent = L.t('match.statusReady');
     } else if (!e.finished) {
-      slow = e.delay >= MatchEngine.SLOW;
+      slow = e.highlight;
       btn.disabled = true; btn.innerHTML = L.t('match.inProgress');
-      sp.textContent = slow ? L.t('match.slow') : e.delay >= MatchEngine.MEDIUM ? L.t('match.medium') : L.t('match.fast', { ms: e.delay });
+      sp.textContent = slow ? L.t('match.slow') : L.t('match.run', { x: e.speed });
       st.textContent = L.t('match.statusLive');
     } else {
       btn.disabled = false; btn.innerHTML = L.t('match.next');
@@ -1548,28 +2018,32 @@ class UIController {
       this.state.opponent = this.state.makeOpponent();
       this.engine = null;
       this.prepareMatch();
-      this.renderOffice();
-      this.renderSquad();
+      this.renderAll();
       return;
     }
     if (this.engine) return;
     this.state.notebookUnlocked = false;
     this.syncLocks();
 
-    const home = { name: this.state.clubName, players: this.state.starters() };
-    this.engine = new MatchEngine(home, this.state.opponent, {
+    this.engine = new MatchEngine(this.homeTeam(), this.state.opponent, {
       onLog: e => this.appendLog(e),
       onUpdate: eng => this.renderLive(eng),
-      onSpeed: () => this.renderMatchChrome(),
+      onSpeed: d => {
+        // dot animation length follows the tick length (0.5s at 1x and during highlights)
+        this.radar.setTransition(d >= MatchEngine.HIGHLIGHT ? 0.5 : clamp(d / 1000 * 0.85, 0.03, 0.5));
+        this.renderMatchChrome();
+      },
       onGoal: () => {
         const el = this.$('sb-score');
         el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
       },
       onEnd: eng => this.onMatchEnd(eng),
-    }, { mentality: this.mentality });
+    }, { mentality: this.mentality, speed: this.speed });
+    this.radar.setup(this.engine.sides);
     this.engine.start();
     this.renderMatchChrome();
     this.renderSquad();
+    this.renderTactics();
   }
 
   logLine(e) {
@@ -1604,17 +2078,11 @@ class UIController {
     this.$('sb-min').textContent = `${pad2(eng.minute)}'`;
     this.$('sb-bar').style.width = `${(eng.minute / 90) * 100}%`;
     this.$('sb-period').textContent = L.t(eng.finished ? 'period.ft' : eng.minute <= 45 ? 'period.h1' : 'period.h2');
-
-    const absZone = eng.poss === 0 ? eng.zone : 2 - eng.zone;   // shown from OUR perspective
-    this.$('zones').querySelectorAll('div').forEach(d => {
-      const on = Number(d.dataset.z) === absZone && !eng.finished;
-      d.classList.toggle('on', on);
-      d.classList.toggle('them', on && eng.poss === 1);
-    });
-    this.$('carrier').textContent = eng.finished ? '—' : `${L.name(eng.carrier.name)} (${L.team(eng.sides[eng.poss].name)})`;
+    this.$('carrier').textContent = eng.finished ? '—' : `#${eng.carrier.number} ${L.name(eng.carrier.name)} (${L.team(eng.sides[eng.poss].name)})`;
     const total = eng.possTicks[0] + eng.possTicks[1] || 1;
     this.$('poss').textContent = `${Math.round(eng.possTicks[0] / total * 100)}% - ${Math.round(eng.possTicks[1] / total * 100)}%`;
     this.renderTeamStats(eng.teamTotals(0));
+    this.radar.render(eng);
     if (this.view === 'office') this.renderOffice();
   }
 
@@ -1642,10 +2110,7 @@ class UIController {
     this.state.applyFatigue(played.map(p => p.id));
     this.state.recordResult(a.score, b.score);
     this.state.notebookUnlocked = true;
-    this.syncLocks();
-    this.renderNotebook();
-    this.renderOffice();
-    this.renderSquad();
+    this.renderAll();
     this.renderMatchChrome();
     if (this.view !== 'notes') this.$('tk-notes').classList.add('alert');
   }
@@ -1678,7 +2143,7 @@ class UIController {
           ${L.t(key, { t: esc(L.tag(t)) })}<small>${esc(L.tagDesc(t))}</small></button>`;
       }).join('');
       return `<article class="card">
-        <h3>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
+        <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>
         <div class="tag-btns">${btns}</div>
@@ -1700,7 +2165,7 @@ class UIController {
    ========================================================= */
 const game = new GameState();
 const ui = new UIController(game);
-window.YAM = { game, ui, MatchEngine, L, ENERGY }; // handy for debugging in DevTools
+window.YAM = { game, ui, MatchEngine, L, ENERGY, FORMATIONS }; // handy for debugging in DevTools
 </script>
 </body>
 </html>
