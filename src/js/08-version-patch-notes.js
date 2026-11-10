@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.4', name: { en: 'Faces', ru: 'Лица' },
+    en: [
+      'Every kid now has a face: a procedural 32x32 pixel-art portrait (head shape, skin tone, eyes, mouth, hair) built in code, no image files.',
+      'Faces are rolled once when a player joins and saved, so each kid keeps the same look all season; older saves get stable faces too.',
+      'Match screen: small portraits next to every name in the live roster; the left column is a bit wider to fit them.',
+      'Coach\'s Notebook: a large portrait sits on top of each card, above the stats and tag buttons.',
+      'Portraits are muted and moody to match the rainy autumn touchline; subbed-off players fade to grey.',
+    ],
+    ru: [
+      'У каждого игрока теперь есть лицо: процедурный пиксельный портрет 32x32 (форма головы, цвет кожи, глаза, рот, причёска) рисуется кодом, без картинок.',
+      'Лицо выбирается один раз при появлении игрока и сохраняется, так что весь сезон он выглядит одинаково; в старых сохранениях лица тоже постоянные.',
+      'Экран матча: маленькие портреты рядом с каждым именем в списке состава; левая колонка стала чуть шире.',
+      'Блокнот тренера: большой портрет вверху каждой карточки, над статистикой и кнопками меток.',
+      'Портреты приглушённые и мрачноватые, под дождливую осень у бровки; заменённые игроки становятся серыми.',
+    ] },
   { v: '1.3', name: { en: 'Brighter Screen', ru: 'Светлее экран' },
     en: [
       'Softer screen edges: the corners of the monitor are no longer so dark, the whole picture is easier to read.',

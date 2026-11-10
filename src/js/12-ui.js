@@ -259,7 +259,7 @@ class UIController {
       const sub = status ? L.t('lr.' + status) : pitch ? L.line(lines[i]) : L.t('team.onBench');
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
-        <span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
+        <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
         <span class="lr-name"><b>${esc(L.name(p.surname))}</b><small>${sub}</small></span>
         <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
       </div>`;
@@ -958,6 +958,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
           ${L.t(key, { t: esc(L.tag(t)) })}<small>${esc(L.tagDesc(t))}</small></button>`;
       }).join('');
       return `<article class="card">
+        <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
         <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>

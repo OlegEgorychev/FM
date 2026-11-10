@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.3</title>
+<title>Youth Academy Manager v1.4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -890,6 +890,28 @@ body.fx .crt-scan{ opacity: .9; }
 }
 
 /* =========================================================
+   v1.4 — PROCEDURAL PORTRAITS (paper doll, 32x32 SVG)
+   ========================================================= */
+.portrait{ display: inline-block; position: relative; flex: none; line-height: 0; background: #1a1d1e;
+  border: 1px solid #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); overflow: hidden; }
+.portrait svg{ width: 100%; height: 100%; display: block; image-rendering: pixelated;
+  filter: saturate(.55) contrast(.92) brightness(.9) sepia(.12); }          /* rainy-autumn mood */
+.portrait::after{ content: ""; position: absolute; inset: 0; pointer-events: none;   /* dim corners + faint scanlines */
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0,0,0,.12) 2px 3px),
+              radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(8,10,14,.5) 100%); }
+.portrait.sm{ width: 40px; height: 40px; }
+.portrait.lg{ width: 100px; height: 100px; border: 2px solid #1b1b18; box-shadow: 3px 3px 0 rgba(0,0,0,.4); }
+
+/* live roster: thumbnail column (left column widened a little to keep names readable) */
+#win-match .match-body{ grid-template-columns: minmax(236px, 280px) minmax(0, 1fr) minmax(230px, 290px); }
+.r-row.lr{ grid-template-columns: 40px 20px 32px minmax(0, 1fr) 50px 10px; gap: 4px; padding: 2px 4px; }
+.r-row.lr.disabled .portrait svg{ filter: grayscale(1) brightness(.7); }
+
+/* notebook: big "polaroid" above stats & tag buttons */
+.card .nb-face{ display: flex; justify-content: center; margin: 2px 0 8px 22px; }
+.card .nb-face .portrait{ transform: rotate(-1.5deg); }
+.card:nth-child(even) .nb-face .portrait{ transform: rotate(1.2deg); }
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1699,10 +1721,65 @@ class Lang {
 const L = new Lang();
 
 /* =========================================================
+   PORTRAIT GENERATOR (v1.4) — procedural 32x32 pixel-art "paper doll".
+   A face is 7 trait indices; layers are plain [x, y, w, h] rect lists.
+   ========================================================= */
+const PortraitGenerator = (() => {
+  const BG    = ['#22282a', '#28252e', '#252b24', '#2c2823'];                         // wet dusk
+  const SKIN  = ['#e3c4a6', '#d0a581', '#b48364', '#8a5d42', '#5c3d2b'];
+  const HAIRC = ['#1d1b19', '#4a3324', '#a8905c', '#7f3b25'];                         // black, brown, blonde, red
+  const KIT   = { home: '#3a5d8f', away: '#8f3b33', gk: '#7d7b34' };                  // muted club colours
+  const HEAD  = [                                                                    // round, square, long
+    [[11, 8, 10, 1], [10, 9, 12, 12], [11, 21, 10, 1], [13, 22, 6, 1]],
+    [[10, 8, 12, 14], [12, 22, 8, 1]],
+    [[11, 7, 10, 1], [10, 8, 12, 13], [11, 21, 10, 2], [13, 23, 6, 1]],
+  ];
+  const EYES  = [                                                                    // [brows], [eyes], [bags]
+    [[[12, 12, 2, 1], [18, 12, 2, 1]], [[12, 14, 2, 1], [18, 14, 2, 1]], []],            // neutral
+    [[[12, 12, 2, 1], [18, 12, 2, 1]], [[12, 14, 2, 1], [18, 14, 2, 1]], [[12, 15, 2, 1], [18, 15, 2, 1]]], // tired
+    [[[11, 12, 2, 1], [13, 13, 1, 1], [19, 12, 2, 1], [18, 13, 1, 1]], [[12, 14, 2, 1], [18, 14, 2, 1]], []], // angry
+  ];
+  const MOUTH = [[[14, 18, 4, 1]], [[14, 18, 3, 1], [17, 17, 1, 1]], [[13, 17, 6, 2]]]; // neutral, smirk, grit
+  const HAIR  = [                                                                    // messy, short, long, bald
+    [[9, 5, 14, 4], [9, 9, 2, 4], [21, 9, 2, 3], [11, 4, 2, 1], [16, 4, 3, 1], [14, 9, 2, 1], [18, 9, 1, 1]],
+    [[10, 6, 12, 3], [10, 9, 1, 3], [21, 9, 1, 3]],
+    [[9, 5, 14, 4], [9, 9, 2, 13], [21, 9, 2, 13], [11, 9, 2, 1]],
+    [[10, 9, 1, 2], [21, 9, 1, 2]],
+  ];
+  const SIZES = [BG.length, HEAD.length, SKIN.length, EYES.length, MOUTH.length, HAIR.length, HAIRC.length];
+  const dark = (hex, f) => '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * f).toString(16).padStart(2, '0')).join('');
+  const rects = (list, fill, op = '') => list.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}"/>`).join('')
+    .replace(/^/, `<g fill="${fill}"${op ? ` opacity="${op}"` : ''}>`) + '</g>';
+  /** Deterministic fallback for saves made before v1.4 (same kid keeps the same face). */
+  const hashFace = str => { let h = 2166136261; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    return SIZES.map(n => { h = Math.imul(h ^ (h >>> 13), 2654435761) >>> 0; return h % n; }); };
+
+  return {
+    roll: () => SIZES.map(n => Math.floor(Math.random() * n)),
+    valid: f => Array.isArray(f) && f.length === SIZES.length && f.every((v, i) => Number.isInteger(v) && v >= 0 && v < SIZES[i]),
+    hashFace,
+    svg([bg, head, skin, eyes, mouth, hair, hairC], kit = 'home') {
+      const s = SKIN[skin], sd = dark(s, 0.78), hc = HAIRC[hairC], j = KIT[kit] || KIT.home;
+      const rain = [0, 1, 2, 3].map(i => [(bg * 7 + i * 9 + head * 5) % 30 + 1, (i * 11 + skin * 3) % 20 + 1, 1, 2]);
+      const [brows, eye, bags] = EYES[eyes];
+      return `<svg class="portrait-svg" viewBox="0 0 32 32" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`
+        + `<rect width="32" height="32" fill="${BG[bg]}"/>` + rects(rain, '#9fb2bf', '.18')
+        + rects([[5, 27, 22, 5], [7, 25, 18, 2]], j) + rects([[5, 30, 22, 2], [7, 25, 2, 2]], dark(j, 0.7))       // shoulders/jersey
+        + rects([[13, 21, 6, 5]], sd) + rects([[14, 25, 4, 1]], dark(j, 0.55))                                  // neck + collar
+        + rects([...HEAD[head], [9, 13, 1, 3], [22, 13, 1, 3]], s) + rects([[21, 10, 1, 10], [16, 15, 1, 2]], sd) // head, ears, shade, nose
+        + rects(bags, sd) + rects(eye, '#15120f') + rects(brows, dark(hc, 0.85))                                  // eyes / brows
+        + rects(MOUTH[mouth], mouth === 2 ? '#2a1a16' : dark(s, 0.55)) + (mouth === 2 ? rects([[14, 17, 4, 1]], '#cfc6b0') : '')
+        + rects(HAIR[hair], hc, hair === 3 ? '.55' : '')
+        + '</svg>';
+    },
+  };
+})();
+
+/* =========================================================
    PLAYER
    ========================================================= */
 class Player {
-  constructor({ id, name, position, attrs, tags, energy, number }) {
+  constructor({ id, name, position, attrs, tags, energy, number, face }) {
     this.id = id;
     this.name = name;
     this.position = position;
@@ -1712,8 +1789,12 @@ class Player {
       this.tags = tags;
       this.energy = energy ?? 100;
     }
+    this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
+    this.portraitSvg = PortraitGenerator.svg(this.face, position === 'GK' ? 'gk' : tags ? 'home' : 'away');
   }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
+  /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */
+  toJSON() { const { portraitSvg, ...o } = this; return o; }
 
   static generate(id, position, usedSurnames, mod = 0, withTags = false, number = 0) {
     let last; let guard = 0;
@@ -1721,10 +1802,9 @@ class Player {
     usedSurnames.add(last);
     const attrs = {};
     for (const a of ATTRS) { const [lo, hi] = PROFILES[position][a]; attrs[a] = clamp(rnd(lo, hi) + mod, 1, 20); }
-    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, number, tags: withTags ? [] : undefined });
+    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll() });
   }
 }
-
 /* =========================================================
    DATES (ISO 'YYYY-MM-DD', always handled in UTC to avoid timezone drift)
    ========================================================= */
@@ -2586,8 +2666,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.4', name: { en: 'Faces', ru: 'Лица' },
+    en: [
+      'Every kid now has a face: a procedural 32x32 pixel-art portrait (head shape, skin tone, eyes, mouth, hair) built in code, no image files.',
+      'Faces are rolled once when a player joins and saved, so each kid keeps the same look all season; older saves get stable faces too.',
+      'Match screen: small portraits next to every name in the live roster; the left column is a bit wider to fit them.',
+      'Coach\'s Notebook: a large portrait sits on top of each card, above the stats and tag buttons.',
+      'Portraits are muted and moody to match the rainy autumn touchline; subbed-off players fade to grey.',
+    ],
+    ru: [
+      'У каждого игрока теперь есть лицо: процедурный пиксельный портрет 32x32 (форма головы, цвет кожи, глаза, рот, причёска) рисуется кодом, без картинок.',
+      'Лицо выбирается один раз при появлении игрока и сохраняется, так что весь сезон он выглядит одинаково; в старых сохранениях лица тоже постоянные.',
+      'Экран матча: маленькие портреты рядом с каждым именем в списке состава; левая колонка стала чуть шире.',
+      'Блокнот тренера: большой портрет вверху каждой карточки, над статистикой и кнопками меток.',
+      'Портреты приглушённые и мрачноватые, под дождливую осень у бровки; заменённые игроки становятся серыми.',
+    ] },
   { v: '1.3', name: { en: 'Brighter Screen', ru: 'Светлее экран' },
     en: [
       'Softer screen edges: the corners of the monitor are no longer so dark, the whole picture is easier to read.',
@@ -3596,7 +3691,7 @@ class UIController {
       const sub = status ? L.t('lr.' + status) : pitch ? L.line(lines[i]) : L.t('team.onBench');
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
-        <span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
+        <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
         <span class="lr-name"><b>${esc(L.name(p.surname))}</b><small>${sub}</small></span>
         <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
       </div>`;
@@ -4295,6 +4390,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
           ${L.t(key, { t: esc(L.tag(t)) })}<small>${esc(L.tagDesc(t))}</small></button>`;
       }).join('');
       return `<article class="card">
+        <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
         <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>

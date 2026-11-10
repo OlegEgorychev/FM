@@ -84,15 +84,24 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.click('.tk[data-view=notes]');
     const nb = await page.evaluate(() => ({ cards: document.querySelectorAll('.card').length, notes: document.querySelectorAll('.coach-note').length }));
     check('notebook: 3 cards with coach notes', nb.cards === 3 && nb.notes === 3);
+    const pt = await page.evaluate(() => ({
+      nb: [...document.querySelectorAll('.card .portrait.lg svg')].map(s => s.getBoundingClientRect().width),
+      lr: document.querySelectorAll('#live-roster .portrait.sm svg').length,
+      uniq: new Set(YAM.game.squad.map(p => p.portraitSvg)).size, n: YAM.game.squad.length,
+      saved: !/portraitSvg/.test(localStorage.getItem('yam_save_v1') || ''),
+    }));
+    check('portraits: roster + notebook, unique, not saved as SVG', pt.nb.length === 3 && pt.nb.every(w => w >= 95) && pt.lr === pt.n && pt.uniq >= pt.n - 1 && pt.saved, JSON.stringify(pt.nb) + ' uniq ' + pt.uniq + '/' + pt.n);
     await page.click('#notes-body [data-tag]');
     await shot('4-notebook');
     await page.click('#btn-back');
     check('return to dashboard queues next matchday', await page.evaluate(() => YAM.game.phase === 'calendar' && YAM.ui.cal.nextEvent().md === 2));
 
     // persistence + language switch
+    const facesBefore = await page.evaluate(() => JSON.stringify(YAM.game.squad.map(p => p.face)));
     await page.reload();
     await page.waitForFunction(() => window.YAM && window.YAM.ui);
     check('save survives reload', await page.evaluate(() => YAM.game.league.playedMatchdays() === 1 && Object.keys(YAM.game.seasonStats).length >= 11));
+    check('faces stable after reload', await page.evaluate(f => JSON.stringify(YAM.game.squad.map(p => p.face)) === f, facesBefore));
     await page.click('#btn-lang'); await page.click('#btn-lang');
     check('frame loop cost < 2 ms', await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0) < 2), (await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0).toFixed(2))) + ' ms');
   } catch (e) {

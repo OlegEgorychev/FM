@@ -40,3 +40,8 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Defend shout slightly better net than Attack.
 - Fatigue ×0.5 is harsh: no rotation → bottom of the table.
 - Correct roles are strong (×1.5). Background duels never produce cards.
+
+## Portraits (v1.4)
+- `PortraitGenerator` (top of `src/js/03-player.js`): 32x32 SVG, `shape-rendering="crispEdges"`, layers = background (+rain specks), jersey (home / away / GK kit), head (3 shapes) & skin (5), eyes/brows (neutral, tired, angry), mouth (neutral, smirk, grit), hair (messy, short, long, bald) & hair colour (4).
+- `player.face` = 7 trait indices, rolled in `Player.generate()` and saved. `player.portraitSvg` is rebuilt in the constructor and dropped by `toJSON()`, so saves stay small. Saves from before v1.4 get a face hashed from id+name (stable).
+- Mood comes from CSS (`src/css/12-portraits.css`): desaturate filter, scanlines, dark corner vignette. 40px in the live roster, 100px on Notebook cards.

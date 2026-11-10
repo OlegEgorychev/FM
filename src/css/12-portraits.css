@@ -1,0 +1,22 @@
+/* =========================================================
+   v1.4 — PROCEDURAL PORTRAITS (paper doll, 32x32 SVG)
+   ========================================================= */
+.portrait{ display: inline-block; position: relative; flex: none; line-height: 0; background: #1a1d1e;
+  border: 1px solid #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); overflow: hidden; }
+.portrait svg{ width: 100%; height: 100%; display: block; image-rendering: pixelated;
+  filter: saturate(.55) contrast(.92) brightness(.9) sepia(.12); }          /* rainy-autumn mood */
+.portrait::after{ content: ""; position: absolute; inset: 0; pointer-events: none;   /* dim corners + faint scanlines */
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0,0,0,.12) 2px 3px),
+              radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(8,10,14,.5) 100%); }
+.portrait.sm{ width: 40px; height: 40px; }
+.portrait.lg{ width: 100px; height: 100px; border: 2px solid #1b1b18; box-shadow: 3px 3px 0 rgba(0,0,0,.4); }
+
+/* live roster: thumbnail column (left column widened a little to keep names readable) */
+#win-match .match-body{ grid-template-columns: minmax(236px, 280px) minmax(0, 1fr) minmax(230px, 290px); }
+.r-row.lr{ grid-template-columns: 40px 20px 32px minmax(0, 1fr) 50px 10px; gap: 4px; padding: 2px 4px; }
+.r-row.lr.disabled .portrait svg{ filter: grayscale(1) brightness(.7); }
+
+/* notebook: big "polaroid" above stats & tag buttons */
+.card .nb-face{ display: flex; justify-content: center; margin: 2px 0 8px 22px; }
+.card .nb-face .portrait{ transform: rotate(-1.5deg); }
+.card:nth-child(even) .nb-face .portrait{ transform: rotate(1.2deg); }
