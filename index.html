@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.0</title>
+<title>Youth Academy Manager v1.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -812,6 +812,84 @@ body.fx .crt-scan{ opacity: .9; }
 @media (max-width: 820px){ .app-title{ display: none; } }
 
 /* =========================================================
+   v1.1 — THREE-COLUMN MATCH, HALF-TIME, LIVE SUBS, ASSISTANT
+   ========================================================= */
+#win-match{ left: 50%; top: 8px; bottom: 8px; width: min(1560px, 99%); max-height: none; transform: translateX(-50%); }
+#win-match .match-body{ flex: 1; min-height: 0; overflow: hidden; padding: 8px;
+  display: grid; grid-template-columns: minmax(210px, 250px) minmax(0, 1fr) minmax(230px, 290px); gap: 10px; }
+.mcol{ display: flex; flex-direction: column; gap: 6px; min-height: 0; min-width: 0; }
+/* centre column: the pitch takes whatever height is left, keeping its 105:68 shape (size container) */
+.mcol-center{ display: grid; grid-template-rows: auto minmax(0, 1fr) auto minmax(90px, 24vh) auto; gap: 6px; }
+.cam-holder{ min-height: 0; container-type: size; display: flex; align-items: center; justify-content: center; }
+.mcol > .groupbox{ margin-top: 8px; }
+.mcol-center .cam-view{ flex: none; width: min(100cqw, calc(100cqh * 1.5441)); margin: 0; }
+.mcol-center .possession{ margin: 0; }
+.mcol-center .log-wrap{ min-height: 0; display: flex; }
+.mcol-center .log{ flex: 1; height: auto; max-height: none; min-height: 0; resize: none; }
+.mc-controls{ display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 8px; align-items: stretch; }
+.mc-controls .shouts{ margin: 0; }
+.mc-controls .shout{ padding: 6px 4px; font-size: 12px; }
+.mc-controls .speeds{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+
+/* left: live roster */
+.lr-box{ flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+.lr-head{ font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+.lr-list{ flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
+.r-row.lr{ grid-template-columns: 22px 34px minmax(0, 1fr) 54px 10px; gap: 5px; padding: 3px 5px; }
+.r-row.lr .num{ min-width: 0; padding: 0 2px; font-size: 10px; }
+.r-row.lr .pos{ font-size: 10px; padding: 1px 2px; min-width: 0; }
+.lr-name{ display: flex; flex-direction: column; min-width: 0; }
+.lr-name b{ font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #eef1ec; }
+.lr-name small{ font-size: 10px; color: var(--muted); }
+.r-row.lr .energy{ height: 12px; } .r-row.lr .energy span{ font-size: 10px; line-height: 10px; }
+.r-row.lr .energy i{ transition: width .4s linear; }
+.r-row.lr.disabled{ opacity: .35; cursor: not-allowed; filter: grayscale(1); }
+.r-row.lr.disabled:hover{ background: transparent; border-left-color: transparent; }
+.lr-cards .cd{ display: inline-block; width: 7px; height: 10px; border: 1px solid #000; }
+.lr-cards .cd.y{ background: #f5d33a; } .lr-cards .cd.r{ background: #c42b20; }
+.lr-help{ margin: 0; font-size: 11px; line-height: 1.4; color: var(--muted); min-height: 30px; }
+
+/* right: assistant coach */
+.asst-wrap{ display: flex; gap: 8px; align-items: flex-start; }
+.asst-ava{ flex: none; display: flex; flex-direction: column; align-items: center; padding: 6px 5px; font: 14px/1.1 "PT Mono", "Courier New", monospace;
+  color: #7ee07a; background: #08130b; border: 2px inset #3a4a3a; text-shadow: 0 0 6px rgba(126,224,122,.5); }
+.asst-ava small{ font-size: 9px; color: #5c8a5c; margin-top: 3px; }
+.asst-msgs{ flex: 1; display: flex; flex-direction: column; gap: 4px; min-height: 64px; }
+.asst-msg{ display: flex; gap: 6px; padding: 5px 7px; font-size: 12px; line-height: 1.35; border-left: 3px solid #4b6276; background: rgba(0,0,0,.25); }
+.asst-msg .ic{ flex: none; width: 14px; height: 14px; display: grid; place-items: center; font: bold 10px var(--ui); border-radius: 50%; background: #2f6fd0; color: #fff; margin-top: 1px; }
+.asst-msg.mid{ border-left-color: #c9a227; color: #f1e2b0; } .asst-msg.mid .ic{ background: #c9a227; color: #111; }
+.asst-msg.hi{ border-left-color: #c42b20; color: #ffd7d0; background: rgba(166,59,48,.18); } .asst-msg.hi .ic{ background: #c42b20; }
+.asst-msg.top{ font-weight: bold; }
+.asst-msg.hi.top{ animation: asstPulse 1.2s steps(2) infinite; }
+@keyframes asstPulse{ 50%{ background: rgba(166,59,48,.32); } }
+.mcol-right .statgrid{ font-size: 13px; line-height: 1.4; }
+
+/* half-time banner over the pitch */
+.ht-banner{ position: absolute; inset: 0; z-index: 12; display: grid; place-items: center; background: rgba(0,0,0,.55); }
+.ht-banner[hidden]{ display: none; }
+.ht-box{ text-align: center; padding: 12px 22px; background: var(--glass); border: 2px outset #8a959e; box-shadow: 6px 8px 0 rgba(0,0,0,.4); }
+.ht-title{ font: 46px/1 "VT323", var(--ui); letter-spacing: 6px; color: var(--amber); text-shadow: 0 0 12px rgba(226,184,90,.6); }
+.ht-score{ font-size: 16px; font-weight: bold; margin: 6px 0; color: #eef1ec; }
+.ht-tip{ margin: 0 0 10px; font-size: 12px; color: var(--muted); max-width: 320px; }
+.pitch.radar .pl.sub-in{ animation: subIn .8s ease-out; }
+@keyframes subIn{ 0%{ box-shadow: 0 0 0 10px rgba(57,255,20,0); } 30%{ box-shadow: 0 0 0 4px #39ff14, 0 0 14px #39ff14; } 100%{ box-shadow: 0 2px 3px rgba(0,0,0,.6); } }
+
+@media (max-width: 1180px){
+  #win-match .match-body{ grid-template-columns: 220px minmax(0, 1fr); overflow-y: auto; }
+  .mcol-center{ grid-template-rows: auto 48vh auto 200px auto; }
+  .mcol-right{ grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+}
+@media (max-width: 820px){
+  #win-match .match-body{ grid-template-columns: 1fr; overflow-y: auto; }
+  .mcol-center{ order: -1; grid-template-rows: auto auto auto 180px auto; }
+  .cam-holder{ container-type: normal; }
+  .mcol-center .cam-view{ width: 100%; }
+  .lr-list{ max-height: 40vh; }
+  .mcol-right{ grid-template-columns: 1fr; }
+  .mc-controls{ grid-template-columns: 1fr; }
+}
+
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -917,51 +995,76 @@ body.fx .crt-scan{ opacity: .9; }
       <div class="titlebar"><span class="t-ico">&#9673;</span><span class="t-txt" id="match-title">MATCHDAY.EXE</span>
         <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
       <div class="win-body match-body">
-        <div class="match-top">
-          <div class="scoreboard sunken">
-            <div class="sb-team home" id="sb-home">HOME</div>
-            <div class="sb-score" id="sb-score">0 - 0</div>
-            <div class="sb-team" id="sb-away">AWAY</div>
-            <div class="sb-clock"><span class="min" id="sb-min">00'</span>
-              <div class="bar"><i id="sb-bar"></i><span class="ht"></span></div><span id="sb-period">PRE</span></div>
+
+        <!-- LEFT: live roster & substitutions -->
+        <aside class="mcol mcol-left">
+          <div class="groupbox lr-box"><span class="gb-label" data-i18n="lr.title"></span>
+            <div class="lr-head"><b id="lr-subs"></b></div>
+            <div class="lr-list sunken" id="live-roster" role="listbox" aria-label="Live roster"></div>
+            <p class="lr-help" id="lr-help"></p>
           </div>
-          <div class="ctrl">
-            <button class="btn go" id="btn-start"></button>
-            <div class="speed" id="speed"></div>
+        </aside>
+
+        <!-- CENTER: scoreboard, timer, pitch, log, shouts, speed -->
+        <div class="mcol mcol-center">
+          <div class="match-top">
+            <div class="scoreboard sunken">
+              <div class="sb-team home" id="sb-home">HOME</div>
+              <div class="sb-score" id="sb-score">0 - 0</div>
+              <div class="sb-team" id="sb-away">AWAY</div>
+              <div class="sb-clock"><span class="min" id="sb-min">00'</span>
+                <div class="bar"><i id="sb-bar"></i><span class="ht"></span></div><span id="sb-period">PRE</span></div>
+            </div>
+            <div class="ctrl">
+              <button class="btn go" id="btn-start"></button>
+              <div class="speed" id="speed"></div>
+            </div>
           </div>
-        </div>
-        <div class="cam-view" id="radar-view">
-          <div class="pitch radar" id="radar"></div>
-          <span class="cam-live" aria-hidden="true">&#9679; LIVE</span>
-        </div>
-        <div class="possession">
-          <span><span data-i18n="match.ball"></span>: <b id="carrier">&mdash;</b></span>
-          <span><span data-i18n="match.forms"></span>: <b id="forms">&mdash;</b></span>
-          <span><span data-i18n="match.poss"></span>: <b id="poss">&mdash;</b></span>
-        </div>
-        <div class="match-bottom">
-          <div class="log-col">
-            <div class="log-wrap"><div class="log sunken" id="log" role="log" aria-live="polite"></div>
-              <button class="btn small log-jump" id="log-jump" hidden data-i18n="match.newEvents"></button></div>
+          <div class="cam-holder"><div class="cam-view" id="radar-view">
+            <div class="pitch radar" id="radar"></div>
+            <span class="cam-live" aria-hidden="true">&#9679; LIVE</span>
+            <div class="ht-banner" id="ht-banner" hidden>
+              <div class="ht-box">
+                <div class="ht-title" data-i18n="ht.title"></div>
+                <div class="ht-score" id="ht-score"></div>
+                <p class="ht-tip" data-i18n="ht.tip"></p>
+                <button class="btn go" id="btn-resume" data-i18n="ht.resume"></button>
+              </div>
+            </div>
+          </div></div>
+          <div class="possession">
+            <span><span data-i18n="match.ball"></span>: <b id="carrier">&mdash;</b></span>
+            <span><span data-i18n="match.forms"></span>: <b id="forms">&mdash;</b></span>
+            <span><span data-i18n="match.poss"></span>: <b id="poss">&mdash;</b></span>
+          </div>
+          <div class="log-wrap"><div class="log sunken" id="log" role="log" aria-live="polite"></div>
+            <button class="btn small log-jump" id="log-jump" hidden data-i18n="match.newEvents"></button></div>
+          <div class="mc-controls">
             <div class="shouts" role="group">
               <button class="btn shout" data-shout="attack" data-i18n="shout.attack" data-i18n-aria="shout.attackTip"></button>
               <button class="btn shout" data-shout="defend" data-i18n="shout.defend" data-i18n-aria="shout.defendTip"></button>
               <button class="btn shout" data-shout="balanced" data-i18n="shout.balanced" data-i18n-aria="shout.balancedTip"></button>
             </div>
-          </div>
-          <div class="side-col">
-            <div class="groupbox"><span class="gb-label" data-i18n="match.speedLbl"></span>
-              <div class="speeds" role="group">
-                <button class="btn small spd" data-speed="1" data-i18n="speed.1"></button>
-                <button class="btn small spd" data-speed="2" data-i18n="speed.2"></button>
-                <button class="btn small spd" data-speed="5" data-i18n="speed.5"></button>
-              </div>
-            </div>
-            <div class="groupbox"><span class="gb-label" data-i18n="match.ourStats"></span>
-              <dl class="statgrid" id="team-stats"></dl>
+            <div class="speeds" role="group" data-i18n-aria="match.speedLbl">
+              <button class="btn small spd" data-speed="1" data-i18n="speed.1"></button>
+              <button class="btn small spd" data-speed="2" data-i18n="speed.2"></button>
+              <button class="btn small spd" data-speed="5" data-i18n="speed.5"></button>
             </div>
           </div>
         </div>
+
+        <!-- RIGHT: assistant coach & live stats -->
+        <aside class="mcol mcol-right">
+          <div class="groupbox asst-box"><span class="gb-label" data-i18n="asst.title"></span>
+            <div class="asst-wrap">
+              <div class="asst-ava" aria-hidden="true">(&bull;_&bull;)<small>ASST.</small></div>
+              <div class="asst-msgs" id="asst" aria-live="polite"></div>
+            </div>
+          </div>
+          <div class="groupbox"><span class="gb-label" data-i18n="match.ourStats"></span>
+            <dl class="statgrid" id="team-stats"></dl>
+          </div>
+        </aside>
       </div>
       <div class="statusbar"><span id="match-status"></span><span id="match-fixture"></span></div>
     </section>
@@ -1098,7 +1201,9 @@ const PROFILES = { // [min, max] per hidden attribute, 1-20
   FWD: { Speed: [10, 18], Pass: [7, 13],  Dribble: [10, 17], Shoot: [11, 18], Tackle: [3, 8],   Save: [1, 3] },
 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
-const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 4 };   // bench +6 on matchday, +4 every rest day
+const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 4,
+  EXHAUSTED: 30, EXHAUSTED_MULT: 0.8,   // live: under 30% during the match → stats ×0.8 (v1.1)
+  HT_REST: 4 };                         // half-time rest for everyone on the pitch   // bench +6 on matchday, +4 every rest day
 const OUT_OF_POSITION = 0.85;   // stat multiplier for a player outside his natural line
 
 /* =========================================================
@@ -1348,6 +1453,68 @@ const TXT = {
     flavor:   ['Дождь усиливается. В центральном круге лужи.', 'Чей-то папа у бровки орёт: «ВЫНОСИ!»', 'Чья-то собака забрела на беговую дорожку.', 'Дальний прожектор мигает и жужжит.', 'Лайнсмен (чей-то дядя) машет флажком непонятно зачем.', 'Мокрые листья летят через поле.', 'Вдалеке, в клубном домике, шипит титан с чаем.'],
   },
 };
+
+/* ---- v1.1: three-column match, half-time, live subs, assistant ---- */
+Object.assign(I18N.en, {
+  'lr.title': 'Live roster & subs', 'lr.onPitch': 'ON THE PITCH', 'lr.bench': 'BENCH', 'lr.subs': 'Substitutions: {n}/{m}', 'lr.preMatch': 'Before kick-off',
+  'lr.off': 'subbed off', 'lr.sent': 'sent off',
+  'lr.help.pre': 'Before kick-off: click two players to change the line-up.',
+  'lr.help.live': 'Click a player on the pitch, then one on the bench (or the other way round) to make a substitution.',
+  'lr.help.sel': '{n} selected → pick who swaps with him. Green = same position. Esc to cancel.',
+  'lr.help.over': 'No changes possible right now.',
+  'sub.err.title': 'Substitution not possible', 'sub.err.limit': 'All {m} substitutions have been used.',
+  'sub.err.sentOff': 'A sent-off player cannot be replaced.', 'sub.err.used': 'A substituted player cannot come back on.',
+  'sub.err.gkOnly': 'Only a goalkeeper can go in goal.', 'sub.err.gkTwo': 'A second goalkeeper cannot play in the outfield.',
+  'sub.err.pick': 'Pick one player on the pitch and one on the bench.', 'sub.err.over': 'The match is over.',
+  'eng.sub': 'SUBSTITUTION: {a} comes on for {b}.', 'bark.sub': 'ON!',
+  'ht.title': 'HALF TIME', 'ht.tip': 'Check stamina on the left and make substitutions, then resume the match.', 'ht.resume': '&#9654; Resume Match',
+  'ht.rest': 'Half-time rest: +{n}% energy for everyone on the pitch.',
+  'match.paused': '■ PAUSED: HALF TIME', 'match.resume': '&#9654; Resume Match',
+  'asst.title': 'Assistant coach',
+  'asst.pre': 'Check the energy bars before kick-off. Anyone under 50% plays at half strength.',
+  'asst.exhausted': 'Coach, {n} is exhausted ({e}%), we need a sub!',
+  'asst.tiring': '{n} is tiring ({e}%). Keep an eye on him.',
+  'asst.yellow': 'Careful, {n} is on a yellow and might get sent off!',
+  'asst.red': 'We are down to {k} men. Maybe DEFEND to hold on?',
+  'asst.losing': 'We are getting outplayed, maybe switch to ATTACK?',
+  'asst.losingLate': 'Time is running out! Throw everyone forward: ATTACK!',
+  'asst.protect': 'We are ahead. Park the bus to protect the lead?',
+  'asst.sloppy': 'Our passing is sloppy today ({r}% completed).',
+  'asst.possession': 'They are keeping the ball ({p}% possession for us). We need to win it back.',
+  'asst.good': 'Good shape, the lads are doing well. Keep it up.',
+  'asst.ht': 'Half-time. Tired players: {t}, on a yellow: {c}. Now is the time for changes.',
+  'asst.ft': 'Full-time. Let us look at the notebook.',
+});
+Object.assign(I18N.ru, {
+  'lr.title': 'Состав и замены', 'lr.onPitch': 'НА ПОЛЕ', 'lr.bench': 'ЗАПАС', 'lr.subs': 'Замены: {n}/{m}', 'lr.preMatch': 'До стартового свистка',
+  'lr.off': 'заменён', 'lr.sent': 'удалён',
+  'lr.help.pre': 'До начала матча: щёлкни двух игроков, чтобы изменить состав.',
+  'lr.help.live': 'Щёлкни игрока на поле, затем запасного (или наоборот), чтобы сделать замену.',
+  'lr.help.sel': 'Выбран {n} → выбери, кем его заменить. Зелёные — та же позиция. Esc — отмена.',
+  'lr.help.over': 'Сейчас изменения невозможны.',
+  'sub.err.title': 'Замена невозможна', 'sub.err.limit': 'Все {m} замен уже использованы.',
+  'sub.err.sentOff': 'Удалённого игрока заменить нельзя.', 'sub.err.used': 'Заменённый игрок не может вернуться на поле.',
+  'sub.err.gkOnly': 'В ворота может встать только вратарь.', 'sub.err.gkTwo': 'Второй вратарь не может играть в поле.',
+  'sub.err.pick': 'Выбери одного игрока на поле и одного в запасе.', 'sub.err.over': 'Матч окончен.',
+  'eng.sub': 'ЗАМЕНА: {a} выходит вместо {b}.', 'bark.sub': 'ВЫХОЖУ!',
+  'ht.title': 'ПЕРЕРЫВ', 'ht.tip': 'Проверь энергию слева и сделай замены, затем продолжай матч.', 'ht.resume': '&#9654; Продолжить матч',
+  'ht.rest': 'Отдых в перерыве: +{n}% энергии всем, кто на поле.',
+  'match.paused': '■ ПАУЗА: ПЕРЕРЫВ', 'match.resume': '&#9654; Продолжить матч',
+  'asst.title': 'Помощник тренера',
+  'asst.pre': 'Проверь энергию до начала. Кто ниже 50% — играет вполсилы.',
+  'asst.exhausted': 'Тренер, {n} выдохся ({e}%), нужна замена!',
+  'asst.tiring': '{n} подсаживается ({e}%). Присмотри за ним.',
+  'asst.yellow': 'Осторожно: {n} уже с жёлтой и может получить удаление!',
+  'asst.red': 'Нас осталось {k}. Может, перейти в ОБОРОНУ?',
+  'asst.losing': 'Нас переигрывают, может, переключиться на АТАКУ?',
+  'asst.losingLate': 'Время уходит! Все вперёд: АТАКА!',
+  'asst.protect': 'Мы впереди. Поставим автобус, чтобы удержать счёт?',
+  'asst.sloppy': 'Сегодня пасуем неряшливо ({r}% точных).',
+  'asst.possession': 'Мяч у них (у нас {p}% владения). Надо отбирать.',
+  'asst.good': 'Хорошо стоим, ребята молодцы. Так держать.',
+  'asst.ht': 'Перерыв. Уставших: {t}, с жёлтой: {c}. Самое время для замен.',
+  'asst.ft': 'Финальный свисток. Давай заглянем в блокнот.',
+});
 
 /* ---- v1.0: notebook 2.0 ---- */
 Object.assign(I18N.en, {
@@ -1829,6 +1996,14 @@ class GameState {
 
   /* ----- energy ----- */
   restDay() { for (const p of this.squad) p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100); }
+  /** v1.1: players who played keep their LIVE end-of-match energy; unused subs rest. */
+  applyLiveFatigue(eng) {
+    for (const p of this.squad) {
+      p.energy = eng.everPlayed.has(p.id)
+        ? clamp(Math.round(eng.energy.get(p.id)), 0, 100)
+        : clamp(Math.round(p.energy + ENERGY.BENCH_REST), 0, 100);
+    }
+  }
   applyFatigue(playedIds) {
     for (const p of this.squad) {
       const delta = playedIds.includes(p.id) ? -rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) : ENERGY.BENCH_REST;
@@ -1920,6 +2095,14 @@ class MatchEngine {
     for (const s of this.sides) for (const e of s.entries) { this.stats.set(e.p.id, MatchEngine.blankStats()); this.lineOf.set(e.p.id, e.line); }
     // Energy is checked once, at kick-off: under 50% => every hidden stat x0.5 for the whole match
     this.tired = new Set(home.players.filter(p => (p.energy ?? 100) < ENERGY.TIRED).map(p => p.id));
+    // LIVE energy (v1.1): every player drains 30–40% over 90 minutes; subs come on with their own energy
+    this.energy = new Map(); this.drain = new Map();
+    for (const s of this.sides) for (const e of s.entries) { this.energy.set(e.p.id, e.p.energy ?? 100); this.drain.set(e.p.id, rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90); }
+    this.everPlayed = new Set(home.players.map(p => p.id));
+    this.subbedOff = new Set();
+    this.subsUsed = 0;
+    this.subs = [];
+    this.paused = false;
     this.mentality = opts.mentality || 'balanced';
     this.speed = opts.speed || 1;
     this.sentOff = new Set();
@@ -1939,7 +2122,7 @@ class MatchEngine {
 
   static buildSide(team, user) {
     const slots = formationSlots(team.formation);
-    return { name: team.name, formation: team.formation, user, score: 0, players: team.players,
+    return { name: team.name, formation: team.formation, user, score: 0, players: [...team.players], all: [...team.players],
       entries: slots.map((s, i) => ({ ...s, p: team.players[i] })) };
   }
   static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0 }; }
@@ -2002,6 +2185,8 @@ class MatchEngine {
   eff(p, attr) {
     let v = p.attrs[attr];
     if (this.tired.has(p.id)) v *= 0.5;
+    const en = this.energy?.get(p.id);
+    if (en !== undefined && en < ENERGY.EXHAUSTED) v *= ENERGY.EXHAUSTED_MULT;
     if (NATURAL_LINE[p.position] !== this.lineOf.get(p.id)) v *= OUT_OF_POSITION;
     const t = p.tags || [];
     if (t.includes('Aggressive') && attr === 'Tackle') v *= 1.5;
@@ -2029,7 +2214,7 @@ class MatchEngine {
     this.mentality = m;
     if (!this.finished && this.started) this.log('coach', 'eng.shout.' + m, {}, 0);
   }
-  setSpeedMode(s) { this.speed = s; if (this.started && !this.finished) this.updateSpeed(); }
+  setSpeedMode(s) { this.speed = s; if (this.started && !this.finished && !this.paused) this.updateSpeed(); }
 
   /* ---------- clock & pacing ---------- */
   start() {
@@ -2045,6 +2230,7 @@ class MatchEngine {
     return MatchEngine.SPEED[this.speed] ?? 600;
   }
   updateSpeed() {
+    if (this.paused) return;
     const d = this.desiredDelay();
     if (d === this.delay && this.timer) return;
     this.delay = d;
@@ -2056,7 +2242,7 @@ class MatchEngine {
   stop() { clearInterval(this.timer); this.timer = null; }
 
   tick() {
-    if (this.finished) return;
+    if (this.finished || this.paused) return;
     if (this.hold > 0) this.hold--;
     if (this.pendingShot) {
       const ps = this.pendingShot;
@@ -2074,6 +2260,9 @@ class MatchEngine {
       this.log('whistle', 'eng.second', { a: this.team(1) }, 1);
     }
     this.possTicks[this.poss]++;
+    for (const side of this.sides) for (const p of side.players) {
+      if (!this.sentOff.has(p.id)) this.energy.set(p.id, Math.max(0, this.energy.get(p.id) - this.drain.get(p.id)));
+    }
     this.act();
     this.ambient();
     this.afterAction();
@@ -2081,11 +2270,64 @@ class MatchEngine {
 
   afterAction() {
     if (!this.pendingShot) {
-      if (this.minute >= 45 && !this.htLogged) { this.htLogged = true; this.log('whistle', 'eng.ht', this.scoreVars()); }
+      if (this.minute >= 45 && !this.htLogged) { this.htLogged = true; this.log('whistle', 'eng.ht', this.scoreVars()); this.halfTime(); return; }
       if (this.minute >= 90) { this.finish(); return; }
     }
     this.updateSpeed();
     this.hooks.onUpdate(this);
+  }
+
+  /* ---------- half-time (v1.1): the loop PAUSES until the coach resumes ---------- */
+  halfTime() {
+    for (const side of this.sides) for (const p of side.players) {
+      if (!this.sentOff.has(p.id)) this.energy.set(p.id, Math.min(100, this.energy.get(p.id) + ENERGY.HT_REST));
+    }
+    this.log('flavor', 'ht.rest', { n: ENERGY.HT_REST }, -1);
+    this.setEv({ kind: 'halftime' });
+    this.pause();
+    this.hooks.onUpdate(this);
+    this.hooks.onHalfTime?.(this);
+  }
+  pause() { this.paused = true; this.stop(); this.hooks.onSpeed?.(this.delay); }
+  resume() {
+    if (!this.paused || this.finished) return;
+    this.paused = false; this.delay = 0;
+    this.updateSpeed();
+    this.hooks.onResume?.(this);
+  }
+
+  /* ---------- live substitution (v1.1): incoming player takes the same formation slot ---------- */
+  static MAX_SUBS = 5;   // youth football: up to five changes
+  substitute(outId, inP) {
+    if (this.finished) return 'over';
+    const side = this.sides[0];
+    const idx = side.entries.findIndex(e => e.p.id === outId);
+    if (idx < 0 || !inP) return 'pick';
+    if (this.sentOff.has(outId)) return 'sentOff';
+    if (this.subbedOff.has(inP.id) || side.players.includes(inP)) return 'used';
+    if (this.subsUsed >= MatchEngine.MAX_SUBS) return 'limit';
+    const line = side.entries[idx].line;
+    if (line === 'GK' && inP.position !== 'GK') return 'gkOnly';
+    if (line !== 'GK' && inP.position === 'GK') return 'gkTwo';
+    const out = side.entries[idx].p;
+    side.entries[idx] = { ...side.entries[idx], p: inP };
+    side.players = side.players.map(p => (p === out ? inP : p));
+    side.all.push(inP);
+    if (!this.stats.has(inP.id)) this.stats.set(inP.id, MatchEngine.blankStats());
+    this.lineOf.set(inP.id, line);
+    this.energy.set(inP.id, inP.energy ?? 100);
+    this.drain.set(inP.id, rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90);
+    if ((inP.energy ?? 100) < ENERGY.TIRED) this.tired.add(inP.id);
+    this.everPlayed.add(inP.id);
+    this.subbedOff.add(outId);
+    this.subsUsed++;
+    this.subs.push({ minute: this.minute, in: inP.id, out: outId });
+    if (this.carrier === out) this.carrier = inP;
+    if (this.pendingShot && this.pendingShot.shooter === out) this.pendingShot.shooter = inP;
+    this.log('coach', 'eng.sub', { a: inP, b: out }, 0);
+    this.hooks.onSub?.(out, inP);
+    this.hooks.onUpdate(this);
+    return null;
   }
 
   finish() {
@@ -2267,7 +2509,7 @@ class MatchEngine {
 
   teamTotals(side = 0) {
     const t = MatchEngine.blankStats();
-    for (const p of this.sides[side].players) { const s = this.st(p); for (const k in t) t[k] += s[k]; }
+    for (const p of this.sides[side].all) { const s = this.st(p); for (const k in t) t[k] += s[k]; }
     return t;
   }
 }
@@ -2344,8 +2586,27 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.1', name: { en: 'Touchline', ru: 'У бровки' },
+    en: [
+      'Match screen redesigned into three columns that use the full width: live roster & subs (left), scoreboard, pitch and log (centre), assistant coach & live stats (right).',
+      'Live energy: every player now tires during the match (30–40% over 90 minutes) and the bars drain in real time. Under 30% a player is exhausted and plays at ×0.8.',
+      'Live substitutions at any time: click a player on the pitch and one on the bench. The dot on the pitch changes immediately, the log announces it and the sub shouts “ON!”. Up to 5 changes; a substituted or sent-off player cannot come back.',
+      'Half-time: the match pauses at 45:00 with a HALF TIME banner and a Resume button; everyone on the pitch gets +4% energy.',
+      'Assistant coach: live advice about exhausted players, yellow cards, red cards, the score, sloppy passing and possession.',
+      'Energy after the match is the real end-of-match value (minutes played count); unused subs rest.',
+      'Version shown in the window title and the taskbar header: v1.1.',
+    ],
+    ru: [
+      'Экран матча переделан в три колонки на всю ширину: состав и замены (слева), табло, поле и протокол (в центре), помощник тренера и статистика (справа).',
+      'Энергия в реальном времени: игроки устают по ходу матча (30–40% за 90 минут), полоски тают на глазах. Ниже 30% игрок выдохся и играет на ×0.8.',
+      'Замены в любой момент: щёлкни игрока на поле и запасного. Фишка на поле меняется сразу, протокол объявляет замену, а вышедший кричит «ВЫХОЖУ!». До 5 замен; заменённый или удалённый игрок не возвращается.',
+      'Перерыв: на 45:00 матч ставится на паузу с табличкой ПЕРЕРЫВ и кнопкой «Продолжить»; все на поле получают +4% энергии.',
+      'Помощник тренера: живые советы об уставших игроках, жёлтых и красных карточках, счёте, неточных передачах и владении.',
+      'Энергия после матча — реальная на финальный свисток (учитываются сыгранные минуты); незадействованные запасные отдыхают.',
+      'Версия в заголовке окна и на панели задач: v1.1.',
+    ] },
   { v: '1.0', name: { en: "Coach's Notebook 2.0", ru: 'Блокнот тренера 2.0' },
     en: [
       'The version number is now part of the game title: browser tab, taskbar header and ReadMe all show v1.0.',
@@ -2576,6 +2837,16 @@ class PitchModel {
     b.power = power; b.trail = power || loft > 0;   // shots and long balls leave a trail
   }
 
+  /** Live substitution: the incoming player inherits the dot (position, slot, motion). */
+  substitute(outId, inP) {
+    const e = this.ents.get(outId);
+    if (!e) return;
+    this.ents.delete(outId);
+    e.id = inP.id; e.p = inP; e.number = inP.number; e.involved = false;
+    this.ents.set(inP.id, e);
+    this.fx.push({ type: 'bark', id: inP.id, key: 'bark.sub', cls: 'good', imp: true });
+  }
+
   /** Diegetic effects for one engine event: barks above heads, screen shake, CRT surge. */
   emitFx(ev, eng) {
     const bark = (p, key, cls = '', imp = false) => { if (p) this.fx.push({ type: 'bark', id: p.id ?? p, key, cls, imp }); };
@@ -2638,7 +2909,7 @@ class PitchModel {
     let ballTo = this.spotFor(eng, carrier), dur = travel, opts = {};
     const dir = this.attackDir(eng.poss);
     switch (ev.kind) {
-      case 'kickoff':
+      case 'kickoff': case 'halftime':
         ballTo = { x: 50, y: 50 }; dur = 0.5; break;
       case 'pass': {
         const d = dist(b.pos, ballTo);
@@ -2685,7 +2956,7 @@ class PitchModel {
     const shiftAtt = clamp(bxc * 0.55, -22, 22), shiftDef = clamp(bxc * 0.38, -13, 13);
     for (const e of this.ents.values()) {
       if (e.off) continue;
-      if (ev.kind === 'kickoff') { e.target = { ...e.base }; continue; }
+      if (ev.kind === 'kickoff' || ev.kind === 'halftime') { e.target = { ...e.base }; continue; }
       const inPoss = e.side === eng.poss;
       const shift = inPoss ? shiftAtt : shiftDef;
       if (e.gk) {
@@ -2828,6 +3099,16 @@ class PitchRenderer {
 
   relabel(model) { for (const e of model.ents.values()) { const n = this.nodes.get(e.id); if (n) n.el.title = L.name(e.p.name); } }
 
+  substitute(outId, inP) {
+    const n = this.nodes.get(outId);
+    if (!n) return;
+    this.nodes.delete(outId);
+    this.nodes.set(inP.id, n);
+    n.el.querySelector('b').textContent = inP.number;
+    n.el.title = L.name(inP.name);
+    n.el.classList.remove('sub-in'); void n.el.offsetWidth; n.el.classList.add('sub-in');
+  }
+
   draw(model, carrierId, dt) {
     if (!this.W) this.measure();
     const W = this.W, H = this.H;
@@ -2917,6 +3198,7 @@ class MatchView {
   onEngineUpdate(eng) { this.eng = eng; this.model.onEvent(eng); }
   setTempo(delayMs) { this.model.setTempo(delayMs); }
   relabel() { this.renderer.relabel(this.model); }
+  substitute(outId, inP) { this.model.substitute(outId, inP); this.renderer.substitute(outId, inP); }
   start() { if (!this.raf) { this.last = performance.now(); this.raf = requestAnimationFrame(this.loop); } }
   stop() { cancelAnimationFrame(this.raf); this.raf = 0; }
   loop(now) {
@@ -3085,6 +3367,7 @@ class UIController {
   }
 
   renderAll() {
+    this.renderLiveRoster(); this.renderAssistant(this.engine);
     this.renderDash();
     this.renderTeam();
     this.renderTable();
@@ -3146,6 +3429,13 @@ class UIController {
     document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => this.show('dash')));
     this.$('btn-start').addEventListener('click', () => this.onStartButton());
     this.$('btn-ver').addEventListener('click', () => this.show('readme'));
+    this.$('btn-resume').addEventListener('click', () => this.resumeMatch());
+    const lr = this.$('live-roster');
+    lr.addEventListener('click', e => { const row = e.target.closest('.r-row'); if (row) this.onLiveRosterClick(row.dataset.id); });
+    lr.addEventListener('keydown', e => {
+      const row = e.target.closest('.r-row');
+      if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.onLiveRosterClick(row.dataset.id); }
+    });
     this.$('btn-sim').addEventListener('click', () => this.onDashAction());
     this.$('btn-startmenu').addEventListener('click', e => { e.stopPropagation(); this.toggleStart(); });
     document.addEventListener('click', e => { if (!e.target.closest('#startmenu')) this.toggleStart(false); });
@@ -3170,12 +3460,14 @@ class UIController {
       if (e.key !== 'Escape' || this.modal.isOpen) return;
       this.toggleStart(false);
       if (this.selected) { this.clearSelection(); }
+      if (this.liveSel) { this.liveSel = null; this.renderLiveRoster(); }
     });
 
     document.querySelectorAll('[data-shout]').forEach(b => b.addEventListener('click', () => {
       this.mentality = b.dataset.shout;
       if (this.live) this.engine.setMentality(this.mentality);
       this.renderShouts();
+      if (this.engine) this.renderAssistant(this.engine);
     }));
     document.querySelectorAll('[data-speed]').forEach(b => b.addEventListener('click', () => {
       this.speed = Number(b.dataset.speed);
@@ -3261,6 +3553,139 @@ class UIController {
   }
 
   get live() { return !!(this.engine && !this.engine.finished); }
+
+  /* ---------- MATCH: live roster & substitutions (left column, v1.1) ---------- */
+  renderLiveRoster() {
+    const eng = this.engine, s = this.state;
+    const onPitch = eng ? eng.sides[0].entries.map(e => e.p) : s.starters();
+    const lines = eng ? eng.sides[0].entries.map(e => e.line) : s.slots().map(x => x.line);
+    const onIds = onPitch.map(p => p.id);
+    const bench = s.squad.filter(p => !onIds.includes(p.id)).sort((a, b) => POS_ORDER[a.position] - POS_ORDER[b.position]);
+    const selP = this.liveSel ? s.player(this.liveSel) : null;
+    const over = !!(eng && eng.finished) || (!eng && s.phase !== 'matchday');
+    const row = (p, i, pitch) => {
+      const status = eng?.sentOff.has(p.id) ? 'sent' : eng?.subbedOff.has(p.id) ? 'off' : '';
+      const disabled = over || !!status;
+      const hint = selP && p.id !== selP.id && !disabled ? (p.position === selP.position ? ' suggested-swap' : ' dimmed-swap') : '';
+      const sub = status ? L.t('lr.' + status) : pitch ? L.line(lines[i]) : L.t('team.onBench');
+      return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
+          data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
+        <span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
+        <span class="lr-name"><b>${esc(L.name(p.surname))}</b><small>${sub}</small></span>
+        <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
+      </div>`;
+    };
+    const box = this.$('live-roster');
+    const keep = box.scrollTop;
+    box.innerHTML = `<div class="r-grp">${L.t('lr.onPitch')}</div>` + onPitch.map((p, i) => row(p, i, true)).join('')
+      + `<div class="r-grp">${L.t('lr.bench')}</div>` + bench.map(p => row(p, -1, false)).join('');
+    box.scrollTop = keep;
+    this.lrRefs = [...box.querySelectorAll('.r-row')].map(el => ({ id: el.dataset.id, bar: el.querySelector('.energy'), fill: el.querySelector('.energy i'), txt: el.querySelector('.energy span'), cards: el.querySelector('.lr-cards'), last: '' }));
+    this.$('lr-subs').textContent = eng ? L.t('lr.subs', { n: eng.subsUsed, m: MatchEngine.MAX_SUBS }) : L.t('lr.preMatch');
+    const help = over ? 'lr.help.over' : this.liveSel ? 'lr.help.sel' : eng ? 'lr.help.live' : 'lr.help.pre';
+    this.$('lr-help').textContent = L.t(help, { n: selP ? L.name(selP.surname) : '' });
+    this.updateLiveRoster();
+  }
+
+  /** Cheap per-tick update: only energy bars and cards (rows are not rebuilt, so clicks are never lost). */
+  updateLiveRoster() {
+    const eng = this.engine, s = this.state;
+    for (const r of this.lrRefs || []) {
+      const p = s.player(r.id); if (!p) continue;
+      const e = Math.round(eng?.energy.get(r.id) ?? p.energy);
+      const st = eng?.stats.get(r.id);
+      const sig = `${e}|${st?.yellow || 0}|${st?.red || 0}`;
+      if (sig === r.last) continue;
+      r.last = sig;
+      r.bar.className = 'energy ' + this.energyClass(e);
+      r.fill.style.width = e + '%';
+      r.txt.textContent = e + '%';
+      r.cards.innerHTML = st?.red ? '<i class="cd r"></i>' : st?.yellow ? '<i class="cd y"></i>' : '';
+    }
+  }
+
+  onLiveRosterClick(id) {
+    const eng = this.engine, s = this.state;
+    const row = this.$('live-roster').querySelector(`.r-row[data-id="${id}"]`);
+    if (!row || row.classList.contains('disabled')) return;
+    const isOn = x => eng ? eng.sides[0].entries.some(e => e.p.id === x) : s.isStarter(x);
+    if (!this.liveSel) this.liveSel = id;
+    else if (this.liveSel === id) this.liveSel = null;
+    else if (!isOn(this.liveSel) && !isOn(id)) this.liveSel = id;   // two bench players: move the selection
+    else if (eng && isOn(this.liveSel) === isOn(id)) this.liveSel = id;
+    else {
+      const a = this.liveSel; this.liveSel = null;
+      if (eng) {                      // LIVE substitution
+        const outId = isOn(a) ? a : id, inId = outId === a ? id : a;
+        const err = eng.substitute(outId, s.player(inId));
+        if (err) this.alert(L.t('sub.err.' + err, { m: MatchEngine.MAX_SUBS }), L.t('sub.err.title'), 'error');
+      } else {                        // before kick-off: same rules as Team Management
+        const err = s.swapPlayers(a, id);
+        if (err) this.alert(L.t('team.err.' + err), L.t('team.err.title'), 'error');
+        else { this.renderTeam(); this.prepareMatch(); return; }
+      }
+    }
+    this.renderLiveRoster();
+  }
+
+  onSub(out, inP) {
+    this.radar.substitute(out.id, inP);
+    this.renderLiveRoster();
+  }
+
+  onHalfTime(eng) {
+    const [a, b] = eng.sides;
+    this.$('ht-score').textContent = `${L.team(a.name).replace(' U-14', '')}  ${a.score} - ${b.score}  ${L.team(b.name)}`;
+    this.$('ht-banner').hidden = false;
+    this.renderMatchChrome();
+    this.renderAssistant(eng);
+  }
+  resumeMatch() {
+    if (!this.engine || !this.engine.paused) return;
+    this.$('ht-banner').hidden = true;
+    this.engine.resume();
+    this.renderMatchChrome();
+  }
+
+  /* ---------- MATCH: assistant coach (right column, v1.1) ---------- */
+  assistantMessages(eng) {
+    if (!eng) return this.state.phase === 'matchday' ? [{ key: 'asst.pre', pr: 10 }] : [];
+    if (eng.finished) return [{ key: 'asst.ft', pr: 10 }];
+    const [us, them] = eng.sides;
+    const mine = us.entries.map(e => e.p).filter(p => !eng.sentOff.has(p.id));
+    const en = p => Math.round(eng.energy.get(p.id) ?? 100);
+    const st = p => eng.stats.get(p.id);
+    const msgs = [];
+    if (eng.paused) msgs.push({ key: 'asst.ht', vars: { t: mine.filter(p => en(p) < 45).length, c: mine.filter(p => st(p).yellow).length }, pr: 100 });
+    mine.slice().sort((a, b) => en(a) - en(b)).slice(0, 2).forEach((p, i) => {
+      const e = en(p);
+      if (e < ENERGY.EXHAUSTED) msgs.push({ key: 'asst.exhausted', vars: { n: p, e }, pr: 90 - i });
+      else if (e < 45) msgs.push({ key: 'asst.tiring', vars: { n: p, e }, pr: 45 - i });
+    });
+    mine.filter(p => st(p).yellow && !st(p).red).forEach(p => msgs.push({ key: 'asst.yellow', vars: { n: p }, pr: 80 }));
+    if (us.players.some(p => eng.sentOff.has(p.id))) msgs.push({ key: 'asst.red', vars: { k: mine.length }, pr: 85 });
+    const diff = us.score - them.score;
+    if (diff < 0 && this.mentality !== 'attack') msgs.push({ key: eng.minute >= 70 ? 'asst.losingLate' : 'asst.losing', pr: eng.minute >= 70 ? 78 : 70 });
+    if (diff > 0 && eng.minute >= 70 && this.mentality !== 'defend') msgs.push({ key: 'asst.protect', pr: 60 });
+    if (eng.minute >= 15) {
+      const t = eng.teamTotals(0), passes = t.passOk + t.passFail;
+      const total = eng.possTicks[0] + eng.possTicks[1] || 1, share = Math.round(eng.possTicks[0] / total * 100);
+      if (passes >= 20 && t.passOk / passes < 0.55) msgs.push({ key: 'asst.sloppy', vars: { r: Math.round(t.passOk / passes * 100) }, pr: 35 });
+      if (share < 38) msgs.push({ key: 'asst.possession', vars: { p: share }, pr: 30 });
+    }
+    if (!msgs.length) msgs.push({ key: 'asst.good', pr: 0 });
+    return msgs.sort((a, b) => b.pr - a.pr).slice(0, 3);
+  }
+  renderAssistant(eng) {
+    const msgs = this.assistantMessages(eng);
+    const html = msgs.map((m, i) => {
+      const vars = {};
+      for (const k in (m.vars || {})) vars[k] = esc(this.v(m.vars[k]));
+      const lvl = m.pr >= 75 ? 'hi' : m.pr >= 45 ? 'mid' : 'lo';
+      return `<div class="asst-msg ${lvl}${i === 0 ? ' top' : ''}"><span class="ic">${lvl === 'lo' ? 'i' : '!'}</span>${L.t(m.key, vars)}</div>`;
+    }).join('');
+    if (html !== this.asstHtml) { this.$('asst').innerHTML = html; this.asstHtml = html; }
+  }
   get matchOpen() { return this.live || this.state.phase === 'matchday' || this.state.phase === 'post'; }
   get notesOpen() { return this.state.phase === 'post' && this.state.notebookUnlocked && !!this.state.lastReport; }
 
@@ -3650,8 +4075,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (oop.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.oopWarn', vars: { n: { list: oop } }, side: 0, r: 0 });
     }
     this.prepareRadar();
+    this.$('ht-banner').hidden = true;
+    this.liveSel = null;
     this.renderMatchChrome();
     this.renderTeamStats(MatchEngine.blankStats());
+    this.renderLiveRoster();
+    this.renderAssistant(null);
   }
 
   renderMatchChrome() {
@@ -3672,6 +4101,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       btn.innerHTML = can ? L.t('match.start') : L.t('match.noMatch');
       sp.textContent = can ? L.t('match.ready') : '';
       st.textContent = can ? L.t('match.statusReady') : L.t('dlg.noMatch').replace(/<br>.*/, '');
+    } else if (e.paused) {
+      btn.disabled = false; btn.innerHTML = L.t('match.resume');
+      sp.textContent = L.t('match.paused');
+      st.textContent = L.t('ht.tip');
     } else if (!e.finished) {
       slow = e.highlight;
       btn.disabled = true; btn.innerHTML = L.t('match.inProgress');
@@ -3687,6 +4120,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
   onStartButton() {
     if (this.engine && this.engine.finished) { this.show('notes'); return; }
+    if (this.engine && this.engine.paused) { this.resumeMatch(); return; }
     if (this.engine) return;
     if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
     const ctx = this.state.matchContext();
@@ -3701,7 +4135,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       },
       onGoal: () => { const el = this.$('sb-score'); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); },
       onEnd: eng => this.onMatchEnd(eng),
+      onHalfTime: eng => this.onHalfTime(eng),
+      onSub: (out, inP) => this.onSub(out, inP),
     }, { mentality: this.mentality, speed: this.speed });
+    this.liveSel = null;
     this.radar.setup(this.engine.sides);
     this.engine.start();
     this.renderAll();
@@ -3745,6 +4182,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.$('poss').textContent = `${Math.round(eng.possTicks[0] / total * 100)}% - ${Math.round(eng.possTicks[1] / total * 100)}%`;
     this.renderTeamStats(eng.teamTotals(0));
     this.radar.onEngineUpdate(eng);
+    this.updateLiveRoster();
+    this.renderAssistant(eng);
   }
 
   renderTeamStats(t) {
@@ -3768,7 +4207,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.league.setUserResult(ctx.fixture, a.score, b.score);
     const others = s.league.simulateOthers(ctx.md);
     this.appendLog({ minute: 90, type: 'flavor', key: 'match.others', vars: { r: { fixtures: others } }, side: -1, r: 0 });
-    const played = a.players;
+    const played = a.all;   // starters + substitutes
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
       players: shuffle(played).slice(0, 3).map(p => ({
@@ -3777,7 +4216,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       })),
     };
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
-    s.applyFatigue(played.map(p => p.id));
+    s.applyLiveFatigue(eng);
     s.phase = 'post';
     s.notebookUnlocked = true;
     s.save();
