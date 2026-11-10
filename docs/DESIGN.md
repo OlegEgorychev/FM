@@ -1,11 +1,11 @@
-# Youth Academy Manager — design notes (current: v1.2)
+# Youth Academy Manager — design notes (current: v1.3)
 
-Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
+Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
 ## Versioning (strict)
 `APP_VERSION` in `src/js/08-version-patch-notes.js` is the single source of truth → `<title>` (injected by `build.js`), `document.title`, taskbar `#app-title`, tray badge, ReadMe.txt. Newest `PATCH_NOTES` entry must match (build fails otherwise). Every change = new version + EN/RU notes + git tag.
 
-Version map: v0.1 MVP · v0.2 Russian + readability · v0.3 roles/shouts/energy · v0.4 formations + radar + speeds · v0.5 league/calendar/dashboard · v0.6 Team Management + modals + Win98 polish · v0.7 60 FPS live pitch · v0.8 Smart Swap · v0.9 Game Feel + ReadMe · v1.0 Coach's Notebook 2.0 · v1.1 Touchline · v1.2 GitHub, modules, WebP. (Git history starts at v0.3; v0.1–v0.2 were not archived.)
+Version map: v0.1 MVP · v0.2 Russian + readability · v0.3 roles/shouts/energy · v0.4 formations + radar + speeds · v0.5 league/calendar/dashboard · v0.6 Team Management + modals + Win98 polish · v0.7 60 FPS live pitch · v0.8 Smart Swap · v0.9 Game Feel + ReadMe · v1.0 Coach's Notebook 2.0 · v1.1 Touchline · v1.2 GitHub, modules, WebP · v1.3 softer vignette, Match icon above ReadMe. (Git history starts at v0.3; v0.1–v0.2 were not archived.)
 
 ## Navigation & loop
 Main nav: Dashboard | Team Management | League Table. Match and Notebook appear only while the calendar unlocks them. ReadMe.txt: desktop icon / Start menu / tray badge.

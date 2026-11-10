@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.2</title>
+<title>Youth Academy Manager v1.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -80,8 +80,8 @@ button{ font-family: var(--ui); }
 .crt-grille{ z-index: 91; opacity: .6;
   background: repeating-linear-gradient(90deg, rgba(255,40,40,.035) 0 1px, rgba(40,255,40,.025) 1px 2px, rgba(40,80,255,.035) 2px 3px); }
 .crt-vignette{ z-index: 92;
-  background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.55) 88%, rgba(0,0,0,.85) 100%);
-  box-shadow: inset 0 0 110px rgba(0,0,0,.85), inset 0 0 18px rgba(0,0,0,.9); border-radius: inherit; }
+  background: radial-gradient(ellipse at center, transparent 68%, rgba(0,0,0,.18) 92%, rgba(0,0,0,.32) 100%);
+  box-shadow: inset 0 0 60px rgba(0,0,0,.35), inset 0 0 10px rgba(0,0,0,.5); border-radius: inherit; }
 .crt-glare{ z-index: 93; background: radial-gradient(ellipse at 28% 12%, rgba(255,255,255,.06), transparent 42%); }
 .crt-flicker{ z-index: 94; background: rgba(180,220,255,.018); animation: flicker .13s steps(2) infinite; }
 .crt-roll{ z-index: 95; height: 18%; background: linear-gradient(to bottom, transparent, rgba(255,255,255,.025), transparent);
@@ -923,8 +923,8 @@ body.fx .crt-scan{ opacity: .9; }
       <button class="icon" data-view="dash"><span class="glyph">&#8962;</span><span data-i18n="nav.dash">Dashboard</span></button>
       <button class="icon" data-view="team"><span class="glyph">&#9783;</span><span data-i18n="nav.team">Team</span></button>
       <button class="icon" data-view="table"><span class="glyph">&#9776;</span><span data-i18n="nav.table">League</span></button>
-      <button class="icon readme-ico" data-view="readme"><span class="glyph">&#9636;</span><span data-i18n="nav.readme">ReadMe.txt</span></button>
       <button class="icon dyn" data-view="match" id="icon-match" hidden><span class="glyph">&#9673;</span><span data-i18n="nav.match">Match</span></button>
+      <button class="icon readme-ico" data-view="readme"><span class="glyph">&#9636;</span><span data-i18n="nav.readme">ReadMe.txt</span></button>
       <button class="icon dyn" data-view="notes" id="icon-notes" hidden><span class="glyph">&#9998;</span><span data-i18n="nav.notebook">Notebook</span></button>
     </nav>
 
@@ -2586,8 +2586,17 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.2';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.3', name: { en: 'Brighter Screen', ru: 'Светлее экран' },
+    en: [
+      'Softer screen edges: the corners of the monitor are no longer so dark, the whole picture is easier to read.',
+      'Desktop icons: Match now sits right after League (in place of ReadMe.txt), ReadMe.txt moved below it.',
+    ],
+    ru: [
+      'Мягче края экрана: углы монитора больше не такие тёмные, картинку легче читать.',
+      'Значки на рабочем столе: Матч теперь сразу под Таблицей (на месте ReadMe.txt), ReadMe.txt опустился ниже.',
+    ] },
   { v: '1.2', name: { en: 'On GitHub', ru: 'На GitHub' },
     en: [
       'The game now lives on GitHub: play it from a link that updates by itself with every new version.',

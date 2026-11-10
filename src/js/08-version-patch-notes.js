@@ -2,8 +2,17 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.2';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.3', name: { en: 'Brighter Screen', ru: 'Светлее экран' },
+    en: [
+      'Softer screen edges: the corners of the monitor are no longer so dark, the whole picture is easier to read.',
+      'Desktop icons: Match now sits right after League (in place of ReadMe.txt), ReadMe.txt moved below it.',
+    ],
+    ru: [
+      'Мягче края экрана: углы монитора больше не такие тёмные, картинку легче читать.',
+      'Значки на рабочем столе: Матч теперь сразу под Таблицей (на месте ReadMe.txt), ReadMe.txt опустился ниже.',
+    ] },
   { v: '1.2', name: { en: 'On GitHub', ru: 'На GitHub' },
     en: [
       'The game now lives on GitHub: play it from a link that updates by itself with every new version.',
