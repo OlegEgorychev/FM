@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager</title>
+<title>Youth Academy Manager v1.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -796,6 +796,22 @@ body.fx .crt-scan{ opacity: .9; }
 @media (prefers-reduced-motion: reduce){ .bark{ animation-duration: 1.2s; } .pitch.radar .ball.power{ animation: none; } }
 
 /* =========================================================
+   v1.0 — NOTEBOOK 2.0 + VERSIONED TITLE
+   ========================================================= */
+.app-title{ margin: 0 6px 0 4px; padding: 0 8px; height: 26px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  font-size: 12px; color: #1b2b45; border: 1px solid; border-color: var(--shadow) var(--hi) var(--hi) var(--shadow); }
+.app-title b{ color: #a63b30; }
+.card ul{ margin-bottom: 6px; }
+.card li{ font-size: 13px; line-height: 20px; }
+.card li .avg{ color: #5e5a4c; font-size: 12px; }
+.coach-note{ margin: 4px 0 8px 22px; padding: 4px 8px; font-style: italic; font-size: 13px; line-height: 1.4; color: #2c3a52;
+  background: rgba(255,246,200,.75); border-left: 3px solid #c9a227; }
+.coach-note b{ font-style: normal; }
+.nb-legend{ margin: -6px 0 10px; font-size: 12px; color: #b9c2b4; }
+.nb-legend span{ background: #e9e4d3; padding: 0 4px; }
+@media (max-width: 820px){ .app-title{ display: none; } }
+
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1028,6 +1044,7 @@ body.fx .crt-scan{ opacity: .9; }
 
   <footer id="taskbar">
     <button class="tk start" id="btn-startmenu" aria-haspopup="menu"><span class="logo">&#9673;</span><span data-i18n="ui.start">Start</span></button>
+    <span class="app-title" id="app-title" title="Youth Academy Manager"></span>
     <span class="sep"></span>
     <div class="tasks">
       <button class="tk" data-view="dash">&#8962; <span class="lbl" data-i18n="nav.dash"></span></button>
@@ -1226,7 +1243,7 @@ const I18N = {
     'eng.shout.attack': 'Coach shouts: PUSH FORWARD!', 'eng.shout.defend': 'Coach shouts: PARK THE BUS!', 'eng.shout.balanced': 'Coach shouts: KEEP YOUR SHAPE, LADS!',
   },
   ru: {
-    'doc.title': 'Менеджер детской академии',
+    'doc.title': 'Youth Academy Manager',
     'nav.office': 'Кабинет', 'nav.squad': 'Состав', 'nav.tactics': 'Тактика', 'nav.match': 'Матч', 'nav.matchday': 'День матча',
     'nav.notebook': 'Блокнот', 'nav.notebookLocked': 'Блокнот (закрыт)',
     'ui.start': 'Пуск', 'ui.ok': 'ОК', 'ui.close': 'Закрыть', 'ui.min': 'Свернуть',
@@ -1332,12 +1349,52 @@ const TXT = {
   },
 };
 
+/* ---- v1.0: notebook 2.0 ---- */
+Object.assign(I18N.en, {
+  'nb.passes': 'Passes', 'nb.tackles': 'Tackles', 'nb.dribbles': 'Dribbles', 'nb.season': 'Season Avg',
+  'nb.intercepts': 'Interceptions & blocks: {a} (season {b})', 'nb.shots': 'Shots: {a} (on target {b}), goals {c} · season goals {g}',
+  'nb.saves': 'Saves: {a} (season {b})', 'nb.apps': 'matches this season: {n}', 'nb.coachNote': "Coach's Note",
+  'nb.legend': 'Season figures include today. Tackles = duels won / duels.', 'st.intercepts': 'Interceptions',
+  'note.duelHigh': 'He was a rock in defence today, very aggressive in the challenge and he wins his duels.',
+  'note.duelLow': 'Got skinned too often one-on-one. A reckless role could cost us cards.',
+  'note.passHigh': 'Great vision, he controls the tempo and finds his man.',
+  'note.passLow': 'Gives the ball away too easily. I would not build our play through him.',
+  'note.dribHigh': 'Loves the ball at his feet and beats his man. Give him freedom to go alone.',
+  'note.dribLow': 'Loses the ball every time he tries to go it alone.',
+  'note.scorer': 'Has an eye for goal and wants to be the hero.',
+  'note.gkBusy': 'Kept us in the game with save after save.', 'note.gkOk': 'Solid between the posts.', 'note.gkQuiet': 'A quiet day for the keeper.',
+  'note.tired': 'He was running on empty, so these numbers are not his real level.',
+  'note.oop': 'Played out of his natural position, so judge with care.',
+  'note.quiet': 'Hard to judge: he barely saw the ball today.',
+  'note.steady': 'An honest, steady game. Nothing stood out either way.',
+  'note.role': 'These numbers already include his current role ({r}).',
+});
+Object.assign(I18N.ru, {
+  'nb.passes': 'Пасы', 'nb.tackles': 'Отборы', 'nb.dribbles': 'Обводка', 'nb.season': 'в сезоне',
+  'nb.intercepts': 'Перехваты и блоки: {a} (в сезоне {b})', 'nb.shots': 'Удары: {a} (в створ {b}), голы {c} · голов в сезоне {g}',
+  'nb.saves': 'Сейвы: {a} (в сезоне {b})', 'nb.apps': 'матчей в сезоне: {n}', 'nb.coachNote': 'Заметка тренера',
+  'nb.legend': 'Сезонные цифры включают этот матч. Отборы = выигранные единоборства / все единоборства.', 'st.intercepts': 'Перехваты',
+  'note.duelHigh': 'Сегодня он был скалой в обороне: жёстко идёт в стык и выигрывает единоборства.',
+  'note.duelLow': 'Слишком часто его обыгрывали один в один. Безрассудная роль может стоить нам карточек.',
+  'note.passHigh': 'Отличное видение поля: он задаёт темп и находит своих.',
+  'note.passLow': 'Слишком легко теряет мяч. Я бы не строил игру через него.',
+  'note.dribHigh': 'Любит мяч в ногах и обыгрывает соперника. Дай ему свободу действовать самому.',
+  'note.dribLow': 'Теряет мяч каждый раз, когда пытается пройти сам.',
+  'note.scorer': 'Чувствует ворота и хочет быть героем.',
+  'note.gkBusy': 'Держал нас в игре сейв за сейвом.', 'note.gkOk': 'Надёжен в воротах.', 'note.gkQuiet': 'Спокойный день для вратаря.',
+  'note.tired': 'Он был выжат, так что эти цифры не его настоящий уровень.',
+  'note.oop': 'Играл не на своей позиции, оценивай осторожно.',
+  'note.quiet': 'Трудно судить: он почти не видел мяча.',
+  'note.steady': 'Честная, ровная игра. Ничего не выделялось.',
+  'note.role': 'Цифры уже учитывают его текущую роль ({r}).',
+});
+
 /* ---- v0.9: patch notes, barks ---- */
 Object.assign(I18N.en, {
   'nav.readme': 'ReadMe.txt', 'nav.readmeLong': 'Patch notes (ReadMe.txt)', 'readme.title': 'README.TXT — Notepad',
   'np.file': 'File', 'np.edit': 'Edit', 'np.format': 'Format', 'np.help': 'Help',
   'readme.head': 'PATCH NOTES', 'readme.current': 'Current version: v{v}', 'readme.new': 'NEW',
-  'readme.foot': 'Every update raises the version number and adds its notes at the top of this file.',
+  'readme.foot': 'Every update raises the version number, adds its notes at the top of this file and updates the version in the window title and the taskbar.',
   'readme.status': 'Version v{v} · {n} releases',
   'update.title': 'Update installed', 'update.text': 'Youth Academy Manager has been updated to <b>v{v}</b>.<br>See what changed in ReadMe.txt.', 'update.open': 'Open ReadMe.txt',
   'bark.mine': 'MINE!', 'bark.huh': '!?', 'bark.tackle': 'TACKLE!', 'bark.ole': 'OLÉ!', 'bark.ouch': 'OUCH!', 'bark.yellow': 'YELLOW',
@@ -1347,7 +1404,7 @@ Object.assign(I18N.ru, {
   'nav.readme': 'ReadMe.txt', 'nav.readmeLong': 'Список изменений (ReadMe.txt)', 'readme.title': 'README.TXT — Блокнот',
   'np.file': 'Файл', 'np.edit': 'Правка', 'np.format': 'Формат', 'np.help': 'Справка',
   'readme.head': 'СПИСОК ИЗМЕНЕНИЙ', 'readme.current': 'Текущая версия: v{v}', 'readme.new': 'НОВОЕ',
-  'readme.foot': 'Каждое обновление повышает номер версии и добавляет свои заметки в начало этого файла.',
+  'readme.foot': 'Каждое обновление повышает номер версии, добавляет заметки в начало этого файла и обновляет версию в заголовке окна и на панели задач.',
   'readme.status': 'Версия v{v} · выпусков: {n}',
   'update.title': 'Установлено обновление', 'update.text': 'Youth Academy Manager обновлён до <b>v{v}</b>.<br>Что нового — в ReadMe.txt.', 'update.open': 'Открыть ReadMe.txt',
   'bark.mine': 'МОЁ!', 'bark.huh': '!?', 'bark.tackle': 'ОТБОР!', 'bark.ole': 'ОЛЕ!', 'bark.ouch': 'АЙ!', 'bark.yellow': 'ЖЁЛТАЯ',
@@ -1696,6 +1753,7 @@ class GameState {
     this.lastReport = null;
     this.notebookUnlocked = false;
     this.diary = [{ date: start, key: 'cal.welcome', vars: { y: year, z: String(year + 1).slice(2) } }];
+    this.seasonStats = {};   // playerId → cumulative stats this season (+ apps)
     for (const p of this.squad) p.energy = 100;   // summer break
     this.save();
   }
@@ -1778,6 +1836,16 @@ class GameState {
     }
   }
 
+  /** Adds one match to every player's season totals. pairs: [[id, stats], ...] */
+  recordSeasonStats(pairs) {
+    for (const [id, st] of pairs) {
+      const acc = this.seasonStats[id] || (this.seasonStats[id] = { ...MatchEngine.blankStats(), apps: 0 });
+      for (const k in st) acc[k] = (acc[k] || 0) + st[k];
+      acc.apps++;
+    }
+  }
+  seasonOf(id) { return this.seasonStats[id] || { ...MatchEngine.blankStats(), apps: 0 }; }
+
   addDiary(entry) { this.diary.push(entry); if (this.diary.length > 80) this.diary.shift(); }
 
   save() {
@@ -1785,7 +1853,7 @@ class GameState {
       localStorage.setItem(GameState.KEY, JSON.stringify({
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
-        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary,
+        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -1817,6 +1885,7 @@ class GameState {
         this.lastReport = d.lastReport || null;
         this.notebookUnlocked = !!d.notebookUnlocked;
         this.diary = Array.isArray(d.diary) ? d.diary : [];
+        this.seasonStats = d.seasonStats && typeof d.seasonStats === 'object' ? d.seasonStats : {};
         // a match interrupted by a page reload is simply replayed
       } else {
         this.newSeason(SEASON.FIRST_YEAR);   // older saves: keep the squad, start the league
@@ -1873,7 +1942,49 @@ class MatchEngine {
     return { name: team.name, formation: team.formation, user, score: 0, players: team.players,
       entries: slots.map((s, i) => ({ ...s, p: team.players[i] })) };
   }
-  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0 }; }
+  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0 }; }
+
+  /* ---------- background play (v1.0) ----------
+     Every minute, each player may also make an OFF-BALL pass or take on a man, resolved with the same
+     maths (hidden stats × roles × fatigue × position × shouts × line superiority). These feed the
+     statistics only: no possession change, no log line, no pitch event, no cards — so the score and
+     the visible match stay exactly as before, but the Notebook gets statistically meaningful numbers.
+     Per-minute chances → per match: MID ≈ 15 passes + ~3 visible; DEF faces ≈ 8–12 duels. */
+  static AMBIENT = {
+    pass:    { GK: 0.05, DEF: 0.09, MID: 0.17, ATT: 0.07 },
+    dribble: { GK: 0,    DEF: 0.02, MID: 0.08, ATT: 0.15 },
+  };
+  static OPP_LINE = { GK: 'ATT', DEF: 'ATT', MID: 'MID', ATT: 'DEF' };   // who contests a player of this line
+  lineMates(side, line) {
+    const l = this.sides[side].entries.filter(e => e.line === line && !this.sentOff.has(e.p.id)).map(e => e.p);
+    return l.length ? l : this.active(side).filter(p => !this.isGK(p));
+  }
+  ambient() {
+    const R = () => Math.random() * 16;   // wider spread than the visible rolls → clearer differences between players
+    for (const side of [0, 1]) {
+      const opp = 1 - side;
+      for (const e of this.sides[side].entries) {
+        const p = e.p;
+        if (this.sentOff.has(p.id)) continue;
+        const z = LINE_IDX[e.line] ?? 0;
+        if (Math.random() < MatchEngine.AMBIENT.pass[e.line]) {
+          const def = pick(this.lineMates(opp, MatchEngine.OPP_LINE[e.line]));
+          const atk = this.eff(p, 'Pass') + R() + this.mod(side, 'atk') + this.sup(side, z) * 0.5;
+          const dfn = this.eff(def, 'Tackle') * 0.35 + 5.2 + R() + this.mod(opp, 'def');
+          if (atk >= dfn) this.st(p).passOk++;
+          else { this.st(p).passFail++; this.st(def).intercepts++; }
+        }
+        if (Math.random() < MatchEngine.AMBIENT.dribble[e.line]) {
+          const line = e.line === 'MID' ? (Math.random() < 0.5 ? 'MID' : 'DEF') : MatchEngine.OPP_LINE[e.line];
+          const def = pick(this.lineMates(opp, line));
+          const atk = (this.eff(p, 'Dribble') + this.eff(p, 'Speed')) / 2 + R() + this.mod(side, 'atk') + this.sup(side, z) * 0.5;
+          const dfn = this.eff(def, 'Tackle') + R() + this.mod(opp, 'def');
+          if (atk >= dfn) { this.st(p).dribbleOk++; this.st(def).tacklesLost++; }
+          else { this.st(p).dribbleFail++; this.st(def).tackles++; }
+        }
+      }
+    }
+  }
   st(p) { return this.stats.get(p.id); }
   active(side) { return this.sides[side].players.filter(p => !this.sentOff.has(p.id)); }
   inZone(side, zone) {
@@ -1964,6 +2075,7 @@ class MatchEngine {
     }
     this.possTicks[this.poss]++;
     this.act();
+    this.ambient();
     this.afterAction();
   }
 
@@ -2052,7 +2164,7 @@ class MatchEngine {
       this.log('', this.isGK(c) ? 'gkPass' : forward ? 'passFwd' : 'passOk', vars, side);
     } else {
       this.st(c).passFail++;
-      this.st(def).tackles++;
+      this.st(def).intercepts++;
       this.log('turn', 'passFail', vars, side);
       this.turnover(def, 2 - tz);
       this.setEv({ kind: 'intercept', a: c, b: recv, d: def });
@@ -2117,7 +2229,7 @@ class MatchEngine {
 
     if (Math.random() < 0.2 &&
         this.eff(blocker, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
-      this.st(blocker).tackles++;
+      this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
       this.turnover(blocker, 0);
       this.setEv({ kind: 'block', d: blocker });
@@ -2232,8 +2344,27 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '0.9';
+const APP_VERSION = '1.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.0', name: { en: "Coach's Notebook 2.0", ru: 'Блокнот тренера 2.0' },
+    en: [
+      'The version number is now part of the game title: browser tab, taskbar header and ReadMe all show v1.0.',
+      'Much more play to judge: every minute players also make off-ball passes and take on opponents. A midfielder now attempts about 15–20 passes per match, a defender faces about 8–12 duels.',
+      'Background play feeds the statistics only: score, match log and pitch are unchanged, and it never causes cards.',
+      'Season stats: every player collects season totals; the Notebook shows today next to the season average, e.g. “Passes: 18/20 (Season Avg: 85%)”.',
+      'Colour coding in the Notebook: success over 75% is green, under 40% is red.',
+      "Coach's Note under every player: a short hint based on his best and worst numbers today (and warnings if he was tired, out of position or already had a role).",
+      'Interceptions and blocks are now counted separately from tackles won in duels; new “Interceptions” row in the match stats.',
+    ],
+    ru: [
+      'Номер версии теперь часть названия игры: вкладка браузера, заголовок на панели задач и ReadMe показывают v1.0.',
+      'Намного больше игры для оценки: каждую минуту игроки ещё и разыгрывают мяч и идут в обводку «за кадром». Полузащитник теперь делает примерно 15–20 пасов за матч, защитник проводит примерно 8–12 единоборств.',
+      'Фоновая игра влияет только на статистику: счёт, протокол и поле не меняются, карточек она не даёт.',
+      'Статистика сезона: у каждого игрока копятся итоги сезона; в Блокноте рядом с матчем показан средний за сезон, например «Пасы: 18/20 (в сезоне: 85%)».',
+      'Цвета в Блокноте: успешность выше 75% — зелёная, ниже 40% — красная.',
+      'Заметка тренера под каждым игроком: короткая подсказка по его лучшей и худшей цифре в этом матче (и предупреждения, если он устал, играл не на своей позиции или уже имел роль).',
+      'Перехваты и блоки теперь считаются отдельно от выигранных единоборств; в статистике матча новая строка «Перехваты».',
+    ] },
   { v: '0.9', name: { en: 'Game Feel', ru: 'Ощущение игры' },
     en: [
       'ReadMe.txt: in-game version history and patch notes (desktop icon, Start menu, version badge in the tray).',
@@ -2857,6 +2988,46 @@ class Modal {
 }
 
 /* =========================================================
+   NOTEBOOK HELPERS (v1.0)
+   ========================================================= */
+/** Inline colour for a success rate: > 75% retro green, < 40% retro red (dark shades: the card is paper). */
+function rateStyle(r) {
+  if (r == null) return '';
+  if (r > 75) return 'color:#1d7a1d;font-weight:bold';
+  if (r < 40) return 'color:#b3261e;font-weight:bold';
+  return '';
+}
+
+/** Coach's Note: looks at the strongest and weakest signal of THIS match and returns i18n keys.
+    It hints at a role without naming it (duels → Aggressive, passing → Playmaker, dribbling/goals → Selfish). */
+function coachNote(p, s, flags = {}) {
+  const out = [];
+  if (flags.tired) out.push('note.tired');
+  if (p.position === 'GK') {
+    out.push(s.saves >= 3 ? 'note.gkBusy' : s.saves ? 'note.gkOk' : 'note.gkQuiet');
+  } else {
+    const rate = (ok, fail, min) => (ok + fail >= min ? { r: ok / (ok + fail), n: ok + fail } : null);
+    const pass = rate(s.passOk, s.passFail, 6), duel = rate(s.tackles, s.tacklesLost, 4), drib = rate(s.dribbleOk, s.dribbleFail, 4);
+    const cands = [];
+    if (duel) cands.push({ key: duel.r >= 0.7 ? 'note.duelHigh' : duel.r < 0.4 ? 'note.duelLow' : null, w: Math.abs(duel.r - 0.55) * duel.n, good: duel.r >= 0.7 });
+    if (pass) cands.push({ key: pass.r >= 0.8 ? 'note.passHigh' : pass.r < 0.45 ? 'note.passLow' : null, w: Math.abs(pass.r - 0.62) * pass.n * 0.8, good: pass.r >= 0.8 });
+    if (drib) cands.push({ key: drib.r >= 0.65 ? 'note.dribHigh' : drib.r < 0.35 ? 'note.dribLow' : null, w: Math.abs(drib.r - 0.5) * drib.n, good: drib.r >= 0.65 });
+    if (s.goals > 0) cands.push({ key: 'note.scorer', w: 2 + s.goals * 2, good: true });
+    const hits = cands.filter(c => c.key).sort((a, b) => b.w - a.w);
+    const best = hits.find(c => c.good), worst = hits.find(c => !c.good);
+    if (best) out.push(best.key);
+    if (worst) out.push(worst.key);
+    if (!best && !worst) {
+      const touches = s.passOk + s.passFail + s.dribbleOk + s.dribbleFail + s.tackles + s.tacklesLost;
+      out.push(touches < 8 ? 'note.quiet' : 'note.steady');
+    }
+  }
+  if (flags.oop) out.push('note.oop');
+  if (flags.role) out.push('note.role');
+  return out;
+}
+
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -2928,7 +3099,8 @@ class UIController {
   /* ---------- language ---------- */
   applyStatic() {
     document.documentElement.lang = L.code;
-    document.title = L.t('doc.title');
+    document.title = `${L.t('doc.title')} v${APP_VERSION}`;
+    this.$('app-title').innerHTML = `Youth Academy Manager <b>v${APP_VERSION}</b>`;
     document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = L.t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-aria]').forEach(el => { const v = L.t(el.dataset.i18nAria); el.setAttribute('aria-label', v); el.title = v; });
     this.$('fx-lbl').textContent = L.t(document.body.classList.contains('fx') ? 'ui.fxOn' : 'ui.fxOff');
@@ -3584,6 +3756,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       <dt>${L.t('st.shots')}</dt><dd>${t.shots} (${t.onTarget})</dd>
       <dt>${L.t('st.goals')}</dt><dd class="ok">${t.goals}</dd>
       <dt>${L.t('st.saves')}</dt><dd>${t.saves}</dd>
+      <dt>${L.t('st.intercepts')}</dt><dd>${t.intercepts}</dd>
       <dt>${L.t('st.cards')}</dt><dd class="${t.red ? 'bad' : ''}">${t.yellow}/${t.red}</dd>`;
   }
 
@@ -3598,8 +3771,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const played = a.players;
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
-      players: shuffle(played).slice(0, 3).map(p => ({ id: p.id, stats: { ...eng.st(p) } })),
+      players: shuffle(played).slice(0, 3).map(p => ({
+        id: p.id, stats: { ...eng.st(p) },
+        tired: eng.tired.has(p.id), oop: NATURAL_LINE[p.position] !== eng.lineOf.get(p.id), role: (p.tags || [])[0] || null,
+      })),
     };
+    s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
     s.applyFatigue(played.map(p => p.id));
     s.phase = 'post';
     s.notebookUnlocked = true;
@@ -3623,18 +3800,28 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       this.$('notes-status').textContent = L.t('notes.locked');
       return;
     }
-    const cards = rep.players.map(({ id, stats: s }) => {
+    const cards = rep.players.map(pr => {
+      const { id, stats: s } = pr;
       const p = this.state.player(id);
       if (!p) return '';
+      const season = this.state.seasonOf(id);
+      const rateLine = (label, ok, fail, sOk, sFail) => {
+        const tot = ok + fail, sTot = sOk + sFail;
+        const r = tot ? Math.round(ok / tot * 100) : null, sr = sTot ? Math.round(sOk / sTot * 100) : null;
+        return `<b>${label}:</b> <span style="${rateStyle(r)}">${tot ? `${ok}/${tot}` : '—'}${r != null ? ` (${r}%)` : ''}</span>`
+          + ` <span class="avg">(${L.t('nb.season')}: <span style="${rateStyle(sr)}">${sr != null ? sr + '%' : '—'}</span>)</span>`;
+      };
       const lines = [
-        L.t('notes.pass', { a: s.passOk, b: s.passFail }),
-        L.t('notes.tackles', { a: s.tackles, b: s.tacklesLost }),
-        L.t('notes.drib', { a: s.dribbleOk, b: s.dribbleFail }),
-        L.t('notes.shots', { a: s.shots, b: s.onTarget, c: s.goals }),
+        rateLine(L.t('nb.passes'), s.passOk, s.passFail, season.passOk, season.passFail),
+        rateLine(L.t('nb.tackles'), s.tackles, s.tacklesLost, season.tackles, season.tacklesLost),
+        rateLine(L.t('nb.dribbles'), s.dribbleOk, s.dribbleFail, season.dribbleOk, season.dribbleFail),
+        L.t('nb.intercepts', { a: s.intercepts || 0, b: season.intercepts || 0 }),
+        L.t('nb.shots', { a: s.shots, b: s.onTarget, c: s.goals, g: season.goals }),
       ];
-      if (p.position === 'GK') lines.push(L.t('notes.saves', { a: s.saves }));
+      if (p.position === 'GK') lines.push(L.t('nb.saves', { a: s.saves, b: season.saves }));
       if (s.yellow || s.red) lines.push(L.t('notes.cards', { a: s.yellow, b: s.red }));
-      lines.push(L.t('notes.energy', { a: Math.round(p.energy) }));
+      lines.push(`${L.t('notes.energy', { a: Math.round(p.energy) })} · ${L.t('nb.apps', { n: season.apps })}`);
+      const note = coachNote(p, s, pr).map(k => k === 'note.role' ? L.t(k, { r: L.tag(pr.role) }) : L.t(k)).join(' ');
       const btns = TAG_KEYS.map(t => {
         const has = p.tags.includes(t);
         const key = has ? 'notes.noted' : p.tags.length ? 'notes.change' : 'notes.add';
@@ -3644,6 +3831,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return `<article class="card">
         <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
+        <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>
         <div class="tag-btns">${btns}</div>
       </article>`;
@@ -3655,6 +3843,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <span class="res ${rep.result}">${L.t('res.' + rep.result)} &nbsp;${rep.gf} - ${rep.ga}</span>
       </div>
       <p class="nb-hint">${L.t('notes.hint')}</p>
+      <p class="nb-legend"><span style="${rateStyle(80)}">■ &gt; 75%</span> · <span style="${rateStyle(30)}">■ &lt; 40%</span> · ${L.t('nb.legend')}</p>
       <div class="cards">${cards}</div>${back}`;
     this.$('notes-status').textContent = L.t('notes.status', { n: rep.md });
   }
