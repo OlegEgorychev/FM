@@ -1,56 +1,56 @@
 # Youth Academy Manager
 
-Ретро-менеджер детской футбольной команды: дождливая воскресная лига, монитор ЭЛТ и окна в духе Windows 98.
 A retro youth football manager: a rainy Sunday league on a CRT monitor, Windows 98 style.
 
-**▶ Играть:** https://olegegorychev.github.io/FM/
+**▶ Play:** https://olegegorychev.github.io/FM/
 
-Работает в любом современном браузере. Сохранение хранится в браузере (localStorage).
+Runs in any modern browser. Your save is stored in the browser (localStorage).
 
-## Что внутри
+## What's inside
 
-- Скрытые параметры игроков: тренер видит только статистику и решает, какую роль дать каждому.
-- Лига из 10 команд, 18 туров, календарь по дням, таблица.
-- Управление командой: 10 схем, замены перетаскиванием, подсказки по позициям.
-- Живой 2D-матч на 60 FPS: камера, реплики игроков, перерыв, замены по ходу игры, помощник тренера.
-- История изменений — в игре, в файле **ReadMe.txt** на рабочем столе.
+- Hidden player attributes: the coach only sees match stats and decides which role to give each player.
+- A 10-team league, 18 matchdays, a day-by-day calendar and a league table.
+- Team management: 10 formations, drag-and-drop swaps, position hints.
+- A live 2D match at 60 FPS: camera, player shouts, half-time, live substitutions, an assistant coach.
+- English and Russian, switchable in the game.
+- Patch notes are in the game, in the **ReadMe.txt** file on the desktop.
 
-## Структура
+## Structure
 
 ```
-index.html            ← готовая игра (собирается из src/, не править руками)
-assets/               ← фоновые картинки (WebP)
-src/index.html        ← шаблон: разметка + метки {{CSS}}, {{JS}}, {{VERSION}}
-src/css/NN-*.css      ← стили, склеиваются по порядку имён
-src/js/NN-*.js        ← код, склеивается по порядку имён (общая область видимости)
-build.js              ← сборка src/ → index.html (без зависимостей)
-test/smoke.js         ← быстрый тест: полный тур в браузере, ~10 секунд
-docs/DESIGN.md        ← дизайн-заметки: механики, формулы, баланс
-CLAUDE.md             ← инструкция для ИИ-помощника (как вносить изменения)
+index.html            ← the playable game (built from src/, do not edit by hand)
+assets/               ← background art (WebP)
+src/index.html        ← template: markup + {{CSS}}, {{JS}}, {{VERSION}} placeholders
+src/css/NN-*.css      ← styles, concatenated in file-name order
+src/js/NN-*.js        ← code, concatenated in file-name order (shared global scope)
+build.js              ← builds src/ → index.html (no dependencies)
+test/smoke.js         ← quick test: a full matchday in the browser, ~10 seconds
+docs/DESIGN.md        ← design notes: mechanics, formulas, balance
+CLAUDE.md             ← instructions for the AI assistant (how to make changes)
 ```
 
-| Модуль | Что в нём |
+| Module | Contents |
 |---|---|
-| `00-utils-data.js` | утилиты, константы, схемы, энергия |
-| `01-i18n.js` | все тексты EN/RU |
-| `02-lang.js`, `03-player.js` | язык, игрок |
-| `04-league-calendar.js` | лига, расписание, календарь событий |
-| `05-game-state.js` | состояние игры, сохранение, составы |
-| `06-match-engine.js` | симуляция матча |
-| `07-tactics-board.js` | тактическая доска |
-| `08-version-patch-notes.js` | **версия и список изменений** |
-| `09-live-pitch.js` | живое поле: модель, отрисовка, камера, эффекты |
-| `10-modal.js`, `11-notebook-helpers.js` | окна-диалоги, логика блокнота |
-| `12-ui.js`, `99-boot.js` | интерфейс и запуск |
+| `00-utils-data.js` | utilities, constants, formations, energy |
+| `01-i18n.js` | all texts (EN/RU) |
+| `02-lang.js`, `03-player.js` | language, player |
+| `04-league-calendar.js` | league, fixtures, event calendar |
+| `05-game-state.js` | game state, saving, line-ups |
+| `06-match-engine.js` | match simulation |
+| `07-tactics-board.js` | tactics board |
+| `08-version-patch-notes.js` | **version and patch notes** |
+| `09-live-pitch.js` | live pitch: model, rendering, camera, effects |
+| `10-modal.js`, `11-notebook-helpers.js` | dialog windows, notebook logic |
+| `12-ui.js`, `99-boot.js` | interface and start-up |
 
-## Разработка
+## Development
 
 ```bash
-node build.js          # собрать index.html
-node build.js --check  # проверить, что index.html актуален
-npm i && npm test      # быстрый тест (Playwright)
+node build.js          # build index.html
+node build.js --check  # check that index.html is up to date
+npm i && npm test      # quick test (Playwright)
 ```
 
-## Правило версий
+## Versioning rule
 
-Каждое изменение: поднять `APP_VERSION` в `src/js/08-version-patch-notes.js`, добавить запись сверху `PATCH_NOTES` (EN + RU), собрать, протестировать, закоммитить с тегом `vX.Y`. Сборка сама подставляет версию в `<title>` и не соберётся, если версия и список изменений не совпадают.
+Every change: bump `APP_VERSION` in `src/js/08-version-patch-notes.js`, add an entry at the top of `PATCH_NOTES` (EN + RU), build, test, and commit with a `vX.Y` tag. The build injects the version into `<title>` automatically and fails if the version and the patch notes don't match.
