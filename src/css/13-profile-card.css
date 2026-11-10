@@ -1,0 +1,66 @@
+/* =========================================================
+   v1.5 — PLAYER PROFILE CARD ("PLAYER_INFO.EXE", Win9x Properties)
+   Gray chrome + sunken dark wells (the CRT shows through the wells).
+   ========================================================= */
+.pinfo-layer{ position: absolute; inset: 0 0 38px 0; z-index: 75; display: grid; place-items: center; padding: 12px;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.18) 0 2px, transparent 2px 4px), rgba(4,8,6,.5);
+  -webkit-backdrop-filter: blur(3px) saturate(.6); backdrop-filter: blur(3px) saturate(.6); }
+.pinfo-layer[hidden]{ display: none; }
+.win.pinfo{ position: relative; left: auto; top: auto; width: min(620px, 100%); max-height: 100%;
+  background: var(--face); color: #111; -webkit-backdrop-filter: none; backdrop-filter: none;
+  border-color: var(--hi) var(--dark) var(--dark) var(--hi); border-radius: 0;
+  box-shadow: inset -1px -1px 0 var(--shadow), inset 1px 1px 0 #fff, 8px 10px 0 rgba(0,0,0,.45);
+  animation: winOpen .15s steps(3); }
+.win.pinfo .titlebar{ border-radius: 0; margin: 2px 2px 0; background: linear-gradient(90deg, #0a246a, #3a6ea5); }
+.pinfo-tabs{ display: flex; padding: 6px 8px 0; }
+.pinfo-tab{ padding: 3px 12px; font-size: 12px; background: var(--face); position: relative; top: 1px;
+  border: 1px solid; border-bottom: 0; border-color: #fff var(--dark) transparent #fff; }
+.pinfo-body{ display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; margin: 0 8px; padding: 10px;
+  border: 1px solid; border-color: #fff var(--dark) var(--dark) #fff; box-shadow: inset -1px -1px 0 var(--shadow); }
+.pinfo-btns{ padding: 8px 8px 6px; justify-content: flex-end; }
+.win.pinfo .statusbar{ border-top: 0; padding: 2px 3px 3px; }
+.win.pinfo .statusbar > span{ color: #333; border-color: var(--shadow) #fff #fff var(--shadow); font-size: 11px; }
+
+/* sunken dark wells */
+.pi-left, .pinfo fieldset > :not(legend){ background: #11171b; color: var(--text);
+  border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); box-shadow: inset 1px 1px 0 var(--dark); }
+.pi-left{ display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 8px; }
+.portrait.xl{ width: 100px; height: 100px; border: 2px solid #000; box-shadow: 0 0 0 1px #3a4650; }
+.pi-kv{ display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; margin: 0; width: 100%; font-size: 12px; }
+.pi-kv dt{ color: var(--muted); }
+.pi-kv dd{ margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.pi-kv b{ color: #eef1ec; }
+
+.pi-right{ display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pinfo fieldset{ margin: 0; padding: 2px 8px 8px; border: 1px solid; border-color: var(--shadow) #fff #fff var(--shadow); }
+.pinfo legend{ padding: 0 4px; font-size: 12px; color: #111; }
+.pinfo fieldset .energy{ border-width: 2px; }
+.pi-role{ display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px 8px; min-height: 30px; }
+.pi-role small{ flex-basis: 100%; color: var(--muted); font-size: 11px; }
+.pi-none{ color: var(--muted); font-style: italic; }
+.pi-stats{ width: 100%; border-collapse: collapse; font-size: 12px; }
+.pi-stats th, .pi-stats td{ padding: 3px 8px; text-align: right; border-bottom: 1px dotted #2b363e; }
+.pi-stats tbody th{ text-align: left; font-weight: normal; color: var(--muted); }
+.pi-stats thead th{ color: var(--amber); font: 15px/1 var(--mono); letter-spacing: .5px; }
+.pi-stats thead th.live{ color: var(--red-hi); }
+.pi-stats small{ color: var(--muted); }
+.pi-stats td[style*="1d7a1d"]{ color: #8fd17f !important; }   /* notebook paper colours → CRT-readable */
+.pi-stats td[style*="b3261e"]{ color: #f08a7e !important; }
+.pi-note > div, .pi-note > p{ margin: 0; padding: 6px 8px; font-size: 12px; }
+.pi-note-h{ color: var(--amber) !important; font-size: 11px !important; padding-bottom: 0 !important; border-bottom: 0 !important; box-shadow: none !important; }
+.pi-note-h + p{ border-top: 0 !important; }
+
+/* [i] retro info button inside roster rows */
+.info-btn{ flex: none; width: 17px; height: 15px; padding: 0; margin-left: 4px; cursor: help; vertical-align: middle;
+  font: bold 10px/1 var(--ui); color: #0a246a; background: var(--face);
+  border: 1px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi); box-shadow: inset -1px -1px 0 var(--shadow); }
+.info-btn:active{ border-color: var(--dark) var(--hi) var(--hi) var(--dark); box-shadow: inset 1px 1px 0 var(--shadow); }
+.info-btn:focus-visible{ outline: 1px dotted #fff; outline-offset: 1px; }
+.lr-name .lr-sub{ display: flex; align-items: center; gap: 4px; min-width: 0; }
+.lr-sub .info-btn{ margin-left: 0; width: 15px; height: 13px; font-size: 9px; }
+.lr-sub small{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 640px){
+  .pinfo-body{ grid-template-columns: 1fr; }
+  .pi-left{ flex-direction: row; align-items: flex-start; }
+}

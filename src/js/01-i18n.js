@@ -202,10 +202,10 @@ const TXT = {
 Object.assign(I18N.en, {
   'lr.title': 'Live roster & subs', 'lr.onPitch': 'ON THE PITCH', 'lr.bench': 'BENCH', 'lr.subs': 'Substitutions: {n}/{m}', 'lr.preMatch': 'Before kick-off',
   'lr.off': 'subbed off', 'lr.sent': 'sent off',
-  'lr.help.pre': 'Before kick-off: click two players to change the line-up.',
+  'lr.help.pre': 'Before kick-off: click two players to change the line-up. Right-click or [i] = profile.',
   'lr.help.live': 'Click a player on the pitch, then one on the bench (or the other way round) to make a substitution.',
   'lr.help.sel': '{n} selected → pick who swaps with him. Green = same position. Esc to cancel.',
-  'lr.help.over': 'No changes possible right now.',
+  'lr.help.over': 'No changes possible right now. Right-click or [i] still opens a profile.',
   'sub.err.title': 'Substitution not possible', 'sub.err.limit': 'All {m} substitutions have been used.',
   'sub.err.sentOff': 'A sent-off player cannot be replaced.', 'sub.err.used': 'A substituted player cannot come back on.',
   'sub.err.gkOnly': 'Only a goalkeeper can go in goal.', 'sub.err.gkTwo': 'A second goalkeeper cannot play in the outfield.',
@@ -232,10 +232,10 @@ Object.assign(I18N.en, {
 Object.assign(I18N.ru, {
   'lr.title': 'Состав и замены', 'lr.onPitch': 'НА ПОЛЕ', 'lr.bench': 'ЗАПАС', 'lr.subs': 'Замены: {n}/{m}', 'lr.preMatch': 'До стартового свистка',
   'lr.off': 'заменён', 'lr.sent': 'удалён',
-  'lr.help.pre': 'До начала матча: щёлкни двух игроков, чтобы изменить состав.',
+  'lr.help.pre': 'До начала матча: щёлкни двух игроков, чтобы изменить состав. Правый клик или [i] — профиль.',
   'lr.help.live': 'Щёлкни игрока на поле, затем запасного (или наоборот), чтобы сделать замену.',
   'lr.help.sel': 'Выбран {n} → выбери, кем его заменить. Зелёные — та же позиция. Esc — отмена.',
-  'lr.help.over': 'Сейчас изменения невозможны.',
+  'lr.help.over': 'Сейчас изменения невозможны. Правый клик или [i] всё равно открывает профиль.',
   'sub.err.title': 'Замена невозможна', 'sub.err.limit': 'Все {m} замен уже использованы.',
   'sub.err.sentOff': 'Удалённого игрока заменить нельзя.', 'sub.err.used': 'Заменённый игрок не может вернуться на поле.',
   'sub.err.gkOnly': 'В ворота может встать только вратарь.', 'sub.err.gkTwo': 'Второй вратарь не может играть в поле.',
@@ -330,7 +330,7 @@ Object.assign(I18N.en, {
   'team.suggestedAria': 'Suggested: same position', 'team.posTitle': 'Natural position: {p}', 'team.colEnergy': 'Energy', 'team.colRole': 'Role',
   'team.xi': 'STARTING XI · {f}', 'team.bench': 'BENCH', 'team.slot': 'in the XI as {l}', 'team.onBench': 'on the bench',
   'team.clear': '&#10005; Cancel selection', 'team.done': 'Swapped: {a} ⇄ {b}',
-  'team.help.idle': 'Click a player in the list or on the pitch, then click where he should go. Drag and drop works too.',
+  'team.help.idle': 'Click a player in the list or on the pitch, then click where he should go. Drag and drop works too. Right-click or [i] = profile.',
   'team.help.sel': '{n} ({p}) selected. Green = same position (recommended) · faded = different position (allowed, −15% out of line). Esc or empty space to cancel.',
   'team.err.title': 'Cannot swap', 'team.err.gkSlot': 'The goalkeeper stays in goal.<br>Swap him with the bench goalkeeper instead.',
   'team.err.gkOnly': 'Only a goalkeeper can play in goal.', 'team.err.gkTwo': 'A second goalkeeper cannot play in the outfield.',
@@ -347,7 +347,7 @@ Object.assign(I18N.ru, {
   'team.suggestedAria': 'Рекомендуется: та же позиция', 'team.posTitle': 'Родная позиция: {p}', 'team.colEnergy': 'Энергия', 'team.colRole': 'Роль',
   'team.xi': 'ОСНОВА · {f}', 'team.bench': 'ЗАПАС', 'team.slot': 'в основе: {l}', 'team.onBench': 'в запасе',
   'team.clear': '&#10005; Отменить выбор', 'team.done': 'Замена: {a} ⇄ {b}',
-  'team.help.idle': 'Щёлкни игрока в списке или на поле, затем — куда его поставить. Можно и перетащить.',
+  'team.help.idle': 'Щёлкни игрока в списке или на поле, затем — куда его поставить. Можно и перетащить. Правый клик или [i] — профиль.',
   'team.help.sel': 'Выбран {n} ({p}). Зелёные — та же позиция (рекомендуется) · блёклые — другая позиция (можно, но −15% вне линии). Esc или пустое место — отмена.',
   'team.err.title': 'Замена невозможна', 'team.err.gkSlot': 'Вратарь остаётся в воротах.<br>Замени его на запасного вратаря.',
   'team.err.gkOnly': 'В ворота может встать только вратарь.', 'team.err.gkTwo': 'Второй вратарь не может играть в поле.',
@@ -420,3 +420,29 @@ Object.assign(I18N.ru, {
   'notes.head': 'ТУР {n}: против {o}', 'notes.status': 'Отчёт по {n}-му туру.', 'notes.back': '&#8962; Вернуться в Штаб',
 });
 
+
+/* ---- v1.5: Player Profile Card ---- */
+Object.assign(I18N.en, {
+  'pi.tab': 'General', 'pi.open': 'Profile: {n} (or right-click the player)',
+  'pi.name': 'Name', 'pi.number': 'Shirt', 'pi.age': 'Age', 'pi.pos': 'Position', 'pi.status': 'Status',
+  'pi.starter': 'Starting XI', 'pi.opponent': 'Opponent',
+  'pi.energy': 'Current energy', 'pi.tags': 'Tags / Role', 'pi.roleLbl': 'Role:', 'pi.noRole': 'No role yet: watch him in the Notebook.',
+  'pi.stats': 'Season statistics', 'pi.season': 'SEASON', 'pi.today': 'TODAY (LIVE)', 'pi.na': '—',
+  'pi.apps': 'Matches played', 'pi.goals': 'Goals', 'pi.shots': 'Shots', 'pi.onTarget': '{n} on target',
+  'pi.tackles': 'Tackles won', 'pi.passAcc': 'Pass accuracy', 'pi.saves': 'Saves',
+  'pi.noteFrom': 'Last note · MD {n} vs {o}', 'pi.noNote': 'No notes yet. The Notebook covers three kids after every match.',
+  'pi.scout': 'Opposition player: no scouting report.', 'pi.oppNote': 'We only know what we see today.',
+  'pi.status.bar': 'Numbers only. Read between the lines, coach.',
+});
+Object.assign(I18N.ru, {
+  'pi.tab': 'Общие', 'pi.open': 'Профиль: {n} (или правый клик по игроку)',
+  'pi.name': 'Имя', 'pi.number': 'Номер', 'pi.age': 'Возраст', 'pi.pos': 'Позиция', 'pi.status': 'Статус',
+  'pi.starter': 'Основной состав', 'pi.opponent': 'Соперник',
+  'pi.energy': 'Текущая энергия', 'pi.tags': 'Метки / роль', 'pi.roleLbl': 'Роль:', 'pi.noRole': 'Роли пока нет: присмотрись к нему в Блокноте.',
+  'pi.stats': 'Статистика сезона', 'pi.season': 'СЕЗОН', 'pi.today': 'СЕГОДНЯ (LIVE)', 'pi.na': '—',
+  'pi.apps': 'Сыграно матчей', 'pi.goals': 'Голы', 'pi.shots': 'Удары', 'pi.onTarget': '{n} в створ',
+  'pi.tackles': 'Выигранные отборы', 'pi.passAcc': 'Точность пасов', 'pi.saves': 'Сейвы',
+  'pi.noteFrom': 'Последняя заметка · тур {n}, {o}', 'pi.noNote': 'Заметок пока нет. После каждого матча Блокнот разбирает трёх игроков.',
+  'pi.scout': 'Игрок соперника: отчёта скаута нет.', 'pi.oppNote': 'Знаем только то, что видим сегодня.',
+  'pi.status.bar': 'Только цифры. Читай между строк, тренер.',
+});

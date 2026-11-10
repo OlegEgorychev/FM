@@ -34,6 +34,7 @@ class GameState {
     this.notebookUnlocked = false;
     this.diary = [{ date: start, key: 'cal.welcome', vars: { y: year, z: String(year + 1).slice(2) } }];
     this.seasonStats = {};   // playerId → cumulative stats this season (+ apps)
+    this.coachNotes = {};    // v1.5: playerId → last Notebook note the coach actually saw { md, keys, role }
     for (const p of this.squad) p.energy = 100;   // summer break
     this.save();
   }
@@ -132,6 +133,13 @@ class GameState {
       acc.apps++;
     }
   }
+  /** v1.5: remember the notes shown in the Notebook so the Profile Card can quote them later. */
+  recordCoachNotes(rep) {
+    for (const pr of rep.players) {
+      const p = this.player(pr.id); if (!p) continue;
+      this.coachNotes[pr.id] = { md: rep.md, opp: rep.opponent, keys: coachNote(p, pr.stats, pr), role: pr.role };
+    }
+  }
   seasonOf(id) { return this.seasonStats[id] || { ...MatchEngine.blankStats(), apps: 0 }; }
 
   addDiary(entry) { this.diary.push(entry); if (this.diary.length > 80) this.diary.shift(); }
@@ -141,7 +149,7 @@ class GameState {
       localStorage.setItem(GameState.KEY, JSON.stringify({
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
-        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats,
+        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -174,6 +182,8 @@ class GameState {
         this.notebookUnlocked = !!d.notebookUnlocked;
         this.diary = Array.isArray(d.diary) ? d.diary : [];
         this.seasonStats = d.seasonStats && typeof d.seasonStats === 'object' ? d.seasonStats : {};
+        this.coachNotes = d.coachNotes && typeof d.coachNotes === 'object' ? d.coachNotes : {};
+        if (this.lastReport && !d.coachNotes) this.recordCoachNotes(this.lastReport);   // pre-v1.5 save
         // a match interrupted by a page reload is simply replayed
       } else {
         this.newSeason(SEASON.FIRST_YEAR);   // older saves: keep the squad, start the league

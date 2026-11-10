@@ -24,6 +24,7 @@ class UIController {
       onDrop: (i, srcId) => this.onDropSwap(this.state.lineup[i], srcId),
     });
     this.modal = new Modal();
+    this.profile = new ProfileCard(this);
     this.setupCalendar();
     this.bind();
     this.applyStatic();
@@ -87,6 +88,7 @@ class UIController {
     this.renderAll();
     if (this.engine) { this.renderLive(this.engine); this.relabelRadar(); } else this.prepareRadar();
     this.rerenderLog();
+    this.profile.tick();
   }
 
   relabelRadar() {
@@ -113,6 +115,26 @@ class UIController {
 
   /* ---------- navigation ---------- */
   bind() {
+    /* v1.5: Player Profile Card — right-click any player element, or press its [i] button.
+       Capture phase + stopPropagation so the [i] never triggers the click-to-swap underneath. */
+    const pidOf = el => el?.closest('[data-info]')?.dataset.info || el?.closest('[data-pid]')?.dataset.pid
+      || el?.closest('#roster .r-row, #live-roster .r-row')?.dataset.id || null;
+    document.addEventListener('contextmenu', e => {
+      const id = pidOf(e.target);
+      if (!id) return;
+      e.preventDefault();
+      this.toggleStart(false);
+      this.profile.open(id);
+    });
+    document.addEventListener('click', e => {
+      const b = e.target.closest('[data-info]');
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      this.profile.open(b.dataset.info);
+    }, true);
+    document.addEventListener('keydown', e => {   // Enter/Space on [i] must not also select the row
+      if (e.target.closest?.('[data-info]') && (e.key === 'Enter' || e.key === ' ')) e.stopPropagation();
+    }, true);
     document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => this.show(b.dataset.view)));
     document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => { this.toggleStart(false); this.show(b.dataset.goto); }));
     document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => this.show('dash')));
@@ -146,7 +168,7 @@ class UIController {
       this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
     });
     document.addEventListener('keydown', e => {
-      if (e.key !== 'Escape' || this.modal.isOpen) return;
+      if (e.key !== 'Escape' || this.modal.isOpen || this.profile.isOpen) return;
       this.toggleStart(false);
       if (this.selected) { this.clearSelection(); }
       if (this.liveSel) { this.liveSel = null; this.renderLiveRoster(); }
@@ -260,7 +282,7 @@ class UIController {
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
         <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
-        <span class="lr-name"><b>${esc(L.name(p.surname))}</b><small>${sub}</small></span>
+        <span class="lr-name"><b>${esc(L.name(p.surname))}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
         <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
       </div>`;
     };
@@ -393,7 +415,7 @@ class UIController {
     if (view === 'dash') this.renderDash();
   }
 
-  alert(html, title, icon = 'info', buttons) { this.modal.show({ title, html, icon, buttons }); }
+  alert(html, title, icon = 'info', buttons) { this.profile?.close(); this.modal.show({ title, html, icon, buttons }); }
 
   /** Match / Notebook only exist in the navigation while the calendar has unlocked them. */
   syncLocks() {
@@ -634,7 +656,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}" data-id="${p.id}"
           role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
-        <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b></span>${sub}</span>
+        <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×0.5' : ''}</span></div>
         <span class="r-tags">${p.tags.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') : '<span class="empty">—</span>'}</span>
       </div>`;
@@ -716,6 +738,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.trySwap(srcId, targetId);
   }
   clearSelection() { this.selected = null; this.renderTeam(); }
+
+  /** v1.5: small retro [i] button → Player Profile Card (left-click alternative to right-click). */
+  infoBtn(p) {
+    const t = esc(L.t('pi.open', { n: L.name(p.name) }));
+    return `<button type="button" class="info-btn" data-info="${p.id}" tabindex="0" aria-label="${t}" title="${t}" draggable="false">i</button>`;
+  }
 
   tagChip(tag, id, removable) {
     const tone = TAGS[tag]?.tone || 'neutral';
@@ -874,6 +902,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.radar.onEngineUpdate(eng);
     this.updateLiveRoster();
     this.renderAssistant(eng);
+    this.profile.tick();
   }
 
   renderTeamStats(t) {
@@ -906,6 +935,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       })),
     };
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
+    s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
     s.phase = 'post';
     s.notebookUnlocked = true;
@@ -957,7 +987,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         return `<button class="btn ${has ? 'done' : ''}" data-tag="${t}" data-id="${p.id}" ${has ? 'disabled' : ''} title="${esc(L.tagDesc(t))}">
           ${L.t(key, { t: esc(L.tag(t)) })}<small>${esc(L.tagDesc(t))}</small></button>`;
       }).join('');
-      return `<article class="card">
+      return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
         <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>

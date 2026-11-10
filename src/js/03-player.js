@@ -57,7 +57,7 @@ const PortraitGenerator = (() => {
    PLAYER
    ========================================================= */
 class Player {
-  constructor({ id, name, position, attrs, tags, energy, number, face }) {
+  constructor({ id, name, position, attrs, tags, energy, number, face, age }) {
     this.id = id;
     this.name = name;
     this.position = position;
@@ -68,6 +68,8 @@ class Player {
       this.energy = energy ?? 100;
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
+    // v1.5: age 14–16 (saves made before v1.5 get a stable age from the name hash)
+    this.age = Number.isInteger(age) && age >= 14 && age <= 16 ? age : 14 + PortraitGenerator.hashFace(id + name + '#age')[1];
     this.portraitSvg = PortraitGenerator.svg(this.face, position === 'GK' ? 'gk' : tags ? 'home' : 'away');
   }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
@@ -80,6 +82,6 @@ class Player {
     usedSurnames.add(last);
     const attrs = {};
     for (const a of ATTRS) { const [lo, hi] = PROFILES[position][a]; attrs[a] = clamp(rnd(lo, hi) + mod, 1, 20); }
-    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll() });
+    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(), age: rnd(14, 16) });
   }
 }

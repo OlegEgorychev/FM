@@ -326,6 +326,7 @@ class PitchRenderer {
       d.className = `pl ${e.side === 0 ? 'home' : 'away'}${e.gk ? ' gk' : ''}`;
       d.innerHTML = `<i class="face"></i><b>${e.number}</b>`;
       d.title = L.name(e.p.name);
+      d.dataset.pid = e.id;     // v1.5: right-click → Player Profile Card
       this.el.appendChild(d);
       this.nodes.set(e.id, { el: d, face: d.firstChild, has: false, off: false, deg: 999 });
     }
@@ -349,6 +350,7 @@ class PitchRenderer {
     this.nodes.set(inP.id, n);
     n.el.querySelector('b').textContent = inP.number;
     n.el.title = L.name(inP.name);
+    n.el.dataset.pid = inP.id;
     n.el.classList.remove('sub-in'); void n.el.offsetWidth; n.el.classList.add('sub-in');
   }
 

@@ -70,6 +70,15 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const inn = YAM.game.squad.find(p => !e.sides[0].players.includes(p) && p.position === 'MID');
       return { out: out.id, in: inn.id };
     });
+    // v1.5: profile card during the match (right-click a pitch token, [i] in the roster) must not touch the swap
+    await page.dispatchEvent(`#radar .pl[data-pid="${sub.out}"]`, 'contextmenu');
+    const pc1 = await page.evaluate(() => ({ open: !document.getElementById('pinfo-layer').hidden, live: !!document.querySelector('#pinfo-body th.live'),
+      sel: YAM.ui.liveSel, attrs: /\b(pace|shooting|passing|tackling)\b\s*[:=]?\s*\d/i.test(document.getElementById('pinfo-body').textContent) }));
+    await page.keyboard.press('Escape');
+    await page.click(`#live-roster .info-btn[data-info="${sub.in}"]`);
+    const pc2 = await page.evaluate(() => ({ open: !document.getElementById('pinfo-layer').hidden, sel: YAM.ui.liveSel }));
+    await page.click('#pinfo-x');
+    check('profile card: right-click pitch + [i], live column, no swap side-effects', pc1.open && pc1.live && !pc1.sel && !pc1.attrs && pc2.open && !pc2.sel, JSON.stringify({ pc1, pc2 }));
     await page.click(`#live-roster .r-row[data-id="${sub.out}"]`);
     await page.click(`#live-roster .r-row[data-id="${sub.in}"]`);
     check('live substitution', await page.evaluate(s => YAM.ui.engine.sides[0].players.some(p => p.id === s.in) && YAM.ui.radar.renderer.nodes.has(s.in), sub));
@@ -91,6 +100,18 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       saved: !/portraitSvg/.test(localStorage.getItem('yam_save_v1') || ''),
     }));
     check('portraits: roster + notebook, unique, not saved as SVG', pt.nb.length === 3 && pt.nb.every(w => w >= 95) && pt.lr === pt.n && pt.uniq >= pt.n - 1 && pt.saved, JSON.stringify(pt.nb) + ' uniq ' + pt.uniq + '/' + pt.n);
+    await page.click('#notes-body .card', { button: 'right' });
+    await page.waitForTimeout(250);   // window-open animation
+    const pc3 = await page.evaluate(() => {
+      const id = document.querySelector('#notes-body .card').dataset.pid, b = document.getElementById('pinfo-body');
+      const p = YAM.game.player(id), st = YAM.game.seasonOf(id);
+      return { open: !document.getElementById('pinfo-layer').hidden, apps: st.apps, age: p.age,
+        txt: b.textContent.includes(String(p.age)) && /1/.test(b.querySelector('.pi-stats td').textContent),
+        note: !!b.querySelector('.pi-note-h'), svg: b.querySelector('.portrait.xl svg').getBoundingClientRect().width };
+    });
+    await shot('5-profile');
+    await page.keyboard.press('Escape');
+    check('profile card: notebook right-click, season stats + note + 96px face', pc3.open && pc3.apps === 1 && pc3.age >= 14 && pc3.age <= 16 && pc3.txt && pc3.note && pc3.svg >= 90, JSON.stringify(pc3));
     await page.click('#notes-body [data-tag]');
     await shot('4-notebook');
     await page.click('#btn-back');

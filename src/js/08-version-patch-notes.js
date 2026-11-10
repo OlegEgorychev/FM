@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.5', name: { en: 'Player Profiles', ru: 'Профили игроков' },
+    en: [
+      'New PLAYER_INFO.EXE window: right-click any player (roster, team list, pitch, Notebook card) to open his Profile Card.',
+      'Small [i] button next to every name in the rosters does the same with a normal click, handy on a trackpad or phone. Click-to-swap and substitutions work exactly as before.',
+      'The card shows a large portrait, shirt number, age (14–16), position, current energy and role.',
+      'Season statistics: matches played, goals, shots, tackles won and pass accuracy; during a match a live "today" column runs next to them.',
+      'The last Coach\'s Note you read about him is kept on the card. Hidden ratings stay hidden: work out his strengths from the numbers.',
+    ],
+    ru: [
+      'Новое окно PLAYER_INFO.EXE: правый клик по любому игроку (состав, список команды, поле, карточка Блокнота) открывает его профиль.',
+      'Маленькая кнопка [i] рядом с каждым именем делает то же обычным щелчком, удобно на тачпаде и телефоне. Замены и перестановки щелчком работают как раньше.',
+      'В профиле: большой портрет, номер, возраст (14–16), позиция, текущая энергия и роль.',
+      'Статистика сезона: сыгранные матчи, голы, удары, выигранные отборы и точность пасов; во время матча рядом идёт колонка «сегодня».',
+      'Последняя заметка тренера о нём сохраняется в профиле. Скрытые характеристики по-прежнему скрыты: сильные стороны угадывай по цифрам.',
+    ] },
   { v: '1.4', name: { en: 'Faces', ru: 'Лица' },
     en: [
       'Every kid now has a face: a procedural 32x32 pixel-art portrait (head shape, skin tone, eyes, mouth, hair) built in code, no image files.',

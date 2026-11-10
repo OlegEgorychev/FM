@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.4</title>
+<title>Youth Academy Manager v1.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -912,6 +912,72 @@ body.fx .crt-scan{ opacity: .9; }
 .card .nb-face .portrait{ transform: rotate(-1.5deg); }
 .card:nth-child(even) .nb-face .portrait{ transform: rotate(1.2deg); }
 /* =========================================================
+   v1.5 — PLAYER PROFILE CARD ("PLAYER_INFO.EXE", Win9x Properties)
+   Gray chrome + sunken dark wells (the CRT shows through the wells).
+   ========================================================= */
+.pinfo-layer{ position: absolute; inset: 0 0 38px 0; z-index: 75; display: grid; place-items: center; padding: 12px;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.18) 0 2px, transparent 2px 4px), rgba(4,8,6,.5);
+  -webkit-backdrop-filter: blur(3px) saturate(.6); backdrop-filter: blur(3px) saturate(.6); }
+.pinfo-layer[hidden]{ display: none; }
+.win.pinfo{ position: relative; left: auto; top: auto; width: min(620px, 100%); max-height: 100%;
+  background: var(--face); color: #111; -webkit-backdrop-filter: none; backdrop-filter: none;
+  border-color: var(--hi) var(--dark) var(--dark) var(--hi); border-radius: 0;
+  box-shadow: inset -1px -1px 0 var(--shadow), inset 1px 1px 0 #fff, 8px 10px 0 rgba(0,0,0,.45);
+  animation: winOpen .15s steps(3); }
+.win.pinfo .titlebar{ border-radius: 0; margin: 2px 2px 0; background: linear-gradient(90deg, #0a246a, #3a6ea5); }
+.pinfo-tabs{ display: flex; padding: 6px 8px 0; }
+.pinfo-tab{ padding: 3px 12px; font-size: 12px; background: var(--face); position: relative; top: 1px;
+  border: 1px solid; border-bottom: 0; border-color: #fff var(--dark) transparent #fff; }
+.pinfo-body{ display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; margin: 0 8px; padding: 10px;
+  border: 1px solid; border-color: #fff var(--dark) var(--dark) #fff; box-shadow: inset -1px -1px 0 var(--shadow); }
+.pinfo-btns{ padding: 8px 8px 6px; justify-content: flex-end; }
+.win.pinfo .statusbar{ border-top: 0; padding: 2px 3px 3px; }
+.win.pinfo .statusbar > span{ color: #333; border-color: var(--shadow) #fff #fff var(--shadow); font-size: 11px; }
+
+/* sunken dark wells */
+.pi-left, .pinfo fieldset > :not(legend){ background: #11171b; color: var(--text);
+  border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); box-shadow: inset 1px 1px 0 var(--dark); }
+.pi-left{ display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 8px; }
+.portrait.xl{ width: 100px; height: 100px; border: 2px solid #000; box-shadow: 0 0 0 1px #3a4650; }
+.pi-kv{ display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; margin: 0; width: 100%; font-size: 12px; }
+.pi-kv dt{ color: var(--muted); }
+.pi-kv dd{ margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.pi-kv b{ color: #eef1ec; }
+
+.pi-right{ display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pinfo fieldset{ margin: 0; padding: 2px 8px 8px; border: 1px solid; border-color: var(--shadow) #fff #fff var(--shadow); }
+.pinfo legend{ padding: 0 4px; font-size: 12px; color: #111; }
+.pinfo fieldset .energy{ border-width: 2px; }
+.pi-role{ display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px 8px; min-height: 30px; }
+.pi-role small{ flex-basis: 100%; color: var(--muted); font-size: 11px; }
+.pi-none{ color: var(--muted); font-style: italic; }
+.pi-stats{ width: 100%; border-collapse: collapse; font-size: 12px; }
+.pi-stats th, .pi-stats td{ padding: 3px 8px; text-align: right; border-bottom: 1px dotted #2b363e; }
+.pi-stats tbody th{ text-align: left; font-weight: normal; color: var(--muted); }
+.pi-stats thead th{ color: var(--amber); font: 15px/1 var(--mono); letter-spacing: .5px; }
+.pi-stats thead th.live{ color: var(--red-hi); }
+.pi-stats small{ color: var(--muted); }
+.pi-stats td[style*="1d7a1d"]{ color: #8fd17f !important; }   /* notebook paper colours → CRT-readable */
+.pi-stats td[style*="b3261e"]{ color: #f08a7e !important; }
+.pi-note > div, .pi-note > p{ margin: 0; padding: 6px 8px; font-size: 12px; }
+.pi-note-h{ color: var(--amber) !important; font-size: 11px !important; padding-bottom: 0 !important; border-bottom: 0 !important; box-shadow: none !important; }
+.pi-note-h + p{ border-top: 0 !important; }
+
+/* [i] retro info button inside roster rows */
+.info-btn{ flex: none; width: 17px; height: 15px; padding: 0; margin-left: 4px; cursor: help; vertical-align: middle;
+  font: bold 10px/1 var(--ui); color: #0a246a; background: var(--face);
+  border: 1px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi); box-shadow: inset -1px -1px 0 var(--shadow); }
+.info-btn:active{ border-color: var(--dark) var(--hi) var(--hi) var(--dark); box-shadow: inset 1px 1px 0 var(--shadow); }
+.info-btn:focus-visible{ outline: 1px dotted #fff; outline-offset: 1px; }
+.lr-name .lr-sub{ display: flex; align-items: center; gap: 4px; min-width: 0; }
+.lr-sub .info-btn{ margin-left: 0; width: 15px; height: 13px; font-size: 9px; }
+.lr-sub small{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 640px){
+  .pinfo-body{ grid-template-columns: 1fr; }
+  .pi-left{ flex-direction: row; align-items: flex-start; }
+}
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1148,6 +1214,17 @@ body.fx .crt-scan{ opacity: .9; }
         <div class="dlg-body"><div class="dlg-ico info" id="modal-ico">i</div><div id="modal-text"></div></div>
         <div class="row-btns" id="modal-btns"></div>
       </div>
+    </section>
+  </div>
+
+  <!-- v1.5: Player Profile Card (right-click a player / [i] button) -->
+  <div class="pinfo-layer" id="pinfo-layer" hidden>
+    <section class="win pinfo open" role="dialog" aria-modal="true" aria-labelledby="pinfo-title">
+      <div class="titlebar"><span class="t-ico">i</span><span class="t-txt" id="pinfo-title">PLAYER_INFO.EXE</span><button class="tb-btn" id="pinfo-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="pinfo-tabs"><span class="pinfo-tab" data-i18n="pi.tab"></span></div>
+      <div class="win-body pinfo-body" id="pinfo-body"></div>
+      <div class="row-btns pinfo-btns"><button class="btn go" id="pinfo-ok" type="button" data-i18n="ui.ok"></button></div>
+      <div class="statusbar"><span id="pinfo-status"></span></div>
     </section>
   </div>
 
@@ -1480,10 +1557,10 @@ const TXT = {
 Object.assign(I18N.en, {
   'lr.title': 'Live roster & subs', 'lr.onPitch': 'ON THE PITCH', 'lr.bench': 'BENCH', 'lr.subs': 'Substitutions: {n}/{m}', 'lr.preMatch': 'Before kick-off',
   'lr.off': 'subbed off', 'lr.sent': 'sent off',
-  'lr.help.pre': 'Before kick-off: click two players to change the line-up.',
+  'lr.help.pre': 'Before kick-off: click two players to change the line-up. Right-click or [i] = profile.',
   'lr.help.live': 'Click a player on the pitch, then one on the bench (or the other way round) to make a substitution.',
   'lr.help.sel': '{n} selected → pick who swaps with him. Green = same position. Esc to cancel.',
-  'lr.help.over': 'No changes possible right now.',
+  'lr.help.over': 'No changes possible right now. Right-click or [i] still opens a profile.',
   'sub.err.title': 'Substitution not possible', 'sub.err.limit': 'All {m} substitutions have been used.',
   'sub.err.sentOff': 'A sent-off player cannot be replaced.', 'sub.err.used': 'A substituted player cannot come back on.',
   'sub.err.gkOnly': 'Only a goalkeeper can go in goal.', 'sub.err.gkTwo': 'A second goalkeeper cannot play in the outfield.',
@@ -1510,10 +1587,10 @@ Object.assign(I18N.en, {
 Object.assign(I18N.ru, {
   'lr.title': 'Состав и замены', 'lr.onPitch': 'НА ПОЛЕ', 'lr.bench': 'ЗАПАС', 'lr.subs': 'Замены: {n}/{m}', 'lr.preMatch': 'До стартового свистка',
   'lr.off': 'заменён', 'lr.sent': 'удалён',
-  'lr.help.pre': 'До начала матча: щёлкни двух игроков, чтобы изменить состав.',
+  'lr.help.pre': 'До начала матча: щёлкни двух игроков, чтобы изменить состав. Правый клик или [i] — профиль.',
   'lr.help.live': 'Щёлкни игрока на поле, затем запасного (или наоборот), чтобы сделать замену.',
   'lr.help.sel': 'Выбран {n} → выбери, кем его заменить. Зелёные — та же позиция. Esc — отмена.',
-  'lr.help.over': 'Сейчас изменения невозможны.',
+  'lr.help.over': 'Сейчас изменения невозможны. Правый клик или [i] всё равно открывает профиль.',
   'sub.err.title': 'Замена невозможна', 'sub.err.limit': 'Все {m} замен уже использованы.',
   'sub.err.sentOff': 'Удалённого игрока заменить нельзя.', 'sub.err.used': 'Заменённый игрок не может вернуться на поле.',
   'sub.err.gkOnly': 'В ворота может встать только вратарь.', 'sub.err.gkTwo': 'Второй вратарь не может играть в поле.',
@@ -1608,7 +1685,7 @@ Object.assign(I18N.en, {
   'team.suggestedAria': 'Suggested: same position', 'team.posTitle': 'Natural position: {p}', 'team.colEnergy': 'Energy', 'team.colRole': 'Role',
   'team.xi': 'STARTING XI · {f}', 'team.bench': 'BENCH', 'team.slot': 'in the XI as {l}', 'team.onBench': 'on the bench',
   'team.clear': '&#10005; Cancel selection', 'team.done': 'Swapped: {a} ⇄ {b}',
-  'team.help.idle': 'Click a player in the list or on the pitch, then click where he should go. Drag and drop works too.',
+  'team.help.idle': 'Click a player in the list or on the pitch, then click where he should go. Drag and drop works too. Right-click or [i] = profile.',
   'team.help.sel': '{n} ({p}) selected. Green = same position (recommended) · faded = different position (allowed, −15% out of line). Esc or empty space to cancel.',
   'team.err.title': 'Cannot swap', 'team.err.gkSlot': 'The goalkeeper stays in goal.<br>Swap him with the bench goalkeeper instead.',
   'team.err.gkOnly': 'Only a goalkeeper can play in goal.', 'team.err.gkTwo': 'A second goalkeeper cannot play in the outfield.',
@@ -1625,7 +1702,7 @@ Object.assign(I18N.ru, {
   'team.suggestedAria': 'Рекомендуется: та же позиция', 'team.posTitle': 'Родная позиция: {p}', 'team.colEnergy': 'Энергия', 'team.colRole': 'Роль',
   'team.xi': 'ОСНОВА · {f}', 'team.bench': 'ЗАПАС', 'team.slot': 'в основе: {l}', 'team.onBench': 'в запасе',
   'team.clear': '&#10005; Отменить выбор', 'team.done': 'Замена: {a} ⇄ {b}',
-  'team.help.idle': 'Щёлкни игрока в списке или на поле, затем — куда его поставить. Можно и перетащить.',
+  'team.help.idle': 'Щёлкни игрока в списке или на поле, затем — куда его поставить. Можно и перетащить. Правый клик или [i] — профиль.',
   'team.help.sel': 'Выбран {n} ({p}). Зелёные — та же позиция (рекомендуется) · блёклые — другая позиция (можно, но −15% вне линии). Esc или пустое место — отмена.',
   'team.err.title': 'Замена невозможна', 'team.err.gkSlot': 'Вратарь остаётся в воротах.<br>Замени его на запасного вратаря.',
   'team.err.gkOnly': 'В ворота может встать только вратарь.', 'team.err.gkTwo': 'Второй вратарь не может играть в поле.',
@@ -1698,6 +1775,32 @@ Object.assign(I18N.ru, {
   'notes.head': 'ТУР {n}: против {o}', 'notes.status': 'Отчёт по {n}-му туру.', 'notes.back': '&#8962; Вернуться в Штаб',
 });
 
+
+/* ---- v1.5: Player Profile Card ---- */
+Object.assign(I18N.en, {
+  'pi.tab': 'General', 'pi.open': 'Profile: {n} (or right-click the player)',
+  'pi.name': 'Name', 'pi.number': 'Shirt', 'pi.age': 'Age', 'pi.pos': 'Position', 'pi.status': 'Status',
+  'pi.starter': 'Starting XI', 'pi.opponent': 'Opponent',
+  'pi.energy': 'Current energy', 'pi.tags': 'Tags / Role', 'pi.roleLbl': 'Role:', 'pi.noRole': 'No role yet: watch him in the Notebook.',
+  'pi.stats': 'Season statistics', 'pi.season': 'SEASON', 'pi.today': 'TODAY (LIVE)', 'pi.na': '—',
+  'pi.apps': 'Matches played', 'pi.goals': 'Goals', 'pi.shots': 'Shots', 'pi.onTarget': '{n} on target',
+  'pi.tackles': 'Tackles won', 'pi.passAcc': 'Pass accuracy', 'pi.saves': 'Saves',
+  'pi.noteFrom': 'Last note · MD {n} vs {o}', 'pi.noNote': 'No notes yet. The Notebook covers three kids after every match.',
+  'pi.scout': 'Opposition player: no scouting report.', 'pi.oppNote': 'We only know what we see today.',
+  'pi.status.bar': 'Numbers only. Read between the lines, coach.',
+});
+Object.assign(I18N.ru, {
+  'pi.tab': 'Общие', 'pi.open': 'Профиль: {n} (или правый клик по игроку)',
+  'pi.name': 'Имя', 'pi.number': 'Номер', 'pi.age': 'Возраст', 'pi.pos': 'Позиция', 'pi.status': 'Статус',
+  'pi.starter': 'Основной состав', 'pi.opponent': 'Соперник',
+  'pi.energy': 'Текущая энергия', 'pi.tags': 'Метки / роль', 'pi.roleLbl': 'Роль:', 'pi.noRole': 'Роли пока нет: присмотрись к нему в Блокноте.',
+  'pi.stats': 'Статистика сезона', 'pi.season': 'СЕЗОН', 'pi.today': 'СЕГОДНЯ (LIVE)', 'pi.na': '—',
+  'pi.apps': 'Сыграно матчей', 'pi.goals': 'Голы', 'pi.shots': 'Удары', 'pi.onTarget': '{n} в створ',
+  'pi.tackles': 'Выигранные отборы', 'pi.passAcc': 'Точность пасов', 'pi.saves': 'Сейвы',
+  'pi.noteFrom': 'Последняя заметка · тур {n}, {o}', 'pi.noNote': 'Заметок пока нет. После каждого матча Блокнот разбирает трёх игроков.',
+  'pi.scout': 'Игрок соперника: отчёта скаута нет.', 'pi.oppNote': 'Знаем только то, что видим сегодня.',
+  'pi.status.bar': 'Только цифры. Читай между строк, тренер.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -1779,7 +1882,7 @@ const PortraitGenerator = (() => {
    PLAYER
    ========================================================= */
 class Player {
-  constructor({ id, name, position, attrs, tags, energy, number, face }) {
+  constructor({ id, name, position, attrs, tags, energy, number, face, age }) {
     this.id = id;
     this.name = name;
     this.position = position;
@@ -1790,6 +1893,8 @@ class Player {
       this.energy = energy ?? 100;
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
+    // v1.5: age 14–16 (saves made before v1.5 get a stable age from the name hash)
+    this.age = Number.isInteger(age) && age >= 14 && age <= 16 ? age : 14 + PortraitGenerator.hashFace(id + name + '#age')[1];
     this.portraitSvg = PortraitGenerator.svg(this.face, position === 'GK' ? 'gk' : tags ? 'home' : 'away');
   }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
@@ -1802,7 +1907,7 @@ class Player {
     usedSurnames.add(last);
     const attrs = {};
     for (const a of ATTRS) { const [lo, hi] = PROFILES[position][a]; attrs[a] = clamp(rnd(lo, hi) + mod, 1, 20); }
-    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll() });
+    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(), age: rnd(14, 16) });
   }
 }
 /* =========================================================
@@ -2001,6 +2106,7 @@ class GameState {
     this.notebookUnlocked = false;
     this.diary = [{ date: start, key: 'cal.welcome', vars: { y: year, z: String(year + 1).slice(2) } }];
     this.seasonStats = {};   // playerId → cumulative stats this season (+ apps)
+    this.coachNotes = {};    // v1.5: playerId → last Notebook note the coach actually saw { md, keys, role }
     for (const p of this.squad) p.energy = 100;   // summer break
     this.save();
   }
@@ -2099,6 +2205,13 @@ class GameState {
       acc.apps++;
     }
   }
+  /** v1.5: remember the notes shown in the Notebook so the Profile Card can quote them later. */
+  recordCoachNotes(rep) {
+    for (const pr of rep.players) {
+      const p = this.player(pr.id); if (!p) continue;
+      this.coachNotes[pr.id] = { md: rep.md, opp: rep.opponent, keys: coachNote(p, pr.stats, pr), role: pr.role };
+    }
+  }
   seasonOf(id) { return this.seasonStats[id] || { ...MatchEngine.blankStats(), apps: 0 }; }
 
   addDiary(entry) { this.diary.push(entry); if (this.diary.length > 80) this.diary.shift(); }
@@ -2108,7 +2221,7 @@ class GameState {
       localStorage.setItem(GameState.KEY, JSON.stringify({
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
-        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats,
+        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -2141,6 +2254,8 @@ class GameState {
         this.notebookUnlocked = !!d.notebookUnlocked;
         this.diary = Array.isArray(d.diary) ? d.diary : [];
         this.seasonStats = d.seasonStats && typeof d.seasonStats === 'object' ? d.seasonStats : {};
+        this.coachNotes = d.coachNotes && typeof d.coachNotes === 'object' ? d.coachNotes : {};
+        if (this.lastReport && !d.coachNotes) this.recordCoachNotes(this.lastReport);   // pre-v1.5 save
         // a match interrupted by a page reload is simply replayed
       } else {
         this.newSeason(SEASON.FIRST_YEAR);   // older saves: keep the squad, start the league
@@ -2626,6 +2741,7 @@ class RadarView {
       d.className = `pl ${si === 0 ? 'home' : 'away'}${e.line === 'GK' ? ' gk' : ''}`;
       d.innerHTML = `<b>${e.p.number ?? idx + 1}</b>${this.labels ? `<span class="pl-pos ${e.p.position}">${L.pos(e.p.position)}</span><span class="pl-nm">${esc(L.name(e.p.surname))}</span>` : ''}`;
       d.title = `${L.name(e.p.name)} · ${L.line(e.line === 'GK' ? 'GK' : e.line)}`;
+      d.dataset.pid = e.p.id;   // v1.5: right-click → Player Profile Card
       if (this.onDotClick) { d.type = 'button'; d.dataset.slot = idx; d.addEventListener('click', () => this.onDotClick(idx)); }
       if (this.onDrop) {
         d.draggable = true;
@@ -2666,8 +2782,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.5', name: { en: 'Player Profiles', ru: 'Профили игроков' },
+    en: [
+      'New PLAYER_INFO.EXE window: right-click any player (roster, team list, pitch, Notebook card) to open his Profile Card.',
+      'Small [i] button next to every name in the rosters does the same with a normal click, handy on a trackpad or phone. Click-to-swap and substitutions work exactly as before.',
+      'The card shows a large portrait, shirt number, age (14–16), position, current energy and role.',
+      'Season statistics: matches played, goals, shots, tackles won and pass accuracy; during a match a live "today" column runs next to them.',
+      'The last Coach\'s Note you read about him is kept on the card. Hidden ratings stay hidden: work out his strengths from the numbers.',
+    ],
+    ru: [
+      'Новое окно PLAYER_INFO.EXE: правый клик по любому игроку (состав, список команды, поле, карточка Блокнота) открывает его профиль.',
+      'Маленькая кнопка [i] рядом с каждым именем делает то же обычным щелчком, удобно на тачпаде и телефоне. Замены и перестановки щелчком работают как раньше.',
+      'В профиле: большой портрет, номер, возраст (14–16), позиция, текущая энергия и роль.',
+      'Статистика сезона: сыгранные матчи, голы, удары, выигранные отборы и точность пасов; во время матча рядом идёт колонка «сегодня».',
+      'Последняя заметка тренера о нём сохраняется в профиле. Скрытые характеристики по-прежнему скрыты: сильные стороны угадывай по цифрам.',
+    ] },
   { v: '1.4', name: { en: 'Faces', ru: 'Лица' },
     en: [
       'Every kid now has a face: a procedural 32x32 pixel-art portrait (head shape, skin tone, eyes, mouth, hair) built in code, no image files.',
@@ -3204,6 +3335,7 @@ class PitchRenderer {
       d.className = `pl ${e.side === 0 ? 'home' : 'away'}${e.gk ? ' gk' : ''}`;
       d.innerHTML = `<i class="face"></i><b>${e.number}</b>`;
       d.title = L.name(e.p.name);
+      d.dataset.pid = e.id;     // v1.5: right-click → Player Profile Card
       this.el.appendChild(d);
       this.nodes.set(e.id, { el: d, face: d.firstChild, has: false, off: false, deg: 999 });
     }
@@ -3227,6 +3359,7 @@ class PitchRenderer {
     this.nodes.set(inP.id, n);
     n.el.querySelector('b').textContent = inP.number;
     n.el.title = L.name(inP.name);
+    n.el.dataset.pid = inP.id;
     n.el.classList.remove('sub-in'); void n.el.offsetWidth; n.el.classList.add('sub-in');
   }
 
@@ -3431,6 +3564,125 @@ function coachNote(p, s, flags = {}) {
 }
 
 /* =========================================================
+   PLAYER PROFILE CARD (v1.5) — "PLAYER_INFO.EXE"
+   Right-click any player (roster rows, pitch tokens, Notebook cards) or press [i] in a roster.
+   Shows only OBSERVABLE data: energy, role, season totals, the coach's last note.
+   Hidden attributes (1–20) are never rendered.
+   ========================================================= */
+class ProfileCard {
+  constructor(ui) {
+    this.ui = ui;
+    this.id = null;
+    this.layer = document.getElementById('pinfo-layer');
+    this.body = document.getElementById('pinfo-body');
+    this.lastSig = '';
+    document.getElementById('pinfo-x').addEventListener('click', () => this.close());
+    document.getElementById('pinfo-ok').addEventListener('click', () => this.close());
+    this.layer.addEventListener('mousedown', e => { if (e.target === this.layer) this.close(); });
+    this.layer.addEventListener('contextmenu', e => { e.preventDefault(); if (e.target === this.layer) this.close(); });
+    document.addEventListener('keydown', e => {
+      if (!this.isOpen || e.key !== 'Escape') return;
+      e.preventDefault(); e.stopImmediatePropagation(); this.close();
+    }, true);
+  }
+  get isOpen() { return !this.layer.hidden; }
+
+  /** Our academy kid, or (during a match) an opponent from the engine. */
+  resolve(id) {
+    const own = this.ui.state.player(id);
+    if (own) return { p: own, own: true };
+    const eng = this.ui.engine;
+    const opp = eng?.sides[1].all?.find(p => p.id === id) || eng?.sides[1].players.find(p => p.id === id);
+    return opp ? { p: opp, own: false } : null;
+  }
+
+  open(id) {
+    if (!this.resolve(id) || this.ui.modal.isOpen) return;
+    this.id = id;
+    this.lastSig = '';
+    this.render();
+    this.lastFocus = document.activeElement;
+    this.layer.hidden = false;
+    document.getElementById('pinfo-ok').focus();
+  }
+  close() {
+    if (!this.isOpen) return;
+    this.layer.hidden = true;
+    this.id = null;
+    if (this.lastFocus && document.contains(this.lastFocus)) this.lastFocus.focus();
+  }
+  /** Called on every engine update: cheap signature check, re-render only when something visible changed. */
+  tick() { if (this.isOpen) this.render(); }
+
+  render() {
+    const r = this.resolve(this.id);
+    if (!r) { this.close(); return; }
+    const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
+    const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
+    const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join()].join('|');
+    if (sig === this.lastSig) return;
+    this.lastSig = sig;
+
+    const season = own ? s.seasonOf(p.id) : null;
+    const pct = (ok, fail) => (ok + fail ? Math.round(ok / (ok + fail) * 100) : null);
+    const cell = (v, r) => `<td style="${rateStyle(r)}">${v}</td>`;
+    const rows = st => [
+      [L.t('pi.apps'), st.apps ?? (st === live ? 1 : 0)],
+      [L.t('pi.goals'), st.goals],
+      [L.t('pi.shots'), `${st.shots} <small>(${L.t('pi.onTarget', { n: st.onTarget })})</small>`],
+      [L.t('pi.tackles'), `${st.tackles} <small>/ ${st.tackles + st.tacklesLost}</small>`, pct(st.tackles, st.tacklesLost)],
+      [L.t('pi.passAcc'), pct(st.passOk, st.passFail) == null ? '—' : pct(st.passOk, st.passFail) + '% <small>(' + st.passOk + '/' + (st.passOk + st.passFail) + ')</small>', pct(st.passOk, st.passFail)],
+      ...(p.position === 'GK' ? [[L.t('pi.saves'), st.saves]] : []),
+    ];
+    const base = season || MatchEngine.blankStats();
+    const sRows = rows(base), lRows = live ? rows(live) : null;
+    const table = `<table class="pi-stats"><thead><tr><th></th><th>${L.t(own ? 'pi.season' : 'pi.na')}</th>${live ? `<th class="live">${L.t('pi.today')}</th>` : ''}</tr></thead><tbody>`
+      + sRows.map((row, i) => `<tr><th>${row[0]}</th>${own ? cell(row[1], row[2]) : '<td>—</td>'}${live ? cell(lRows[i][1], lRows[i][2]) : ''}</tr>`).join('')
+      + '</tbody></table>';
+
+    let roleHtml, noteHtml;
+    if (own) {
+      const tag = p.tags[0];
+      roleHtml = tag ? `${L.t('pi.roleLbl')} ${ui.tagChip(tag, p.id, false)}<small>${esc(L.tagDesc(tag))}</small>`
+        : `<span class="pi-none">${L.t('pi.noRole')}</span>`;
+      const n = s.coachNotes?.[p.id];
+      noteHtml = n
+        ? `<div class="pi-note-h">${L.t('pi.noteFrom', { n: n.md, o: esc(L.team(n.opp || '')) })}</div><p>${esc(n.keys.map(k => k === 'note.role' ? L.t(k, { r: L.tag(n.role) }) : L.t(k)).join(' '))}</p>`
+        : `<p class="pi-none">${L.t('pi.noNote')}</p>`;
+    } else {
+      roleHtml = `<span class="pi-none">${L.t('pi.scout')}</span>`;
+      noteHtml = `<p class="pi-none">${L.t('pi.oppNote')}</p>`;
+    }
+    const where = !own ? L.t('pi.opponent')
+      : eng && !eng.finished ? (eng.sentOff.has(p.id) ? L.t('lr.sent') : eng.subbedOff.has(p.id) ? L.t('lr.off')
+        : eng.sides[0].players.includes(p) ? L.t('lr.onPitch') : L.t('lr.bench'))
+      : s.isStarter(p.id) ? L.t('pi.starter') : L.t('team.onBench');
+    const tired = energy < ENERGY.TIRED;
+
+    this.body.innerHTML = `
+      <div class="pi-left">
+        <span class="portrait xl">${p.portraitSvg}</span>
+        <dl class="pi-kv">
+          <dt>${L.t('pi.name')}</dt><dd><b>${esc(L.name(p.name))}</b></dd>
+          <dt>${L.t('pi.number')}</dt><dd>#${p.number ?? '—'}</dd>
+          <dt>${L.t('pi.age')}</dt><dd>${p.age}</dd>
+          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.position}">${L.pos(p.position)}</span></dd>
+          <dt>${L.t('pi.status')}</dt><dd>${where}</dd>
+        </dl>
+      </div>
+      <div class="pi-right">
+        <fieldset><legend>${L.t('pi.energy')}</legend>
+          <div class="energy ${ui.energyClass(energy)}"><i style="width:${energy}%"></i><span>${energy}%${tired ? ' ×0.5' : ''}</span></div>
+        </fieldset>
+        <fieldset><legend>${L.t('pi.tags')}</legend><div class="pi-role">${roleHtml}</div></fieldset>
+        <fieldset><legend>${L.t('pi.stats')}</legend>${table}</fieldset>
+        <fieldset class="pi-note"><legend>${L.t('nb.coachNote')}</legend>${noteHtml}</fieldset>
+      </div>`;
+    document.getElementById('pinfo-status').textContent = L.t('pi.status.bar');
+  }
+}
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -3456,6 +3708,7 @@ class UIController {
       onDrop: (i, srcId) => this.onDropSwap(this.state.lineup[i], srcId),
     });
     this.modal = new Modal();
+    this.profile = new ProfileCard(this);
     this.setupCalendar();
     this.bind();
     this.applyStatic();
@@ -3519,6 +3772,7 @@ class UIController {
     this.renderAll();
     if (this.engine) { this.renderLive(this.engine); this.relabelRadar(); } else this.prepareRadar();
     this.rerenderLog();
+    this.profile.tick();
   }
 
   relabelRadar() {
@@ -3545,6 +3799,26 @@ class UIController {
 
   /* ---------- navigation ---------- */
   bind() {
+    /* v1.5: Player Profile Card — right-click any player element, or press its [i] button.
+       Capture phase + stopPropagation so the [i] never triggers the click-to-swap underneath. */
+    const pidOf = el => el?.closest('[data-info]')?.dataset.info || el?.closest('[data-pid]')?.dataset.pid
+      || el?.closest('#roster .r-row, #live-roster .r-row')?.dataset.id || null;
+    document.addEventListener('contextmenu', e => {
+      const id = pidOf(e.target);
+      if (!id) return;
+      e.preventDefault();
+      this.toggleStart(false);
+      this.profile.open(id);
+    });
+    document.addEventListener('click', e => {
+      const b = e.target.closest('[data-info]');
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      this.profile.open(b.dataset.info);
+    }, true);
+    document.addEventListener('keydown', e => {   // Enter/Space on [i] must not also select the row
+      if (e.target.closest?.('[data-info]') && (e.key === 'Enter' || e.key === ' ')) e.stopPropagation();
+    }, true);
     document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => this.show(b.dataset.view)));
     document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => { this.toggleStart(false); this.show(b.dataset.goto); }));
     document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => this.show('dash')));
@@ -3578,7 +3852,7 @@ class UIController {
       this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
     });
     document.addEventListener('keydown', e => {
-      if (e.key !== 'Escape' || this.modal.isOpen) return;
+      if (e.key !== 'Escape' || this.modal.isOpen || this.profile.isOpen) return;
       this.toggleStart(false);
       if (this.selected) { this.clearSelection(); }
       if (this.liveSel) { this.liveSel = null; this.renderLiveRoster(); }
@@ -3692,7 +3966,7 @@ class UIController {
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
         <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
-        <span class="lr-name"><b>${esc(L.name(p.surname))}</b><small>${sub}</small></span>
+        <span class="lr-name"><b>${esc(L.name(p.surname))}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
         <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
       </div>`;
     };
@@ -3825,7 +4099,7 @@ class UIController {
     if (view === 'dash') this.renderDash();
   }
 
-  alert(html, title, icon = 'info', buttons) { this.modal.show({ title, html, icon, buttons }); }
+  alert(html, title, icon = 'info', buttons) { this.profile?.close(); this.modal.show({ title, html, icon, buttons }); }
 
   /** Match / Notebook only exist in the navigation while the calendar has unlocked them. */
   syncLocks() {
@@ -4066,7 +4340,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}" data-id="${p.id}"
           role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
-        <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b></span>${sub}</span>
+        <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×0.5' : ''}</span></div>
         <span class="r-tags">${p.tags.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') : '<span class="empty">—</span>'}</span>
       </div>`;
@@ -4148,6 +4422,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.trySwap(srcId, targetId);
   }
   clearSelection() { this.selected = null; this.renderTeam(); }
+
+  /** v1.5: small retro [i] button → Player Profile Card (left-click alternative to right-click). */
+  infoBtn(p) {
+    const t = esc(L.t('pi.open', { n: L.name(p.name) }));
+    return `<button type="button" class="info-btn" data-info="${p.id}" tabindex="0" aria-label="${t}" title="${t}" draggable="false">i</button>`;
+  }
 
   tagChip(tag, id, removable) {
     const tone = TAGS[tag]?.tone || 'neutral';
@@ -4306,6 +4586,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.radar.onEngineUpdate(eng);
     this.updateLiveRoster();
     this.renderAssistant(eng);
+    this.profile.tick();
   }
 
   renderTeamStats(t) {
@@ -4338,6 +4619,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       })),
     };
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
+    s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
     s.phase = 'post';
     s.notebookUnlocked = true;
@@ -4389,7 +4671,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         return `<button class="btn ${has ? 'done' : ''}" data-tag="${t}" data-id="${p.id}" ${has ? 'disabled' : ''} title="${esc(L.tagDesc(t))}">
           ${L.t(key, { t: esc(L.tag(t)) })}<small>${esc(L.tagDesc(t))}</small></button>`;
       }).join('');
-      return `<article class="card">
+      return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
         <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>

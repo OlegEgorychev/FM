@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v1.3)
+# Youth Academy Manager — design notes (current: v1.5)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -45,3 +45,10 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - `PortraitGenerator` (top of `src/js/03-player.js`): 32x32 SVG, `shape-rendering="crispEdges"`, layers = background (+rain specks), jersey (home / away / GK kit), head (3 shapes) & skin (5), eyes/brows (neutral, tired, angry), mouth (neutral, smirk, grit), hair (messy, short, long, bald) & hair colour (4).
 - `player.face` = 7 trait indices, rolled in `Player.generate()` and saved. `player.portraitSvg` is rebuilt in the constructor and dropped by `toJSON()`, so saves stay small. Saves from before v1.4 get a face hashed from id+name (stable).
 - Mood comes from CSS (`src/css/12-portraits.css`): desaturate filter, scanlines, dark corner vignette. 40px in the live roster, 100px on Notebook cards.
+
+## Player Profile Card (v1.5)
+- `ProfileCard` in `src/js/11a-profile-card.js`, DOM `#pinfo-layer` in `src/index.html`, styles `src/css/13-profile-card.css` (z-index 75, above `Modal` at 70; `ui.alert()` closes it first).
+- Triggers (all in `UIController.bind()`): document `contextmenu` on any `[data-pid]` (tactics board + live pitch tokens, Notebook cards) or roster `.r-row`; `[data-info]` "i" buttons (capture-phase click, `stopPropagation`) so click-to-swap / subs are never triggered.
+- Shows: portrait (100px), name, number, `player.age` (14–16, rolled in `Player.generate()`, hashed for old saves), position, status, energy (live engine value during a match), role tag, season totals from `state.seasonOf()` (apps, goals, shots/on target, tackles won/duels, pass %), plus a live "today" column while a match runs (season totals are only added at full time).
+- Coach's Note: `state.coachNotes[id]` keeps the last note shown in the Notebook (only the 3 players per match the Notebook covers — scarcity is intentional). Opponents get a card with today's numbers only.
+- Hidden attributes are never rendered; smoke test checks the card text for attribute-like output.
