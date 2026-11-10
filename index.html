@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Youth Academy Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   THEME TOKENS
+   ========================================================= */
+:root{
+  --glass: rgba(30, 40, 50, 0.85);
+  --glass-deep: rgba(8, 12, 16, 0.78);
+  --text: #d5dce2;
+  --muted: #8796a3;
+  --title-a: #18263d;
+  --title-b: #4b6276;
+  --green: #3e6a3f;
+  --green-hi: #79a464;
+  --red: #a63b30;
+  --red-hi: #d4675a;
+  --amber: #e2b85a;
+  --face: #b6bab4;
+  --hi: #eceee9;
+  --shadow: #5c605b;
+  --dark: #0b0d0c;
+  --frame-hi: #7f8b95;
+  --frame-lo: #070a0c;
+  --ui: "MS Sans Serif", "Microsoft Sans Serif", "Pixelated MS Sans Serif", Tahoma, Geneva, Verdana, sans-serif;
+  --mono: "VT323", "Courier New", Courier, monospace;
+}
+*{ box-sizing: border-box; }
+html, body{
+  margin: 0; height: 100%; overflow: hidden;
+  background: #040504; color: var(--text);
+  font: 13px/1.35 var(--ui);
+}
+button{ font-family: var(--ui); }
+
+/* =========================================================
+   CRT MONITOR
+   ========================================================= */
+#screen{
+  position: fixed; inset: 10px;
+  border-radius: 28px / 24px;
+  overflow: hidden;
+  background: #11171c;
+  box-shadow: 0 0 0 3px #161816, 0 0 0 9px #0a0b0a, 0 0 50px rgba(0,0,0,.9);
+}
+.scene{
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  opacity: 0; transition: opacity .9s ease;
+  filter: saturate(.82) contrast(1.06) brightness(.92);
+  image-rendering: pixelated;
+}
+.scene.active{ opacity: 1; }
+/* Fallback gradients sit under each image so the game works without assets */
+#scene-office{ background-image: url("assets/office.webp"), linear-gradient(160deg, #26323b, #0d1215); }
+#scene-squad { background-image: url("assets/locker-room.webp"), linear-gradient(160deg, #2b3133, #101414); }
+#scene-match { background-image: url("assets/pitch.webp"), linear-gradient(180deg, #3a4650 0%, #22302a 55%, #1a2a1c 100%); }
+#scene-notes { background-image: url("assets/notebook-desk.webp"), linear-gradient(160deg, #2c2722, #121110); }
+
+.rain{
+  position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: .5;
+  background-image:
+    repeating-linear-gradient(104deg, transparent 0 22px, rgba(190,210,225,.06) 22px 23px, transparent 23px 61px),
+    repeating-linear-gradient(101deg, transparent 0 37px, rgba(190,210,225,.05) 37px 38px, transparent 38px 90px);
+  background-size: 300px 300px, 420px 420px;
+  animation: rain .45s linear infinite;
+}
+@keyframes rain{ to{ background-position: -70px 300px, -90px 420px; } }
+
+.crt{ position: absolute; inset: 0; pointer-events: none; }
+.crt-scan{ z-index: 90; background: repeating-linear-gradient(to bottom, rgba(0,0,0,.24) 0 1px, transparent 1px 3px); }
+.crt-grille{ z-index: 91; opacity: .6;
+  background: repeating-linear-gradient(90deg, rgba(255,40,40,.035) 0 1px, rgba(40,255,40,.025) 1px 2px, rgba(40,80,255,.035) 2px 3px); }
+.crt-vignette{ z-index: 92;
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.55) 88%, rgba(0,0,0,.85) 100%);
+  box-shadow: inset 0 0 110px rgba(0,0,0,.85), inset 0 0 18px rgba(0,0,0,.9); border-radius: inherit; }
+.crt-glare{ z-index: 93; background: radial-gradient(ellipse at 28% 12%, rgba(255,255,255,.06), transparent 42%); }
+.crt-flicker{ z-index: 94; background: rgba(180,220,255,.018); animation: flicker .13s steps(2) infinite; }
+.crt-roll{ z-index: 95; height: 18%; background: linear-gradient(to bottom, transparent, rgba(255,255,255,.025), transparent);
+  animation: roll 9s linear infinite; }
+@keyframes flicker{ 0%{ opacity: .4; } 100%{ opacity: 1; } }
+@keyframes roll{ from{ transform: translateY(-120%); } to{ transform: translateY(650%); } }
+@media (prefers-reduced-motion: reduce){ .rain, .crt-flicker, .crt-roll{ animation: none; } }
+
+/* =========================================================
+   DESKTOP
+   ========================================================= */
+#desktop{ position: absolute; inset: 0 0 38px 0; z-index: 10; }
+.icons{ position: absolute; top: 18px; left: 18px; display: flex; flex-direction: column; gap: 14px; z-index: 11; }
+.icon{
+  width: 78px; background: none; border: 1px dotted transparent; color: #fff; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 2px;
+  font-size: 12px; text-shadow: 1px 1px 0 #000;
+}
+.icon .glyph{
+  width: 36px; height: 36px; display: grid; place-items: center;
+  font: 28px/1 var(--mono); color: #e8ece6;
+  background: linear-gradient(135deg, #4c5d6b, #23303a);
+  border: 2px solid; border-color: #9aa6ae #0b0e10 #0b0e10 #9aa6ae;
+  box-shadow: 2px 2px 0 rgba(0,0,0,.5);
+}
+.icon:focus-visible, .icon:hover{ border-color: #fff; background: rgba(30,50,80,.45); outline: none; }
+.icon.locked .glyph{ filter: grayscale(1) brightness(.6); }
+
+/* =========================================================
+   WINDOWS 98-ish WINDOWS
+   ========================================================= */
+.win{
+  position: absolute; display: none; flex-direction: column;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  border: 2px solid; border-color: var(--frame-hi) var(--frame-lo) var(--frame-lo) var(--frame-hi);
+  border-radius: 7px 7px 3px 3px;
+  box-shadow: inset 1px 1px 0 #55626c, inset -1px -1px 0 #161d23, 7px 9px 0 rgba(0,0,0,.38);
+  z-index: 20; max-height: calc(100% - 40px);
+  animation: winOpen .18s steps(4);
+}
+.win.open{ display: flex; }
+@keyframes winOpen{ from{ transform: scale(.94); opacity: .2; } to{ transform: none; opacity: 1; } }
+.titlebar{
+  flex: none; height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 3px 0 6px;
+  background: linear-gradient(90deg, var(--title-a), var(--title-b));
+  color: #fff; font-weight: bold; border-radius: 5px 5px 0 0; letter-spacing: .2px;
+  user-select: none;
+}
+.titlebar .t-ico{ width: 16px; height: 16px; display: grid; place-items: center; font: 16px/1 var(--mono); background: #2a3a2a; border: 1px solid #000; }
+.titlebar .t-txt{ flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-btn{
+  width: 18px; height: 16px; padding: 0; display: grid; place-items: center; cursor: pointer;
+  background: var(--face); color: #000; font: bold 11px/1 var(--ui);
+  border: 1px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
+  box-shadow: inset -1px -1px 0 var(--shadow);
+}
+.tb-btn:active{ border-color: var(--dark) var(--hi) var(--hi) var(--dark); box-shadow: inset 1px 1px 0 var(--shadow); }
+.win-body{ flex: 1; min-height: 0; overflow: auto; padding: 12px; }
+.statusbar{ flex: none; display: flex; gap: 3px; padding: 3px; border-top: 1px solid #0a0d10; }
+.statusbar > span{
+  padding: 1px 6px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border: 1px solid; border-color: #0a0d10 #66737d #66737d #0a0d10;
+}
+.statusbar > span:first-child{ flex: 1; }
+
+.sunken{
+  background: var(--glass-deep);
+  border: 2px solid; border-color: var(--frame-lo) var(--frame-hi) var(--frame-hi) var(--frame-lo);
+}
+.groupbox{ border: 1px solid #66737d; box-shadow: 1px 1px 0 #0a0d10 inset, 1px 1px 0 #0a0d10; padding: 14px 10px 10px; position: relative; margin-top: 8px; }
+.groupbox > legend, .groupbox > .gb-label{ position: absolute; top: -9px; left: 8px; padding: 0 4px; background: #222c35; font-size: 12px; color: #c8d0d6; }
+
+.btn{
+  font: 13px var(--ui); color: #111; cursor: pointer; padding: 5px 16px; min-width: 88px;
+  background: var(--face);
+  border: 2px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
+  box-shadow: inset -1px -1px 0 var(--shadow), inset 1px 1px 0 #fff;
+}
+.btn:hover{ background: #c4c8c2; }
+.btn:active:not(:disabled){ border-color: var(--dark) var(--hi) var(--hi) var(--dark); box-shadow: inset 1px 1px 0 var(--shadow); padding: 6px 15px 4px 17px; }
+.btn:focus-visible{ outline: 1px dotted #000; outline-offset: -5px; }
+.btn:disabled{ color: #7c807a; text-shadow: 1px 1px 0 #f2f2f2; cursor: default; }
+.btn.go{ background: #557c4c; color: #f2f6ee; box-shadow: inset -1px -1px 0 #2a4224, inset 1px 1px 0 #9cc08d; }
+.btn.go:hover{ background: #618a57; }
+.btn.small{ min-width: 0; padding: 3px 9px; font-size: 12px; }
+
+/* Window placements */
+#win-office{ left: 50%; top: 9%; width: min(440px, 92%); transform: translateX(-10%); }
+#win-squad{ right: 3%; top: 3%; width: min(860px, 95%); }
+#win-match{ left: 50%; bottom: 3%; width: min(980px, 95%); transform: translateX(-50%); max-height: calc(100% - 24px); }
+#win-notes{ left: 50%; top: 4%; width: min(860px, 94%); transform: translateX(-50%); }
+#win-office.open, #win-match.open, #win-notes.open{ animation: none; }
+#dlg{ left: 50%; top: 38%; width: min(360px, 90%); transform: translate(-50%, -50%); z-index: 60; }
+
+/* =========================================================
+   OFFICE
+   ========================================================= */
+.office-head{ display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.crest{ width: 48px; height: 56px; flex: none; display: grid; place-items: center; font: 30px var(--mono);
+  background: linear-gradient(#3e6a3f, #23402a); border: 2px solid #9bb68c; border-radius: 4px 4px 24px 24px; color: #e7efe1; }
+.office-head h2{ margin: 0; font-size: 15px; }
+.office-head p{ margin: 2px 0 0; color: var(--muted); }
+.kv{ display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font: 19px/1.1 var(--mono); }
+.kv dt{ color: var(--muted); } .kv dd{ margin: 0; color: #e9ede6; }
+.memo{ font: 18px/1.15 var(--mono); color: #cfd8c9; margin: 10px 0 0; padding: 8px 10px; }
+.memo li{ margin: 2px 0; }
+.row-btns{ display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+
+/* =========================================================
+   SQUAD TABLE
+   ========================================================= */
+.tbl-wrap{ max-height: 68vh; overflow: auto; }
+table.grid{ width: 100%; border-collapse: collapse; }
+.grid th{
+  position: sticky; top: 0; z-index: 1; text-align: left; font-weight: normal; color: #111;
+  background: var(--face); padding: 3px 8px;
+  border: 1px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
+}
+.grid td{ padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.05); vertical-align: middle; }
+.grid tbody tr:nth-child(even) td{ background: rgba(255,255,255,.025); }
+.grid tbody tr:hover td{ background: rgba(75,98,118,.35); }
+.grid .nm{ font-weight: bold; color: #eef1ec; }
+.pos{ display: inline-block; min-width: 38px; text-align: center; font: 17px/1 var(--mono); padding: 2px 4px; border: 1px solid; }
+.pos.GK { color: #e2b85a; border-color: #8a6f33; background: rgba(226,184,90,.08); }
+.pos.DEF{ color: #8fb4d6; border-color: #47657f; background: rgba(143,180,214,.08); }
+.pos.MID{ color: #9cc58a; border-color: #4b6e40; background: rgba(156,197,138,.08); }
+.pos.FWD{ color: #e08b7f; border-color: #86443b; background: rgba(224,139,127,.08); }
+.tags{ display: flex; flex-wrap: wrap; gap: 4px; }
+.tag{
+  display: inline-flex; align-items: center; gap: 4px; font: 17px/1 var(--mono); padding: 2px 6px;
+  border: 1px solid; white-space: nowrap;
+}
+.tag.good{ color: #cfe8c2; background: rgba(62,106,63,.55); border-color: #79a464; }
+.tag.bad { color: #f4cfc9; background: rgba(166,59,48,.5); border-color: #d4675a; }
+.tag.neutral{ color: #e8e2cf; background: rgba(110,100,70,.45); border-color: #a99a6c; }
+.tag button{ background: none; border: 0; color: inherit; cursor: pointer; font: 15px/1 var(--mono); padding: 0 0 0 2px; opacity: .7; }
+.tag button:hover{ opacity: 1; }
+.empty{ color: #5f6c77; font: 17px var(--mono); }
+
+/* =========================================================
+   MATCH
+   ========================================================= */
+.match-top{ display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: stretch; }
+.scoreboard{ padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px; background: rgba(2,5,3,.88); }
+.sb-team{ font: 24px/1 var(--mono); letter-spacing: 1px; color: #c9d4c3; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-team.home{ text-align: right; color: #a9d095; }
+.sb-score{ font: 56px/0.9 var(--mono); color: var(--amber); text-shadow: 0 0 10px rgba(226,184,90,.55); letter-spacing: 3px; }
+.sb-score.flash{ animation: goalflash .25s steps(2) 8; }
+@keyframes goalflash{ 50%{ color: #fff; text-shadow: 0 0 18px #fff; } }
+.sb-clock{ grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; font: 22px/1 var(--mono); color: #7ee07a; }
+.sb-clock .min{ min-width: 52px; text-shadow: 0 0 8px rgba(126,224,122,.5); }
+.bar{ flex: 1; height: 10px; background: #08100a; border: 1px solid #2c3d2c; position: relative; }
+.bar > i{ position: absolute; inset: 0 auto 0 0; width: 0; background: repeating-linear-gradient(90deg, #4f9a4b 0 6px, #2f6a2c 6px 8px); }
+.bar > .ht{ position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: #8a9a8a; }
+.ctrl{ display: flex; flex-direction: column; gap: 8px; justify-content: center; min-width: 190px; }
+.ctrl .btn{ padding: 10px 16px; font-weight: bold; }
+.speed{ font: 17px/1 var(--mono); color: var(--muted); text-align: center; }
+.speed.slow{ color: var(--red-hi); animation: blink .5s steps(2) infinite; }
+@keyframes blink{ 50%{ opacity: .35; } }
+
+.zones{ display: grid; grid-template-columns: repeat(3, 1fr); margin: 10px 0; font: 17px/1 var(--mono); }
+.zones > div{ padding: 6px 8px; text-align: center; color: #66756a; border: 1px solid #263127; background: rgba(20,35,22,.6); position: relative; }
+.zones > div.on{ color: #fff; background: rgba(62,106,63,.75); border-color: var(--green-hi); }
+.zones > div.on.them{ background: rgba(166,59,48,.6); border-color: var(--red-hi); }
+.possession{ font: 17px/1 var(--mono); color: var(--muted); margin-top: -4px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.possession b{ color: #e9ede6; font-weight: normal; }
+
+.match-main{ display: grid; grid-template-columns: 1fr 230px; gap: 12px; min-height: 0; }
+.log{
+  height: clamp(180px, 38vh, 420px); overflow-y: auto; padding: 8px 10px;
+  font: 19px/1.12 var(--mono); color: #b7c3bb; white-space: pre-wrap; resize: vertical;
+  scrollbar-color: #6d7a72 #11181a;
+}
+.log .ln{ display: block; padding: 1px 0; }
+.log .m{ color: #5e7262; margin-right: 6px; }
+.log .us{ color: #c9dfc0; } .log .them{ color: #9fb0c0; }
+.log .turn{ color: #e09a8f; }
+.log .shot{ color: #f1dca6; }
+.log .goal{ color: #111; background: var(--amber); padding: 0 4px; }
+.log .goal.them{ background: #c2564a; color: #fff; }
+.log .whistle{ color: #86e182; }
+.log .flavor{ color: #6d7c86; font-style: italic; }
+.statgrid{ display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font: 19px/1.1 var(--mono); }
+.statgrid dt{ color: var(--muted); } .statgrid dd{ margin: 0; text-align: right; color: #e9ede6; }
+.statgrid dd.ok{ color: #9cc58a; } .statgrid dd.bad{ color: #e08b7f; }
+
+/* =========================================================
+   NOTEBOOK (POST-MATCH)
+   ========================================================= */
+.nb-head{ display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.nb-head h2{ margin: 0; font: 26px/1 var(--mono); color: #efe9d6; letter-spacing: 1px; }
+.nb-head .res{ font: 20px var(--mono); padding: 2px 8px; border: 1px solid; }
+.res.W{ color: #cfe8c2; border-color: #79a464; background: rgba(62,106,63,.5); }
+.res.D{ color: #e8e2cf; border-color: #a99a6c; background: rgba(110,100,70,.4); }
+.res.L{ color: #f4cfc9; border-color: #d4675a; background: rgba(166,59,48,.45); }
+.nb-hint{ font: 18px/1.15 var(--mono); color: #a5afa0; margin: 0 0 10px; }
+.cards{ display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.card{
+  padding: 12px; position: relative; color: #2a2a26;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 21px, rgba(60,90,130,.22) 21px 22px),
+    linear-gradient(#e9e4d3, #dcd5c0);
+  border: 1px solid #000; box-shadow: 3px 4px 0 rgba(0,0,0,.45);
+  font: 20px/22px var(--mono);
+}
+.card::before{ content: ""; position: absolute; left: 26px; top: 0; bottom: 0; width: 1px; background: rgba(170,60,50,.45); }
+.card > *{ position: relative; margin-left: 22px; }
+.card h3{ margin: 0 0 0 22px; font: 24px/22px var(--mono); color: #13213a; }
+.card h3 .pos{ font-size: 15px; padding: 0 4px; margin-left: 6px; vertical-align: 2px; color: #f1ede0; background: #2b3a4c; border-color: #000; }
+.card ul{ list-style: none; padding: 0; margin: 4px 0 8px 22px; }
+.card li::before{ content: "- "; color: #7a6b4c; }
+.card .cur{ min-height: 22px; margin-bottom: 8px; }
+.card .tag-btns{ display: flex; flex-direction: column; gap: 6px; }
+.card .btn{ text-align: left; font-size: 12px; }
+.card .btn.done{ background: #8fae7f; color: #10200c; }
+.locked-msg{ padding: 30px 16px; text-align: center; font: 22px var(--mono); color: #b8b19b; }
+
+/* =========================================================
+   TASKBAR
+   ========================================================= */
+#taskbar{
+  position: absolute; left: 0; right: 0; bottom: 0; height: 38px; z-index: 40;
+  display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 14px;
+  background: rgba(182,186,180,.94); border-top: 2px solid var(--hi); color: #000;
+}
+.tk{
+  height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 10px; cursor: pointer;
+  background: var(--face); color: #000; font: 12px var(--ui); white-space: nowrap;
+  border: 2px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
+  box-shadow: inset -1px -1px 0 var(--shadow);
+}
+.tk.start{ font-weight: bold; padding: 0 8px; }
+.tk.start .logo{ width: 16px; height: 16px; display: grid; place-items: center; background: var(--green); color: #fff; font: 15px/1 var(--mono); border: 1px solid #000; }
+.tk.active{ border-color: var(--dark) var(--hi) var(--hi) var(--dark); box-shadow: inset 1px 1px 0 var(--shadow);
+  background: repeating-conic-gradient(#d9dcd6 0 25%, #c4c8c2 0 50%) 0 0 / 2px 2px; font-weight: bold; }
+.tk.locked{ color: #6c706a; }
+.tk.alert{ animation: tkAlert .6s steps(2) infinite; }
+@keyframes tkAlert{ 50%{ background: var(--title-b); color: #fff; } }
+.tasks{ display: flex; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
+.tray{ height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12px; margin-right: 10px;
+  border: 1px solid; border-color: var(--shadow) var(--hi) var(--hi) var(--shadow); }
+.sep{ width: 2px; height: 26px; border-left: 1px solid var(--shadow); border-right: 1px solid var(--hi); }
+#startmenu{
+  position: absolute; left: 14px; bottom: 38px; z-index: 45; display: none; width: 230px;
+  background: var(--face); color: #000; border: 2px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
+  box-shadow: inset -1px -1px 0 var(--shadow), 4px 4px 0 rgba(0,0,0,.35);
+}
+#startmenu.open{ display: flex; }
+#startmenu .side{ width: 26px; background: linear-gradient(0deg, var(--title-a), var(--title-b)); color: #cfd8e0;
+  writing-mode: vertical-rl; transform: rotate(180deg); font-weight: bold; padding: 8px 4px; letter-spacing: 1px; }
+#startmenu ul{ list-style: none; margin: 0; padding: 3px; flex: 1; }
+#startmenu li button{ width: 100%; text-align: left; background: none; border: 0; padding: 7px 10px; cursor: pointer; font: 13px var(--ui); color: #000; }
+#startmenu li button:hover{ background: var(--title-a); color: #fff; }
+#startmenu hr{ border: 0; border-top: 1px solid var(--shadow); border-bottom: 1px solid var(--hi); margin: 3px 2px; }
+
+.dlg-body{ display: flex; gap: 12px; align-items: flex-start; }
+.dlg-ico{ width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #c9a43c; color: #000; font: bold 22px var(--ui); border: 1px solid #000; }
+
+/* =========================================================
+   READABILITY PASS — clean Cyrillic-friendly font, higher contrast,
+   CRT effects off by default (toggle in the Start menu)
+   ========================================================= */
+:root{
+  --ui: "PT Sans", "Segoe UI", Tahoma, Arial, sans-serif;
+  --mono: "PT Sans", "Segoe UI", Tahoma, Arial, sans-serif;
+  --glass: rgba(20, 28, 36, 0.94);
+  --glass-deep: rgba(6, 10, 14, 0.92);
+  --text: #e9eef2;
+  --muted: #aab7c2;
+}
+html, body{ font-size: 14px; }
+.titlebar{ font-size: 13px; }
+.btn, .tk{ font-size: 13px; }
+.icon{ font-size: 13px; }
+.log{ font-size: 15px; line-height: 1.5; color: #e1e8e3; }
+.log .m{ display: inline-block; min-width: 2.6em; color: #8aa092; font-variant-numeric: tabular-nums; }
+.log .us{ color: #e6f1df; } .log .them{ color: #bccbd8; }
+.log .turn{ color: #f0a89d; } .log .shot{ color: #f5e2b0; font-weight: bold; }
+.log .goal{ font-weight: bold; } .log .whistle{ color: #9be797; font-weight: bold; }
+.log .flavor{ color: #97a6b0; }
+.kv, .statgrid{ font-size: 15px; line-height: 1.5; }
+.memo, .nb-hint{ font-size: 14px; line-height: 1.5; }
+.zones, .possession, .speed, .empty{ font-size: 13px; }
+.zones > div{ color: #95a69a; }
+.possession{ color: #b3bfc8; }
+.tag{ font-size: 13px; padding: 2px 7px; }
+.pos{ font-size: 12px; font-weight: bold; }
+.sb-team{ font-size: 18px; font-weight: bold; letter-spacing: .5px; }
+.sb-score{ font-family: "VT323", "PT Sans", monospace; }
+.sb-clock{ font-size: 16px; }
+.sb-clock .min{ font-variant-numeric: tabular-nums; }
+.card{ font-size: 14px; line-height: 22px; color: #1d1d1a; }
+.card h3{ font-size: 17px; font-weight: bold; }
+.nb-head h2{ font-size: 20px; font-weight: bold; }
+.nb-head .res{ font-size: 15px; font-weight: bold; }
+.locked-msg{ font-size: 16px; }
+.statusbar > span{ color: #b6c1ca; }
+.gb-label{ font-size: 13px; }
+.card .tag.good{ background: #3e6a3f; color: #fff; border-color: #24401f; }
+.card .tag.bad{ background: #a63b30; color: #fff; border-color: #5e1d16; }
+.card .tag.neutral{ background: #7a6a3e; color: #fff; border-color: #463b1f; }
+
+/* CRT: no flicker, no rolling band, no grille. Only a static vignette by default. */
+.rain, .crt-scan, .crt-grille, .crt-roll, .crt-flicker, .crt-glare{ display: none; }
+body.fx .rain{ display: block; opacity: .3; }
+body.fx .crt-scan{ display: block; opacity: .35; }
+body.fx .crt-glare{ display: block; }
+
+.lang{
+  height: 20px; min-width: 30px; padding: 0 5px; cursor: pointer; font: bold 11px var(--ui); color: #fff;
+  background: var(--title-a); border: 1px solid; border-color: #6d8296 #000 #000 #6d8296;
+}
+.lang:hover{ background: var(--title-b); }
+
+/* =========================================================
+   AGENCY: energy bars, substitutions, shouts, cards
+   ========================================================= */
+.energy{ position: relative; height: 18px; background: #0a0f12; border: 1px solid #3c4a54; }
+.energy i{ position: absolute; inset: 0 auto 0 0; }
+.energy.hi i{ background: #4f8a45; } .energy.mid i{ background: #b28a2e; } .energy.lo i{ background: #a63b30; }
+.energy span{ position: relative; display: block; text-align: center; font-size: 12px; line-height: 16px; color: #fff; text-shadow: 1px 1px 0 #000; font-weight: bold; }
+.grid tr.grp td{ background: rgba(75,98,118,.5) !important; font-weight: bold; font-size: 12px; letter-spacing: 1px; color: #e6edf2; padding: 4px 8px; }
+.grid tr.sel td{ background: rgba(121,164,100,.38) !important; }
+.grid tr.tired .nm{ color: #f0a89d; }
+.grid td.act{ text-align: right; }
+.grid td.act .btn{ white-space: nowrap; min-width: 104px; }
+.grid td{ padding: 4px 8px; }
+.kv dd.warn{ color: #f0a89d; }
+.log-col{ display: flex; flex-direction: column; min-width: 0; }
+.log{ height: clamp(160px, 32vh, 380px); }
+.shouts{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.shout{ font-weight: bold; padding: 8px 6px; }
+.shout.active{ color: #fff; border-color: var(--dark) var(--hi) var(--hi) var(--dark); box-shadow: inset 1px 1px 0 rgba(0,0,0,.5); }
+.shout[data-shout="attack"].active{ background: #a63b30; }
+.shout[data-shout="defend"].active{ background: #2b4f78; }
+.shout[data-shout="balanced"].active{ background: #3e6a3f; }
+.log .coach{ color: #8fd3ff; font-weight: bold; }
+.log .foul{ color: #f5d76e; font-weight: bold; }
+.log .red{ background: #a63b30; color: #fff; font-weight: bold; padding: 0 4px; }
+.card .btn small{ display: block; font-size: 11px; color: #3d4238; line-height: 1.25; margin-top: 2px; }
+.card .btn.done small{ color: #1f3518; }
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 820px){
+  #screen{ inset: 4px; border-radius: 14px; }
+  .icons{ display: none; }
+  #win-office, #win-squad, #win-notes{ left: 50%; right: auto; top: 10px; transform: translateX(-50%); }
+  #win-match{ bottom: 6px; top: 6px; }
+  .match-top, .match-main{ grid-template-columns: 1fr; }
+  .ctrl{ min-width: 0; flex-direction: row; align-items: center; }
+  .ctrl .btn{ flex: 1; }
+  .sb-score{ font-size: 44px; } .sb-team{ font-size: 18px; }
+  .log{ height: 30vh; }
+  .tk .lbl{ display: none; }
+  .tray .clk-label{ display: none; }
+}
+</style>
+</head>
+<body>
+<div id="screen">
+  <!-- Scene backdrops (cross-faded per tab) -->
+  <div class="scene active" id="scene-office" aria-hidden="true"></div>
+  <div class="scene" id="scene-squad" aria-hidden="true"></div>
+  <div class="scene" id="scene-match" aria-hidden="true"></div>
+  <div class="scene" id="scene-notes" aria-hidden="true"></div>
+  <div class="rain" aria-hidden="true"></div>
+
+  <div id="desktop">
+    <nav class="icons" aria-label="Desktop">
+      <button class="icon" data-view="office"><span class="glyph">&#8962;</span><span data-i18n="nav.office">Office</span></button>
+      <button class="icon" data-view="squad"><span class="glyph">&#9638;</span><span data-i18n="nav.squad">Squad</span></button>
+      <button class="icon" data-view="match"><span class="glyph">&#9673;</span><span data-i18n="nav.matchday">Match Day</span></button>
+      <button class="icon" data-view="notes" id="icon-notes"><span class="glyph">&#9998;</span><span data-i18n="nav.notebook">Notebook</span></button>
+    </nav>
+
+    <!-- OFFICE -->
+    <section class="win" id="win-office">
+      <div class="titlebar"><span class="t-ico">&#8962;</span><span class="t-txt" data-i18n="office.title"></span>
+        <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
+      <div class="win-body">
+        <div class="office-head">
+          <div class="crest">&#9673;</div>
+          <div><h2 id="club-name">Club</h2><p data-i18n="office.sub"></p></div>
+        </div>
+        <dl class="kv sunken" style="padding:8px 10px;margin:0" id="office-kv"></dl>
+        <ol class="memo sunken" id="office-memo" data-i18n="office.memo"></ol>
+        <div class="row-btns">
+          <button class="btn" data-goto="squad" data-i18n="office.toSquad"></button>
+          <button class="btn go" data-goto="match" data-i18n="office.toMatch"></button>
+        </div>
+      </div>
+      <div class="statusbar"><span id="office-status"></span><span id="office-date"></span></div>
+    </section>
+
+    <!-- SQUAD -->
+    <section class="win" id="win-squad">
+      <div class="titlebar"><span class="t-ico">&#9638;</span><span class="t-txt" data-i18n="squad.title"></span>
+        <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
+      <div class="win-body">
+        <div class="tbl-wrap sunken">
+          <table class="grid">
+            <thead><tr><th data-i18n="squad.name"></th><th style="width:64px" data-i18n="squad.pos"></th><th style="width:150px" data-i18n="squad.energy"></th><th data-i18n="squad.role"></th><th style="width:110px"></th></tr></thead>
+            <tbody id="squad-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="statusbar"><span id="squad-status"></span><span data-i18n="squad.hidden"></span></div>
+    </section>
+
+    <!-- MATCH -->
+    <section class="win" id="win-match">
+      <div class="titlebar"><span class="t-ico">&#9673;</span><span class="t-txt" id="match-title">MATCHDAY.EXE</span>
+        <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
+      <div class="win-body">
+        <div class="match-top">
+          <div class="scoreboard sunken">
+            <div class="sb-team home" id="sb-home">HOME</div>
+            <div class="sb-score" id="sb-score">0 - 0</div>
+            <div class="sb-team" id="sb-away">AWAY</div>
+            <div class="sb-clock"><span class="min" id="sb-min">00'</span>
+              <div class="bar"><i id="sb-bar"></i><span class="ht"></span></div><span id="sb-period">PRE</span></div>
+          </div>
+          <div class="ctrl">
+            <button class="btn go" id="btn-start"></button>
+            <div class="speed" id="speed"></div>
+          </div>
+        </div>
+        <div class="zones" id="zones">
+          <div data-z="0" data-i18n="zone.0"></div><div data-z="1" data-i18n="zone.1"></div><div data-z="2" data-i18n="zone.2"></div>
+        </div>
+        <div class="possession">
+          <span><span data-i18n="match.ball"></span>: <b id="carrier">&mdash;</b></span>
+          <span><span data-i18n="match.poss"></span>: <b id="poss">&mdash;</b></span>
+        </div>
+        <div class="match-main">
+          <div class="log-col">
+            <div class="log sunken" id="log" role="log" aria-live="polite"></div>
+            <div class="shouts" role="group">
+              <button class="btn shout" data-shout="attack" data-i18n="shout.attack" data-i18n-aria="shout.attackTip"></button>
+              <button class="btn shout" data-shout="defend" data-i18n="shout.defend" data-i18n-aria="shout.defendTip"></button>
+              <button class="btn shout" data-shout="balanced" data-i18n="shout.balanced" data-i18n-aria="shout.balancedTip"></button>
+            </div>
+          </div>
+          <div class="groupbox"><span class="gb-label" data-i18n="match.ourStats"></span>
+            <dl class="statgrid" id="team-stats"></dl>
+          </div>
+        </div>
+      </div>
+      <div class="statusbar"><span id="match-status"></span><span id="match-fixture"></span></div>
+    </section>
+
+    <!-- NOTEBOOK -->
+    <section class="win" id="win-notes">
+      <div class="titlebar"><span class="t-ico">&#9998;</span><span class="t-txt" data-i18n="notes.title"></span>
+        <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
+      <div class="win-body" id="notes-body"></div>
+      <div class="statusbar"><span id="notes-status"></span><span data-i18n="notes.saveHint"></span></div>
+    </section>
+
+    <!-- DIALOG -->
+    <section class="win" id="dlg" role="alertdialog" aria-labelledby="dlg-title">
+      <div class="titlebar"><span class="t-txt" id="dlg-title"></span><button class="tb-btn" id="dlg-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="win-body">
+        <div class="dlg-body"><div class="dlg-ico">!</div><div id="dlg-text"></div></div>
+        <div class="row-btns" style="justify-content:center"><button class="btn" id="dlg-ok" data-i18n="ui.ok">OK</button></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="startmenu" role="menu">
+    <div class="side">ACADEMY 98</div>
+    <ul>
+      <li><button data-goto="office">&#8962;&nbsp; <span data-i18n="nav.office"></span></button></li>
+      <li><button data-goto="squad">&#9638;&nbsp; <span data-i18n="nav.squad"></span></button></li>
+      <li><button data-goto="match">&#9673;&nbsp; <span data-i18n="nav.matchday"></span></button></li>
+      <li><button data-goto="notes">&#9998;&nbsp; <span data-i18n="nav.notebook"></span></button></li>
+      <hr>
+      <li><button id="btn-lang-menu">&#127760;&nbsp; <span data-i18n="ui.switchLang"></span></button></li>
+      <li><button id="btn-fx">&#9635;&nbsp; <span id="fx-lbl"></span></button></li>
+      <li><button id="btn-reset">&#9888;&nbsp; <span data-i18n="ui.newAcademy"></span></button></li>
+    </ul>
+  </div>
+
+  <footer id="taskbar">
+    <button class="tk start" id="btn-startmenu" aria-haspopup="menu"><span class="logo">&#9673;</span><span data-i18n="ui.start">Start</span></button>
+    <span class="sep"></span>
+    <div class="tasks">
+      <button class="tk" data-view="office">&#8962; <span class="lbl" data-i18n="nav.office"></span></button>
+      <button class="tk" data-view="squad">&#9638; <span class="lbl" data-i18n="nav.squad"></span></button>
+      <button class="tk" data-view="match">&#9673; <span class="lbl" data-i18n="nav.match"></span></button>
+      <button class="tk" data-view="notes" id="tk-notes">&#9998; <span class="lbl" id="tk-notes-lbl"></span></button>
+    </div>
+    <div class="tray">
+      <button class="lang" id="btn-lang">RU</button>
+      <span class="clk-label">&#9729; 9&deg;C</span><span id="clock">--:--</span>
+    </div>
+  </footer>
+
+  <!-- CRT overlay stack -->
+  <div class="crt crt-scan"></div><div class="crt crt-grille"></div><div class="crt crt-roll"></div>
+  <div class="crt crt-flicker"></div><div class="crt crt-glare"></div><div class="crt crt-vignette"></div>
+</div>
+
+<script>
+'use strict';
+
+/* =========================================================
+   UTILITIES & STATIC DATA
+   ========================================================= */
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const pad2 = n => String(n).padStart(2, '0');
+const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (tpl, map) => tpl.replace(/\{(\w+)\}/g, (_, k) => map[k] ?? '');
+
+const CLUB_NAME = 'Ashford Rovers U-14';
+const FORMATION = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD'];
+const BENCH = ['GK', 'DEF', 'MID', 'MID', 'FWD'];
+const POS_ORDER = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
+const ZONE_POS = ['DEF', 'MID', 'FWD']; // zone index -> who naturally plays there (relative to the team in possession)
+const ATTRS = ['Speed', 'Pass', 'Dribble', 'Shoot', 'Tackle', 'Save'];
+const PROFILES = { // [min, max] per hidden attribute, 1-20
+  GK:  { Speed: [6, 12],  Pass: [5, 11],  Dribble: [3, 8],   Shoot: [2, 6],   Tackle: [4, 9],   Save: [10, 18] },
+  DEF: { Speed: [7, 14],  Pass: [7, 13],  Dribble: [5, 10],  Shoot: [4, 9],   Tackle: [10, 18], Save: [1, 4] },
+  MID: { Speed: [8, 15],  Pass: [10, 18], Dribble: [8, 15],  Shoot: [7, 13],  Tackle: [7, 14],  Save: [1, 4] },
+  FWD: { Speed: [10, 18], Pass: [7, 13],  Dribble: [10, 17], Shoot: [11, 18], Tackle: [3, 8],   Save: [1, 3] },
+};
+/* Energy economy. WEEK_REST is a small recovery for everyone between fixtures:
+   without it, 16 players can't sustain 11 starters at ±30-40/+30. Tune here. */
+const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 30, WEEK_REST: 15 };
+const FIRST = ['Tommy', 'Jamie', 'Callum', 'Liam', 'Owen', 'Danny', 'Kieran', 'Ryan', 'Connor', 'Ben', 'Josh', 'Lewis', 'Harvey', 'Alfie', 'Reece', 'Sam', 'Mikey', 'Charlie', 'Ethan', 'Jack', 'Nathan', 'Dylan', 'Kai', 'Robbie', 'Elliot', 'Archie', 'Finn', 'Leo', 'Marcus', 'Theo', 'Aaron', 'Jordan'];
+const LAST = ['Smith', 'Jones', 'Walsh', 'Doyle', 'Carter', 'Hughes', 'Price', 'Barnes', 'Fletcher', 'Kenny', 'Morgan', 'Reid', 'Shaw', 'Harper', 'Quinn', 'Mason', 'Booth', 'Lowe', 'Dunn', 'Pike', 'Holt', 'Riley', 'Webb', 'Nolan', 'Cobb', 'Finch', 'Rowe', 'Sutton', 'Dale', 'Gill', 'Marsh', 'Platt', 'Varley', 'Ashworth', 'Brennan', 'Tully', 'Kemp', 'Oakes', 'Perry', 'Ward'];
+const OPPONENTS = ['Dockside Juniors', "St. Albert's U-14", 'Ironworks Colts', 'Northgate Rangers', 'Millbrook Wanderers', 'Canal Street Youth', 'Fernhill Athletic', 'Gasworks Boys'];
+
+/* =========================================================
+   LOCALISATION (EN / RU)
+   ========================================================= */
+const RU_NAMES = {
+  Tommy: 'Томми', Jamie: 'Джейми', Callum: 'Каллум', Liam: 'Лиам', Owen: 'Оуэн', Danny: 'Дэнни', Kieran: 'Киран', Ryan: 'Райан',
+  Connor: 'Коннор', Ben: 'Бен', Josh: 'Джош', Lewis: 'Льюис', Harvey: 'Харви', Alfie: 'Алфи', Reece: 'Рис', Sam: 'Сэм',
+  Mikey: 'Майки', Charlie: 'Чарли', Ethan: 'Итан', Jack: 'Джек', Nathan: 'Нейтан', Dylan: 'Дилан', Kai: 'Кай', Robbie: 'Робби',
+  Elliot: 'Эллиот', Archie: 'Арчи', Finn: 'Финн', Leo: 'Лео', Marcus: 'Маркус', Theo: 'Тео', Aaron: 'Аарон', Jordan: 'Джордан',
+  Smith: 'Смит', Jones: 'Джонс', Walsh: 'Уолш', Doyle: 'Дойл', Carter: 'Картер', Hughes: 'Хьюз', Price: 'Прайс', Barnes: 'Барнс',
+  Fletcher: 'Флетчер', Kenny: 'Кенни', Morgan: 'Морган', Reid: 'Рид', Shaw: 'Шоу', Harper: 'Харпер', Quinn: 'Куинн', Mason: 'Мейсон',
+  Booth: 'Бут', Lowe: 'Лоу', Dunn: 'Данн', Pike: 'Пайк', Holt: 'Холт', Riley: 'Райли', Webb: 'Уэбб', Nolan: 'Нолан', Cobb: 'Кобб',
+  Finch: 'Финч', Rowe: 'Роу', Sutton: 'Саттон', Dale: 'Дейл', Gill: 'Гилл', Marsh: 'Марш', Platt: 'Платт', Varley: 'Варли',
+  Ashworth: 'Эшворт', Brennan: 'Бреннан', Tully: 'Талли', Kemp: 'Кемп', Oakes: 'Оукс', Perry: 'Перри', Pryce: 'Прайсс', Ward: 'Уорд',
+};
+const RU_TEAMS = {
+  'Ashford Rovers U-14': 'Эшфорд Роверс U-14', 'Dockside Juniors': 'Доксайд Джуниорс', "St. Albert's U-14": 'Сент-Олбертс U-14',
+  'Ironworks Colts': 'Айронворкс Колтс', 'Northgate Rangers': 'Нортгейт Рейнджерс', 'Millbrook Wanderers': 'Миллбрук Уондерерс',
+  'Canal Street Youth': 'Канал-Стрит Юниорс', 'Fernhill Athletic': 'Фернхилл Атлетик', 'Gasworks Boys': 'Газворкс Бойз',
+};
+const POS_LABEL = { en: { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'FWD' }, ru: { GK: 'ВРТ', DEF: 'ЗАЩ', MID: 'ПЗ', FWD: 'НАП' } };
+
+/* Role tags — each one changes the match math (see MatchEngine.eff / chooseAction / commitFoul). */
+const TAGS = {
+  Aggressive: { tone: 'bad',     en: ['Aggressive', 'Tackle ×1.5. Loses a tackle → foul + yellow card.'], ru: ['Агрессивный', 'Отбор ×1.5. Проиграл единоборство — фол и жёлтая карточка.'] },
+  Playmaker:  { tone: 'good',    en: ['Playmaker', 'Pass ×1.5. Looks for a pass first.'],                ru: ['Плеймейкер', 'Пас ×1.5. В первую очередь ищет передачу.'] },
+  Selfish:    { tone: 'neutral', en: ['Selfish', 'Dribble & Shoot ×1.5. Almost never passes.'],         ru: ['Эгоист', 'Дриблинг и удар ×1.5. Почти никогда не пасует.'] },
+};
+const TAG_KEYS = Object.keys(TAGS);
+
+const I18N = {
+  en: {
+    'doc.title': 'Youth Academy Manager',
+    'nav.office': 'Office', 'nav.squad': 'Squad', 'nav.match': 'Match', 'nav.matchday': 'Match Day',
+    'nav.notebook': 'Notebook', 'nav.notebookLocked': 'Notebook (locked)',
+    'ui.start': 'Start', 'ui.ok': 'OK', 'ui.close': 'Close', 'ui.min': 'Minimize',
+    'ui.newAcademy': 'New Academy (wipe save)', 'ui.fxOn': 'Screen effects: ON', 'ui.fxOff': 'Screen effects: OFF',
+    'ui.switchLang': 'Язык: Русский', 'ui.lang': 'Switch to Russian',
+    'office.title': 'COACH.EXE — Office', 'office.sub': 'Youth Academy · Sunday League, Division 3',
+    'office.memo': '<li>Ratings are hidden. Watch the log and trust your eyes.</li><li>After the match give lads a ROLE in the Notebook. It changes how they play, for better or worse.</li><li>During the match, shout from the touchline: Attack / Defend / Balanced.</li><li>Rotate the squad: anyone starting under 50% energy plays at half strength.</li>',
+    'office.toSquad': 'Squad Sheet', 'office.toMatch': 'Go to Match Day &#9656;',
+    'office.fixture': 'Fixture', 'office.record': 'Record', 'office.notes': 'Roles', 'office.pitch': 'Pitch', 'office.tired': 'Tired',
+    'office.recordVal': 'W{w} D{d} L{l} &nbsp;(GF {gf} / GA {ga})', 'office.tagsWritten': '{n} roles given',
+    'office.tiredVal': '{n} of {t} under 50%',
+    'office.live': 'MATCH IN PROGRESS', 'office.pitchStates': ['Waterlogged', 'Heavy', 'Muddy', 'Soaked'],
+    'office.rain': "It's raining again.", 'office.liveStatus': 'Live: {h} {x} - {y} {a}',
+    'squad.title': 'SQUAD.DBF — Locker Room', 'squad.name': 'Name', 'squad.pos': 'Pos', 'squad.energy': 'Energy', 'squad.role': 'Role',
+    'squad.xi': 'STARTING XI', 'squad.bench': 'BENCH',
+    'squad.out': 'Sub Out ↓', 'squad.in': 'Sub In ↑', 'squad.swap': '⇄ Swap', 'squad.cancel': 'Cancel',
+    'squad.none': '— no role —', 'squad.hidden': 'Ratings: hidden', 'squad.remove': 'Remove role',
+    'squad.status': '{n} tired in the XI (stats ×0.5)', 'squad.pick': '{name} selected. Now pick a player from the other group.',
+    'squad.locked': 'Lineup is locked during the match.',
+    'squad.err.gk': 'The starting XI needs exactly one goalkeeper.',
+    'squad.err.lines': 'The starting XI needs at least one defender, one midfielder and one forward.',
+    'match.title': 'MATCHDAY.EXE — Fixture #{n}', 'match.home': 'Home: {c}',
+    'match.intro': '{a} vs {b}. Kick-off in the rain. Press Start when the kids are ready.',
+    'match.hintShouts': 'Tip: the shout buttons under the log change our mentality at any time.',
+    'match.tiredWarn': 'Tired legs in the XI: {n}. Their stats are halved. Rotate on the Squad screen?',
+    'match.start': '&#9654; Start Match', 'match.inProgress': 'Match in progress…', 'match.next': 'Next Fixture &#9656;',
+    'match.ready': 'READY', 'match.slow': '● SHOT! SLOW-MO', 'match.medium': '▶ BUILD-UP…', 'match.fast': '▶▶▶ {ms}ms / min', 'match.ft': 'FULL-TIME',
+    'match.statusReady': 'Ready.', 'match.statusLive': 'Match in progress...',
+    'match.endW': 'Full-time: a win. The Notebook is now open.', 'match.endD': 'Full-time: a draw. The Notebook is now open.', 'match.endL': 'Full-time: a defeat. The Notebook is now open.',
+    'period.pre': 'PRE', 'period.h1': '1ST', 'period.h2': '2ND', 'period.ft': 'FT',
+    'zone.0': 'OUR THIRD', 'zone.1': 'MIDFIELD', 'zone.2': 'THEIR THIRD',
+    'match.ball': 'Ball', 'match.poss': 'Possession', 'match.ourStats': 'Our stats',
+    'shout.attack': '▲ ATTACK', 'shout.defend': '▼ DEFEND', 'shout.balanced': '■ BALANCED',
+    'shout.attackTip': '+3 to our attacking rolls, −3 to our defending rolls',
+    'shout.defendTip': '+3 to our defending rolls, −3 to our attacking rolls',
+    'shout.balancedTip': 'No modifiers',
+    'st.passOk': 'Passes ✓', 'st.passFail': 'Passes ✗', 'st.tackles': 'Tackles', 'st.dribbles': 'Dribbles ✓/✗',
+    'st.shots': 'Shots (on tgt)', 'st.goals': 'Goals', 'st.saves': 'GK saves', 'st.cards': 'Cards Y/R',
+    'notes.title': 'NOTEBOOK.TXT — Post-Match', 'notes.saveHint': 'Roles apply from the next match', 'notes.locked': 'Locked.',
+    'notes.lockedMsg': '&#128274; Nothing written yet.<br>Play a match to unlock the notebook.',
+    'notes.head': 'MATCH #{n}: vs {o}',
+    'notes.hint': 'Three lads caught your eye. Give each ONE role. It changes how he plays next match. Guess wrong and it backfires.',
+    'notes.status': 'Report for fixture #{n}. Roles apply from the next match.',
+    'notes.pass': '{a} successful passes, {b} failed', 'notes.tackles': '{a} tackles won, {b} lost', 'notes.drib': '{a} dribbles past a man, {b} lost',
+    'notes.shots': '{a} shots ({b} on target), {c} goals', 'notes.saves': '{a} saves', 'notes.cards': 'cards: {a} yellow, {b} red',
+    'notes.energy': 'energy now: {a}%',
+    'notes.noTags': 'no role yet', 'notes.add': 'Role: &ldquo;{t}&rdquo;', 'notes.change': 'Change to &ldquo;{t}&rdquo;', 'notes.noted': '&#10003; Current: &ldquo;{t}&rdquo;',
+    'res.W': 'W', 'res.D': 'D', 'res.L': 'L',
+    'dlg.nbTitle': 'Notebook', 'dlg.nbLocked': 'The notebook is empty.<br>Play a match first, then write down what you saw.',
+    'dlg.academy': 'Academy', 'dlg.finishFirst': 'Finish the current match first.',
+    'dlg.reset': 'A fresh batch of kids has turned up at the gate. New academy created.',
+    'eng.kickoff': 'Kick-off! {a} get us under way in the rain.', 'eng.second': 'Second half! {a} kick off.',
+    'eng.ht': 'HALF-TIME. {h} {x} - {y} {a}. Orange slices in the dugout.', 'eng.ft': 'FULL-TIME. {h} {x} - {y} {a}.',
+    'eng.shout.attack': 'Coach shouts: PUSH FORWARD!', 'eng.shout.defend': 'Coach shouts: PARK THE BUS!', 'eng.shout.balanced': 'Coach shouts: KEEP YOUR SHAPE, LADS!',
+  },
+  ru: {
+    'doc.title': 'Менеджер детской академии',
+    'nav.office': 'Кабинет', 'nav.squad': 'Состав', 'nav.match': 'Матч', 'nav.matchday': 'День матча',
+    'nav.notebook': 'Блокнот', 'nav.notebookLocked': 'Блокнот (закрыт)',
+    'ui.start': 'Пуск', 'ui.ok': 'ОК', 'ui.close': 'Закрыть', 'ui.min': 'Свернуть',
+    'ui.newAcademy': 'Новая академия (сброс)', 'ui.fxOn': 'Эффекты экрана: ВКЛ', 'ui.fxOff': 'Эффекты экрана: ВЫКЛ',
+    'ui.switchLang': 'Language: English', 'ui.lang': 'Переключить на английский',
+    'office.title': 'COACH.EXE — Кабинет', 'office.sub': 'Детская академия · Воскресная лига, 3-й дивизион',
+    'office.memo': '<li>Рейтинги скрыты. Смотри протокол и верь своим глазам.</li><li>После матча дай парням РОЛЬ в Блокноте. Она меняет их игру — к добру или к худу.</li><li>Во время матча кричи с бровки: Атака / Оборона / Баланс.</li><li>Делай ротацию: кто выходит с энергией ниже 50% — играет вполсилы.</li>',
+    'office.toSquad': 'Список состава', 'office.toMatch': 'На матч &#9656;',
+    'office.fixture': 'Матч', 'office.record': 'Итоги', 'office.notes': 'Роли', 'office.pitch': 'Поле', 'office.tired': 'Уставшие',
+    'office.recordVal': 'В{w} Н{d} П{l} &nbsp;(забито {gf} / пропущено {ga})', 'office.tagsWritten': 'ролей назначено: {n}',
+    'office.tiredVal': '{n} из {t} ниже 50%',
+    'office.live': 'ИДЁТ МАТЧ', 'office.pitchStates': ['Залито водой', 'Тяжёлое', 'Грязное', 'Раскисшее'],
+    'office.rain': 'Опять дождь.', 'office.liveStatus': 'Идёт матч: {h} {x} - {y} {a}',
+    'squad.title': 'SQUAD.DBF — Раздевалка', 'squad.name': 'Имя', 'squad.pos': 'Поз.', 'squad.energy': 'Энергия', 'squad.role': 'Роль',
+    'squad.xi': 'ОСНОВНОЙ СОСТАВ', 'squad.bench': 'ЗАПАС',
+    'squad.out': 'Убрать ↓', 'squad.in': 'Выпустить ↑', 'squad.swap': '⇄ Заменить', 'squad.cancel': 'Отмена',
+    'squad.none': '— без роли —', 'squad.hidden': 'Рейтинги: скрыты', 'squad.remove': 'Убрать роль',
+    'squad.status': 'Уставших в основе: {n} (параметры ×0.5)', 'squad.pick': 'Выбран {name}. Теперь выберите игрока из другой группы.',
+    'squad.locked': 'Во время матча состав заблокирован.',
+    'squad.err.gk': 'В основе должен быть ровно один вратарь.',
+    'squad.err.lines': 'В основе нужен хотя бы один защитник, один полузащитник и один нападающий.',
+    'match.title': 'MATCHDAY.EXE — Матч №{n}', 'match.home': 'Хозяева: {c}',
+    'match.intro': '{a} — {b}. Стартовый свисток под дождём. Жми «Начать», когда ребята готовы.',
+    'match.hintShouts': 'Подсказка: кнопки под протоколом меняют настрой команды в любой момент.',
+    'match.tiredWarn': 'Уставшие в основе: {n}. Их параметры урезаны вдвое. Может, ротация в Составе?',
+    'match.start': '&#9654; Начать матч', 'match.inProgress': 'Идёт матч…', 'match.next': 'Следующий матч &#9656;',
+    'match.ready': 'ГОТОВО', 'match.slow': '● УДАР! ЗАМЕДЛЕНИЕ', 'match.medium': '▶ АТАКА РАЗВИВАЕТСЯ…', 'match.fast': '▶▶▶ {ms} мс / мин', 'match.ft': 'МАТЧ ОКОНЧЕН',
+    'match.statusReady': 'Готово.', 'match.statusLive': 'Идёт матч...',
+    'match.endW': 'Финальный свисток: победа. Блокнот открыт.', 'match.endD': 'Финальный свисток: ничья. Блокнот открыт.', 'match.endL': 'Финальный свисток: поражение. Блокнот открыт.',
+    'period.pre': 'ДО', 'period.h1': '1-Й', 'period.h2': '2-Й', 'period.ft': 'КОН',
+    'zone.0': 'НАША ТРЕТЬ', 'zone.1': 'ЦЕНТР ПОЛЯ', 'zone.2': 'ИХ ТРЕТЬ',
+    'match.ball': 'Мяч', 'match.poss': 'Владение', 'match.ourStats': 'Наша статистика',
+    'shout.attack': '▲ АТАКА', 'shout.defend': '▼ ОБОРОНА', 'shout.balanced': '■ БАЛАНС',
+    'shout.attackTip': '+3 к нашим броскам в атаке, −3 в обороне',
+    'shout.defendTip': '+3 к нашим броскам в обороне, −3 в атаке',
+    'shout.balancedTip': 'Без модификаторов',
+    'st.passOk': 'Пасы ✓', 'st.passFail': 'Пасы ✗', 'st.tackles': 'Отборы', 'st.dribbles': 'Обводки ✓/✗',
+    'st.shots': 'Удары (в створ)', 'st.goals': 'Голы', 'st.saves': 'Сейвы вратаря', 'st.cards': 'Карточки Ж/К',
+    'notes.title': 'NOTEBOOK.TXT — После матча', 'notes.saveHint': 'Роли действуют со следующего матча', 'notes.locked': 'Закрыто.',
+    'notes.lockedMsg': '&#128274; Пока ничего не записано.<br>Сыграй матч, чтобы открыть блокнот.',
+    'notes.head': 'МАТЧ №{n}: против {o}',
+    'notes.hint': 'Трое парней привлекли внимание. Дай каждому ОДНУ роль — она изменит его игру в следующем матче. Ошибёшься — выйдет боком.',
+    'notes.status': 'Отчёт по матчу №{n}. Роли действуют со следующего матча.',
+    'notes.pass': 'точных пасов: {a}, неточных: {b}', 'notes.tackles': 'отборов выиграно: {a}, проиграно: {b}', 'notes.drib': 'удачных обводок: {a}, потерь: {b}',
+    'notes.shots': 'ударов: {a} (в створ: {b}), голов: {c}', 'notes.saves': 'сейвов: {a}', 'notes.cards': 'карточки: жёлтых {a}, красных {b}',
+    'notes.energy': 'энергия сейчас: {a}%',
+    'notes.noTags': 'роли пока нет', 'notes.add': 'Роль: «{t}»', 'notes.change': 'Сменить на «{t}»', 'notes.noted': '&#10003; Текущая: «{t}»',
+    'res.W': 'В', 'res.D': 'Н', 'res.L': 'П',
+    'dlg.nbTitle': 'Блокнот', 'dlg.nbLocked': 'Блокнот пуст.<br>Сначала сыграй матч, потом запиши, что увидел.',
+    'dlg.academy': 'Академия', 'dlg.finishFirst': 'Сначала доиграй текущий матч.',
+    'dlg.reset': 'У ворот стоит новая партия мальчишек. Академия создана заново.',
+    'eng.kickoff': 'Начали! {a} разыгрывают мяч под дождём.', 'eng.second': 'Второй тайм! Начинают {a}.',
+    'eng.ht': 'ПЕРЕРЫВ. {h} {x} - {y} {a}. В раздевалке дольки апельсина.', 'eng.ft': 'МАТЧ ОКОНЧЕН. {h} {x} - {y} {a}.',
+    'eng.shout.attack': 'Тренер кричит: ВПЕРЁД, ВСЕ В АТАКУ!', 'eng.shout.defend': 'Тренер кричит: ВСЕ НАЗАД! СТАВИМ АВТОБУС!', 'eng.shout.balanced': 'Тренер кричит: ДЕРЖИМ ПОЗИЦИИ, ПАРНИ!',
+  },
+};
+
+const TXT = {
+  en: {
+    passOk:   ['{a} plays it short to {b}.', '{a} finds {b} with a tidy ball.', '{a} slides it across to {b}.', 'Neat from {a}; the ball is with {b}.', '{a} tries to pass to {b}... and it arrives.'],
+    passFwd:  ['{a} spots {b} running forward and picks him out!', '{a} lofts it up to {b}. Good ball.', '{a} threads it through to {b}!'],
+    passFail: ['{a} tries to pass... {d} intercepts the ball!', '{a} looks for {b} but {d} reads it and steps in!', "{a}'s pass skids on the wet grass and {d} collects.", 'Sloppy from {a}; {d} pounces on the loose ball.'],
+    gkPass:   ['{a} rolls it out to {b}.', '{a} launches it upfield toward {b}.'],
+    drOk:     ['{a} drops a shoulder and skips past {d}!', '{a} nutmegs {d}! The touchline parents go wild.', '{a} slaloms through the mud, leaving {d} behind.', '{a} knocks it past {d} and chases it down.'],
+    drFail:   ['{a} tries to go past {d}, but {d} wins it with a crunching tackle!', '{a} slips on the wet turf and {d} takes the ball.', '{d} stands {a} up and pokes the ball away.', '{a} takes one touch too many and {d} nicks it.'],
+    aim:      ['{a} has a sight of goal... he aims...', '{a} steadies himself... looks up...', '{a} shapes to shoot...'],
+    aimLong:  ['{a} sizes it up from thirty yards...', '{a} has a look from distance...'],
+    fkAim:    ['Free kick in a dangerous spot. {a} stands over the ball...', 'Free kick on the edge of the box. {a} wipes the rain from his eyes...'],
+    strike:   ['SHOOTS!', '...and he STRIKES IT!', '{a} pulls the trigger!'],
+    goal:     ['GOAL!!! {a} buries it past {k}!', 'GOAL! {a} sends {k} the wrong way!', 'GOAL! It squirms under {k} and in!', 'GOAL! {a} smashes it into the roof of the net!'],
+    save:     ['{k} gets down well and saves!', 'Great hands from {k}! Held at the second attempt.', '{k} blocks it with his chest and gathers.'],
+    wide:     ['{a} drags it wide. Goal kick.', 'Over the bar! That one lands in the car park.', '{a} skies it into the trees.'],
+    block:    ['{d} throws himself in front of it. BLOCKED!', 'Brave block from {d}!'],
+    foul:     ['{d} clatters into {a}. FOUL! Yellow card for {d}.', 'Late lunge from {d} on {a}. The referee shows yellow.'],
+    red:      ['SECOND YELLOW! {d} is sent off! {n} players left.', 'That is a second booking. {d} walks off in the rain. Down to {n}.'],
+    flavor:   ['The rain is getting heavier. Puddles in the centre circle.', 'A parent on the touchline shouts "GET RID!"', "Somebody's dog has wandered onto the running track.", 'The far floodlight flickers and buzzes.', "The linesman (somebody's uncle) waves his flag at nothing in particular.", 'Wet leaves blow across the pitch.', 'The tea urn in the clubhouse hisses in the distance.'],
+  },
+  // Russian lines keep player names in the nominative case, so untranslated surnames never need declension.
+  ru: {
+    passOk:   ['{a} отдаёт короткий пас — {b} принимает.', '{a} аккуратно пасует, мяч получает {b}.', '{a} смещает игру в сторону, {b} подхватывает.', 'Чисто сыграно: {a} → {b}.', '{a} пытается отдать пас... {b} на мяче.'],
+    passFwd:  ['{a} замечает рывок — {b} получает мяч в разрез!', '{a} навешивает вперёд, {b} справляется с мячом. Хорошая передача.', '{a} отдаёт пас в разрез — {b} убегает!'],
+    passFail: ['{a} пытается отдать пас... {d} перехватывает мяч!', '{a} ищет партнёра, но {d} читает передачу и вмешивается!', '{a} пасует, мяч вязнет в мокрой траве — {d} тут как тут.', 'Неряшливо! {a} теряет мяч, {d} подбирает.'],
+    gkPass:   ['{a} вводит мяч рукой, {b} принимает.', '{a} выбивает далеко вперёд, мяч забирает {b}.'],
+    drOk:     ['{a} делает финт корпусом и уходит — {d} позади!', '{a} пробрасывает между ног, {d} остаётся ни с чем! Родители у бровки ликуют.', '{a} петляет по грязи, {d} не успевает.', '{a} убирает мяч в сторону, {d} проваливается.'],
+    drFail:   ['{a} пытается обыграть, но {d} отбирает мяч жёстким подкатом!', '{a} поскальзывается на мокром газоне, {d} забирает мяч.', '{d} не даёт развернуться и выбивает мяч.', '{a} перебирает с мячом, {d} отбирает.'],
+    aim:      ['{a} видит ворота... прицеливается...', '{a} собирается... поднимает голову...', '{a} готовится к удару...'],
+    aimLong:  ['{a} примеривается издалека, метров с тридцати...', '{a} присматривается к воротам с дальней дистанции...'],
+    fkAim:    ['Штрафной в опасной зоне. {a} устанавливает мяч...', 'Штрафной у границы штрафной. {a} вытирает дождь с лица...'],
+    strike:   ['УДАР!', '...и он БЬЁТ!', '{a} наносит удар!'],
+    goal:     ['ГОЛ!!! {a} забивает, {k} бессилен!', 'ГОЛ! {a} бьёт в один угол, {k} прыгает в другой!', 'ГОЛ! Мяч проскальзывает под вратарём — {k} в отчаянии!', 'ГОЛ! {a} вколачивает мяч под перекладину!'],
+    save:     ['{k} падает в угол и спасает!', 'Отличные руки! {k} фиксирует мяч со второй попытки.', '{k} принимает удар на грудь и забирает мяч.'],
+    wide:     ['{a} бьёт мимо. Удар от ворот.', 'Выше ворот! Мяч улетел на парковку.', '{a} запускает мяч в деревья.'],
+    block:    ['{d} бросается под мяч — ЗАБЛОКИРОВАНО!', 'Смелый блок, {d} молодец!'],
+    foul:     ['{d} сносит соперника, {a} на газоне. ФОЛ! Жёлтая карточка.', 'Поздний подкат: {d} грубо остановил соперника, {a} держится за ногу. Жёлтая.'],
+    red:      ['ВТОРАЯ ЖЁЛТАЯ! {d} удалён! На поле осталось {n}.', 'Вторая карточка. {d} уходит под дождём в раздевалку. Нас {n}.'],
+    flavor:   ['Дождь усиливается. В центральном круге лужи.', 'Чей-то папа у бровки орёт: «ВЫНОСИ!»', 'Чья-то собака забрела на беговую дорожку.', 'Дальний прожектор мигает и жужжит.', 'Лайнсмен (чей-то дядя) машет флажком непонятно зачем.', 'Мокрые листья летят через поле.', 'Вдалеке, в клубном домике, шипит титан с чаем.'],
+  },
+};
+
+class Lang {
+  static KEY = 'yam_lang';
+  constructor() {
+    let saved = null;
+    try { saved = localStorage.getItem(Lang.KEY); } catch (e) {}
+    this.code = saved === 'en' || saved === 'ru' ? saved : 'ru';
+  }
+  set(code) { this.code = code; try { localStorage.setItem(Lang.KEY, code); } catch (e) {} }
+  t(key, vars = {}) {
+    const v = I18N[this.code][key] ?? I18N.en[key] ?? key;
+    return typeof v === 'string' ? fmt(v, vars) : v;
+  }
+  name(full) { return this.code === 'ru' ? full.split(' ').map(w => RU_NAMES[w] || w).join(' ') : full; }
+  team(n) { return this.code === 'ru' ? (RU_TEAMS[n] || n) : n; }
+  pos(p) { return POS_LABEL[this.code][p] || p; }
+  tag(key) { return TAGS[key] ? TAGS[key][this.code][0] : key; }
+  tagDesc(key) { return TAGS[key] ? TAGS[key][this.code][1] : ''; }
+  locale() { return this.code === 'ru' ? 'ru-RU' : 'en-GB'; }
+}
+const L = new Lang();
+
+/* =========================================================
+   PLAYER
+   ========================================================= */
+class Player {
+  constructor({ id, name, position, attrs, tags, energy }) {
+    this.id = id;
+    this.name = name;
+    this.position = position;
+    this.attrs = attrs;              // HIDDEN — never rendered
+    if (tags) {                      // only the academy squad carries tags + energy
+      this.tags = tags;
+      this.energy = energy ?? 100;
+    }
+  }
+  get surname() { return this.name.split(' ').slice(-1)[0]; }
+
+  static generate(id, position, usedSurnames, mod = 0, withTags = false) {
+    let last; let guard = 0;
+    do { last = pick(LAST); } while (usedSurnames.has(last) && guard++ < 200);
+    usedSurnames.add(last);
+    const attrs = {};
+    for (const a of ATTRS) { const [lo, hi] = PROFILES[position][a]; attrs[a] = clamp(rnd(lo, hi) + mod, 1, 20); }
+    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, tags: withTags ? [] : undefined });
+  }
+}
+
+/* =========================================================
+   GAME STATE
+   ========================================================= */
+class GameState {
+  static KEY = 'yam_save_v1';
+
+  constructor() {
+    if (!this.load()) this.newAcademy();
+    this.opponent = this.makeOpponent();
+    this.lastReport = null;
+    this.notebookUnlocked = false;
+  }
+
+  newAcademy() {
+    this.clubName = CLUB_NAME;
+    const used = new Set();
+    this.squad = [...FORMATION, ...BENCH].map((pos, i) => Player.generate(`a${i}`, pos, used, 0, true));
+    this.lineup = this.squad.slice(0, 11).map(p => p.id);
+    this.record = { w: 0, d: 0, l: 0, gf: 0, ga: 0 };
+    this.fixture = 1;
+    this.save();
+  }
+
+  makeOpponent() {
+    const used = new Set(this.squad.map(p => p.surname));
+    const strength = rnd(-2, 2);
+    return {
+      name: OPPONENTS[(this.fixture - 1) % OPPONENTS.length],
+      players: FORMATION.map((pos, i) => Player.generate(`b${this.fixture}_${i}`, pos, used, strength, false)),
+    };
+  }
+
+  player(id) { return this.squad.find(p => p.id === id); }
+  isStarter(id) { return this.lineup.includes(id); }
+  starters() { return this.lineup.map(id => this.player(id)); }
+  bench() { return this.squad.filter(p => !this.isStarter(p.id)); }
+
+  static lineupError(players) {
+    const n = pos => players.filter(p => p.position === pos).length;
+    if (n('GK') !== 1) return 'gk';
+    if (!n('DEF') || !n('MID') || !n('FWD')) return 'lines';
+    return null;
+  }
+
+  /** Swap one starter with one bench player. Returns an error key or null. */
+  swap(a, b) {
+    const [s, bn] = this.isStarter(a) ? [a, b] : [b, a];
+    if (!this.isStarter(s) || this.isStarter(bn)) return 'lines';
+    const next = this.lineup.map(id => (id === s ? bn : id));
+    const err = GameState.lineupError(next.map(id => this.player(id)));
+    if (err) return err;
+    this.lineup = next;
+    this.save();
+    return null;
+  }
+
+  /** One role per player: setting a tag replaces the previous one. */
+  setTag(id, tag) {
+    const p = this.player(id);
+    if (p && TAGS[tag]) { p.tags = [tag]; this.save(); }
+  }
+  removeTag(id, tag) {
+    const p = this.player(id);
+    if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); }
+  }
+
+  applyFatigue(playedIds) {
+    for (const p of this.squad) {
+      const played = playedIds.includes(p.id);
+      const delta = played ? -rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) : ENERGY.BENCH_REST;
+      p.energy = clamp(Math.round(p.energy + delta + ENERGY.WEEK_REST), 0, 100);
+    }
+    this.save();
+  }
+
+  recordResult(gf, ga) {
+    this.record.gf += gf; this.record.ga += ga;
+    if (gf > ga) this.record.w++; else if (gf === ga) this.record.d++; else this.record.l++;
+    this.fixture++;
+    this.save();
+  }
+
+  save() {
+    try {
+      localStorage.setItem(GameState.KEY, JSON.stringify({ v: 2, clubName: this.clubName, squad: this.squad, lineup: this.lineup, record: this.record, fixture: this.fixture }));
+    } catch (e) { /* storage unavailable: play in memory */ }
+  }
+  load() {
+    try {
+      const raw = localStorage.getItem(GameState.KEY);
+      if (!raw) return false;
+      const d = JSON.parse(raw);
+      if (!Array.isArray(d.squad) || d.squad.length < 11) return false;
+      this.clubName = d.clubName || CLUB_NAME;
+      this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
+      if (this.squad.length === 11) { // migrate v1 saves: add a bench
+        const used = new Set(this.squad.map(p => p.surname));
+        BENCH.forEach((pos, i) => this.squad.push(Player.generate(`a${11 + i}`, pos, used, 0, true)));
+      }
+      const ok = Array.isArray(d.lineup) && d.lineup.length === 11 && d.lineup.every(id => this.player(id))
+        && !GameState.lineupError(d.lineup.map(id => this.player(id)));
+      this.lineup = ok ? d.lineup : this.squad.slice(0, 11).map(p => p.id);
+      this.record = d.record || { w: 0, d: 0, l: 0, gf: 0, ga: 0 };
+      this.fixture = d.fixture || 1;
+      this.save();
+      return true;
+    } catch (e) { return false; }
+  }
+  reset() {
+    try { localStorage.removeItem(GameState.KEY); } catch (e) {}
+    this.newAcademy();
+    this.opponent = this.makeOpponent();
+    this.lastReport = null;
+    this.notebookUnlocked = false;
+  }
+}
+
+/* =========================================================
+   MATCH ENGINE
+   Zones are relative to the team in possession:
+   0 = own defensive third, 1 = midfield, 2 = attacking third.
+   The opponent defending zone z stands in their own zone (2 - z).
+   Emits language-neutral log entries (template key + variables).
+   ========================================================= */
+class MatchEngine {
+  static FAST = 50;     // ms per minute while the ball is in defence / midfield
+  static MEDIUM = 300;  // ms per minute while the ball is in the attacking third
+  static SLOW = 1000;   // ms per log line during a shot sequence (aim -> strike -> outcome)
+
+  constructor(home, away, hooks, opts = {}) {
+    this.sides = [
+      { name: home.name, players: home.players, user: true, score: 0 },
+      { name: away.name, players: away.players, user: false, score: 0 },
+    ];
+    this.hooks = hooks;
+    this.minute = 0;
+    this.stats = new Map();
+    for (const s of this.sides) for (const p of s.players) this.stats.set(p.id, MatchEngine.blankStats());
+    // Energy is checked once, at kick-off: under 50% => every hidden stat x0.5 for the whole match
+    this.tired = new Set(home.players.filter(p => (p.energy ?? 100) < ENERGY.TIRED).map(p => p.id));
+    this.mentality = opts.mentality || 'balanced';
+    this.sentOff = new Set();
+    this.timer = null;
+    this.delay = 0;
+    this.pendingShot = null;
+    this.hold = 0;
+    this.boxBonus = 0;
+    this.finished = false;
+    this.htLogged = false;
+    this.possTicks = [0, 0];
+  }
+
+  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0 }; }
+  st(p) { return this.stats.get(p.id); }
+  active(side) { return this.sides[side].players.filter(p => !this.sentOff.has(p.id)); }
+  inZone(side, zone) {
+    const list = this.active(side).filter(p => p.position === ZONE_POS[zone]);
+    return list.length ? list : this.active(side).filter(p => p.position !== 'GK');
+  }
+  keeper(side) { return this.sides[side].players.find(p => p.position === 'GK'); }
+  team(side) { return { team: this.sides[side].name }; }
+  scoreVars() { return { h: this.team(0), x: this.sides[0].score, y: this.sides[1].score, a: this.team(1) }; }
+
+  /* ---------- the maths behind tags, fatigue and shouts ---------- */
+  eff(p, attr) {
+    let v = p.attrs[attr];
+    if (this.tired.has(p.id)) v *= 0.5;
+    const t = p.tags || [];
+    if (t.includes('Aggressive') && attr === 'Tackle') v *= 1.5;
+    if (t.includes('Playmaker') && attr === 'Pass') v *= 1.5;
+    if (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) v *= 1.5;
+    return v;
+  }
+  /** Coach shout modifier for a roll. role: 'atk' (we have the ball) or 'def' (we're defending). */
+  mod(side, role) {
+    if (side !== 0 || this.mentality === 'balanced') return 0;
+    const pushing = this.mentality === 'attack';
+    return (role === 'atk') === pushing ? 3 : -3;
+  }
+  setMentality(m) {
+    if (m === this.mentality) return;
+    this.mentality = m;
+    if (!this.finished && this.timer) this.log('coach', 'eng.shout.' + m, {}, 0);
+  }
+
+  /* ---------- clock & pacing ---------- */
+  start() {
+    this.kickoff(0);
+    this.log('whistle', 'eng.kickoff', { a: this.team(0) }, 0);
+    this.updateSpeed();
+    this.hooks.onUpdate(this);
+  }
+  desiredDelay() {
+    if (this.pendingShot || this.hold > 0) return MatchEngine.SLOW;
+    if (this.zone === 2) return MatchEngine.MEDIUM;
+    return MatchEngine.FAST;
+  }
+  updateSpeed() {
+    const d = this.desiredDelay();
+    if (d === this.delay && this.timer) return;
+    this.delay = d;
+    clearInterval(this.timer);
+    this.timer = setInterval(() => this.tick(), d);
+    this.hooks.onSpeed?.(d);
+  }
+  stop() { clearInterval(this.timer); this.timer = null; }
+
+  tick() {
+    if (this.finished) return;
+    if (this.hold > 0) this.hold--;
+    if (this.pendingShot) {                 // shot sequence: one log line per slow beat
+      const ps = this.pendingShot;
+      if (ps.phase === 1) { ps.phase = 2; this.log('shot', 'strike', { a: ps.shooter }, ps.side); }
+      else this.resolveShot();
+      this.afterAction();
+      return;
+    }
+    this.minute++;
+    if (this.minute === 46) {
+      this.kickoff(1);
+      this.log('whistle', 'eng.second', { a: this.team(1) }, 1);
+    }
+    this.possTicks[this.poss]++;
+    this.act();
+    this.afterAction();
+  }
+
+  afterAction() {
+    if (!this.pendingShot) {
+      if (this.minute >= 45 && !this.htLogged) { this.htLogged = true; this.log('whistle', 'eng.ht', this.scoreVars()); }
+      if (this.minute >= 90) { this.finish(); return; }
+    }
+    this.updateSpeed();
+    this.hooks.onUpdate(this);
+  }
+
+  finish() {
+    this.stop();
+    this.finished = true;
+    this.log('whistle', 'eng.ft', this.scoreVars());
+    this.hooks.onUpdate(this);
+    this.hooks.onEnd(this);
+  }
+
+  /* ---------- possession helpers ---------- */
+  kickoff(side) {
+    this.poss = side;
+    this.zone = 1;
+    this.carrier = pick(this.inZone(side, 1));
+    this.boxBonus = 0;
+  }
+  turnover(newCarrier, zone) {
+    this.poss = 1 - this.poss;
+    this.carrier = newCarrier;
+    this.zone = zone;
+    this.boxBonus = 0;
+  }
+
+  /* ---------- decision (tags bend the AI) ---------- */
+  chooseAction() {
+    const c = this.carrier;
+    if (c.position === 'GK') return 'pass';
+    const w = { ...[
+      { pass: 80, dribble: 20, shoot: 0 },
+      { pass: 60, dribble: 32, shoot: 8 },
+      c.position === 'FWD' ? { pass: 28, dribble: 22, shoot: 50 } : { pass: 38, dribble: 27, shoot: 35 },
+    ][this.zone] };
+    const t = c.tags || [];
+    if (t.includes('Playmaker')) { w.pass *= 2; w.dribble *= 0.4; }
+    if (t.includes('Selfish')) {
+      w.pass *= 0.08; w.dribble *= 1.6; w.shoot *= 1.8;
+      if (this.zone === 1) w.shoot = Math.max(w.shoot, 22);
+    }
+    let r = Math.random() * (w.pass + w.dribble + w.shoot);
+    for (const [action, weight] of Object.entries(w)) { if ((r -= weight) < 0) return action; }
+    return 'pass';
+  }
+
+  act() {
+    const action = this.chooseAction();
+    if (action === 'pass') this.doPass();
+    else if (action === 'dribble') this.doDribble();
+    else this.startShot(this.carrier, false);
+    if (!this.pendingShot && Math.random() < 0.05) this.log('flavor', 'flavor', {}, -1);
+  }
+
+  /* ---------- actions: (attacker stat + rand*10) vs (defender stat + rand*10) ---------- */
+  doPass() {
+    const c = this.carrier, side = this.poss, opp = 1 - side, z = this.zone;
+    let tz;
+    if (c.position === 'GK') tz = Math.random() < 0.7 ? 0 : 1;
+    else if (z === 0) tz = Math.random() < 0.65 ? 1 : 0;
+    else if (z === 1) tz = Math.random() < 0.6 ? 2 : 1;
+    else tz = Math.random() < 0.7 ? 2 : 1;
+    let mates = this.inZone(side, tz).filter(p => p !== c);
+    if (!mates.length) { tz = 1; mates = this.active(side).filter(p => p !== c && p.position !== 'GK'); }
+    const recv = pick(mates);
+    const def = pick(this.inZone(opp, 2 - tz));
+    const forward = tz > z;
+
+    const atk = this.eff(c, 'Pass') + Math.random() * 10 + 3 - (forward ? 2 : 0) + (c.position === 'GK' ? 2 : 0) + this.mod(side, 'atk');
+    const dfn = this.eff(def, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def');
+    const vars = { a: c, b: recv, d: def };
+
+    if (atk >= dfn) {
+      this.st(c).passOk++;
+      this.carrier = recv; this.zone = recv.position === 'GK' ? 0 : tz;
+      this.log('', c.position === 'GK' ? 'gkPass' : forward ? 'passFwd' : 'passOk', vars, side);
+    } else {
+      this.st(c).passFail++;
+      this.st(def).tackles++;
+      this.log('turn', 'passFail', vars, side);
+      this.turnover(def, 2 - tz);
+    }
+  }
+
+  doDribble() {
+    const c = this.carrier, side = this.poss, opp = 1 - side, z = this.zone;
+    const def = pick(this.inZone(opp, 2 - z));
+    const atk = (this.eff(c, 'Dribble') + this.eff(c, 'Speed')) / 2 + Math.random() * 10 + 1 + this.mod(side, 'atk');
+    const dfn = this.eff(def, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def');
+    const vars = { a: c, d: def };
+
+    if (atk >= dfn) {
+      this.st(c).dribbleOk++;
+      this.st(def).tacklesLost++;
+      if (z < 2) this.zone++; else this.boxBonus = 3; // already in the final third: better shooting angle
+      this.log('', 'drOk', vars, side);
+      if ((def.tags || []).includes('Aggressive')) this.commitFoul(def, c, side);
+    } else {
+      this.st(c).dribbleFail++;
+      this.st(def).tackles++;
+      this.log('turn', 'drFail', vars, side);
+      this.turnover(def, 2 - z);
+    }
+  }
+
+  /** "Aggressive" downside: a lost tackle is always a foul + yellow. Two yellows = red. */
+  commitFoul(def, victim, attSide) {
+    const defSide = 1 - attSide;
+    const s = this.st(def);
+    s.yellow++;
+    this.log('foul', 'foul', { a: victim, d: def }, defSide);
+    this.hold = 1;
+    if (s.yellow >= 2) {
+      s.red = 1;
+      this.sentOff.add(def.id);
+      this.log('red', 'red', { d: def, n: this.active(defSide).length }, defSide);
+    }
+    if (this.zone === 2 && Math.random() < 0.5) this.startShot(victim, true);
+  }
+
+  startShot(c, freeKick) {
+    const side = this.poss;
+    const long = !freeKick && this.zone < 2;
+    this.st(c).shots++;
+    this.pendingShot = { shooter: c, side, long, freeKick, bonus: freeKick ? 1 : this.boxBonus, phase: 1 };
+    this.boxBonus = 0;
+    this.log('shot', freeKick ? 'fkAim' : long ? 'aimLong' : 'aim', { a: c }, side);
+  }
+
+  resolveShot() {
+    const { shooter, side, long, bonus } = this.pendingShot;
+    this.pendingShot = null;
+    this.hold = 1;   // let the outcome breathe for one slow beat
+    const opp = 1 - side;
+    const blocker = pick(this.inZone(opp, 0));
+    const keeper = this.keeper(opp);
+
+    if (Math.random() < 0.2 &&
+        this.eff(blocker, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
+      this.st(blocker).tackles++;
+      this.log('turn', 'block', { d: blocker }, opp);
+      this.turnover(blocker, 0);
+      return;
+    }
+    const atk = this.eff(shooter, 'Shoot') + Math.random() * 10 + bonus - (long ? 5 : 0) + this.mod(side, 'atk');
+    const dfn = this.eff(keeper, 'Save') + Math.random() * 10 + 4 + this.mod(opp, 'def');
+    const vars = { a: shooter, k: keeper };
+
+    if (atk > dfn) {
+      this.st(shooter).goals++; this.st(shooter).onTarget++;
+      this.sides[side].score++;
+      this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
+      this.hooks.onGoal?.(side);
+      this.kickoff(opp);
+    } else if (atk < dfn - 7) {
+      this.log('', 'wide', vars, side);
+      this.turnover(keeper, 0);
+    } else {
+      this.st(shooter).onTarget++;
+      this.st(keeper).saves++;
+      this.log('', 'save', vars, opp);
+      this.turnover(keeper, 0);
+    }
+  }
+
+  /* ---------- reporting ---------- */
+  log(type, key, vars = {}, side = -1, suffix = '') {
+    this.hooks.onLog({ minute: this.minute, type, key, vars, side, suffix, r: Math.random() });
+  }
+
+  teamTotals(side = 0) {
+    const t = MatchEngine.blankStats();
+    for (const p of this.sides[side].players) { const s = this.st(p); for (const k in t) t[k] += s[k]; }
+    return t;
+  }
+}
+
+/* =========================================================
+   UI CONTROLLER
+   ========================================================= */
+class UIController {
+  constructor(state) {
+    this.state = state;
+    this.engine = null;
+    this.view = 'office';
+    this.logEntries = [];
+    this.selected = null;          // squad screen: player picked for a swap
+    this.mentality = 'balanced';
+    this.pitchIdx = rnd(0, 3);
+    this.$ = id => document.getElementById(id);
+    this.bind();
+    this.applyStatic();
+    this.renderOffice();
+    this.renderSquad();
+    this.prepareMatch();
+    this.renderNotebook();
+    this.syncLocks();
+    this.renderShouts();
+    this.tickClock(); setInterval(() => this.tickClock(), 15000);
+    this.show('office');
+  }
+
+  /* ---------- language ---------- */
+  applyStatic() {
+    document.documentElement.lang = L.code;
+    document.title = L.t('doc.title');
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = L.t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => { const v = L.t(el.dataset.i18nAria); el.setAttribute('aria-label', v); el.title = v; });
+    this.$('fx-lbl').textContent = L.t(document.body.classList.contains('fx') ? 'ui.fxOn' : 'ui.fxOff');
+    const b = this.$('btn-lang');
+    b.textContent = L.code === 'ru' ? 'RU' : 'EN';
+    b.title = L.t('ui.lang');
+  }
+
+  setLang(code) {
+    L.set(code);
+    this.applyStatic();
+    this.renderOffice();
+    this.renderSquad();
+    this.renderMatchChrome();
+    if (this.engine) this.renderLive(this.engine); else this.renderTeamStats(MatchEngine.blankStats());
+    this.rerenderLog();
+    this.renderNotebook();
+    this.syncLocks();
+    this.tickClock();
+  }
+
+  /** Turns a template variable into display text in the current language. */
+  v(x) {
+    if (x instanceof Player) return L.name(x.surname);
+    if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
+    if (x && typeof x === 'object' && 'team' in x) return L.team(x.team);
+    return String(x);
+  }
+
+  entryText(e) {
+    const vars = {};
+    for (const k in e.vars) vars[k] = this.v(e.vars[k]);
+    const pool = TXT[L.code][e.key];
+    const text = pool ? fmt(pool[Math.floor(e.r * pool.length)], vars) : L.t(e.key, vars);
+    return text + (e.suffix || '');
+  }
+
+  /* ---------- navigation ---------- */
+  bind() {
+    document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => this.show(b.dataset.view)));
+    document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => { this.toggleStart(false); this.show(b.dataset.goto); }));
+    document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => this.show('office')));
+    this.$('btn-start').addEventListener('click', () => this.onStartButton());
+    this.$('btn-startmenu').addEventListener('click', e => { e.stopPropagation(); this.toggleStart(); });
+    document.addEventListener('click', e => { if (!e.target.closest('#startmenu')) this.toggleStart(false); });
+    const flip = () => this.setLang(L.code === 'ru' ? 'en' : 'ru');
+    this.$('btn-lang').addEventListener('click', flip);
+    this.$('btn-lang-menu').addEventListener('click', () => { this.toggleStart(false); flip(); });
+    try { document.body.classList.toggle('fx', localStorage.getItem('yam_fx') === '1'); } catch (e) {}
+    this.$('btn-fx').addEventListener('click', () => {
+      const on = document.body.classList.toggle('fx');
+      try { localStorage.setItem('yam_fx', on ? '1' : '0'); } catch (e) {}
+      this.applyStatic();
+    });
+    this.$('btn-reset').addEventListener('click', () => {
+      this.toggleStart(false);
+      if (this.engine && !this.engine.finished) { this.alert(L.t('dlg.finishFirst'), L.t('dlg.academy')); return; }
+      this.state.reset(); this.engine = null; this.selected = null;
+      this.renderOffice(); this.renderSquad(); this.prepareMatch(); this.renderNotebook(); this.syncLocks();
+      this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
+    });
+    const closeDlg = () => this.$('dlg').classList.remove('open');
+    this.$('dlg-ok').addEventListener('click', closeDlg);
+    this.$('dlg-x').addEventListener('click', closeDlg);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDlg(); this.toggleStart(false); this.selected = null; this.renderSquad(); } });
+
+    // Coach shouts
+    document.querySelectorAll('[data-shout]').forEach(b => b.addEventListener('click', () => {
+      this.mentality = b.dataset.shout;
+      if (this.engine && !this.engine.finished) this.engine.setMentality(this.mentality);
+      this.renderShouts();
+    }));
+
+    // Squad: remove role / substitutions
+    this.$('squad-body').addEventListener('click', e => {
+      const rm = e.target.closest('[data-untag]');
+      if (rm) { this.state.removeTag(rm.dataset.id, rm.dataset.untag); this.renderSquad(); this.renderNotebook(); return; }
+      const sb = e.target.closest('[data-sub]');
+      if (sb && !sb.disabled) this.onSubClick(sb.dataset.sub);
+    });
+    // Notebook: assign role
+    this.$('notes-body').addEventListener('click', e => {
+      const b = e.target.closest('[data-tag]'); if (!b || b.disabled) return;
+      this.state.setTag(b.dataset.id, b.dataset.tag);
+      this.renderNotebook(); this.renderSquad(); this.renderOffice();
+    });
+  }
+
+  toggleStart(force) {
+    const m = this.$('startmenu');
+    m.classList.toggle('open', force ?? !m.classList.contains('open'));
+  }
+
+  show(view) {
+    if (view === 'notes' && !this.state.notebookUnlocked) {
+      this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'));
+      return;
+    }
+    this.view = view;
+    const scenes = { office: 'scene-office', squad: 'scene-squad', match: 'scene-match', notes: 'scene-notes' };
+    for (const [v, id] of Object.entries(scenes)) this.$(id).classList.toggle('active', v === view);
+    for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
+    document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+    if (view === 'notes') this.$('tk-notes').classList.remove('alert');
+    if (view === 'office') this.renderOffice();
+  }
+
+  alert(html, title) {
+    this.$('dlg-title').textContent = title;
+    this.$('dlg-text').innerHTML = html;
+    this.$('dlg').classList.add('open');
+    this.$('dlg-ok').focus();
+  }
+
+  syncLocks() {
+    const locked = !this.state.notebookUnlocked;
+    this.$('tk-notes').classList.toggle('locked', locked);
+    this.$('icon-notes').classList.toggle('locked', locked);
+    this.$('tk-notes-lbl').textContent = L.t(locked ? 'nav.notebookLocked' : 'nav.notebook');
+  }
+
+  tickClock() {
+    const d = new Date();
+    this.$('clock').textContent = d.toLocaleTimeString(L.locale(), { hour: '2-digit', minute: '2-digit' });
+    this.$('office-date').textContent = d.toLocaleDateString(L.locale(), { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+
+  /* ---------- OFFICE ---------- */
+  renderOffice() {
+    const s = this.state, r = s.record;
+    const live = this.engine && !this.engine.finished;
+    const tired = s.squad.filter(p => p.energy < ENERGY.TIRED).length;
+    this.$('club-name').textContent = L.team(s.clubName);
+    this.$('office-kv').innerHTML = `
+      <dt>${L.t('office.fixture')}</dt><dd>#${pad2(s.fixture)} &middot; ${esc(L.team(s.opponent.name))}</dd>
+      <dt>${L.t('office.record')}</dt><dd>${L.t('office.recordVal', r)}</dd>
+      <dt>${L.t('office.notes')}</dt><dd>${L.t('office.tagsWritten', { n: s.squad.filter(p => p.tags.length).length })}</dd>
+      <dt>${L.t('office.tired')}</dt><dd${tired ? ' class="warn"' : ''}>${L.t('office.tiredVal', { n: tired, t: s.squad.length })}</dd>
+      <dt>${L.t('office.pitch')}</dt><dd>${live ? L.t('office.live') : L.t('office.pitchStates')[this.pitchIdx]}</dd>`;
+    this.$('office-status').textContent = live
+      ? L.t('office.liveStatus', { h: L.team(s.clubName), x: this.engine.sides[0].score, y: this.engine.sides[1].score, a: L.team(this.engine.sides[1].name) })
+      : L.t('office.rain');
+  }
+
+  /* ---------- SQUAD: energy, roles, substitutions (no hidden attributes rendered) ---------- */
+  renderSquad() {
+    const s = this.state;
+    const live = !!(this.engine && !this.engine.finished);
+    if (live) this.selected = null;
+    const byPos = (a, b) => POS_ORDER[a.position] - POS_ORDER[b.position];
+    const selStarter = this.selected ? s.isStarter(this.selected) : null;
+
+    const row = (p, starter) => {
+      const e = Math.round(p.energy);
+      const cls = e >= 70 ? 'hi' : e >= ENERGY.TIRED ? 'mid' : 'lo';
+      const isSel = this.selected === p.id;
+      const canSwap = this.selected && selStarter !== starter;
+      const label = canSwap ? L.t('squad.swap') : isSel ? L.t('squad.cancel') : L.t(starter ? 'squad.out' : 'squad.in');
+      return `<tr class="${isSel ? 'sel' : ''}${e < ENERGY.TIRED ? ' tired' : ''}">
+        <td class="nm">${esc(L.name(p.name))}</td>
+        <td><span class="pos ${p.position}">${L.pos(p.position)}</span></td>
+        <td><div class="energy ${cls}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' · ×0.5' : ''}</span></div></td>
+        <td>${p.tags.length ? `<div class="tags">${p.tags.map(t => this.tagChip(t, p.id, !live)).join('')}</div>` : `<span class="empty">${L.t('squad.none')}</span>`}</td>
+        <td class="act"><button class="btn small ${canSwap ? 'go' : ''}" data-sub="${p.id}" ${live ? 'disabled' : ''}>${label}</button></td>
+      </tr>`;
+    };
+    this.$('squad-body').innerHTML =
+      `<tr class="grp"><td colspan="5">${L.t('squad.xi')} (${s.lineup.length})</td></tr>` +
+      s.starters().sort(byPos).map(p => row(p, true)).join('') +
+      `<tr class="grp"><td colspan="5">${L.t('squad.bench')} (${s.bench().length})</td></tr>` +
+      s.bench().sort(byPos).map(p => row(p, false)).join('');
+
+    const tiredXI = s.starters().filter(p => p.energy < ENERGY.TIRED).length;
+    this.$('squad-status').textContent = live ? L.t('squad.locked')
+      : this.selected ? L.t('squad.pick', { name: L.name(s.player(this.selected).name) })
+      : L.t('squad.status', { n: tiredXI });
+  }
+
+  onSubClick(id) {
+    const s = this.state;
+    if (!this.selected || this.selected === id || s.isStarter(this.selected) === s.isStarter(id)) {
+      this.selected = this.selected === id ? null : id;
+    } else {
+      const err = s.swap(this.selected, id);
+      this.selected = null;
+      if (err) this.alert(L.t('squad.err.' + err), L.t('nav.squad'));
+      if (!this.engine) this.prepareMatch();   // refresh the pre-match fatigue warning
+    }
+    this.renderSquad();
+    this.renderOffice();
+  }
+
+  tagChip(tag, id, removable) {
+    const tone = TAGS[tag]?.tone || 'neutral';
+    const x = removable ? `<button data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(L.t('squad.remove'))}" title="${esc(L.t('squad.remove'))}">&times;</button>` : '';
+    return `<span class="tag ${tone}" title="${esc(L.tagDesc(tag))}">${esc(L.tag(tag))}${x}</span>`;
+  }
+
+  /* ---------- MATCH ---------- */
+  renderShouts() {
+    document.querySelectorAll('[data-shout]').forEach(b => {
+      const on = b.dataset.shout === this.mentality;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on);
+    });
+  }
+
+  prepareMatch() {
+    this.$('sb-score').textContent = '0 - 0';
+    this.$('sb-min').textContent = "00'";
+    this.$('sb-bar').style.width = '0%';
+    this.$('sb-period').textContent = L.t('period.pre');
+    this.$('carrier').textContent = '—'; this.$('poss').textContent = '—';
+    this.$('zones').querySelectorAll('div').forEach(d => d.classList.remove('on', 'them'));
+    this.logEntries = [];
+    this.$('log').innerHTML = '';
+    const s = this.state;
+    this.appendLog({ minute: 0, type: 'flavor', key: 'match.intro', vars: { a: { team: s.clubName }, b: { team: s.opponent.name } }, side: -1, r: 0 });
+    this.appendLog({ minute: 0, type: 'coach', key: 'match.hintShouts', vars: {}, side: -1, r: 0 });
+    const tired = s.starters().filter(p => p.energy < ENERGY.TIRED);
+    if (tired.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.tiredWarn', vars: { n: { list: tired } }, side: 0, r: 0 });
+    this.renderMatchChrome();
+    this.renderTeamStats(MatchEngine.blankStats());
+  }
+
+  /** Title, team names, start button, speed label and status bar — derived from match state. */
+  renderMatchChrome() {
+    const s = this.state, e = this.engine;
+    const fixtureNo = e && e.finished ? s.fixture - 1 : s.fixture;
+    this.$('match-title').textContent = L.t('match.title', { n: pad2(fixtureNo) });
+    this.$('match-fixture').textContent = L.t('match.home', { c: L.team(s.clubName) });
+    this.$('sb-home').textContent = L.team(s.clubName).replace(' U-14', '');
+    this.$('sb-away').textContent = L.team(s.opponent.name);
+    const btn = this.$('btn-start'), sp = this.$('speed'), st = this.$('match-status');
+    let slow = false;
+    if (!e) {
+      btn.disabled = false; btn.innerHTML = L.t('match.start');
+      sp.textContent = L.t('match.ready'); st.textContent = L.t('match.statusReady');
+    } else if (!e.finished) {
+      slow = e.delay >= MatchEngine.SLOW;
+      btn.disabled = true; btn.innerHTML = L.t('match.inProgress');
+      sp.textContent = slow ? L.t('match.slow') : e.delay >= MatchEngine.MEDIUM ? L.t('match.medium') : L.t('match.fast', { ms: e.delay });
+      st.textContent = L.t('match.statusLive');
+    } else {
+      btn.disabled = false; btn.innerHTML = L.t('match.next');
+      sp.textContent = L.t('match.ft');
+      st.textContent = L.t('match.end' + this.state.lastReport.result);
+    }
+    sp.classList.toggle('slow', slow);
+  }
+
+  onStartButton() {
+    if (this.engine && this.engine.finished) {   // "Next fixture"
+      this.state.opponent = this.state.makeOpponent();
+      this.engine = null;
+      this.prepareMatch();
+      this.renderOffice();
+      this.renderSquad();
+      return;
+    }
+    if (this.engine) return;
+    this.state.notebookUnlocked = false;
+    this.syncLocks();
+
+    const home = { name: this.state.clubName, players: this.state.starters() };
+    this.engine = new MatchEngine(home, this.state.opponent, {
+      onLog: e => this.appendLog(e),
+      onUpdate: eng => this.renderLive(eng),
+      onSpeed: () => this.renderMatchChrome(),
+      onGoal: () => {
+        const el = this.$('sb-score');
+        el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+      },
+      onEnd: eng => this.onMatchEnd(eng),
+    }, { mentality: this.mentality });
+    this.engine.start();
+    this.renderMatchChrome();
+    this.renderSquad();
+  }
+
+  logLine(e) {
+    const sideCls = e.side === 0 ? 'us' : e.side === 1 ? 'them' : '';
+    const line = document.createElement('span');
+    line.className = 'ln';
+    line.innerHTML = `<span class="m">${pad2(e.minute)}'</span><span class="${sideCls} ${e.type}">${esc(this.entryText(e))}</span>`;
+    return line;
+  }
+
+  appendLog(e) {
+    const log = this.$('log');
+    const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    this.logEntries.push(e);
+    log.appendChild(this.logLine(e));
+    while (log.children.length > 400) { log.removeChild(log.firstChild); this.logEntries.shift(); }
+    if (nearBottom) log.scrollTop = log.scrollHeight;
+  }
+
+  rerenderLog() {
+    const log = this.$('log');
+    const frag = document.createDocumentFragment();
+    this.logEntries.forEach(e => frag.appendChild(this.logLine(e)));
+    log.innerHTML = '';
+    log.appendChild(frag);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  renderLive(eng) {
+    const [a, b] = eng.sides;
+    this.$('sb-score').textContent = `${a.score} - ${b.score}`;
+    this.$('sb-min').textContent = `${pad2(eng.minute)}'`;
+    this.$('sb-bar').style.width = `${(eng.minute / 90) * 100}%`;
+    this.$('sb-period').textContent = L.t(eng.finished ? 'period.ft' : eng.minute <= 45 ? 'period.h1' : 'period.h2');
+
+    const absZone = eng.poss === 0 ? eng.zone : 2 - eng.zone;   // shown from OUR perspective
+    this.$('zones').querySelectorAll('div').forEach(d => {
+      const on = Number(d.dataset.z) === absZone && !eng.finished;
+      d.classList.toggle('on', on);
+      d.classList.toggle('them', on && eng.poss === 1);
+    });
+    this.$('carrier').textContent = eng.finished ? '—' : `${L.name(eng.carrier.name)} (${L.team(eng.sides[eng.poss].name)})`;
+    const total = eng.possTicks[0] + eng.possTicks[1] || 1;
+    this.$('poss').textContent = `${Math.round(eng.possTicks[0] / total * 100)}% - ${Math.round(eng.possTicks[1] / total * 100)}%`;
+    this.renderTeamStats(eng.teamTotals(0));
+    if (this.view === 'office') this.renderOffice();
+  }
+
+  renderTeamStats(t) {
+    this.$('team-stats').innerHTML = `
+      <dt>${L.t('st.passOk')}</dt><dd class="ok">${t.passOk}</dd>
+      <dt>${L.t('st.passFail')}</dt><dd class="bad">${t.passFail}</dd>
+      <dt>${L.t('st.tackles')}</dt><dd>${t.tackles}</dd>
+      <dt>${L.t('st.dribbles')}</dt><dd>${t.dribbleOk}/${t.dribbleFail}</dd>
+      <dt>${L.t('st.shots')}</dt><dd>${t.shots} (${t.onTarget})</dd>
+      <dt>${L.t('st.goals')}</dt><dd class="ok">${t.goals}</dd>
+      <dt>${L.t('st.saves')}</dt><dd>${t.saves}</dd>
+      <dt>${L.t('st.cards')}</dt><dd class="${t.red ? 'bad' : ''}">${t.yellow}/${t.red}</dd>`;
+  }
+
+  onMatchEnd(eng) {
+    const [a, b] = eng.sides;
+    const result = a.score > b.score ? 'W' : a.score === b.score ? 'D' : 'L';
+    const played = a.players;
+    const chosen = shuffle(played).slice(0, 3);
+    this.state.lastReport = {
+      fixture: this.state.fixture, opponent: b.name, gf: a.score, ga: b.score, result,
+      players: chosen.map(p => ({ id: p.id, stats: { ...eng.st(p) } })),
+    };
+    this.state.applyFatigue(played.map(p => p.id));
+    this.state.recordResult(a.score, b.score);
+    this.state.notebookUnlocked = true;
+    this.syncLocks();
+    this.renderNotebook();
+    this.renderOffice();
+    this.renderSquad();
+    this.renderMatchChrome();
+    if (this.view !== 'notes') this.$('tk-notes').classList.add('alert');
+  }
+
+  /* ---------- NOTEBOOK: assign ONE role per player ---------- */
+  renderNotebook() {
+    const body = this.$('notes-body');
+    const rep = this.state.lastReport;
+    if (!this.state.notebookUnlocked || !rep) {
+      body.innerHTML = `<div class="locked-msg">${L.t('notes.lockedMsg')}</div>`;
+      this.$('notes-status').textContent = L.t('notes.locked');
+      return;
+    }
+    const cards = rep.players.map(({ id, stats: s }) => {
+      const p = this.state.player(id);
+      if (!p) return '';
+      const lines = [
+        L.t('notes.pass', { a: s.passOk, b: s.passFail }),
+        L.t('notes.tackles', { a: s.tackles, b: s.tacklesLost }),
+        L.t('notes.drib', { a: s.dribbleOk, b: s.dribbleFail }),
+        L.t('notes.shots', { a: s.shots, b: s.onTarget, c: s.goals }),
+      ];
+      if (p.position === 'GK') lines.push(L.t('notes.saves', { a: s.saves }));
+      if (s.yellow || s.red) lines.push(L.t('notes.cards', { a: s.yellow, b: s.red }));
+      lines.push(L.t('notes.energy', { a: Math.round(p.energy) }));
+      const btns = TAG_KEYS.map(t => {
+        const has = p.tags.includes(t);
+        const key = has ? 'notes.noted' : p.tags.length ? 'notes.change' : 'notes.add';
+        return `<button class="btn ${has ? 'done' : ''}" data-tag="${t}" data-id="${p.id}" ${has ? 'disabled' : ''} title="${esc(L.tagDesc(t))}">
+          ${L.t(key, { t: esc(L.tag(t)) })}<small>${esc(L.tagDesc(t))}</small></button>`;
+      }).join('');
+      return `<article class="card">
+        <h3>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
+        <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
+        <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>
+        <div class="tag-btns">${btns}</div>
+      </article>`;
+    }).join('');
+    body.innerHTML = `
+      <div class="nb-head">
+        <h2>${L.t('notes.head', { n: pad2(rep.fixture), o: esc(L.team(rep.opponent)) })}</h2>
+        <span class="res ${rep.result}">${L.t('res.' + rep.result)} &nbsp;${rep.gf} - ${rep.ga}</span>
+      </div>
+      <p class="nb-hint">${L.t('notes.hint')}</p>
+      <div class="cards">${cards}</div>`;
+    this.$('notes-status').textContent = L.t('notes.status', { n: rep.fixture });
+  }
+}
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+const game = new GameState();
+const ui = new UIController(game);
+window.YAM = { game, ui, MatchEngine, L, ENERGY }; // handy for debugging in DevTools
+</script>
+</body>
+</html>
