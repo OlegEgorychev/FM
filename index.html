@@ -62,6 +62,7 @@ button{ font-family: var(--ui); }
 #scene-squad { background-image: url("assets/locker-room.webp"), linear-gradient(160deg, #2b3133, #101414); }
 #scene-match { background-image: url("assets/pitch.webp"), linear-gradient(180deg, #3a4650 0%, #22302a 55%, #1a2a1c 100%); }
 #scene-tactics{ background-image: url("assets/office.webp"), linear-gradient(160deg, #26323b, #0d1215); }
+#scene-table { background-image: url("assets/locker-room.webp"), linear-gradient(160deg, #2b3133, #101414); filter: saturate(.7) brightness(.7); }
 #scene-notes { background-image: url("assets/notebook-desk.webp"), linear-gradient(160deg, #2c2722, #121110); }
 
 .rain{
@@ -174,7 +175,7 @@ button{ font-family: var(--ui); }
 #win-match{ left: 50%; top: 8px; width: min(1100px, 97%); transform: translateX(-50%); max-height: calc(100% - 16px); }
 #win-tactics{ left: 50%; top: 4%; width: min(1000px, 95%); transform: translateX(-50%); }
 #win-notes{ left: 50%; top: 4%; width: min(860px, 94%); transform: translateX(-50%); }
-#win-office.open, #win-match.open, #win-notes.open, #win-tactics.open{ animation: none; }
+#win-office.open, #win-match.open, #win-notes.open, #win-tactics.open, #win-dash.open, #win-table.open{ animation: none; }
 #dlg{ left: 50%; top: 38%; width: min(360px, 90%); transform: translate(-50%, -50%); z-index: 60; }
 
 /* =========================================================
@@ -508,6 +509,55 @@ body.fx .crt-glare{ display: block; }
 }
 
 /* =========================================================
+   DASHBOARD, CALENDAR, STANDINGS
+   ========================================================= */
+#win-dash{ left: 50%; top: 3%; width: min(1040px, 95%); transform: translateX(-50%); }
+#win-table{ left: 50%; top: 3%; width: min(1100px, 96%); transform: translateX(-50%); }
+.dash-top{ display: grid; grid-template-columns: 170px 1fr 300px; gap: 12px; align-items: stretch; }
+.dash-top .groupbox{ margin-top: 8px; }
+.datebox{ display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 6px; text-align: center;
+  background: linear-gradient(#e9e4d3, #d6cfba); color: #1f2a38; border-top: 14px solid #a63b30; box-shadow: 3px 4px 0 rgba(0,0,0,.45); }
+.datebox .wd{ font-weight: bold; text-transform: capitalize; font-size: 14px; }
+.datebox .dn{ font: 64px/1 "VT323", var(--ui); color: #13213a; }
+.datebox .my{ font-size: 13px; text-transform: capitalize; }
+.next-card .ev-when{ font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.next-card .ev-when .today{ color: #fff; background: #a63b30; padding: 1px 6px; animation: blink .8s steps(2) infinite; }
+.next-card .ev-title{ font-size: 19px; font-weight: bold; margin: 6px 0; color: #f1f4ee; }
+.next-card .ev-ico{ margin-right: 8px; }
+.next-card .ev-sub{ font-size: 13px; color: #b9c6cf; }
+#club-kv{ grid-template-columns: auto 1fr; font-size: 14px; }
+.dash-actions{ display: flex; align-items: center; gap: 16px; margin: 12px 0 4px; flex-wrap: wrap; }
+.btn.big{ font-size: 17px; font-weight: bold; padding: 12px 26px; min-width: 300px; }
+.btn.pulse{ animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse{ 50%{ background: #79a464; } }
+.sim-hint{ flex: 1; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; min-width: 220px; }
+.dash-bottom{ display: grid; grid-template-columns: 1fr 340px; gap: 12px; }
+.ticker{ height: clamp(120px, 30vh, 320px); overflow-y: auto; padding: 6px 8px; font-size: 14px; line-height: 1.5; }
+.tk-line .d{ display: inline-block; min-width: 92px; color: #7f9686; margin-right: 6px; }
+.tk-line.hl{ color: #f5e2b0; font-weight: bold; }
+.fx-list{ display: flex; flex-direction: column; gap: 3px; }
+.fx{ display: grid; grid-template-columns: 1fr 58px 1fr; gap: 6px; align-items: center; padding: 4px 6px; font-size: 13px; background: rgba(255,255,255,.03); }
+.fx .h{ text-align: right; } .fx b{ text-align: center; font: 20px/1 "VT323", var(--ui); color: var(--amber); }
+.fx.me{ background: rgba(47,111,208,.25); outline: 1px solid rgba(110,160,230,.45); font-weight: bold; }
+.fc{ display: inline-block; width: 19px; height: 19px; line-height: 19px; margin-right: 2px; text-align: center; font-size: 11px; font-weight: bold; color: #fff; }
+.fc.W{ background: #3e6a3f; } .fc.D{ background: #7a6a3e; } .fc.L{ background: #a63b30; }
+.table-grid{ display: grid; grid-template-columns: 1fr 330px; gap: 12px; align-items: start; }
+.grid.league td, .grid.league th{ padding: 5px 7px; }
+.grid.league .c{ text-align: center; }
+.grid.league .tm{ font-weight: bold; color: #eef1ec; }
+.grid.league .pts{ font-weight: bold; color: var(--amber); font-size: 15px; }
+.grid.league tr.me td{ background: rgba(47,111,208,.3) !important; }
+.grid.league tr.lead .pos-n{ background: #b8902f; color: #111; font-weight: bold; }
+.md-nav{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.notes-foot{ margin-top: 14px; }
+#notes-body .row-btns{ justify-content: center; margin-top: 16px; }
+@media (max-width: 820px){
+  .dash-top, .dash-bottom, .table-grid{ grid-template-columns: 1fr; }
+  .btn.big{ min-width: 0; width: 100%; }
+  #win-dash, #win-table{ top: 6px; }
+}
+
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -533,35 +583,47 @@ body.fx .crt-glare{ display: block; }
   <div class="scene" id="scene-match" aria-hidden="true"></div>
   <div class="scene" id="scene-notes" aria-hidden="true"></div>
   <div class="scene" id="scene-tactics" aria-hidden="true"></div>
+  <div class="scene" id="scene-table" aria-hidden="true"></div>
   <div class="rain" aria-hidden="true"></div>
 
   <div id="desktop">
     <nav class="icons" aria-label="Desktop">
-      <button class="icon" data-view="office"><span class="glyph">&#8962;</span><span data-i18n="nav.office">Office</span></button>
+      <button class="icon" data-view="dash"><span class="glyph">&#8962;</span><span data-i18n="nav.dash">Dashboard</span></button>
       <button class="icon" data-view="squad"><span class="glyph">&#9638;</span><span data-i18n="nav.squad">Squad</span></button>
       <button class="icon" data-view="tactics"><span class="glyph">&#9783;</span><span data-i18n="nav.tactics">Tactics</span></button>
-      <button class="icon" data-view="match"><span class="glyph">&#9673;</span><span data-i18n="nav.matchday">Match Day</span></button>
+      <button class="icon" data-view="match" id="icon-match"><span class="glyph">&#9673;</span><span data-i18n="nav.match">Match</span></button>
+      <button class="icon" data-view="table"><span class="glyph">&#9776;</span><span data-i18n="nav.table">Standings</span></button>
       <button class="icon" data-view="notes" id="icon-notes"><span class="glyph">&#9998;</span><span data-i18n="nav.notebook">Notebook</span></button>
     </nav>
 
-    <!-- OFFICE -->
-    <section class="win" id="win-office">
-      <div class="titlebar"><span class="t-ico">&#8962;</span><span class="t-txt" data-i18n="office.title"></span>
-        <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
+    <!-- DASHBOARD (home screen) -->
+    <section class="win" id="win-dash">
+      <div class="titlebar"><span class="t-ico">&#8962;</span><span class="t-txt" data-i18n="dash.title"></span>
+        <button class="tb-btn" data-i18n-aria="ui.min">_</button><button class="tb-btn" data-i18n-aria="ui.close">&times;</button></div>
       <div class="win-body">
-        <div class="office-head">
-          <div class="crest">&#9673;</div>
-          <div><h2 id="club-name">Club</h2><p data-i18n="office.sub"></p></div>
+        <div class="dash-top">
+          <div class="datebox sunken" id="datebox"></div>
+          <div class="groupbox next-card"><span class="gb-label" data-i18n="dash.next"></span>
+            <div id="next-event"></div>
+          </div>
+          <div class="groupbox"><span class="gb-label" data-i18n="dash.club"></span>
+            <dl class="kv" id="club-kv"></dl>
+          </div>
         </div>
-        <dl class="kv sunken" style="padding:8px 10px;margin:0" id="office-kv"></dl>
-        <ol class="memo sunken" id="office-memo" data-i18n="office.memo"></ol>
-        <div class="row-btns">
-          <button class="btn" data-goto="squad" data-i18n="office.toSquad"></button>
-          <button class="btn" data-goto="tactics" data-i18n="nav.tactics"></button>
-          <button class="btn go" data-goto="match" data-i18n="office.toMatch"></button>
+        <div class="dash-actions">
+          <button class="btn go big" id="btn-sim"></button>
+          <p class="sim-hint" id="sim-hint"></p>
+        </div>
+        <div class="dash-bottom">
+          <div class="groupbox"><span class="gb-label" data-i18n="dash.ticker"></span>
+            <div class="ticker sunken" id="ticker" role="log" aria-live="polite"></div>
+          </div>
+          <div class="groupbox"><span class="gb-label" id="md-fx-label"></span>
+            <div class="fx-list" id="md-fixtures"></div>
+          </div>
         </div>
       </div>
-      <div class="statusbar"><span id="office-status"></span><span id="office-date"></span></div>
+      <div class="statusbar"><span id="dash-status"></span><span id="dash-season"></span></div>
     </section>
 
     <!-- SQUAD -->
@@ -618,14 +680,12 @@ body.fx .crt-glare{ display: block; }
             <div class="speed" id="speed"></div>
           </div>
         </div>
-        <!-- TOP: 2D radar -->
         <div class="pitch radar" id="radar"></div>
         <div class="possession">
           <span><span data-i18n="match.ball"></span>: <b id="carrier">&mdash;</b></span>
           <span><span data-i18n="match.forms"></span>: <b id="forms">&mdash;</b></span>
           <span><span data-i18n="match.poss"></span>: <b id="poss">&mdash;</b></span>
         </div>
-        <!-- BOTTOM: log, shouts, speed, stats -->
         <div class="match-bottom">
           <div class="log-col">
             <div class="log sunken" id="log" role="log" aria-live="polite"></div>
@@ -652,6 +712,36 @@ body.fx .crt-glare{ display: block; }
       <div class="statusbar"><span id="match-status"></span><span id="match-fixture"></span></div>
     </section>
 
+    <!-- STANDINGS -->
+    <section class="win" id="win-table">
+      <div class="titlebar"><span class="t-ico">&#9776;</span><span class="t-txt" data-i18n="table.title"></span>
+        <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
+      <div class="win-body">
+        <div class="table-grid">
+          <div class="tbl-wrap sunken">
+            <table class="grid league">
+              <thead><tr>
+                <th class="c" data-i18n="table.pos"></th><th data-i18n="table.team"></th>
+                <th class="c" data-i18n="table.p"></th><th class="c" data-i18n="table.w"></th><th class="c" data-i18n="table.d"></th><th class="c" data-i18n="table.l"></th>
+                <th class="c" data-i18n="table.gf"></th><th class="c" data-i18n="table.ga"></th><th class="c" data-i18n="table.gd"></th><th class="c" data-i18n="table.pts"></th>
+                <th data-i18n="table.form"></th>
+              </tr></thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+          <div class="groupbox"><span class="gb-label" data-i18n="table.results"></span>
+            <div class="md-nav">
+              <button class="btn small" id="md-prev" aria-label="Previous">&#9664;</button>
+              <b id="md-label"></b>
+              <button class="btn small" id="md-next" aria-label="Next">&#9654;</button>
+            </div>
+            <div class="fx-list" id="md-results"></div>
+          </div>
+        </div>
+      </div>
+      <div class="statusbar"><span id="table-status"></span><span data-i18n="table.sort"></span></div>
+    </section>
+
     <!-- NOTEBOOK -->
     <section class="win" id="win-notes">
       <div class="titlebar"><span class="t-ico">&#9998;</span><span class="t-txt" data-i18n="notes.title"></span>
@@ -673,10 +763,11 @@ body.fx .crt-glare{ display: block; }
   <div id="startmenu" role="menu">
     <div class="side">ACADEMY 98</div>
     <ul>
-      <li><button data-goto="office">&#8962;&nbsp; <span data-i18n="nav.office"></span></button></li>
+      <li><button data-goto="dash">&#8962;&nbsp; <span data-i18n="nav.dash"></span></button></li>
       <li><button data-goto="squad">&#9638;&nbsp; <span data-i18n="nav.squad"></span></button></li>
       <li><button data-goto="tactics">&#9783;&nbsp; <span data-i18n="nav.tactics"></span></button></li>
-      <li><button data-goto="match">&#9673;&nbsp; <span data-i18n="nav.matchday"></span></button></li>
+      <li><button data-goto="match">&#9673;&nbsp; <span data-i18n="nav.match"></span></button></li>
+      <li><button data-goto="table">&#9776;&nbsp; <span data-i18n="nav.table"></span></button></li>
       <li><button data-goto="notes">&#9998;&nbsp; <span data-i18n="nav.notebook"></span></button></li>
       <hr>
       <li><button id="btn-lang-menu">&#127760;&nbsp; <span data-i18n="ui.switchLang"></span></button></li>
@@ -689,15 +780,16 @@ body.fx .crt-glare{ display: block; }
     <button class="tk start" id="btn-startmenu" aria-haspopup="menu"><span class="logo">&#9673;</span><span data-i18n="ui.start">Start</span></button>
     <span class="sep"></span>
     <div class="tasks">
-      <button class="tk" data-view="office">&#8962; <span class="lbl" data-i18n="nav.office"></span></button>
+      <button class="tk" data-view="dash">&#8962; <span class="lbl" data-i18n="nav.dash"></span></button>
       <button class="tk" data-view="squad">&#9638; <span class="lbl" data-i18n="nav.squad"></span></button>
       <button class="tk" data-view="tactics">&#9783; <span class="lbl" data-i18n="nav.tactics"></span></button>
-      <button class="tk" data-view="match">&#9673; <span class="lbl" data-i18n="nav.match"></span></button>
+      <button class="tk" data-view="match" id="tk-match">&#9673; <span class="lbl" data-i18n="nav.match"></span></button>
+      <button class="tk" data-view="table">&#9776; <span class="lbl" data-i18n="nav.table"></span></button>
       <button class="tk" data-view="notes" id="tk-notes">&#9998; <span class="lbl" id="tk-notes-lbl"></span></button>
     </div>
     <div class="tray">
       <button class="lang" id="btn-lang">RU</button>
-      <span class="clk-label">&#9729; 9&deg;C</span><span id="clock">--:--</span>
+      <span class="clk-label" id="tray-date"></span>
     </div>
   </footer>
 
@@ -736,8 +828,8 @@ const PROFILES = { // [min, max] per hidden attribute, 1-20
   MID: { Speed: [8, 15],  Pass: [10, 18], Dribble: [8, 15],  Shoot: [7, 13],  Tackle: [7, 14],  Save: [1, 4] },
   FWD: { Speed: [10, 18], Pass: [7, 13],  Dribble: [10, 17], Shoot: [11, 18], Tackle: [3, 8],   Save: [1, 3] },
 };
-/* Energy economy. WEEK_REST: small recovery for everyone between fixtures. */
-const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 30, WEEK_REST: 15 };
+/* Energy economy: matchday drain/rest + daily recovery from the calendar. */
+const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 4 };   // bench +6 on matchday, +4 every rest day
 const OUT_OF_POSITION = 0.85;   // stat multiplier for a player outside his natural line
 
 /* =========================================================
@@ -786,7 +878,7 @@ const SUP_SCALE = 0.8;
 
 const FIRST = ['Tommy', 'Jamie', 'Callum', 'Liam', 'Owen', 'Danny', 'Kieran', 'Ryan', 'Connor', 'Ben', 'Josh', 'Lewis', 'Harvey', 'Alfie', 'Reece', 'Sam', 'Mikey', 'Charlie', 'Ethan', 'Jack', 'Nathan', 'Dylan', 'Kai', 'Robbie', 'Elliot', 'Archie', 'Finn', 'Leo', 'Marcus', 'Theo', 'Aaron', 'Jordan'];
 const LAST = ['Smith', 'Jones', 'Walsh', 'Doyle', 'Carter', 'Hughes', 'Price', 'Barnes', 'Fletcher', 'Kenny', 'Morgan', 'Reid', 'Shaw', 'Harper', 'Quinn', 'Mason', 'Booth', 'Lowe', 'Dunn', 'Pike', 'Holt', 'Riley', 'Webb', 'Nolan', 'Cobb', 'Finch', 'Rowe', 'Sutton', 'Dale', 'Gill', 'Marsh', 'Platt', 'Varley', 'Ashworth', 'Brennan', 'Tully', 'Kemp', 'Oakes', 'Perry', 'Ward'];
-const OPPONENTS = ['Dockside Juniors', "St. Albert's U-14", 'Ironworks Colts', 'Northgate Rangers', 'Millbrook Wanderers', 'Canal Street Youth', 'Fernhill Athletic', 'Gasworks Boys'];
+const OPPONENTS = ['Dockside Juniors', "St. Albert's U-14", 'Ironworks Colts', 'Northgate Rangers', 'Millbrook Wanderers', 'Canal Street Youth', 'Fernhill Athletic', 'Gasworks Boys', 'Crossley Athletic'];
 
 /* =========================================================
    LOCALISATION (EN / RU)
@@ -805,7 +897,7 @@ const RU_NAMES = {
 const RU_TEAMS = {
   'Ashford Rovers U-14': 'Эшфорд Роверс U-14', 'Dockside Juniors': 'Доксайд Джуниорс', "St. Albert's U-14": 'Сент-Олбертс U-14',
   'Ironworks Colts': 'Айронворкс Колтс', 'Northgate Rangers': 'Нортгейт Рейнджерс', 'Millbrook Wanderers': 'Миллбрук Уондерерс',
-  'Canal Street Youth': 'Канал-Стрит Юниорс', 'Fernhill Athletic': 'Фернхилл Атлетик', 'Gasworks Boys': 'Газворкс Бойз',
+  'Canal Street Youth': 'Канал-Стрит Юниорс', 'Fernhill Athletic': 'Фернхилл Атлетик', 'Gasworks Boys': 'Газворкс Бойз', 'Crossley Athletic': 'Кроссли Атлетик',
 };
 const POS_LABEL = { en: { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'FWD' }, ru: { GK: 'ВРТ', DEF: 'ЗАЩ', MID: 'ПЗ', FWD: 'НАП' } };
 
@@ -988,6 +1080,68 @@ const TXT = {
   },
 };
 
+/* ---- Iteration 4: league, calendar, dashboard ---- */
+Object.assign(I18N.en, {
+  'nav.dash': 'Dashboard', 'nav.table': 'Standings', 'nav.matchLocked': 'Match (locked)',
+  'dash.title': "DASHBOARD.EXE — Coach's Office", 'dash.next': 'Upcoming event', 'dash.club': 'Club',
+  'dash.none': 'No more events this season.', 'dash.inDays': 'in {n} days', 'dash.tomorrow': 'tomorrow', 'dash.today': 'TODAY',
+  'dash.sim': '&#9654; Simulate Calendar', 'dash.simming': 'Days passing…', 'dash.goMatch': '&#9917; Go to Match &#9656;',
+  'dash.close': '&#10003; Close Matchday &#9656;', 'dash.newSeason': '&#9733; Start Season {y}/{z} &#9656;',
+  'dash.hint.calendar': 'Days pass one by one. Every rest day gives the whole squad +{n}% energy. The calendar stops on the next event.',
+  'dash.hint.matchday': 'Matchday! Check the Squad and Tactics, then go to the Match tab.',
+  'dash.hint.post': 'The match is over and the table is updated. Read the Notebook, then close the matchday.',
+  'dash.hint.seasonEnd': 'Season over. You finished {pos} of 10 with {pts} points.',
+  'dash.position': 'Position', 'dash.posVal': '{p} of 10', 'dash.record': 'Record', 'dash.recordVal': 'W{w} D{d} L{l} · {pts} pts',
+  'dash.form': 'Form', 'dash.formation': 'Formation', 'dash.energy': 'Squad energy', 'dash.energyVal': 'avg {a}% · {t} tired',
+  'dash.ticker': 'Diary', 'dash.thisMd': 'Matchday {md}', 'dash.season': 'Season {y}/{z}',
+  'dash.status.calendar': 'Between matches.', 'dash.status.matchday': 'Matchday: the Match tab is open.',
+  'dash.status.post': 'Matchday played.', 'dash.status.seasonEnd': 'Season finished.',
+  'ev.match.label': 'Matchday {md} · vs {o} ({v})', 'ev.match.sub': '{date} · opponent is {pos} in the table · plays {f}',
+  'venue.home': 'home', 'venue.away': 'away',
+  'cal.welcome': 'Season {y}/{z} begins. 10 teams, 18 matchdays. Good luck, coach.',
+  'cal.rest': 'Rest day. Squad energy +{n}%.',
+  'cal.arrive': 'MATCHDAY {md}: {o} ({v}). The Match tab is unlocked.',
+  'cal.closed': 'Matchday {md} closed: {x}-{y} vs {o}. We are {pos} in the table.',
+  'dlg.matchdayTitle': 'Matchday!', 'dlg.matchday': 'Matchday {md} is today: {o} ({v}).<br>The Match tab is unlocked.',
+  'dlg.noMatch': 'No match today.<br>Use &ldquo;Simulate Calendar&rdquo; on the Dashboard to reach the next matchday.',
+  'table.title': 'LEAGUE.DBF — Sunday League, Division 3', 'table.pos': '#', 'table.team': 'Team', 'table.p': 'P', 'table.w': 'W',
+  'table.d': 'D', 'table.l': 'L', 'table.gf': 'GF', 'table.ga': 'GA', 'table.gd': 'GD', 'table.pts': 'Pts', 'table.form': 'Form',
+  'table.results': 'Results', 'table.md': 'Matchday {n}', 'table.status': 'After {n} of 18 matchdays', 'table.sort': 'Sorted by Pts, GD, GF',
+  'match.title': 'MATCHDAY.EXE — Matchday {n} ({v})', 'match.venue': '{c} play {v}', 'match.toNotes': 'To Notebook &#9656;',
+  'match.noMatch': 'No match today', 'match.others': 'Other results: {r}',
+  'notes.head': 'MATCHDAY {n}: vs {o}', 'notes.status': 'Report for matchday {n}.', 'notes.back': '&#8962; Return to Dashboard',
+});
+Object.assign(I18N.ru, {
+  'nav.dash': 'Штаб', 'nav.table': 'Таблица', 'nav.matchLocked': 'Матч (закрыт)',
+  'dash.title': 'DASHBOARD.EXE — Кабинет тренера', 'dash.next': 'Следующее событие', 'dash.club': 'Клуб',
+  'dash.none': 'В этом сезоне событий больше нет.', 'dash.inDays': 'через {n} дн.', 'dash.tomorrow': 'завтра', 'dash.today': 'СЕГОДНЯ',
+  'dash.sim': '&#9654; Промотать календарь', 'dash.simming': 'Идут дни…', 'dash.goMatch': '&#9917; На матч &#9656;',
+  'dash.close': '&#10003; Завершить тур &#9656;', 'dash.newSeason': '&#9733; Начать сезон {y}/{z} &#9656;',
+  'dash.hint.calendar': 'Дни идут по одному. Каждый день отдыха даёт всему составу +{n}% энергии. Календарь остановится на следующем событии.',
+  'dash.hint.matchday': 'День матча! Проверь Состав и Тактику, затем иди на вкладку «Матч».',
+  'dash.hint.post': 'Матч сыгран, таблица обновлена. Загляни в Блокнот, затем заверши тур.',
+  'dash.hint.seasonEnd': 'Сезон окончен. Итог: {pos}-е место из 10, очков: {pts}.',
+  'dash.position': 'Место', 'dash.posVal': '{p} из 10', 'dash.record': 'Итоги', 'dash.recordVal': 'В{w} Н{d} П{l} · {pts} очк.',
+  'dash.form': 'Форма', 'dash.formation': 'Схема', 'dash.energy': 'Энергия состава', 'dash.energyVal': 'в среднем {a}% · уставших {t}',
+  'dash.ticker': 'Дневник', 'dash.thisMd': 'Тур {md}', 'dash.season': 'Сезон {y}/{z}',
+  'dash.status.calendar': 'Между матчами.', 'dash.status.matchday': 'День матча: вкладка «Матч» открыта.',
+  'dash.status.post': 'Тур сыгран.', 'dash.status.seasonEnd': 'Сезон завершён.',
+  'ev.match.label': 'Тур {md} · против {o} ({v})', 'ev.match.sub': '{date} · соперник на {pos}-м месте · играет {f}',
+  'venue.home': 'дома', 'venue.away': 'в гостях',
+  'cal.welcome': 'Начинается сезон {y}/{z}. 10 команд, 18 туров. Удачи, тренер.',
+  'cal.rest': 'День отдыха. Энергия состава +{n}%.',
+  'cal.arrive': 'ТУР {md}: {o} ({v}). Вкладка «Матч» открыта.',
+  'cal.closed': 'Тур {md} завершён: {x}-{y} против {o}. Мы на {pos}-м месте.',
+  'dlg.matchdayTitle': 'День матча!', 'dlg.matchday': 'Сегодня {md}-й тур: {o} ({v}).<br>Вкладка «Матч» открыта.',
+  'dlg.noMatch': 'Сегодня матча нет.<br>Нажми «Промотать календарь» в Штабе, чтобы дойти до следующего тура.',
+  'table.title': 'LEAGUE.DBF — Воскресная лига, 3-й дивизион', 'table.pos': '№', 'table.team': 'Команда', 'table.p': 'И', 'table.w': 'В',
+  'table.d': 'Н', 'table.l': 'П', 'table.gf': 'ЗМ', 'table.ga': 'ПМ', 'table.gd': 'РМ', 'table.pts': 'О', 'table.form': 'Форма',
+  'table.results': 'Результаты', 'table.md': 'Тур {n}', 'table.status': 'Сыграно туров: {n} из 18', 'table.sort': 'Сортировка: очки, разница, забитые',
+  'match.title': 'MATCHDAY.EXE — Тур {n} ({v})', 'match.venue': '{c} играют {v}', 'match.toNotes': 'В Блокнот &#9656;',
+  'match.noMatch': 'Сегодня матча нет', 'match.others': 'Другие матчи тура: {r}',
+  'notes.head': 'ТУР {n}: против {o}', 'notes.status': 'Отчёт по {n}-му туру.', 'notes.back': '&#8962; Вернуться в Штаб',
+});
+
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -1038,17 +1192,175 @@ class Player {
 }
 
 /* =========================================================
+   DATES (ISO 'YYYY-MM-DD', always handled in UTC to avoid timezone drift)
+   ========================================================= */
+const isoAdd = (iso, days) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000);
+const fmtDate = (iso, opts) => new Date(iso + 'T00:00:00Z').toLocaleDateString(L.locale(), { timeZone: 'UTC', ...opts });
+const SEASON = { START_MONTH_DAY: '09-01', FIRST_MATCH_OFFSET: 6, MATCH_INTERVAL: 7, FIRST_YEAR: 2002 };
+
+/* =========================================================
+   LEAGUE — 10 teams, double round-robin (18 matchdays x 5 fixtures)
+   Team strength is HIDDEN: it drives AI rosters and AI-vs-AI results.
+   ========================================================= */
+class League {
+  static STRENGTHS = [3, 2, 1, 1, 0, 0, -1, -2, -3];   // spread across the 9 AI clubs
+
+  constructor({ teams, fixtures }) {
+    this.teams = teams;
+    this.fixtures = fixtures;
+    for (const t of this.teams) if (t.roster) t.roster = t.roster.map(p => new Player(p));
+  }
+
+  static create(userName) {
+    const strengths = shuffle(League.STRENGTHS);
+    const teams = [{ id: 0, name: userName, user: true }];
+    OPPONENTS.forEach((name, i) => teams.push({ id: i + 1, name, strength: strengths[i], formation: pick(FORMATION_KEYS), roster: null }));
+    return new League({ teams, fixtures: League.roundRobin(teams.map(t => t.id)) });
+  }
+
+  /** Circle method: one team fixed, the rest rotate. Second half mirrors the first with home/away swapped. */
+  static roundRobin(ids) {
+    const n = ids.length, arr = shuffle(ids), rounds = [];
+    for (let r = 0; r < n - 1; r++) {
+      const md = [];
+      for (let i = 0; i < n / 2; i++) {
+        let h = arr[i], a = arr[n - 1 - i];
+        if ((r + i) % 2 === 1) [h, a] = [a, h];
+        md.push([h, a]);
+      }
+      rounds.push(md);
+      arr.splice(1, 0, arr.pop());
+    }
+    const fixtures = [];
+    rounds.forEach((md, r) => md.forEach(([h, a]) => fixtures.push({ md: r + 1, home: h, away: a, hg: null, ag: null })));
+    rounds.forEach((md, r) => md.forEach(([h, a]) => fixtures.push({ md: r + n, home: a, away: h, hg: null, ag: null })));
+    return fixtures;
+  }
+
+  get matchdays() { return (this.teams.length - 1) * 2; }
+  team(id) { return this.teams.find(t => t.id === id); }
+  fixturesOf(md) { return this.fixtures.filter(f => f.md === md); }
+  userFixture(md) { return this.fixtures.find(f => f.md === md && (f.home === 0 || f.away === 0)); }
+  played(f) { return f.hg !== null; }
+  playedMatchdays() { return new Set(this.fixtures.filter(f => this.played(f)).map(f => f.md)).size; }
+
+  /** AI roster is generated on first need and stored, so a club keeps the same kids all season. */
+  roster(team, usedSurnames) {
+    if (!team.roster) {
+      team.roster = formationSlots(team.formation).map((s, i) =>
+        Player.generate(`t${team.id}_${i}`, LINE_POS[s.line], usedSurnames, team.strength, false, i + 1));
+    }
+    return team.roster;
+  }
+
+  setUserResult(f, userGoals, oppGoals) {
+    if (f.home === 0) { f.hg = userGoals; f.ag = oppGoals; } else { f.hg = oppGoals; f.ag = userGoals; }
+  }
+
+  /* Simplified background model: Poisson goals around a rating difference.
+     rating = 50 + strength*4 (user club counts as 50). Home side gets a small edge. */
+  rating(t) { return t.user ? 50 : 50 + t.strength * 4; }
+  static poisson(lambda) { const l = Math.exp(-lambda); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return Math.min(k - 1, 7); }
+  simulateFixture(f) {
+    const rh = this.rating(this.team(f.home)), ra = this.rating(this.team(f.away));
+    // base rates tuned so AI games score like the visual engine does (~2 goals per game)
+    f.hg = League.poisson(clamp(1.1 + (rh - ra) * 0.035, 0.15, 3));
+    f.ag = League.poisson(clamp(0.85 + (ra - rh) * 0.035, 0.1, 2.8));
+  }
+  /** Resolve every unplayed AI-vs-AI fixture of a matchday. Returns those fixtures. */
+  simulateOthers(md) {
+    const done = [];
+    for (const f of this.fixturesOf(md)) if (!this.played(f) && f.home !== 0 && f.away !== 0) { this.simulateFixture(f); done.push(f); }
+    return done;
+  }
+
+  table() {
+    const rows = new Map(this.teams.map(t => [t.id, { team: t, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0, form: [] }]));
+    for (const f of [...this.fixtures].sort((a, b) => a.md - b.md)) {
+      if (!this.played(f)) continue;
+      const h = rows.get(f.home), a = rows.get(f.away);
+      h.p++; a.p++; h.gf += f.hg; h.ga += f.ag; a.gf += f.ag; a.ga += f.hg;
+      if (f.hg > f.ag) { h.w++; a.l++; h.pts += 3; h.form.push('W'); a.form.push('L'); }
+      else if (f.hg < f.ag) { a.w++; h.l++; a.pts += 3; h.form.push('L'); a.form.push('W'); }
+      else { h.d++; a.d++; h.pts++; a.pts++; h.form.push('D'); a.form.push('D'); }
+    }
+    const list = [...rows.values()];
+    list.forEach(r => { r.gd = r.gf - r.ga; r.form = r.form.slice(-5); });
+    return list.sort((x, y) => y.pts - x.pts || y.gd - x.gd || y.gf - x.gf || x.team.name.localeCompare(y.team.name));
+  }
+  position(teamId) { return this.table().findIndex(r => r.team.id === teamId) + 1; }
+
+  toJSON() { return { teams: this.teams, fixtures: this.fixtures }; }
+}
+
+/* =========================================================
+   CALENDAR ENGINE — event-driven day-by-day progression.
+   New event types plug in with registerType(); daily routines with onDay().
+     registerType('match',    { blocking: true,  label(ev), onArrive(ev) })
+     registerType('training', { blocking: false, label(ev), onArrive(ev) })   // future
+     registerType('dialogue', { blocking: true,  label(ev), onArrive(ev) })   // future
+   Blocking events stop the simulation on their day and stay pending until
+   completeEvent(); non-blocking ones fire and auto-complete as the day passes.
+   ========================================================= */
+class CalendarEngine {
+  constructor(data) {
+    this.attach(data);
+    this.types = {};
+    this.dailyHooks = [];
+    this.timer = null;
+    this.running = false;
+  }
+  attach(data) { this.data = data; }               // data = { date, events: [{id, type, date, done, ...}] }
+  get date() { return this.data.date; }
+  registerType(type, def) { this.types[type] = def; }
+  onDay(fn) { this.dailyHooks.push(fn); }
+  pending() { return this.data.events.filter(e => !e.done).sort((a, b) => a.date.localeCompare(b.date)); }
+  nextEvent() { return this.pending()[0] || null; }
+  eventsOn(date) { return this.pending().filter(e => e.date === date); }
+  blockingToday() { return this.eventsOn(this.date).find(e => this.types[e.type]?.blocking) || null; }
+  label(ev) { return this.types[ev.type]?.label?.(ev) ?? ev.type; }
+  advanceDay() { this.data.date = isoAdd(this.data.date, 1); }
+  completeEvent(id) { const e = this.data.events.find(x => x.id === id); if (e) e.done = true; }
+
+  /** Runs one day. Returns { stopped: event|null, infos: [...] } */
+  step() {
+    const today = this.eventsOn(this.date);
+    for (const e of today) if (!this.types[e.type]?.blocking) { this.types[e.type]?.onArrive?.(e); e.done = true; }
+    const blocking = today.find(e => this.types[e.type]?.blocking);
+    if (blocking) return { stopped: blocking, infos: [] };
+    const date = this.date;
+    const infos = this.dailyHooks.map(fn => fn(date)).filter(Boolean);
+    this.advanceDay();
+    return { stopped: null, date, infos };
+  }
+
+  /** Simulates days one by one (visibly) until a blocking event or the end of the calendar. */
+  simulate({ stepMs = 180, onStep, onStop } = {}) {
+    if (this.running) return;
+    this.running = true;
+    const tick = () => {
+      const r = this.step();
+      if (r.stopped) { this.stop(); this.types[r.stopped.type]?.onArrive?.(r.stopped); onStop?.(r.stopped); return; }
+      onStep?.(r.date, r.infos);
+      if (!this.nextEvent()) { this.stop(); onStop?.(null); }
+    };
+    tick();
+    if (this.running) this.timer = setInterval(tick, stepMs);
+  }
+  stop() { this.running = false; clearInterval(this.timer); this.timer = null; }
+}
+
+/* =========================================================
    GAME STATE
    lineup[i] is the player in formation slot i (slot 0 = goalkeeper).
+   phase: 'calendar' -> 'matchday' -> 'post' -> 'calendar' ... -> 'seasonEnd'
    ========================================================= */
 class GameState {
   static KEY = 'yam_save_v1';
 
   constructor() {
     if (!this.load()) this.newAcademy();
-    this.opponent = this.makeOpponent();
-    this.lastReport = null;
-    this.notebookUnlocked = false;
   }
 
   newAcademy() {
@@ -1058,22 +1370,40 @@ class GameState {
     this.squad = SQUAD_POS.map((pos, i) => Player.generate(`a${i}`, pos, used, 0, true, i + 1));
     this.lineup = this.squad.slice(0, 11).map(p => p.id);
     this.autoArrange();
-    this.record = { w: 0, d: 0, l: 0, gf: 0, ga: 0 };
-    this.fixture = 1;
+    this.newSeason(SEASON.FIRST_YEAR);
+  }
+
+  newSeason(year) {
+    this.season = year;
+    this.league = League.create(this.clubName);
+    const start = `${year}-${SEASON.START_MONTH_DAY}`;
+    const events = [];
+    for (let md = 1; md <= this.league.matchdays; md++) {
+      events.push({ id: `md${md}`, type: 'match', md, date: isoAdd(start, SEASON.FIRST_MATCH_OFFSET + SEASON.MATCH_INTERVAL * (md - 1)), done: false });
+    }
+    this.calendar = { date: start, events };
+    this.phase = 'calendar';
+    this.lastReport = null;
+    this.notebookUnlocked = false;
+    this.diary = [{ date: start, key: 'cal.welcome', vars: { y: year, z: String(year + 1).slice(2) } }];
+    for (const p of this.squad) p.energy = 100;   // summer break
     this.save();
   }
 
-  makeOpponent() {
-    const used = new Set(this.squad.map(p => p.surname));
-    const strength = rnd(-2, 2);
-    const formation = pick(FORMATION_KEYS);
-    return {
-      name: OPPONENTS[(this.fixture - 1) % OPPONENTS.length],
-      formation,
-      players: formationSlots(formation).map((s, i) => Player.generate(`b${this.fixture}_${i}`, LINE_POS[s.line], used, strength, false, i + 1)),
-    };
+  /* ----- current match context (from the calendar + league) ----- */
+  nextMatchEvent() { return this.calendar.events.filter(e => !e.done && e.type === 'match').sort((a, b) => a.date.localeCompare(b.date))[0] || null; }
+  matchContext() {
+    const ev = this.nextMatchEvent();
+    if (!ev) return null;
+    const fixture = this.league.userFixture(ev.md);
+    const opp = this.league.team(fixture.home === 0 ? fixture.away : fixture.home);
+    const players = this.league.roster(opp, new Set(this.squad.map(p => p.surname)));
+    return { ev, md: ev.md, fixture, opp, venue: fixture.home === 0 ? 'home' : 'away',
+      team: { name: opp.name, players, formation: opp.formation } };
   }
+  userRow() { return this.league.table().find(r => r.team.user); }
 
+  /* ----- squad / lineup ----- */
   player(id) { return this.squad.find(p => p.id === id); }
   isStarter(id) { return this.lineup.includes(id); }
   starters() { return this.lineup.map(id => this.player(id)); }
@@ -1084,49 +1414,34 @@ class GameState {
     const slots = this.slots();
     return this.starters().map((p, i) => ({ p, line: slots[i].line })).filter(({ p, line }) => NATURAL_LINE[p.position] !== line);
   }
-
   static gkError(players) { return players.filter(p => p.position === 'GK').length !== 1 ? 'gk' : null; }
 
-  /** Put the GK in slot 0, then fill each slot with the best natural fit (ties: higher energy). */
   autoArrange() {
     const slots = this.slots();
     const pool = this.starters();
     const gk = pool.find(p => p.position === 'GK') || pool[0];
-    const rest = pool.filter(p => p !== gk).sort((a, b) => b.energy - a.energy);
-    const out = [gk.id];
-    const free = [...rest];
+    const free = pool.filter(p => p !== gk).sort((a, b) => b.energy - a.energy);
     const assigned = new Array(slots.length).fill(null);
-    // pass 1: exact matches
     slots.forEach((s, i) => {
       if (i === 0) return;
       const k = free.findIndex(p => NATURAL_LINE[p.position] === s.line);
       if (k >= 0) assigned[i] = free.splice(k, 1)[0];
     });
-    // pass 2: nearest line for the rest
     slots.forEach((s, i) => {
       if (i === 0 || assigned[i]) return;
-      free.sort((a, b) => Math.abs((LINE_IDX[NATURAL_LINE[a.position]] ?? 1) - LINE_IDX[s.line]) - Math.abs((LINE_IDX[NATURAL_LINE[b.position]] ?? 1) - LINE_IDX[s.line]));
+      const dist = p => Math.abs((LINE_IDX[NATURAL_LINE[p.position]] ?? 1) - LINE_IDX[s.line]);
+      free.sort((a, b) => dist(a) - dist(b));
       assigned[i] = free.shift();
     });
-    for (let i = 1; i < slots.length; i++) out.push(assigned[i].id);
-    this.lineup = out;
+    this.lineup = [gk.id, ...assigned.slice(1).map(p => p.id)];
   }
-
-  setFormation(f) {
-    if (!FORMATIONS[f]) return;
-    this.formation = f;
-    this.autoArrange();
-    this.save();
-  }
-
+  setFormation(f) { if (!FORMATIONS[f]) return; this.formation = f; this.autoArrange(); this.save(); }
   swapSlots(i, j) {
     if (i === 0 || j === 0) return 'gk';
     [this.lineup[i], this.lineup[j]] = [this.lineup[j], this.lineup[i]];
     this.save();
     return null;
   }
-
-  /** Substitution: bench player takes the starter's slot. Returns an error key or null. */
   swap(a, b) {
     const [s, bn] = this.isStarter(a) ? [a, b] : [b, a];
     if (!this.isStarter(s) || this.isStarter(bn)) return 'gk';
@@ -1136,29 +1451,27 @@ class GameState {
     this.save();
     return null;
   }
-
   setTag(id, tag) { const p = this.player(id); if (p && TAGS[tag]) { p.tags = [tag]; this.save(); } }
   removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
 
+  /* ----- energy ----- */
+  restDay() { for (const p of this.squad) p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100); }
   applyFatigue(playedIds) {
     for (const p of this.squad) {
-      const played = playedIds.includes(p.id);
-      const delta = played ? -rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) : ENERGY.BENCH_REST;
-      p.energy = clamp(Math.round(p.energy + delta + ENERGY.WEEK_REST), 0, 100);
+      const delta = playedIds.includes(p.id) ? -rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) : ENERGY.BENCH_REST;
+      p.energy = clamp(Math.round(p.energy + delta), 0, 100);
     }
-    this.save();
   }
 
-  recordResult(gf, ga) {
-    this.record.gf += gf; this.record.ga += ga;
-    if (gf > ga) this.record.w++; else if (gf === ga) this.record.d++; else this.record.l++;
-    this.fixture++;
-    this.save();
-  }
+  addDiary(entry) { this.diary.push(entry); if (this.diary.length > 80) this.diary.shift(); }
 
   save() {
     try {
-      localStorage.setItem(GameState.KEY, JSON.stringify({ v: 3, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup, record: this.record, fixture: this.fixture }));
+      localStorage.setItem(GameState.KEY, JSON.stringify({
+        v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
+        season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
+        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary,
+      }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
   load() {
@@ -1170,20 +1483,29 @@ class GameState {
       this.clubName = d.clubName || CLUB_NAME;
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
       this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
-      if (this.squad.length === 11) { // migrate v1 saves: add a bench
+      if (this.squad.length === 11) {
         const used = new Set(this.squad.map(p => p.surname));
         SQUAD_POS.slice(11).forEach((pos, i) => this.squad.push(Player.generate(`a${11 + i}`, pos, used, 0, true)));
       }
-      // jersey numbers for older saves
       const taken = new Set(this.squad.map(p => p.number).filter(Boolean));
       let n = 1;
       for (const p of this.squad) if (!p.number) { while (taken.has(n)) n++; p.number = n; taken.add(n); }
       const ok = Array.isArray(d.lineup) && d.lineup.length === 11 && d.lineup.every(id => this.player(id))
         && !GameState.gkError(d.lineup.map(id => this.player(id)));
       this.lineup = ok ? d.lineup : this.squad.slice(0, 11).map(p => p.id);
-      if (d.v !== 3 || this.player(this.lineup[0]).position !== 'GK') this.autoArrange();
-      this.record = d.record || { w: 0, d: 0, l: 0, gf: 0, ga: 0 };
-      this.fixture = d.fixture || 1;
+      if (!d.v || d.v < 3 || this.player(this.lineup[0]).position !== 'GK') this.autoArrange();
+      if (d.v >= 4 && d.league && d.calendar) {
+        this.season = d.season;
+        this.league = new League(d.league);
+        this.calendar = d.calendar;
+        this.phase = d.phase || 'calendar';
+        this.lastReport = d.lastReport || null;
+        this.notebookUnlocked = !!d.notebookUnlocked;
+        this.diary = Array.isArray(d.diary) ? d.diary : [];
+        // a match interrupted by a page reload is simply replayed
+      } else {
+        this.newSeason(SEASON.FIRST_YEAR);   // older saves: keep the squad, start the league
+      }
       this.save();
       return true;
     } catch (e) { return false; }
@@ -1191,9 +1513,6 @@ class GameState {
   reset() {
     try { localStorage.removeItem(GameState.KEY); } catch (e) {}
     this.newAcademy();
-    this.opponent = this.makeOpponent();
-    this.lastReport = null;
-    this.notebookUnlocked = false;
   }
 }
 
@@ -1632,31 +1951,54 @@ class UIController {
   constructor(state) {
     this.state = state;
     this.engine = null;
-    this.view = 'office';
+    this.view = 'dash';
     this.logEntries = [];
     this.selected = null;        // squad screen: player picked for a substitution
     this.selSlot = null;         // tactics board: slot picked for a swap
     this.mentality = 'balanced';
     this.speed = 1;
+    this.tableMd = null;
     try { const s = Number(localStorage.getItem('yam_speed')); if (MatchEngine.SPEED[s]) this.speed = s; } catch (e) {}
-    this.pitchIdx = rnd(0, 3);
     this.$ = id => document.getElementById(id);
     this.radar = new RadarView(this.$('radar'));
     this.board = new RadarView(this.$('tac-board'), { labels: true, onDotClick: i => this.onBoardClick(i) });
+    this.setupCalendar();
     this.bind();
     this.applyStatic();
     this.fillFormations();
-    this.renderAll();
     this.prepareMatch();
-    this.tickClock(); setInterval(() => this.tickClock(), 15000);
-    this.show('office');
+    this.renderAll();
+    this.show('dash');
+  }
+
+  /* ---------- calendar wiring: event types + daily routines ---------- */
+  setupCalendar() {
+    const cal = this.cal = new CalendarEngine(this.state.calendar);
+    cal.registerType('match', {
+      blocking: true,
+      label: ev => {
+        const ctx = this.state.matchContext();
+        if (!ctx || ctx.md !== ev.md) return `#${ev.md}`;
+        return L.t('ev.match.label', { md: ev.md, o: esc(L.team(ctx.opp.name)), v: L.t('venue.' + ctx.venue) });
+      },
+      onArrive: ev => this.onMatchdayArrived(ev),
+    });
+    // Future event types plug in here, e.g.:
+    // cal.registerType('training', { blocking: false, label: ev => '…', onArrive: ev => this.state.applyTraining(ev) });
+    // cal.registerType('dialogue', { blocking: true,  label: ev => '…', onArrive: ev => this.openDialogue(ev) });
+    cal.onDay(() => {
+      this.state.restDay();
+      return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
+    });
   }
 
   renderAll() {
-    this.renderOffice();
+    this.renderDash();
     this.renderSquad();
     this.renderTactics();
+    this.renderTable();
     this.renderNotebook();
+    this.renderMatchChrome();
     this.syncLocks();
     this.renderShouts();
     this.renderSpeedBtns();
@@ -1678,10 +2020,8 @@ class UIController {
     L.set(code);
     this.applyStatic();
     this.renderAll();
-    this.renderMatchChrome();
     if (this.engine) { this.renderLive(this.engine); this.relabelRadar(); } else this.prepareRadar();
     this.rerenderLog();
-    this.tickClock();
   }
 
   relabelRadar() {
@@ -1694,9 +2034,12 @@ class UIController {
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
+    if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
     if (x && typeof x === 'object' && 'team' in x) return L.team(x.team);
+    if (x && typeof x === 'object' && 'venue' in x) return L.t('venue.' + x.venue);
     return String(x);
   }
+  fxText(f) { const lg = this.state.league; return `${L.team(lg.team(f.home).name)} ${f.hg}-${f.ag} ${L.team(lg.team(f.away).name)}`; }
 
   entryText(e) {
     const vars = {};
@@ -1710,8 +2053,9 @@ class UIController {
   bind() {
     document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => this.show(b.dataset.view)));
     document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => { this.toggleStart(false); this.show(b.dataset.goto); }));
-    document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => this.show('office')));
+    document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => this.show('dash')));
     this.$('btn-start').addEventListener('click', () => this.onStartButton());
+    this.$('btn-sim').addEventListener('click', () => this.onDashAction());
     this.$('btn-startmenu').addEventListener('click', e => { e.stopPropagation(); this.toggleStart(); });
     document.addEventListener('click', e => { if (!e.target.closest('#startmenu')) this.toggleStart(false); });
     const flip = () => this.setLang(L.code === 'ru' ? 'en' : 'ru');
@@ -1725,9 +2069,10 @@ class UIController {
     });
     this.$('btn-reset').addEventListener('click', () => {
       this.toggleStart(false);
-      if (this.engine && !this.engine.finished) { this.alert(L.t('dlg.finishFirst'), L.t('dlg.academy')); return; }
-      this.state.reset(); this.engine = null; this.selected = null; this.selSlot = null;
-      this.renderAll(); this.prepareMatch();
+      if (this.live || this.cal.running) { this.alert(L.t('dlg.finishFirst'), L.t('dlg.academy')); return; }
+      this.state.reset(); this.cal.attach(this.state.calendar);
+      this.engine = null; this.selected = null; this.selSlot = null; this.tableMd = null;
+      this.prepareMatch(); this.renderAll(); this.show('dash');
       this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
     });
     const closeDlg = () => this.$('dlg').classList.remove('open');
@@ -1738,51 +2083,49 @@ class UIController {
       closeDlg(); this.toggleStart(false); this.selected = null; this.selSlot = null; this.renderSquad(); this.renderTactics();
     });
 
-    // Coach shouts
     document.querySelectorAll('[data-shout]').forEach(b => b.addEventListener('click', () => {
       this.mentality = b.dataset.shout;
-      if (this.engine && !this.engine.finished) this.engine.setMentality(this.mentality);
+      if (this.live) this.engine.setMentality(this.mentality);
       this.renderShouts();
     }));
-    // Simulation speed
     document.querySelectorAll('[data-speed]').forEach(b => b.addEventListener('click', () => {
       this.speed = Number(b.dataset.speed);
       try { localStorage.setItem('yam_speed', this.speed); } catch (e) {}
-      if (this.engine && !this.engine.finished) this.engine.setSpeedMode(this.speed);
+      if (this.live) this.engine.setSpeedMode(this.speed);
       this.renderSpeedBtns();
     }));
-    // Tactics
     this.$('formation').addEventListener('change', e => {
-      if (this.engine && !this.engine.finished) { e.target.value = this.state.formation; return; }
+      if (this.live) { e.target.value = this.state.formation; return; }
       this.state.setFormation(e.target.value);
       this.selSlot = null;
       this.afterLineupChange();
     });
     this.$('btn-auto').addEventListener('click', () => {
-      if (this.engine && !this.engine.finished) return;
+      if (this.live) return;
       this.state.autoArrange(); this.state.save(); this.selSlot = null;
       this.afterLineupChange();
     });
+    this.$('md-prev').addEventListener('click', () => { this.tableMd = Math.max(1, this.tableMd - 1); this.renderTable(); });
+    this.$('md-next').addEventListener('click', () => { this.tableMd = Math.min(this.state.league.matchdays, this.tableMd + 1); this.renderTable(); });
 
-    // Squad: remove role / substitutions
     this.$('squad-body').addEventListener('click', e => {
       const rm = e.target.closest('[data-untag]');
       if (rm) { this.state.removeTag(rm.dataset.id, rm.dataset.untag); this.renderSquad(); this.renderNotebook(); return; }
       const sb = e.target.closest('[data-sub]');
       if (sb && !sb.disabled) this.onSubClick(sb.dataset.sub);
     });
-    // Notebook: assign role
     this.$('notes-body').addEventListener('click', e => {
+      if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
       const b = e.target.closest('[data-tag]'); if (!b || b.disabled) return;
       this.state.setTag(b.dataset.id, b.dataset.tag);
-      this.renderNotebook(); this.renderSquad(); this.renderOffice();
+      this.renderNotebook(); this.renderSquad(); this.renderDash();
     });
   }
 
   afterLineupChange() {
     this.renderTactics();
     this.renderSquad();
-    this.renderOffice();
+    this.renderDash();
     if (!this.engine) this.prepareMatch();
   }
 
@@ -1791,18 +2134,21 @@ class UIController {
     m.classList.toggle('open', force ?? !m.classList.contains('open'));
   }
 
+  get live() { return !!(this.engine && !this.engine.finished); }
+  get matchOpen() { return this.live || this.state.phase === 'matchday' || this.state.phase === 'post'; }
+
   show(view) {
-    if (view === 'notes' && !this.state.notebookUnlocked) {
-      this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'));
-      return;
-    }
+    if (view === 'notes' && !this.state.notebookUnlocked) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle')); return; }
+    if (view === 'match' && !this.matchOpen) { this.alert(L.t('dlg.noMatch'), L.t('nav.match')); return; }
     this.view = view;
-    const scenes = { office: 'scene-office', squad: 'scene-squad', tactics: 'scene-tactics', match: 'scene-match', notes: 'scene-notes' };
+    const scenes = { dash: 'scene-office', squad: 'scene-squad', tactics: 'scene-tactics', match: 'scene-match', table: 'scene-table', notes: 'scene-notes' };
     for (const [v, id] of Object.entries(scenes)) this.$(id).classList.toggle('active', v === view);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     if (view === 'notes') this.$('tk-notes').classList.remove('alert');
-    if (view === 'office') this.renderOffice();
+    if (view === 'match') this.$('tk-match').classList.remove('alert');
+    if (view === 'table') this.renderTable();
+    if (view === 'dash') this.renderDash();
   }
 
   alert(html, title) {
@@ -1813,38 +2159,176 @@ class UIController {
   }
 
   syncLocks() {
-    const locked = !this.state.notebookUnlocked;
-    this.$('tk-notes').classList.toggle('locked', locked);
-    this.$('icon-notes').classList.toggle('locked', locked);
-    this.$('tk-notes-lbl').textContent = L.t(locked ? 'nav.notebookLocked' : 'nav.notebook');
+    const nbLocked = !this.state.notebookUnlocked;
+    this.$('tk-notes').classList.toggle('locked', nbLocked);
+    this.$('icon-notes').classList.toggle('locked', nbLocked);
+    this.$('tk-notes-lbl').textContent = L.t(nbLocked ? 'nav.notebookLocked' : 'nav.notebook');
+    const mLocked = !this.matchOpen;
+    this.$('tk-match').classList.toggle('locked', mLocked);
+    this.$('icon-match').classList.toggle('locked', mLocked);
+    this.$('tk-match').querySelector('.lbl').textContent = L.t(mLocked ? 'nav.matchLocked' : 'nav.match');
+    this.$('tray-date').textContent = fmtDate(this.cal.date, { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  tickClock() {
-    const d = new Date();
-    this.$('clock').textContent = d.toLocaleTimeString(L.locale(), { hour: '2-digit', minute: '2-digit' });
-    this.$('office-date').textContent = d.toLocaleDateString(L.locale(), { weekday: 'short', day: 'numeric', month: 'short' });
-  }
+  /* ---------- DASHBOARD ---------- */
+  seasonVars() { return { y: this.state.season, z: String(this.state.season + 1).slice(2) }; }
 
-  get live() { return !!(this.engine && !this.engine.finished); }
+  renderDash() {
+    const s = this.state, lg = s.league, phase = s.phase;
+    const date = this.cal.date;
+    this.$('datebox').innerHTML = `
+      <div class="wd">${fmtDate(date, { weekday: 'long' })}</div>
+      <div class="dn">${fmtDate(date, { day: 'numeric' })}</div>
+      <div class="my">${fmtDate(date, { day: 'numeric', month: 'long', year: 'numeric' }).replace(/^\d+\.?\s*/, '')}</div>`;
 
-  /* ---------- OFFICE ---------- */
-  renderOffice() {
-    const s = this.state, r = s.record;
+    // upcoming event widget
+    const ev = this.cal.nextEvent();
+    if (ev) {
+      const n = daysBetween(date, ev.date);
+      const when = n <= 0 ? `<span class="today">${L.t('dash.today')}</span>` : n === 1 ? L.t('dash.tomorrow') : L.t('dash.inDays', { n });
+      let sub = '';
+      const ctx = s.matchContext();
+      if (ev.type === 'match' && ctx) {
+        sub = L.t('ev.match.sub', { date: fmtDate(ev.date, { weekday: 'short', day: 'numeric', month: 'short' }), pos: lg.position(ctx.opp.id), f: ctx.opp.formation });
+      }
+      this.$('next-event').innerHTML = `
+        <div class="ev-when">${when}</div>
+        <div class="ev-title"><span class="ev-ico">&#9917;</span>${this.cal.label(ev)}</div>
+        <div class="ev-sub">${sub}</div>`;
+    } else {
+      this.$('next-event').innerHTML = `<div class="ev-title">${L.t('dash.none')}</div>`;
+    }
+
+    // club panel
+    const row = s.userRow();
+    const avg = Math.round(s.squad.reduce((a, p) => a + p.energy, 0) / s.squad.length);
     const tired = s.squad.filter(p => p.energy < ENERGY.TIRED).length;
-    this.$('club-name').textContent = L.team(s.clubName);
-    this.$('office-kv').innerHTML = `
-      <dt>${L.t('office.fixture')}</dt><dd>#${pad2(s.fixture)} &middot; ${esc(L.team(s.opponent.name))} (${s.opponent.formation})</dd>
-      <dt>${L.t('office.formation')}</dt><dd>${s.formation}</dd>
-      <dt>${L.t('office.record')}</dt><dd>${L.t('office.recordVal', r)}</dd>
-      <dt>${L.t('office.notes')}</dt><dd>${L.t('office.tagsWritten', { n: s.squad.filter(p => p.tags.length).length })}</dd>
-      <dt>${L.t('office.tired')}</dt><dd${tired ? ' class="warn"' : ''}>${L.t('office.tiredVal', { n: tired, t: s.squad.length })}</dd>
-      <dt>${L.t('office.pitch')}</dt><dd>${this.live ? L.t('office.live') : L.t('office.pitchStates')[this.pitchIdx]}</dd>`;
-    this.$('office-status').textContent = this.live
-      ? L.t('office.liveStatus', { h: L.team(s.clubName), x: this.engine.sides[0].score, y: this.engine.sides[1].score, a: L.team(this.engine.sides[1].name) })
-      : L.t('office.rain');
+    this.$('club-kv').innerHTML = `
+      <dt>${L.t('dash.position')}</dt><dd><b>${L.t('dash.posVal', { p: lg.position(0) })}</b></dd>
+      <dt>${L.t('dash.record')}</dt><dd>${L.t('dash.recordVal', row)}</dd>
+      <dt>${L.t('dash.form')}</dt><dd>${this.formChips(row.form) || '—'}</dd>
+      <dt>${L.t('dash.formation')}</dt><dd>${s.formation}</dd>
+      <dt>${L.t('dash.energy')}</dt><dd${tired ? ' class="warn"' : ''}>${L.t('dash.energyVal', { a: avg, t: tired })}</dd>`;
+
+    // main action button
+    const btn = this.$('btn-sim');
+    btn.disabled = this.cal.running || this.live;
+    btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
+    if (this.cal.running) btn.innerHTML = L.t('dash.simming');
+    else if (phase === 'calendar') btn.innerHTML = L.t('dash.sim');
+    else if (phase === 'matchday') btn.innerHTML = L.t('dash.goMatch');
+    else if (phase === 'post') btn.innerHTML = L.t('dash.close');
+    else btn.innerHTML = L.t('dash.newSeason', { y: s.season + 1, z: String(s.season + 2).slice(2) });
+    this.$('sim-hint').innerHTML = phase === 'seasonEnd'
+      ? L.t('dash.hint.seasonEnd', { pos: lg.position(0), pts: row.pts })
+      : L.t('dash.hint.' + phase, { n: ENERGY.DAILY_REST });
+
+    // diary
+    this.renderTicker();
+
+    // fixtures of the current / next matchday
+    const md = ev?.type === 'match' ? ev.md : lg.matchdays;
+    this.$('md-fx-label').textContent = L.t('dash.thisMd', { md });
+    this.$('md-fixtures').innerHTML = lg.fixturesOf(md).map(f => this.fixtureHTML(f)).join('');
+
+    this.$('dash-status').textContent = L.t('dash.status.' + phase);
+    this.$('dash-season').textContent = L.t('dash.season', this.seasonVars());
+    this.syncLocks();
   }
 
-  /* ---------- SQUAD: energy, roles, substitutions (no hidden attributes rendered) ---------- */
+  renderTicker() {
+    const t = this.$('ticker');
+    t.innerHTML = this.state.diary.slice(-40).map(d =>
+      `<div class="tk-line ${d.cls || ''}"><span class="d">${fmtDate(d.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>${esc(this.entryText({ ...d, r: 0 }))}</div>`).join('');
+    t.scrollTop = t.scrollHeight;
+  }
+
+  formChips(form) { return form.map(r => `<span class="fc ${r}">${L.t('res.' + r)}</span>`).join(''); }
+
+  fixtureHTML(f) {
+    const lg = this.state.league;
+    const me = f.home === 0 || f.away === 0;
+    const score = lg.played(f) ? `${f.hg} - ${f.ag}` : 'vs';
+    return `<div class="fx${me ? ' me' : ''}"><span class="h">${esc(L.team(lg.team(f.home).name))}</span><b>${score}</b><span class="a">${esc(L.team(lg.team(f.away).name))}</span></div>`;
+  }
+
+  /** The one big button on the Dashboard changes with the phase of the matchday loop. */
+  onDashAction() {
+    const phase = this.state.phase;
+    if (phase === 'matchday') { this.show('match'); return; }
+    if (phase === 'post') { this.closeMatchday(); return; }
+    if (phase === 'seasonEnd') {
+      this.state.newSeason(this.state.season + 1);
+      this.cal.attach(this.state.calendar);
+      this.engine = null; this.tableMd = null;
+      this.prepareMatch(); this.renderAll();
+      return;
+    }
+    this.cal.simulate({
+      stepMs: 180,
+      onStep: (date, infos) => {
+        for (const info of infos) this.state.addDiary({ date, ...info });
+        this.state.save();
+        this.renderDash();
+        this.renderSquad();
+      },
+      onStop: () => { this.state.save(); this.renderAll(); },
+    });
+    this.renderDash();
+  }
+
+  onMatchdayArrived(ev) {
+    const s = this.state;
+    s.phase = 'matchday';
+    const ctx = s.matchContext();
+    const vars = { md: ev.md, o: { team: ctx.opp.name }, v: L.t('venue.' + ctx.venue) };
+    s.addDiary({ date: ev.date, key: 'cal.arrive', vars: { ...vars, v: { venue: ctx.venue } }, cls: 'hl' });
+    s.save();
+    this.engine = null;
+    this.prepareMatch();
+    this.renderAll();
+    this.$('tk-match').classList.add('alert');
+    this.alert(L.t('dlg.matchday', { md: ev.md, o: esc(L.team(ctx.opp.name)), v: L.t('venue.' + ctx.venue) }), L.t('dlg.matchdayTitle'));
+  }
+
+  /** "Return to Dashboard": completes the matchday event and queues the next one. */
+  closeMatchday() {
+    const s = this.state;
+    if (s.phase !== 'post') { this.show('dash'); return; }
+    const ev = s.nextMatchEvent();
+    const rep = s.lastReport;
+    this.cal.completeEvent(ev.id);
+    this.cal.advanceDay();
+    s.addDiary({ date: ev.date, key: 'cal.closed', vars: { md: ev.md, x: rep.gf, y: rep.ga, o: { team: rep.opponent }, pos: s.league.position(0) } });
+    s.phase = this.cal.nextEvent() ? 'calendar' : 'seasonEnd';
+    this.engine = null;
+    s.save();
+    this.prepareMatch();
+    this.renderAll();
+    this.show('dash');
+  }
+
+  /* ---------- STANDINGS ---------- */
+  renderTable() {
+    const lg = this.state.league;
+    const rows = lg.table();
+    this.$('table-body').innerHTML = rows.map((r, i) => `
+      <tr class="${r.team.user ? 'me' : ''}${i === 0 && r.p ? ' lead' : ''}">
+        <td class="c pos-n">${i + 1}</td><td class="tm">${esc(L.team(r.team.name))}</td>
+        <td class="c">${r.p}</td><td class="c">${r.w}</td><td class="c">${r.d}</td><td class="c">${r.l}</td>
+        <td class="c">${r.gf}</td><td class="c">${r.ga}</td><td class="c">${r.gd > 0 ? '+' : ''}${r.gd}</td>
+        <td class="c pts">${r.pts}</td><td class="form">${this.formChips(r.form)}</td>
+      </tr>`).join('');
+    const playedMd = lg.playedMatchdays();
+    if (this.tableMd == null) this.tableMd = Math.max(1, playedMd);
+    this.$('md-label').textContent = L.t('table.md', { n: this.tableMd });
+    this.$('md-prev').disabled = this.tableMd <= 1;
+    this.$('md-next').disabled = this.tableMd >= lg.matchdays;
+    this.$('md-results').innerHTML = lg.fixturesOf(this.tableMd).map(f => this.fixtureHTML(f)).join('');
+    this.$('table-status').textContent = L.t('table.status', { n: playedMd });
+  }
+
+  /* ---------- SQUAD ---------- */
   renderSquad() {
     const s = this.state;
     const live = this.live;
@@ -1910,20 +2394,16 @@ class UIController {
     sel.value = s.formation;
     sel.disabled = this.live;
     this.$('btn-auto').disabled = this.live;
-
     const c = lineCounts(s.formation), base = lineCounts('4-4-2');
     this.$('tac-strength').innerHTML = [0, 1, 2].map(z => {
-      const own = presence(c, z), ref = presence(base, z);
-      const d = own - ref;
+      const own = presence(c, z), d = own - presence(base, z);
       const cls = d > 0.01 ? 'ok' : d < -0.01 ? 'bad' : '';
       return `<dt>${L.t('tac.z' + z)}</dt><dd class="${cls}">${own.toFixed(2)} (${d >= 0 ? '+' : ''}${d.toFixed(2)})</dd>`;
     }).join('');
-
     const oop = s.outOfPosition();
     this.$('tac-warn').innerHTML = oop.length
       ? oop.map(({ p, line }) => `<div class="w">${L.t('tac.oop', { n: esc(L.name(p.name)), p: L.pos(p.position), l: L.line(line) })}</div>`).join('')
       : `<div class="okmsg">${L.t('tac.allGood')}</div>`;
-
     this.board.setup([{ entries: s.slots().map((sl, i) => ({ ...sl, p: s.player(s.lineup[i]) })) }], { board: true });
     if (this.selSlot != null) this.board.select(s.lineup[this.selSlot]);
     this.$('tac-board').classList.toggle('locked', this.live);
@@ -1945,25 +2425,23 @@ class UIController {
   renderShouts() {
     document.querySelectorAll('[data-shout]').forEach(b => {
       const on = b.dataset.shout === this.mentality;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', on);
+      b.classList.toggle('active', on); b.setAttribute('aria-pressed', on);
     });
   }
   renderSpeedBtns() {
     document.querySelectorAll('[data-speed]').forEach(b => {
       const on = Number(b.dataset.speed) === this.speed;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', on);
+      b.classList.toggle('active', on); b.setAttribute('aria-pressed', on);
     });
   }
 
   homeTeam() { return { name: this.state.clubName, players: this.state.starters(), formation: this.state.formation }; }
 
-  /** Pre-match: both teams standing in their formations. */
   prepareRadar() {
+    const ctx = this.state.matchContext();
     const home = MatchEngine.buildSide(this.homeTeam(), true);
-    const away = MatchEngine.buildSide(this.state.opponent, false);
-    this.radar.setup([home, away]);
+    const sides = ctx ? [home, MatchEngine.buildSide(ctx.team, false)] : [home];
+    this.radar.setup(sides);
     this.radar.setTransition(0.5);
   }
 
@@ -1975,75 +2453,71 @@ class UIController {
     this.$('carrier').textContent = '—'; this.$('poss').textContent = '—';
     this.logEntries = [];
     this.$('log').innerHTML = '';
-    const s = this.state;
-    this.appendLog({ minute: 0, type: 'flavor', key: 'match.intro', vars: { a: { team: s.clubName }, b: { team: s.opponent.name } }, side: -1, r: 0 });
-    this.appendLog({ minute: 0, type: 'coach', key: 'match.hintShouts', vars: {}, side: -1, r: 0 });
-    const tired = s.starters().filter(p => p.energy < ENERGY.TIRED);
-    if (tired.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.tiredWarn', vars: { n: { list: tired } }, side: 0, r: 0 });
-    const oop = s.outOfPosition().map(o => o.p);
-    if (oop.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.oopWarn', vars: { n: { list: oop } }, side: 0, r: 0 });
+    const s = this.state, ctx = s.matchContext();
+    if (ctx) {
+      this.appendLog({ minute: 0, type: 'flavor', key: 'match.intro', vars: { a: { team: s.clubName }, b: { team: ctx.opp.name } }, side: -1, r: 0 });
+      this.appendLog({ minute: 0, type: 'coach', key: 'match.hintShouts', vars: {}, side: -1, r: 0 });
+      const tired = s.starters().filter(p => p.energy < ENERGY.TIRED);
+      if (tired.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.tiredWarn', vars: { n: { list: tired } }, side: 0, r: 0 });
+      const oop = s.outOfPosition().map(o => o.p);
+      if (oop.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.oopWarn', vars: { n: { list: oop } }, side: 0, r: 0 });
+    }
     this.prepareRadar();
     this.renderMatchChrome();
     this.renderTeamStats(MatchEngine.blankStats());
   }
 
   renderMatchChrome() {
-    const s = this.state, e = this.engine;
-    const fixtureNo = e && e.finished ? s.fixture - 1 : s.fixture;
-    this.$('match-title').textContent = L.t('match.title', { n: pad2(fixtureNo) });
-    this.$('match-fixture').textContent = L.t('match.home', { c: L.team(s.clubName) });
-    this.$('sb-home').textContent = L.team(s.clubName).replace(' U-14', '');
-    this.$('sb-away').textContent = L.team(s.opponent.name);
-    this.$('forms').textContent = `${e ? e.sides[0].formation : s.formation} vs ${s.opponent.formation}`;
+    const s = this.state, e = this.engine, ctx = s.matchContext();
     const btn = this.$('btn-start'), sp = this.$('speed'), st = this.$('match-status');
+    this.$('sb-home').textContent = L.team(s.clubName).replace(' U-14', '');
+    if (ctx) {
+      const v = L.t('venue.' + ctx.venue);
+      this.$('match-title').textContent = L.t('match.title', { n: ctx.md, v });
+      this.$('match-fixture').textContent = L.t('match.venue', { c: L.team(s.clubName), v });
+      this.$('sb-away').textContent = L.team(ctx.opp.name);
+      this.$('forms').textContent = `${e ? e.sides[0].formation : s.formation} vs ${ctx.opp.formation}`;
+    }
     let slow = false;
     if (!e) {
-      btn.disabled = false; btn.innerHTML = L.t('match.start');
-      sp.textContent = L.t('match.ready'); st.textContent = L.t('match.statusReady');
+      const can = s.phase === 'matchday';
+      btn.disabled = !can;
+      btn.innerHTML = can ? L.t('match.start') : L.t('match.noMatch');
+      sp.textContent = can ? L.t('match.ready') : '';
+      st.textContent = can ? L.t('match.statusReady') : L.t('dlg.noMatch').replace(/<br>.*/, '');
     } else if (!e.finished) {
       slow = e.highlight;
       btn.disabled = true; btn.innerHTML = L.t('match.inProgress');
       sp.textContent = slow ? L.t('match.slow') : L.t('match.run', { x: e.speed });
       st.textContent = L.t('match.statusLive');
     } else {
-      btn.disabled = false; btn.innerHTML = L.t('match.next');
+      btn.disabled = false; btn.innerHTML = L.t('match.toNotes');
       sp.textContent = L.t('match.ft');
-      st.textContent = L.t('match.end' + this.state.lastReport.result);
+      st.textContent = s.lastReport ? L.t('match.end' + s.lastReport.result) : '';
     }
     sp.classList.toggle('slow', slow);
   }
 
   onStartButton() {
-    if (this.engine && this.engine.finished) {   // "Next fixture"
-      this.state.opponent = this.state.makeOpponent();
-      this.engine = null;
-      this.prepareMatch();
-      this.renderAll();
-      return;
-    }
+    if (this.engine && this.engine.finished) { this.show('notes'); return; }
     if (this.engine) return;
+    if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match')); return; }
+    const ctx = this.state.matchContext();
     this.state.notebookUnlocked = false;
     this.syncLocks();
-
-    this.engine = new MatchEngine(this.homeTeam(), this.state.opponent, {
+    this.engine = new MatchEngine(this.homeTeam(), ctx.team, {
       onLog: e => this.appendLog(e),
       onUpdate: eng => this.renderLive(eng),
       onSpeed: d => {
-        // dot animation length follows the tick length (0.5s at 1x and during highlights)
         this.radar.setTransition(d >= MatchEngine.HIGHLIGHT ? 0.5 : clamp(d / 1000 * 0.85, 0.03, 0.5));
         this.renderMatchChrome();
       },
-      onGoal: () => {
-        const el = this.$('sb-score');
-        el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
-      },
+      onGoal: () => { const el = this.$('sb-score'); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); },
       onEnd: eng => this.onMatchEnd(eng),
     }, { mentality: this.mentality, speed: this.speed });
     this.radar.setup(this.engine.sides);
     this.engine.start();
-    this.renderMatchChrome();
-    this.renderSquad();
-    this.renderTactics();
+    this.renderAll();
   }
 
   logLine(e) {
@@ -2053,7 +2527,6 @@ class UIController {
     line.innerHTML = `<span class="m">${pad2(e.minute)}'</span><span class="${sideCls} ${e.type}">${esc(this.entryText(e))}</span>`;
     return line;
   }
-
   appendLog(e) {
     const log = this.$('log');
     const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
@@ -2062,7 +2535,6 @@ class UIController {
     while (log.children.length > 400) { log.removeChild(log.firstChild); this.logEntries.shift(); }
     if (nearBottom) log.scrollTop = log.scrollHeight;
   }
-
   rerenderLog() {
     const log = this.$('log');
     const frag = document.createDocumentFragment();
@@ -2083,7 +2555,6 @@ class UIController {
     this.$('poss').textContent = `${Math.round(eng.possTicks[0] / total * 100)}% - ${Math.round(eng.possTicks[1] / total * 100)}%`;
     this.renderTeamStats(eng.teamTotals(0));
     this.radar.render(eng);
-    if (this.view === 'office') this.renderOffice();
   }
 
   renderTeamStats(t) {
@@ -2098,24 +2569,29 @@ class UIController {
       <dt>${L.t('st.cards')}</dt><dd class="${t.red ? 'bad' : ''}">${t.yellow}/${t.red}</dd>`;
   }
 
+  /** Our match is over: record it, resolve the 4 AI fixtures instantly, update table, open the notebook. */
   onMatchEnd(eng) {
+    const s = this.state, ctx = s.matchContext();
     const [a, b] = eng.sides;
     const result = a.score > b.score ? 'W' : a.score === b.score ? 'D' : 'L';
+    s.league.setUserResult(ctx.fixture, a.score, b.score);
+    const others = s.league.simulateOthers(ctx.md);
+    this.appendLog({ minute: 90, type: 'flavor', key: 'match.others', vars: { r: { fixtures: others } }, side: -1, r: 0 });
     const played = a.players;
-    const chosen = shuffle(played).slice(0, 3);
-    this.state.lastReport = {
-      fixture: this.state.fixture, opponent: b.name, gf: a.score, ga: b.score, result,
-      players: chosen.map(p => ({ id: p.id, stats: { ...eng.st(p) } })),
+    s.lastReport = {
+      md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
+      players: shuffle(played).slice(0, 3).map(p => ({ id: p.id, stats: { ...eng.st(p) } })),
     };
-    this.state.applyFatigue(played.map(p => p.id));
-    this.state.recordResult(a.score, b.score);
-    this.state.notebookUnlocked = true;
+    s.applyFatigue(played.map(p => p.id));
+    s.phase = 'post';
+    s.notebookUnlocked = true;
+    s.save();
+    this.tableMd = ctx.md;
     this.renderAll();
-    this.renderMatchChrome();
     if (this.view !== 'notes') this.$('tk-notes').classList.add('alert');
   }
 
-  /* ---------- NOTEBOOK: assign ONE role per player ---------- */
+  /* ---------- NOTEBOOK ---------- */
   renderNotebook() {
     const body = this.$('notes-body');
     const rep = this.state.lastReport;
@@ -2149,14 +2625,15 @@ class UIController {
         <div class="tag-btns">${btns}</div>
       </article>`;
     }).join('');
+    const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t('notes.back')}</button></div>` : '';
     body.innerHTML = `
       <div class="nb-head">
-        <h2>${L.t('notes.head', { n: pad2(rep.fixture), o: esc(L.team(rep.opponent)) })}</h2>
+        <h2>${L.t('notes.head', { n: rep.md, o: esc(L.team(rep.opponent)) })}</h2>
         <span class="res ${rep.result}">${L.t('res.' + rep.result)} &nbsp;${rep.gf} - ${rep.ga}</span>
       </div>
       <p class="nb-hint">${L.t('notes.hint')}</p>
-      <div class="cards">${cards}</div>`;
-    this.$('notes-status').textContent = L.t('notes.status', { n: rep.fixture });
+      <div class="cards">${cards}</div>${back}`;
+    this.$('notes-status').textContent = L.t('notes.status', { n: rep.md });
   }
 }
 
@@ -2165,7 +2642,8 @@ class UIController {
    ========================================================= */
 const game = new GameState();
 const ui = new UIController(game);
-window.YAM = { game, ui, MatchEngine, L, ENERGY, FORMATIONS }; // handy for debugging in DevTools
+window.YAM = { game, ui, MatchEngine, League, CalendarEngine, L, ENERGY, FORMATIONS }; // handy for debugging in DevTools
+
 </script>
 </body>
 </html>
