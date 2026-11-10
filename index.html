@@ -519,7 +519,7 @@ body.fx .crt-glare{ display: block; }
   background: linear-gradient(#e9e4d3, #d6cfba); color: #1f2a38; border-top: 14px solid #a63b30; box-shadow: 3px 4px 0 rgba(0,0,0,.45); }
 .datebox .wd{ font-weight: bold; text-transform: capitalize; font-size: 14px; }
 .datebox .dn{ font: 64px/1 "VT323", var(--ui); color: #13213a; }
-.datebox .my{ font-size: 13px; text-transform: capitalize; }
+.datebox .my{ font-size: 13px; }
 .next-card .ev-when{ font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
 .next-card .ev-when .today{ color: #fff; background: #a63b30; padding: 1px 6px; animation: blink .8s steps(2) infinite; }
 .next-card .ev-title{ font-size: 19px; font-weight: bold; margin: 6px 0; color: #f1f4ee; }
@@ -558,6 +558,126 @@ body.fx .crt-glare{ display: block; }
 }
 
 /* =========================================================
+   ITERATION 5 — TEAM MANAGEMENT, MODALS, RETRO UX POLISH
+   ========================================================= */
+/* Win98 buttons: outset by default, inset while pressed */
+.btn, .tk, .tb-btn, .lang{
+  border-width: 2px; border-style: outset; border-color: #e3e6e0;
+  box-shadow: none; cursor: pointer; transition: background-color .08s;
+}
+.btn.go{ border-color: #9cc08d; }
+.btn:hover:not(:disabled), .tk:hover, .tb-btn:hover{ background-color: #cfd3cc; }
+.btn.go:hover:not(:disabled){ background-color: #6a9560; }
+.btn:active:not(:disabled), .tk:active, .tb-btn:active, .lang:active{ border-style: inset; padding-top: 6px; padding-bottom: 4px; }
+.btn.small:active:not(:disabled){ padding-top: 4px; padding-bottom: 2px; }
+.tk.active, .shout.active, .spd.active{ border-style: inset; }
+.btn:disabled{ cursor: not-allowed; }
+.btn:focus-visible, .tk:focus-visible, .r-row:focus-visible, .pl:focus-visible{ outline: 2px dotted #ffe066; outline-offset: 1px; }
+/* every clickable thing says so */
+button:not(:disabled), select:not(:disabled), [role="button"], [role="option"], .r-row, .pitch.board .pl, .icon, .tag button{ cursor: pointer; }
+.icon:hover .glyph{ border-color: #fff #555 #555 #fff; filter: brightness(1.25); }
+.lang:hover{ background: var(--title-b); }
+.sel98:hover:not(:disabled){ background: #fff; }
+.tag button:hover{ opacity: 1; color: #fff; }
+
+/* retro scrollbars everywhere content can scroll (layout never resizes) */
+.roster, .log, .ticker, .tbl-wrap, .win-body, .fx-list{ scrollbar-gutter: stable; scrollbar-width: auto; scrollbar-color: #b6bab4 #1b232a; }
+.roster::-webkit-scrollbar, .log::-webkit-scrollbar, .ticker::-webkit-scrollbar, .tbl-wrap::-webkit-scrollbar, .win-body::-webkit-scrollbar{ width: 16px; height: 16px; }
+.roster::-webkit-scrollbar-track, .log::-webkit-scrollbar-track, .ticker::-webkit-scrollbar-track, .tbl-wrap::-webkit-scrollbar-track, .win-body::-webkit-scrollbar-track{
+  background: repeating-conic-gradient(#2c363e 0 25%, #1b232a 0 50%) 0 0 / 4px 4px; }
+.roster::-webkit-scrollbar-thumb, .log::-webkit-scrollbar-thumb, .ticker::-webkit-scrollbar-thumb, .tbl-wrap::-webkit-scrollbar-thumb, .win-body::-webkit-scrollbar-thumb{
+  background: #b6bab4; border: 2px outset #e3e6e0; min-height: 24px; }
+.roster::-webkit-scrollbar-thumb:hover, .log::-webkit-scrollbar-thumb:hover, .ticker::-webkit-scrollbar-thumb:hover{ background: #cfd3cc; }
+.roster::-webkit-scrollbar-button:single-button, .log::-webkit-scrollbar-button:single-button, .ticker::-webkit-scrollbar-button:single-button, .tbl-wrap::-webkit-scrollbar-button:single-button, .win-body::-webkit-scrollbar-button:single-button{
+  display: block; height: 16px; background: #b6bab4 no-repeat center / 8px 5px; border: 2px outset #e3e6e0; }
+.roster::-webkit-scrollbar-button:single-button:vertical:decrement, .log::-webkit-scrollbar-button:single-button:vertical:decrement, .ticker::-webkit-scrollbar-button:single-button:vertical:decrement, .tbl-wrap::-webkit-scrollbar-button:single-button:vertical:decrement, .win-body::-webkit-scrollbar-button:single-button:vertical:decrement{
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'%3E%3Cpath d='M4 0 8 5H0z'/%3E%3C/svg%3E"); }
+.roster::-webkit-scrollbar-button:single-button:vertical:increment, .log::-webkit-scrollbar-button:single-button:vertical:increment, .ticker::-webkit-scrollbar-button:single-button:vertical:increment, .tbl-wrap::-webkit-scrollbar-button:single-button:vertical:increment, .win-body::-webkit-scrollbar-button:single-button:vertical:increment{
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'%3E%3Cpath d='M0 0h8L4 5z'/%3E%3C/svg%3E"); }
+.roster::-webkit-scrollbar-button:active, .log::-webkit-scrollbar-button:active{ border-style: inset; }
+
+/* subtle CRT, always on: static scanlines + edge vignette (no flicker/roll) */
+.crt-scan{ display: block; opacity: .55; background: repeating-linear-gradient(to bottom, rgba(0,0,0,.2) 0 1px, transparent 1px 3px); }
+body.fx .crt-scan{ opacity: .9; }
+
+/* semantic energy colours: green > 70 · yellow 30–70 · red < 30 */
+.energy.hi i{ background: #3f8f3a; } .energy.mid i{ background: #c9a227; } .energy.lo i{ background: #b23a2e; }
+
+/* ---- Team Management window ---- */
+#win-team{ left: 50%; top: 10px; bottom: 10px; width: min(1220px, 97%); transform: translateX(-50%); max-height: none; }
+#win-team.open{ animation: none; }
+.team-body{ overflow: hidden; display: flex; padding: 10px; }
+.team-grid{ flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); gap: 12px; }
+.panel{ display: flex; flex-direction: column; min-height: 0; gap: 6px; }
+.panel-head{ display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; flex-wrap: wrap; }
+.panel-head b{ font-size: 14px; }
+.panel-head .legend{ font-size: 11px; color: var(--muted); }
+.toolbar{ justify-content: flex-start; }
+.inline-fld{ display: flex; align-items: center; gap: 6px; font-weight: bold; }
+.inline-fld .sel98{ font-size: 14px; padding: 2px 4px; }
+.roster-cols, .r-row{ display: grid; grid-template-columns: 30px minmax(0, 1fr) 46px 108px 112px; align-items: center; gap: 8px; }
+.roster-cols{ padding: 0 24px 0 11px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.roster{ flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0; }
+.r-grp{ position: sticky; top: 0; z-index: 2; padding: 4px 10px; font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #e6edf2; background: #33475a; border-bottom: 1px solid #0b0e10; }
+.r-row{ padding: 5px 8px; border-left: 3px solid transparent; border-bottom: 1px solid rgba(255,255,255,.05); user-select: none; transition: background-color .08s; }
+.r-row:hover{ background: rgba(90,120,150,.32); border-left-color: #8fb3d6; }
+.r-row.sel{ background: rgba(226,184,90,.24); border-left-color: var(--amber); box-shadow: inset 0 0 0 1px rgba(226,184,90,.75); }
+.r-row.sel:hover{ background: rgba(226,184,90,.32); }
+.r-row.bench .r-name b{ color: #c3ccd3; }
+.r-row.locked{ cursor: not-allowed; }
+.r-row.dragging{ opacity: .4; }
+.r-row.drop-over{ box-shadow: inset 0 0 0 2px #ffe066; }
+.r-name{ display: flex; flex-direction: column; min-width: 0; }
+.r-name b{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #eef1ec; }
+.r-slot{ font-size: 11px; color: var(--muted); }
+.r-slot.warn{ color: #f0a89d; }
+.r-row .num{ margin: 0; }
+.r-row .pos{ min-width: 0; font-size: 11px; }
+.r-row .energy{ height: 16px; } .r-row .energy span{ font-size: 11px; line-height: 14px; }
+.r-tags{ display: flex; flex-wrap: wrap; gap: 3px; min-width: 0; }
+.r-tags .tag{ font-size: 11px; padding: 1px 5px; }
+.tac-strip{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
+.tac-strip .lbl{ color: var(--muted); }
+.tac-strip .chip{ padding: 2px 7px; border: 1px solid #4a5a66; background: rgba(0,0,0,.25); }
+.tac-strip .chip.ok b{ color: #9cc58a; } .tac-strip .chip.bad b{ color: #f0a89d; }
+.board-wrap{ flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.board-wrap .pitch.board{ width: min(100%, calc((100vh - 300px) * 1.544)); }
+.pitch.board .pl:hover{ box-shadow: 0 0 0 3px rgba(143,179,214,.95), 0 2px 3px rgba(0,0,0,.6); }
+.pitch.board.armed .pl:not(.sel){ animation: armed 1.1s ease-in-out infinite; }
+@keyframes armed{ 50%{ box-shadow: 0 0 0 3px rgba(255,224,102,.55), 0 2px 3px rgba(0,0,0,.6); } }
+.pitch.board .pl.drop-over{ box-shadow: 0 0 0 4px #ffe066; transform: translate(-50%, -50%) scale(1.15); }
+.tac-warn{ display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; min-height: 18px; }
+.tac-warn .w{ color: #f0a89d; } .tac-warn .okmsg{ color: #9cc58a; }
+
+/* ---- match log "new events" pill ---- */
+.log-wrap{ position: relative; }
+.log-jump{ position: absolute; right: 24px; bottom: 8px; z-index: 3; box-shadow: 0 2px 6px rgba(0,0,0,.6); }
+
+/* ---- in-game modal ---- */
+.modal-layer{ position: absolute; inset: 0 0 38px 0; z-index: 70; display: grid; place-items: center; background: rgba(0,0,0,.5); }
+.modal-layer[hidden]{ display: none; }
+.modal-layer .modal{ position: relative; left: auto; top: auto; transform: none; width: min(430px, 92%); animation: winOpen .15s steps(3); }
+.modal .dlg-body{ align-items: center; }
+#modal-text{ line-height: 1.5; }
+#modal-btns{ justify-content: center; flex-wrap: wrap; }
+.dlg-ico{ font-size: 20px; }
+.dlg-ico.info{ background: #2f6fd0; color: #fff; }
+.dlg-ico.warn{ background: #c9a227; color: #111; }
+.dlg-ico.error{ background: #b23a2e; color: #fff; }
+.dlg-ico.ok{ background: #3f8f3a; color: #fff; }
+.dlg-ico.match{ background: #eef0ec; color: #111; }
+
+/* dynamic taskbar entries (Match / Notebook appear when the calendar unlocks them) */
+.tk.dyn{ background: #c4cbd3; font-weight: bold; }
+.tk[hidden], .icon[hidden], #startmenu li[hidden], .sep[hidden]{ display: none; }
+@media (max-width: 820px){
+  .team-grid{ grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .roster-cols, .r-row{ grid-template-columns: 26px minmax(0, 1fr) 40px 80px; }
+  .roster-cols span:last-child, .r-tags{ display: none; }
+  .board-wrap .pitch.board{ width: 100%; }
+}
+
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -589,11 +709,10 @@ body.fx .crt-glare{ display: block; }
   <div id="desktop">
     <nav class="icons" aria-label="Desktop">
       <button class="icon" data-view="dash"><span class="glyph">&#8962;</span><span data-i18n="nav.dash">Dashboard</span></button>
-      <button class="icon" data-view="squad"><span class="glyph">&#9638;</span><span data-i18n="nav.squad">Squad</span></button>
-      <button class="icon" data-view="tactics"><span class="glyph">&#9783;</span><span data-i18n="nav.tactics">Tactics</span></button>
-      <button class="icon" data-view="match" id="icon-match"><span class="glyph">&#9673;</span><span data-i18n="nav.match">Match</span></button>
-      <button class="icon" data-view="table"><span class="glyph">&#9776;</span><span data-i18n="nav.table">Standings</span></button>
-      <button class="icon" data-view="notes" id="icon-notes"><span class="glyph">&#9998;</span><span data-i18n="nav.notebook">Notebook</span></button>
+      <button class="icon" data-view="team"><span class="glyph">&#9783;</span><span data-i18n="nav.team">Team</span></button>
+      <button class="icon" data-view="table"><span class="glyph">&#9776;</span><span data-i18n="nav.table">League</span></button>
+      <button class="icon dyn" data-view="match" id="icon-match" hidden><span class="glyph">&#9673;</span><span data-i18n="nav.match">Match</span></button>
+      <button class="icon dyn" data-view="notes" id="icon-notes" hidden><span class="glyph">&#9998;</span><span data-i18n="nav.notebook">Notebook</span></button>
     </nav>
 
     <!-- DASHBOARD (home screen) -->
@@ -626,40 +745,35 @@ body.fx .crt-glare{ display: block; }
       <div class="statusbar"><span id="dash-status"></span><span id="dash-season"></span></div>
     </section>
 
-    <!-- SQUAD -->
-    <section class="win" id="win-squad">
-      <div class="titlebar"><span class="t-ico">&#9638;</span><span class="t-txt" data-i18n="squad.title"></span>
+    <!-- TEAM MANAGEMENT (roster + tactics board) -->
+    <section class="win" id="win-team">
+      <div class="titlebar"><span class="t-ico">&#9783;</span><span class="t-txt" data-i18n="team.title"></span>
         <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
-      <div class="win-body">
-        <div class="tbl-wrap sunken">
-          <table class="grid">
-            <thead><tr><th data-i18n="squad.name"></th><th style="width:64px" data-i18n="squad.pos"></th><th style="width:150px" data-i18n="squad.energy"></th><th data-i18n="squad.role"></th><th style="width:110px"></th></tr></thead>
-            <tbody id="squad-body"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="statusbar"><span id="squad-status"></span><span data-i18n="squad.hidden"></span></div>
-    </section>
-
-    <!-- TACTICS -->
-    <section class="win" id="win-tactics">
-      <div class="titlebar"><span class="t-ico">&#9783;</span><span class="t-txt" data-i18n="tac.title"></span>
-        <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
-      <div class="win-body">
-        <div class="tac-grid">
-          <div class="tac-side">
-            <label class="fld"><span data-i18n="tac.formation"></span>
-              <select id="formation" class="sel98"></select></label>
-            <button class="btn" id="btn-auto" data-i18n="tac.auto"></button>
-            <div class="groupbox"><span class="gb-label" data-i18n="tac.strength"></span>
-              <dl class="statgrid" id="tac-strength"></dl></div>
-            <div class="tac-warn sunken" id="tac-warn"></div>
-            <p class="tac-hint" data-i18n="tac.hint"></p>
+      <div class="win-body team-body">
+        <div class="team-grid">
+          <!-- LEFT: roster -->
+          <div class="panel">
+            <div class="panel-head"><b id="roster-title"></b><span class="legend" data-i18n="team.legendShort"></span></div>
+            <div class="roster-cols" aria-hidden="true">
+              <span>#</span><span data-i18n="team.colName"></span><span data-i18n="team.colPos"></span><span data-i18n="team.colEnergy"></span><span data-i18n="team.colRole"></span>
+            </div>
+            <div class="roster sunken" id="roster" role="listbox" aria-label="Roster"></div>
           </div>
-          <div class="pitch board" id="tac-board"></div>
+          <!-- RIGHT: tactics board -->
+          <div class="panel">
+            <div class="panel-head toolbar">
+              <label class="inline-fld"><span data-i18n="tac.formation"></span>
+                <select id="formation" class="sel98"></select></label>
+              <button class="btn small" id="btn-auto" data-i18n="tac.auto"></button>
+              <button class="btn small" id="btn-clear" data-i18n="team.clear"></button>
+            </div>
+            <div class="tac-strip" id="tac-strength"></div>
+            <div class="board-wrap"><div class="pitch board" id="tac-board"></div></div>
+            <div class="tac-warn" id="tac-warn"></div>
+          </div>
         </div>
       </div>
-      <div class="statusbar"><span id="tac-status"></span><span id="tac-sel"></span></div>
+      <div class="statusbar"><span id="team-status"></span><span id="team-msg"></span></div>
     </section>
 
     <!-- MATCH -->
@@ -688,7 +802,8 @@ body.fx .crt-glare{ display: block; }
         </div>
         <div class="match-bottom">
           <div class="log-col">
-            <div class="log sunken" id="log" role="log" aria-live="polite"></div>
+            <div class="log-wrap"><div class="log sunken" id="log" role="log" aria-live="polite"></div>
+              <button class="btn small log-jump" id="log-jump" hidden data-i18n="match.newEvents"></button></div>
             <div class="shouts" role="group">
               <button class="btn shout" data-shout="attack" data-i18n="shout.attack" data-i18n-aria="shout.attackTip"></button>
               <button class="btn shout" data-shout="defend" data-i18n="shout.defend" data-i18n-aria="shout.defendTip"></button>
@@ -750,12 +865,15 @@ body.fx .crt-glare{ display: block; }
       <div class="statusbar"><span id="notes-status"></span><span data-i18n="notes.saveHint"></span></div>
     </section>
 
-    <!-- DIALOG -->
-    <section class="win" id="dlg" role="alertdialog" aria-labelledby="dlg-title">
-      <div class="titlebar"><span class="t-txt" id="dlg-title"></span><button class="tb-btn" id="dlg-x" data-i18n-aria="ui.close">&times;</button></div>
+  </div>
+
+  <!-- IN-GAME MODAL (replaces any native alert) -->
+  <div class="modal-layer" id="modal-layer" hidden>
+    <section class="win modal open" role="alertdialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="titlebar"><span class="t-txt" id="modal-title"></span><button class="tb-btn" id="modal-x" data-i18n-aria="ui.close">&times;</button></div>
       <div class="win-body">
-        <div class="dlg-body"><div class="dlg-ico">!</div><div id="dlg-text"></div></div>
-        <div class="row-btns" style="justify-content:center"><button class="btn" id="dlg-ok" data-i18n="ui.ok">OK</button></div>
+        <div class="dlg-body"><div class="dlg-ico info" id="modal-ico">i</div><div id="modal-text"></div></div>
+        <div class="row-btns" id="modal-btns"></div>
       </div>
     </section>
   </div>
@@ -764,11 +882,10 @@ body.fx .crt-glare{ display: block; }
     <div class="side">ACADEMY 98</div>
     <ul>
       <li><button data-goto="dash">&#8962;&nbsp; <span data-i18n="nav.dash"></span></button></li>
-      <li><button data-goto="squad">&#9638;&nbsp; <span data-i18n="nav.squad"></span></button></li>
-      <li><button data-goto="tactics">&#9783;&nbsp; <span data-i18n="nav.tactics"></span></button></li>
-      <li><button data-goto="match">&#9673;&nbsp; <span data-i18n="nav.match"></span></button></li>
+      <li><button data-goto="team">&#9783;&nbsp; <span data-i18n="nav.team"></span></button></li>
       <li><button data-goto="table">&#9776;&nbsp; <span data-i18n="nav.table"></span></button></li>
-      <li><button data-goto="notes">&#9998;&nbsp; <span data-i18n="nav.notebook"></span></button></li>
+      <li id="sm-match" hidden><button data-goto="match">&#9673;&nbsp; <span data-i18n="nav.match"></span></button></li>
+      <li id="sm-notes" hidden><button data-goto="notes">&#9998;&nbsp; <span data-i18n="nav.notebook"></span></button></li>
       <hr>
       <li><button id="btn-lang-menu">&#127760;&nbsp; <span data-i18n="ui.switchLang"></span></button></li>
       <li><button id="btn-fx">&#9635;&nbsp; <span id="fx-lbl"></span></button></li>
@@ -781,11 +898,11 @@ body.fx .crt-glare{ display: block; }
     <span class="sep"></span>
     <div class="tasks">
       <button class="tk" data-view="dash">&#8962; <span class="lbl" data-i18n="nav.dash"></span></button>
-      <button class="tk" data-view="squad">&#9638; <span class="lbl" data-i18n="nav.squad"></span></button>
-      <button class="tk" data-view="tactics">&#9783; <span class="lbl" data-i18n="nav.tactics"></span></button>
-      <button class="tk" data-view="match" id="tk-match">&#9673; <span class="lbl" data-i18n="nav.match"></span></button>
+      <button class="tk" data-view="team">&#9783; <span class="lbl" data-i18n="nav.team"></span></button>
       <button class="tk" data-view="table">&#9776; <span class="lbl" data-i18n="nav.table"></span></button>
-      <button class="tk" data-view="notes" id="tk-notes">&#9998; <span class="lbl" id="tk-notes-lbl"></span></button>
+      <span class="sep dyn-sep" id="dyn-sep" hidden></span>
+      <button class="tk dyn" data-view="match" id="tk-match" hidden>&#9673; <span class="lbl" data-i18n="nav.match"></span></button>
+      <button class="tk dyn" data-view="notes" id="tk-notes" hidden>&#9998; <span class="lbl" data-i18n="nav.notebook"></span></button>
     </div>
     <div class="tray">
       <button class="lang" id="btn-lang">RU</button>
@@ -1080,15 +1197,47 @@ const TXT = {
   },
 };
 
+/* ---- Iteration 5: team management, modals ---- */
+Object.assign(I18N.en, {
+  'nav.team': 'Team Management', 'team.title': 'TEAM.EXE — Team Management', 'team.roster': 'Squad · {n} players',
+  'team.legendShort': 'Energy: >70 · 30–70 · <30', 'team.colName': 'Player', 'team.colPos': 'Pos', 'team.colEnergy': 'Energy', 'team.colRole': 'Role',
+  'team.xi': 'STARTING XI · {f}', 'team.bench': 'BENCH', 'team.slot': 'in the XI as {l}', 'team.onBench': 'on the bench',
+  'team.clear': '&#10005; Clear selection', 'team.done': 'Swapped: {a} ⇄ {b}',
+  'team.help.idle': 'Click a player in the list or on the pitch, then click where he should go. Drag and drop works too.',
+  'team.help.sel': '{n} selected → click a pitch slot or another player to swap. Esc or “Clear selection” to cancel.',
+  'team.err.title': 'Cannot swap', 'team.err.gkSlot': 'The goalkeeper stays in goal.<br>Swap him with the bench goalkeeper instead.',
+  'team.err.gkOnly': 'Only a goalkeeper can play in goal.', 'team.err.gkTwo': 'A second goalkeeper cannot play in the outfield.',
+  'team.err.bench': 'Pick at least one player from the starting XI.',
+  'modal.toMatch': '&#9917; To the Match &#9656;', 'modal.toTeam': 'Check the team', 'modal.later': 'Later',
+  'modal.ftTitle': 'Full-time', 'modal.ft': '<b>{h} {x} - {y} {a}</b><br>Other results are in. The Notebook is open: give roles to three lads.',
+  'modal.toNotes': 'To Notebook &#9656;', 'modal.stay': 'Stay here', 'match.newEvents': '&#9660; New events',
+  'dlg.nbLocked': 'The post-match Notebook opens after the final whistle<br>and closes when the matchday is closed.',
+});
+Object.assign(I18N.ru, {
+  'nav.team': 'Команда', 'team.title': 'TEAM.EXE — Управление командой', 'team.roster': 'Состав · {n} игроков',
+  'team.legendShort': 'Энергия: >70 · 30–70 · <30', 'team.colName': 'Игрок', 'team.colPos': 'Поз.', 'team.colEnergy': 'Энергия', 'team.colRole': 'Роль',
+  'team.xi': 'ОСНОВА · {f}', 'team.bench': 'ЗАПАС', 'team.slot': 'в основе: {l}', 'team.onBench': 'в запасе',
+  'team.clear': '&#10005; Снять выбор', 'team.done': 'Замена: {a} ⇄ {b}',
+  'team.help.idle': 'Щёлкни игрока в списке или на поле, затем — куда его поставить. Можно и перетащить.',
+  'team.help.sel': 'Выбран {n} → щёлкни позицию на поле или другого игрока. Esc или «Снять выбор» — отмена.',
+  'team.err.title': 'Замена невозможна', 'team.err.gkSlot': 'Вратарь остаётся в воротах.<br>Замени его на запасного вратаря.',
+  'team.err.gkOnly': 'В ворота может встать только вратарь.', 'team.err.gkTwo': 'Второй вратарь не может играть в поле.',
+  'team.err.bench': 'Выбери хотя бы одного игрока из основы.',
+  'modal.toMatch': '&#9917; На матч &#9656;', 'modal.toTeam': 'Проверить команду', 'modal.later': 'Позже',
+  'modal.ftTitle': 'Финальный свисток', 'modal.ft': '<b>{h} {x} - {y} {a}</b><br>Остальные результаты тура известны. Блокнот открыт: дай роли трём парням.',
+  'modal.toNotes': 'В Блокнот &#9656;', 'modal.stay': 'Остаться', 'match.newEvents': '&#9660; Новые события',
+  'dlg.nbLocked': 'Блокнот открывается после финального свистка<br>и закрывается, когда тур завершён.',
+});
+
 /* ---- Iteration 4: league, calendar, dashboard ---- */
 Object.assign(I18N.en, {
-  'nav.dash': 'Dashboard', 'nav.table': 'Standings', 'nav.matchLocked': 'Match (locked)',
+  'nav.dash': 'Dashboard', 'nav.table': 'League Table', 'nav.matchLocked': 'Match (locked)',
   'dash.title': "DASHBOARD.EXE — Coach's Office", 'dash.next': 'Upcoming event', 'dash.club': 'Club',
   'dash.none': 'No more events this season.', 'dash.inDays': 'in {n} days', 'dash.tomorrow': 'tomorrow', 'dash.today': 'TODAY',
   'dash.sim': '&#9654; Simulate Calendar', 'dash.simming': 'Days passing…', 'dash.goMatch': '&#9917; Go to Match &#9656;',
   'dash.close': '&#10003; Close Matchday &#9656;', 'dash.newSeason': '&#9733; Start Season {y}/{z} &#9656;',
   'dash.hint.calendar': 'Days pass one by one. Every rest day gives the whole squad +{n}% energy. The calendar stops on the next event.',
-  'dash.hint.matchday': 'Matchday! Check the Squad and Tactics, then go to the Match tab.',
+  'dash.hint.matchday': 'Matchday! Check lineup and formation in Team Management, then go to the Match.',
   'dash.hint.post': 'The match is over and the table is updated. Read the Notebook, then close the matchday.',
   'dash.hint.seasonEnd': 'Season over. You finished {pos} of 10 with {pts} points.',
   'dash.position': 'Position', 'dash.posVal': '{p} of 10', 'dash.record': 'Record', 'dash.recordVal': 'W{w} D{d} L{l} · {pts} pts',
@@ -1112,13 +1261,13 @@ Object.assign(I18N.en, {
   'notes.head': 'MATCHDAY {n}: vs {o}', 'notes.status': 'Report for matchday {n}.', 'notes.back': '&#8962; Return to Dashboard',
 });
 Object.assign(I18N.ru, {
-  'nav.dash': 'Штаб', 'nav.table': 'Таблица', 'nav.matchLocked': 'Матч (закрыт)',
+  'nav.dash': 'Штаб', 'nav.table': 'Таблица лиги', 'nav.matchLocked': 'Матч (закрыт)',
   'dash.title': 'DASHBOARD.EXE — Кабинет тренера', 'dash.next': 'Следующее событие', 'dash.club': 'Клуб',
   'dash.none': 'В этом сезоне событий больше нет.', 'dash.inDays': 'через {n} дн.', 'dash.tomorrow': 'завтра', 'dash.today': 'СЕГОДНЯ',
   'dash.sim': '&#9654; Промотать календарь', 'dash.simming': 'Идут дни…', 'dash.goMatch': '&#9917; На матч &#9656;',
   'dash.close': '&#10003; Завершить тур &#9656;', 'dash.newSeason': '&#9733; Начать сезон {y}/{z} &#9656;',
   'dash.hint.calendar': 'Дни идут по одному. Каждый день отдыха даёт всему составу +{n}% энергии. Календарь остановится на следующем событии.',
-  'dash.hint.matchday': 'День матча! Проверь Состав и Тактику, затем иди на вкладку «Матч».',
+  'dash.hint.matchday': 'День матча! Проверь состав и схему во вкладке «Команда», затем иди на матч.',
   'dash.hint.post': 'Матч сыгран, таблица обновлена. Загляни в Блокнот, затем заверши тур.',
   'dash.hint.seasonEnd': 'Сезон окончен. Итог: {pos}-е место из 10, очков: {pts}.',
   'dash.position': 'Место', 'dash.posVal': '{p} из 10', 'dash.record': 'Итоги', 'dash.recordVal': 'В{w} Н{d} П{l} · {pts} очк.',
@@ -1436,18 +1585,23 @@ class GameState {
     this.lineup = [gk.id, ...assigned.slice(1).map(p => p.id)];
   }
   setFormation(f) { if (!FORMATIONS[f]) return; this.formation = f; this.autoArrange(); this.save(); }
-  swapSlots(i, j) {
-    if (i === 0 || j === 0) return 'gk';
-    [this.lineup[i], this.lineup[j]] = [this.lineup[j], this.lineup[i]];
-    this.save();
-    return null;
-  }
-  swap(a, b) {
-    const [s, bn] = this.isStarter(a) ? [a, b] : [b, a];
-    if (!this.isStarter(s) || this.isStarter(bn)) return 'gk';
-    const next = this.lineup.map(id => (id === s ? bn : id));
-    if (GameState.gkError(next.map(id => this.player(id)))) return 'gk';
-    this.lineup = next;
+  /** Unified lineup swap used by both the roster list and the pitch.
+      starter <-> starter : exchange formation slots
+      starter <-> bench   : bench player takes the starter's slot
+      Returns an error key (shown in a modal) or null. */
+  swapPlayers(a, b) {
+    const ia = this.lineup.indexOf(a), ib = this.lineup.indexOf(b);
+    const pa = this.player(a), pb = this.player(b);
+    if (!pa || !pb || (ia < 0 && ib < 0)) return 'bench';
+    if (ia >= 0 && ib >= 0) {
+      if (ia === 0 || ib === 0) return 'gkSlot';
+      [this.lineup[ia], this.lineup[ib]] = [b, a];
+    } else {
+      const [slot, incoming] = ia >= 0 ? [ia, pb] : [ib, pa];
+      if (slot === 0 && incoming.position !== 'GK') return 'gkOnly';
+      if (slot !== 0 && incoming.position === 'GK') return 'gkTwo';
+      this.lineup[slot] = incoming.id;
+    }
     this.save();
     return null;
   }
@@ -1856,10 +2010,11 @@ class RadarView {
     <div class="pl-line six l"></div><div class="pl-line six r"></div>
     <div class="pl-goal l"></div><div class="pl-goal r"></div>`;
 
-  constructor(el, { labels = false, onDotClick = null } = {}) {
+  constructor(el, { labels = false, onDotClick = null, onDrop = null } = {}) {
     this.el = el;
     this.labels = labels;
     this.onDotClick = onDotClick;
+    this.onDrop = onDrop;
     this.dots = new Map();
     this.ball = null;
     this.lastSeq = -1;
@@ -1876,6 +2031,13 @@ class RadarView {
       d.innerHTML = `<b>${e.p.number ?? idx + 1}</b>${this.labels ? `<span class="pl-nm">${esc(L.name(e.p.surname))}</span>` : ''}`;
       d.title = `${L.name(e.p.name)} · ${L.line(e.line === 'GK' ? 'GK' : e.line)}`;
       if (this.onDotClick) { d.type = 'button'; d.dataset.slot = idx; d.addEventListener('click', () => this.onDotClick(idx)); }
+      if (this.onDrop) {
+        d.draggable = true;
+        d.addEventListener('dragstart', ev => { ev.dataTransfer.setData('text/plain', e.p.id); ev.dataTransfer.effectAllowed = 'move'; });
+        d.addEventListener('dragover', ev => { ev.preventDefault(); d.classList.add('drop-over'); });
+        d.addEventListener('dragleave', () => d.classList.remove('drop-over'));
+        d.addEventListener('drop', ev => { ev.preventDefault(); d.classList.remove('drop-over'); this.onDrop(idx, ev.dataTransfer.getData('text/plain')); });
+      }
       this.el.appendChild(d);
       // base position (away mirrored); the tactics board spreads the shape over the whole pitch
       const bx = board ? (e.line === 'GK' ? 5 : 5 + (e.x - 5) * 1.9) : e.x;
@@ -1945,6 +2107,60 @@ class RadarView {
 }
 
 /* =========================================================
+   MODAL — retro in-game dialog (no native alert/confirm anywhere)
+   ========================================================= */
+class Modal {
+  static ICONS = { info: 'i', warn: '!', error: '\u00d7', ok: '\u2713', match: '\u26bd' };
+  constructor() {
+    this.layer = document.getElementById('modal-layer');
+    this.titleEl = document.getElementById('modal-title');
+    this.textEl = document.getElementById('modal-text');
+    this.iconEl = document.getElementById('modal-ico');
+    this.btnsEl = document.getElementById('modal-btns');
+    document.getElementById('modal-x').addEventListener('click', () => this.close());
+    this.layer.addEventListener('mousedown', e => { if (e.target === this.layer) this.close(); });
+    document.addEventListener('keydown', e => {
+      if (!this.isOpen) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); this.close(); }
+      if (e.key === 'Tab') {   // keep focus inside the dialog
+        const f = [...this.layer.querySelectorAll('button')];
+        const i = f.indexOf(document.activeElement);
+        if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+      }
+    }, true);
+  }
+  get isOpen() { return !this.layer.hidden; }
+  /** buttons: [{ label, primary, onClick }] */
+  show({ title, html, icon = 'info', buttons }) {
+    buttons = buttons?.length ? buttons : [{ label: L.t('ui.ok'), primary: true }];
+    this.titleEl.textContent = title;
+    this.textEl.innerHTML = html;
+    this.iconEl.className = 'dlg-ico ' + icon;
+    this.iconEl.textContent = Modal.ICONS[icon] || 'i';
+    this.btnsEl.innerHTML = '';
+    let primary = null;
+    for (const b of buttons) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'btn' + (b.primary ? ' go' : '');
+      el.innerHTML = b.label;
+      el.addEventListener('click', () => { this.close(); b.onClick?.(); });
+      this.btnsEl.appendChild(el);
+      if (b.primary) primary = el;
+    }
+    this.lastFocus = document.activeElement;
+    this.layer.hidden = false;
+    (primary || this.btnsEl.firstChild).focus();
+  }
+  close() {
+    if (!this.isOpen) return;
+    this.layer.hidden = true;
+    if (this.lastFocus && document.contains(this.lastFocus)) this.lastFocus.focus();
+  }
+}
+
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -1953,15 +2169,20 @@ class UIController {
     this.engine = null;
     this.view = 'dash';
     this.logEntries = [];
-    this.selected = null;        // squad screen: player picked for a substitution
-    this.selSlot = null;         // tactics board: slot picked for a swap
+    this.selected = null;        // team screen: player id picked for a swap (list row or pitch dot)
+    this.teamMsg = '';
     this.mentality = 'balanced';
     this.speed = 1;
     this.tableMd = null;
     try { const s = Number(localStorage.getItem('yam_speed')); if (MatchEngine.SPEED[s]) this.speed = s; } catch (e) {}
     this.$ = id => document.getElementById(id);
     this.radar = new RadarView(this.$('radar'));
-    this.board = new RadarView(this.$('tac-board'), { labels: true, onDotClick: i => this.onBoardClick(i) });
+    this.board = new RadarView(this.$('tac-board'), {
+      labels: true,
+      onDotClick: i => this.onBoardClick(i),
+      onDrop: (i, srcId) => this.onDropSwap(this.state.lineup[i], srcId),
+    });
+    this.modal = new Modal();
     this.setupCalendar();
     this.bind();
     this.applyStatic();
@@ -1994,8 +2215,7 @@ class UIController {
 
   renderAll() {
     this.renderDash();
-    this.renderSquad();
-    this.renderTactics();
+    this.renderTeam();
     this.renderTable();
     this.renderNotebook();
     this.renderMatchChrome();
@@ -2071,16 +2291,14 @@ class UIController {
       this.toggleStart(false);
       if (this.live || this.cal.running) { this.alert(L.t('dlg.finishFirst'), L.t('dlg.academy')); return; }
       this.state.reset(); this.cal.attach(this.state.calendar);
-      this.engine = null; this.selected = null; this.selSlot = null; this.tableMd = null;
+      this.engine = null; this.selected = null; this.tableMd = null;
       this.prepareMatch(); this.renderAll(); this.show('dash');
       this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
     });
-    const closeDlg = () => this.$('dlg').classList.remove('open');
-    this.$('dlg-ok').addEventListener('click', closeDlg);
-    this.$('dlg-x').addEventListener('click', closeDlg);
     document.addEventListener('keydown', e => {
-      if (e.key !== 'Escape') return;
-      closeDlg(); this.toggleStart(false); this.selected = null; this.selSlot = null; this.renderSquad(); this.renderTactics();
+      if (e.key !== 'Escape' || this.modal.isOpen) return;
+      this.toggleStart(false);
+      if (this.selected) { this.clearSelection(); }
     });
 
     document.querySelectorAll('[data-shout]').forEach(b => b.addEventListener('click', () => {
@@ -2097,34 +2315,65 @@ class UIController {
     this.$('formation').addEventListener('change', e => {
       if (this.live) { e.target.value = this.state.formation; return; }
       this.state.setFormation(e.target.value);
-      this.selSlot = null;
+      this.selected = null;
+      this.teamMsg = '';
       this.afterLineupChange();
     });
     this.$('btn-auto').addEventListener('click', () => {
       if (this.live) return;
-      this.state.autoArrange(); this.state.save(); this.selSlot = null;
+      this.state.autoArrange(); this.state.save(); this.selected = null; this.teamMsg = '';
       this.afterLineupChange();
+    });
+    this.$('btn-clear').addEventListener('click', () => this.clearSelection());
+
+    // match log: sticky auto-scroll + "new events" pill when the user scrolled up
+    const log = this.$('log');
+    log.addEventListener('scroll', () => { if (this.logAtBottom()) this.$('log-jump').hidden = true; });
+    this.$('log-jump').addEventListener('click', () => { log.scrollTop = log.scrollHeight; this.$('log-jump').hidden = true; });
+
+    // roster: click / keyboard / drag-and-drop
+    const roster = this.$('roster');
+    roster.addEventListener('click', e => {
+      const rm = e.target.closest('[data-untag]');
+      if (rm) { e.stopPropagation(); if (!this.live) { this.state.removeTag(rm.dataset.id, rm.dataset.untag); this.renderTeam(); } return; }
+      const row = e.target.closest('.r-row');
+      if (row) this.pick(row.dataset.id);
+    });
+    roster.addEventListener('keydown', e => {
+      const row = e.target.closest('.r-row');
+      if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.pick(row.dataset.id); }
+    });
+    roster.addEventListener('dragstart', e => {
+      const row = e.target.closest('.r-row'); if (!row || this.live) return;
+      e.dataTransfer.setData('text/plain', row.dataset.id); e.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging');
+    });
+    roster.addEventListener('dragend', e => { e.target.closest('.r-row')?.classList.remove('dragging'); });
+    roster.addEventListener('dragover', e => {
+      const row = e.target.closest('.r-row'); if (!row) return;
+      e.preventDefault();
+      roster.querySelectorAll('.drop-over').forEach(r => r !== row && r.classList.remove('drop-over'));
+      row.classList.add('drop-over');
+    });
+    roster.addEventListener('dragleave', e => { e.target.closest('.r-row')?.classList.remove('drop-over'); });
+    roster.addEventListener('drop', e => {
+      const row = e.target.closest('.r-row'); if (!row) return;
+      e.preventDefault(); row.classList.remove('drop-over');
+      this.onDropSwap(row.dataset.id, e.dataTransfer.getData('text/plain'));
     });
     this.$('md-prev').addEventListener('click', () => { this.tableMd = Math.max(1, this.tableMd - 1); this.renderTable(); });
     this.$('md-next').addEventListener('click', () => { this.tableMd = Math.min(this.state.league.matchdays, this.tableMd + 1); this.renderTable(); });
 
-    this.$('squad-body').addEventListener('click', e => {
-      const rm = e.target.closest('[data-untag]');
-      if (rm) { this.state.removeTag(rm.dataset.id, rm.dataset.untag); this.renderSquad(); this.renderNotebook(); return; }
-      const sb = e.target.closest('[data-sub]');
-      if (sb && !sb.disabled) this.onSubClick(sb.dataset.sub);
-    });
     this.$('notes-body').addEventListener('click', e => {
       if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
       const b = e.target.closest('[data-tag]'); if (!b || b.disabled) return;
       this.state.setTag(b.dataset.id, b.dataset.tag);
-      this.renderNotebook(); this.renderSquad(); this.renderDash();
+      this.renderNotebook(); this.renderTeam(); this.renderDash();
     });
   }
 
   afterLineupChange() {
-    this.renderTactics();
-    this.renderSquad();
+    this.renderTeam();
     this.renderDash();
     if (!this.engine) this.prepareMatch();
   }
@@ -2136,12 +2385,13 @@ class UIController {
 
   get live() { return !!(this.engine && !this.engine.finished); }
   get matchOpen() { return this.live || this.state.phase === 'matchday' || this.state.phase === 'post'; }
+  get notesOpen() { return this.state.phase === 'post' && this.state.notebookUnlocked && !!this.state.lastReport; }
 
   show(view) {
-    if (view === 'notes' && !this.state.notebookUnlocked) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle')); return; }
-    if (view === 'match' && !this.matchOpen) { this.alert(L.t('dlg.noMatch'), L.t('nav.match')); return; }
+    if (view === 'notes' && !this.notesOpen) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'), 'warn'); return; }
+    if (view === 'match' && !this.matchOpen) { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
     this.view = view;
-    const scenes = { dash: 'scene-office', squad: 'scene-squad', tactics: 'scene-tactics', match: 'scene-match', table: 'scene-table', notes: 'scene-notes' };
+    const scenes = { dash: 'scene-office', team: 'scene-squad', match: 'scene-match', table: 'scene-table', notes: 'scene-notes' };
     for (const [v, id] of Object.entries(scenes)) this.$(id).classList.toggle('active', v === view);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
@@ -2151,22 +2401,15 @@ class UIController {
     if (view === 'dash') this.renderDash();
   }
 
-  alert(html, title) {
-    this.$('dlg-title').textContent = title;
-    this.$('dlg-text').innerHTML = html;
-    this.$('dlg').classList.add('open');
-    this.$('dlg-ok').focus();
-  }
+  alert(html, title, icon = 'info', buttons) { this.modal.show({ title, html, icon, buttons }); }
 
+  /** Match / Notebook only exist in the navigation while the calendar has unlocked them. */
   syncLocks() {
-    const nbLocked = !this.state.notebookUnlocked;
-    this.$('tk-notes').classList.toggle('locked', nbLocked);
-    this.$('icon-notes').classList.toggle('locked', nbLocked);
-    this.$('tk-notes-lbl').textContent = L.t(nbLocked ? 'nav.notebookLocked' : 'nav.notebook');
-    const mLocked = !this.matchOpen;
-    this.$('tk-match').classList.toggle('locked', mLocked);
-    this.$('icon-match').classList.toggle('locked', mLocked);
-    this.$('tk-match').querySelector('.lbl').textContent = L.t(mLocked ? 'nav.matchLocked' : 'nav.match');
+    const m = this.matchOpen, n = this.notesOpen;
+    for (const id of ['tk-match', 'icon-match', 'sm-match']) this.$(id).hidden = !m;
+    for (const id of ['tk-notes', 'icon-notes', 'sm-notes']) this.$(id).hidden = !n;
+    this.$('dyn-sep').hidden = !(m || n);
+    if ((this.view === 'match' && !m) || (this.view === 'notes' && !n)) this.show('dash');
     this.$('tray-date').textContent = fmtDate(this.cal.date, { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
@@ -2270,7 +2513,7 @@ class UIController {
         for (const info of infos) this.state.addDiary({ date, ...info });
         this.state.save();
         this.renderDash();
-        this.renderSquad();
+        this.renderTeam();
       },
       onStop: () => { this.state.save(); this.renderAll(); },
     });
@@ -2288,7 +2531,11 @@ class UIController {
     this.prepareMatch();
     this.renderAll();
     this.$('tk-match').classList.add('alert');
-    this.alert(L.t('dlg.matchday', { md: ev.md, o: esc(L.team(ctx.opp.name)), v: L.t('venue.' + ctx.venue) }), L.t('dlg.matchdayTitle'));
+    this.alert(L.t('dlg.matchday', { md: ev.md, o: esc(L.team(ctx.opp.name)), v: L.t('venue.' + ctx.venue) }), L.t('dlg.matchdayTitle'), 'match', [
+      { label: L.t('modal.toMatch'), primary: true, onClick: () => this.show('match') },
+      { label: L.t('modal.toTeam'), onClick: () => this.show('team') },
+      { label: L.t('modal.later') },
+    ]);
   }
 
   /** "Return to Dashboard": completes the matchday event and queues the next one. */
@@ -2301,6 +2548,7 @@ class UIController {
     this.cal.advanceDay();
     s.addDiary({ date: ev.date, key: 'cal.closed', vars: { md: ev.md, x: rep.gf, y: rep.ga, o: { team: rep.opponent }, pos: s.league.position(0) } });
     s.phase = this.cal.nextEvent() ? 'calendar' : 'seasonEnd';
+    s.notebookUnlocked = false;   // POST-MATCH only exists until the matchday is closed
     this.engine = null;
     s.save();
     this.prepareMatch();
@@ -2328,97 +2576,109 @@ class UIController {
     this.$('table-status').textContent = L.t('table.status', { n: playedMd });
   }
 
-  /* ---------- SQUAD ---------- */
-  renderSquad() {
-    const s = this.state;
-    const live = this.live;
-    if (live) this.selected = null;
-    const byPos = (a, b) => POS_ORDER[a.position] - POS_ORDER[b.position];
-    const selStarter = this.selected ? s.isStarter(this.selected) : null;
-
-    const row = (p, starter) => {
-      const e = Math.round(p.energy);
-      const cls = e >= 70 ? 'hi' : e >= ENERGY.TIRED ? 'mid' : 'lo';
-      const isSel = this.selected === p.id;
-      const canSwap = this.selected && selStarter !== starter;
-      const label = canSwap ? L.t('squad.swap') : isSel ? L.t('squad.cancel') : L.t(starter ? 'squad.out' : 'squad.in');
-      const line = starter ? s.slotLine(p.id) : null;
-      const oop = line && line !== 'GK' && NATURAL_LINE[p.position] !== line ? `<span class="oop">${L.t('squad.oop', { l: L.line(line) })}</span>` : '';
-      return `<tr class="${isSel ? 'sel' : ''}${e < ENERGY.TIRED ? ' tired' : ''}">
-        <td class="nm"><span class="num">${p.number}</span>${esc(L.name(p.name))}${oop}</td>
-        <td><span class="pos ${p.position}">${L.pos(p.position)}</span></td>
-        <td><div class="energy ${cls}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' · ×0.5' : ''}</span></div></td>
-        <td>${p.tags.length ? `<div class="tags">${p.tags.map(t => this.tagChip(t, p.id, !live)).join('')}</div>` : `<span class="empty">${L.t('squad.none')}</span>`}</td>
-        <td class="act"><button class="btn small ${canSwap ? 'go' : ''}" data-sub="${p.id}" ${live ? 'disabled' : ''}>${label}</button></td>
-      </tr>`;
-    };
-    this.$('squad-body').innerHTML =
-      `<tr class="grp"><td colspan="5">${L.t('squad.xi')} · ${s.formation}</td></tr>` +
-      s.starters().map(p => row(p, true)).join('') +
-      `<tr class="grp"><td colspan="5">${L.t('squad.bench')} (${s.bench().length})</td></tr>` +
-      s.bench().sort(byPos).map(p => row(p, false)).join('');
-
-    const tiredXI = s.starters().filter(p => p.energy < ENERGY.TIRED).length;
-    this.$('squad-status').textContent = live ? L.t('squad.locked')
-      : this.selected ? L.t('squad.pick', { name: L.name(s.player(this.selected).name) })
-      : L.t('squad.status', { n: tiredXI });
-  }
-
-  onSubClick(id) {
-    const s = this.state;
-    if (!this.selected || this.selected === id || s.isStarter(this.selected) === s.isStarter(id)) {
-      this.selected = this.selected === id ? null : id;
-    } else {
-      const err = s.swap(this.selected, id);
-      this.selected = null;
-      if (err) this.alert(L.t('squad.err.' + err), L.t('nav.squad'));
-      this.afterLineupChange();
-    }
-    this.renderSquad();
-  }
-
-  tagChip(tag, id, removable) {
-    const tone = TAGS[tag]?.tone || 'neutral';
-    const x = removable ? `<button data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(L.t('squad.remove'))}" title="${esc(L.t('squad.remove'))}">&times;</button>` : '';
-    return `<span class="tag ${tone}" title="${esc(L.tagDesc(tag))}">${esc(L.tag(tag))}${x}</span>`;
-  }
-
-  /* ---------- TACTICS ---------- */
+  /* ---------- TEAM MANAGEMENT: roster (left) + tactics board (right) ---------- */
   fillFormations() {
     this.$('formation').innerHTML = FORMATION_KEYS.map(f => `<option value="${f}">${f}</option>`).join('');
   }
 
-  renderTactics() {
-    const s = this.state;
+  /** Semantic energy colours: green > 70, yellow 30-70, red < 30 (stats halve below 50). */
+  energyClass(e) { return e > 70 ? 'hi' : e >= 30 ? 'mid' : 'lo'; }
+
+  renderTeam() {
+    const s = this.state, live = this.live;
+    if (live || (this.selected && !s.player(this.selected))) this.selected = null;
+    const slots = s.slots();
+    const byPos = (a, b) => POS_ORDER[a.position] - POS_ORDER[b.position];
+
+    const row = (p, starter) => {
+      const e = Math.round(p.energy);
+      const line = starter ? slots[s.lineup.indexOf(p.id)].line : null;
+      const oop = line && line !== 'GK' && NATURAL_LINE[p.position] !== line;
+      const sub = starter
+        ? `<small class="r-slot${oop ? ' warn' : ''}">${oop ? L.t('squad.oop', { l: L.line(line) }) : L.t('team.slot', { l: L.line(line) })}</small>`
+        : `<small class="r-slot">${L.t('team.onBench')}</small>`;
+      const sel = this.selected === p.id;
+      return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${live ? ' locked' : ''}" data-id="${p.id}"
+          role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}">
+        <span class="num">${p.number}</span>
+        <span class="r-name"><b>${esc(L.name(p.name))}</b>${sub}</span>
+        <span class="pos ${p.position}">${L.pos(p.position)}</span>
+        <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×0.5' : ''}</span></div>
+        <span class="r-tags">${p.tags.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') : '<span class="empty">—</span>'}</span>
+      </div>`;
+    };
+    const roster = this.$('roster');
+    const keepScroll = roster.scrollTop;
+    roster.innerHTML =
+      `<div class="r-grp">${L.t('team.xi', { f: s.formation })}</div>` + s.starters().map(p => row(p, true)).join('') +
+      `<div class="r-grp">${L.t('team.bench')} · ${s.bench().length}</div>` + s.bench().sort(byPos).map(p => row(p, false)).join('');
+    roster.scrollTop = keepScroll;
+    this.$('roster-title').textContent = L.t('team.roster', { n: s.squad.length });
+
+    // tactics toolbar + line strength
     const sel = this.$('formation');
-    sel.value = s.formation;
-    sel.disabled = this.live;
-    this.$('btn-auto').disabled = this.live;
+    sel.value = s.formation; sel.disabled = live;
+    this.$('btn-auto').disabled = live;
+    this.$('btn-clear').disabled = !this.selected;
     const c = lineCounts(s.formation), base = lineCounts('4-4-2');
-    this.$('tac-strength').innerHTML = [0, 1, 2].map(z => {
-      const own = presence(c, z), d = own - presence(base, z);
+    this.$('tac-strength').innerHTML = `<span class="lbl">${L.t('tac.strength')}:</span>` + [0, 1, 2].map(z => {
+      const d = presence(c, z) - presence(base, z);
       const cls = d > 0.01 ? 'ok' : d < -0.01 ? 'bad' : '';
-      return `<dt>${L.t('tac.z' + z)}</dt><dd class="${cls}">${own.toFixed(2)} (${d >= 0 ? '+' : ''}${d.toFixed(2)})</dd>`;
+      return `<span class="chip ${cls}">${L.t('tac.z' + z)} <b>${d >= 0 ? '+' : ''}${d.toFixed(2)}</b></span>`;
     }).join('');
     const oop = s.outOfPosition();
     this.$('tac-warn').innerHTML = oop.length
-      ? oop.map(({ p, line }) => `<div class="w">${L.t('tac.oop', { n: esc(L.name(p.name)), p: L.pos(p.position), l: L.line(line) })}</div>`).join('')
-      : `<div class="okmsg">${L.t('tac.allGood')}</div>`;
-    this.board.setup([{ entries: s.slots().map((sl, i) => ({ ...sl, p: s.player(s.lineup[i]) })) }], { board: true });
-    if (this.selSlot != null) this.board.select(s.lineup[this.selSlot]);
-    this.$('tac-board').classList.toggle('locked', this.live);
-    this.$('tac-status').textContent = L.t('tac.status', { f: s.formation, d: c.DEF, m: c.MID, a: c.ATT });
-    this.$('tac-sel').textContent = this.live ? L.t('tac.locked')
-      : this.selSlot != null ? L.t('tac.pick', { n: L.name(s.player(s.lineup[this.selSlot]).name) }) : '';
+      ? oop.map(({ p, line }) => `<span class="w">&#9888; ${L.t('tac.oop', { n: esc(L.name(p.surname)), p: L.pos(p.position), l: L.line(line) })}</span>`).join('')
+      : `<span class="okmsg">&#10003; ${L.t('tac.allGood')}</span>`;
+
+    // board: the starting XI exactly as the match engine will read it (state.lineup, slot order)
+    this.board.setup([{ entries: slots.map((sl, i) => ({ ...sl, p: s.player(s.lineup[i]) })) }], { board: true });
+    this.board.select(this.selected);
+    const boardEl = this.$('tac-board');
+    boardEl.classList.toggle('locked', live);
+    boardEl.classList.toggle('armed', !!this.selected);
+
+    const who = this.selected ? L.name(s.player(this.selected).name) : '';
+    this.$('team-status').textContent = live ? L.t('squad.locked') : this.selected ? L.t('team.help.sel', { n: who }) : L.t('team.help.idle');
+    this.$('team-msg').textContent = this.teamMsg;
   }
 
-  onBoardClick(i) {
-    if (this.live) return;
-    if (i === 0) { this.alert(L.t('tac.gk'), L.t('nav.tactics')); this.selSlot = null; this.renderTactics(); return; }
-    if (this.selSlot == null) this.selSlot = i;
-    else if (this.selSlot === i) this.selSlot = null;
-    else { this.state.swapSlots(this.selSlot, i); this.selSlot = null; this.afterLineupChange(); return; }
-    this.renderTactics();
+  /** Unified swap: select one player (list row or pitch dot), then pick another (row or dot). */
+  pick(id) {
+    if (this.live) { this.alert(L.t('squad.locked'), L.t('team.err.title'), 'warn'); return; }
+    const s = this.state;
+    if (!this.selected) { this.selected = id; this.teamMsg = ''; }
+    else if (this.selected === id) { this.selected = null; }
+    else if (!s.isStarter(this.selected) && !s.isStarter(id)) { this.selected = id; }   // two bench players: just move the selection
+    else { this.trySwap(this.selected, id); return; }
+    this.renderTeam();
+  }
+
+  trySwap(a, b) {
+    const s = this.state;
+    const err = s.swapPlayers(a, b);
+    this.selected = null;
+    if (err) {
+      this.alert(L.t('team.err.' + err), L.t('team.err.title'), 'error');
+      this.renderTeam();
+      return;
+    }
+    this.teamMsg = L.t('team.done', { a: L.name(s.player(a).surname), b: L.name(s.player(b).surname) });
+    this.afterLineupChange();
+  }
+
+  onBoardClick(i) { this.pick(this.state.lineup[i]); }
+  onDropSwap(targetId, srcId) {
+    if (this.live || !srcId || !targetId || srcId === targetId || !this.state.player(srcId)) return;
+    if (!this.state.isStarter(srcId) && !this.state.isStarter(targetId)) return;
+    this.trySwap(srcId, targetId);
+  }
+  clearSelection() { this.selected = null; this.renderTeam(); }
+
+  tagChip(tag, id, removable) {
+    const tone = TAGS[tag]?.tone || 'neutral';
+    const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(L.t('squad.remove'))}" title="${esc(L.t('squad.remove'))}">&times;</button>` : '';
+    return `<span class="tag ${tone}" title="${esc(L.tagDesc(tag))}">${esc(L.tag(tag))}${x}</span>`;
   }
 
   /* ---------- MATCH ---------- */
@@ -2453,6 +2713,7 @@ class UIController {
     this.$('carrier').textContent = '—'; this.$('poss').textContent = '—';
     this.logEntries = [];
     this.$('log').innerHTML = '';
+    this.$('log-jump').hidden = true;
     const s = this.state, ctx = s.matchContext();
     if (ctx) {
       this.appendLog({ minute: 0, type: 'flavor', key: 'match.intro', vars: { a: { team: s.clubName }, b: { team: ctx.opp.name } }, side: -1, r: 0 });
@@ -2501,7 +2762,7 @@ class UIController {
   onStartButton() {
     if (this.engine && this.engine.finished) { this.show('notes'); return; }
     if (this.engine) return;
-    if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match')); return; }
+    if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
     const ctx = this.state.matchContext();
     this.state.notebookUnlocked = false;
     this.syncLocks();
@@ -2527,13 +2788,16 @@ class UIController {
     line.innerHTML = `<span class="m">${pad2(e.minute)}'</span><span class="${sideCls} ${e.type}">${esc(this.entryText(e))}</span>`;
     return line;
   }
+  logAtBottom() { const log = this.$('log'); return log.scrollHeight - log.scrollTop - log.clientHeight < 24; }
+  /** Auto-scrolls to every new event; if the coach scrolled up to re-read, a "new events" pill appears instead. */
   appendLog(e) {
     const log = this.$('log');
-    const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    const stick = this.logAtBottom();
     this.logEntries.push(e);
     log.appendChild(this.logLine(e));
     while (log.children.length > 400) { log.removeChild(log.firstChild); this.logEntries.shift(); }
-    if (nearBottom) log.scrollTop = log.scrollHeight;
+    if (stick) log.scrollTop = log.scrollHeight;
+    else this.$('log-jump').hidden = false;
   }
   rerenderLog() {
     const log = this.$('log');
@@ -2588,7 +2852,12 @@ class UIController {
     s.save();
     this.tableMd = ctx.md;
     this.renderAll();
-    if (this.view !== 'notes') this.$('tk-notes').classList.add('alert');
+    this.$('tk-notes').classList.add('alert');
+    this.alert(L.t('modal.ft', { h: esc(L.team(s.clubName)), x: a.score, y: b.score, a: esc(L.team(ctx.opp.name)) }), L.t('modal.ftTitle'),
+      result === 'W' ? 'ok' : result === 'D' ? 'info' : 'warn', [
+        { label: L.t('modal.toNotes'), primary: true, onClick: () => this.show('notes') },
+        { label: L.t('modal.stay') },
+      ]);
   }
 
   /* ---------- NOTEBOOK ---------- */
