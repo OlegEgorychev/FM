@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.1</title>
+<title>Youth Academy Manager v1.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -2586,8 +2586,25 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.2';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.2', name: { en: 'On GitHub', ru: 'На GitHub' },
+    en: [
+      'The game now lives on GitHub: play it from a link that updates by itself with every new version.',
+      'Full version history: every release is a tagged commit (v0.3 … v1.2), older builds can be opened any time.',
+      'Background art converted to WebP: about 1 MB instead of 19 MB, so the game loads much faster.',
+      'Source code split into small modules (engine, interface, texts, styles) with a build script; the game is still one index.html.',
+      'Built-in smoke test checks a full matchday (calendar, match, half-time, notebook) after every change.',
+      'Fixed: the Dashboard background picture was missing since v0.9.',
+    ],
+    ru: [
+      'Игра теперь на GitHub: её можно открыть по ссылке, которая сама обновляется с каждой новой версией.',
+      'Полная история версий: каждый выпуск — коммит с тегом (v0.3 … v1.2), старые сборки можно открыть в любой момент.',
+      'Фоновые картинки переведены в WebP: около 1 МБ вместо 19 МБ, игра загружается намного быстрее.',
+      'Исходный код разбит на небольшие модули (движок, интерфейс, тексты, стили) со скриптом сборки; сама игра по-прежнему один index.html.',
+      'Встроенный быстрый тест проверяет полный тур (календарь, матч, перерыв, блокнот) после каждого изменения.',
+      'Исправлено: с версии v0.9 в Штабе пропадала фоновая картинка.',
+    ] },
   { v: '1.1', name: { en: 'Touchline', ru: 'У бровки' },
     en: [
       'Match screen redesigned into three columns that use the full width: live roster & subs (left), scoreboard, pitch and log (centre), assistant coach & live stats (right).',
@@ -3694,7 +3711,8 @@ class UIController {
     if (view === 'match' && !this.matchOpen) { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
     this.view = view;
     const scenes = { dash: 'scene-office', team: 'scene-squad', match: 'scene-match', table: 'scene-table', notes: 'scene-notes', readme: 'scene-office' };
-    for (const [v, id] of Object.entries(scenes)) this.$(id).classList.toggle('active', v === view);
+    // several views can share one backdrop (readme uses the office): compare by scene id, not by view name
+    for (const id of new Set(Object.values(scenes))) this.$(id).classList.toggle('active', id === scenes[view]);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     if (view === 'notes') this.$('tk-notes').classList.remove('alert');

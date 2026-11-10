@@ -1,0 +1,14 @@
+/* =========================================================
+   ITERATION 6 — LIVE PITCH (rAF + translate3d)
+   ========================================================= */
+.pitch.radar .pl, .pitch.radar .ball, .pitch.radar .ball-sh{
+  left: 0; top: 0; will-change: transform; backface-visibility: hidden;
+  transition: none;                       /* motion comes from the 60 FPS loop, not CSS */
+}
+.pitch.radar .pl{ margin: calc(var(--dot) / -2) 0 0 calc(var(--dot) / -2); transition: box-shadow .2s, opacity .3s; }
+.pitch.radar .ball{ margin: -4.5px 0 0 -4.5px; z-index: 6; }
+.pitch.radar .ball-sh{ position: absolute; z-index: 1; width: 10px; height: 5px; margin: -1px 0 0 -5px; border-radius: 50%; background: rgba(0,0,0,.45); filter: blur(1px); }
+.pitch.radar .pl.has{ z-index: 4; }
+.pitch.radar .ball, .pitch.radar .ball-sh{ transition: opacity .15s; }
+.pitch.radar .respot{ opacity: 0; transition: none; }
+

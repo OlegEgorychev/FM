@@ -1,0 +1,13 @@
+{
+  "name": "youth-academy-manager",
+  "private": true,
+  "description": "Retro youth football manager in a single HTML file",
+  "scripts": {
+    "build": "node build.js",
+    "check": "node build.js --check",
+    "test": "node test/smoke.js"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

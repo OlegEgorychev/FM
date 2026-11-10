@@ -1,0 +1,28 @@
+/* =========================================================
+   AGENCY: energy bars, substitutions, shouts, cards
+   ========================================================= */
+.energy{ position: relative; height: 18px; background: #0a0f12; border: 1px solid #3c4a54; }
+.energy i{ position: absolute; inset: 0 auto 0 0; }
+.energy.hi i{ background: #4f8a45; } .energy.mid i{ background: #b28a2e; } .energy.lo i{ background: #a63b30; }
+.energy span{ position: relative; display: block; text-align: center; font-size: 12px; line-height: 16px; color: #fff; text-shadow: 1px 1px 0 #000; font-weight: bold; }
+.grid tr.grp td{ background: rgba(75,98,118,.5) !important; font-weight: bold; font-size: 12px; letter-spacing: 1px; color: #e6edf2; padding: 4px 8px; }
+.grid tr.sel td{ background: rgba(121,164,100,.38) !important; }
+.grid tr.tired .nm{ color: #f0a89d; }
+.grid td.act{ text-align: right; }
+.grid td.act .btn{ white-space: nowrap; min-width: 104px; }
+.grid td{ padding: 4px 8px; }
+.kv dd.warn{ color: #f0a89d; }
+.log-col{ display: flex; flex-direction: column; min-width: 0; }
+.log{ height: clamp(160px, 32vh, 380px); }
+.shouts{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.shout{ font-weight: bold; padding: 8px 6px; }
+.shout.active{ color: #fff; border-color: var(--dark) var(--hi) var(--hi) var(--dark); box-shadow: inset 1px 1px 0 rgba(0,0,0,.5); }
+.shout[data-shout="attack"].active{ background: #a63b30; }
+.shout[data-shout="defend"].active{ background: #2b4f78; }
+.shout[data-shout="balanced"].active{ background: #3e6a3f; }
+.log .coach{ color: #8fd3ff; font-weight: bold; }
+.log .foul{ color: #f5d76e; font-weight: bold; }
+.log .red{ background: #a63b30; color: #fff; font-weight: bold; padding: 0 4px; }
+.card .btn small{ display: block; font-size: 11px; color: #3d4238; line-height: 1.25; margin-top: 2px; }
+.card .btn.done small{ color: #1f3518; }
+

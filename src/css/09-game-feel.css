@@ -1,0 +1,73 @@
+/* =========================================================
+   v0.9 — GAME FEEL: camera, trails, barks, shake, facing; README
+   ========================================================= */
+/* camera: the viewport clips a world 30% larger than itself */
+.cam-view{ position: relative; width: min(100%, calc(36vh * 1.544)); aspect-ratio: 105 / 68; margin: 6px auto 4px; overflow: hidden;
+  background: #1f3d1c; border: 2px solid #0b0e0c; box-shadow: 0 0 0 1px #2a3a2a; contain: layout paint; }
+.cam-view .pitch.radar{ position: absolute; left: 0; top: 0; width: 130%; height: 130%; margin: 0; aspect-ratio: auto;
+  transform-origin: 0 0; will-change: transform; border: 0; --dot: 18px; }
+.cam-view::after{ content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 9;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,.45) 100%); }
+.cam-live{ position: absolute; top: 6px; left: 8px; z-index: 10; font: 13px/1 "VT323", var(--ui); letter-spacing: 1px; color: #fff;
+  background: rgba(166,59,48,.85); padding: 2px 6px; pointer-events: none; }
+
+/* facing indicator: a small notch on the rim that points at the ball */
+.pl .face{ position: absolute; left: 50%; top: 50%; width: calc(var(--dot) / 2 + 1px); height: 0; transform-origin: 0 0; pointer-events: none; }
+.pl .face::after{ content: ""; position: absolute; right: -5px; top: -3px; border-left: 5px solid rgba(255,255,255,.9);
+  border-top: 3px solid transparent; border-bottom: 3px solid transparent; }
+.pl.away .face::after{ border-left-color: rgba(255,225,215,.9); }
+
+/* ball power + trail ghosts */
+.pitch.radar .ghost{ position: absolute; left: 0; top: 0; z-index: 5; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+  background: #fff; opacity: 0; will-change: transform, opacity; pointer-events: none; }
+.pitch.radar .ghost.hot{ background: #ffe14d; box-shadow: 0 0 6px rgba(255,210,60,.8); }
+.pitch.radar .ball.power{ background: #ffe14d; box-shadow: 0 0 10px #ffd23c, 0 0 2px #fff; animation: ballPulse .12s steps(2) infinite; }
+@keyframes ballPulse{ 50%{ background: #fff6c2; } }
+
+/* floating barks: pop, float up ~20px and fade over 1s, then removed */
+.bark{ position: absolute; left: 0; top: 0; z-index: 8; pointer-events: none; white-space: nowrap;
+  font: 17px/1 "VT323", "PT Sans", monospace; color: #fff; padding: 1px 4px; letter-spacing: .5px;
+  text-shadow: 1px 1px 0 #000, -1px 0 0 #000, 0 -1px 0 #000;
+  animation: barkFloat 1s ease-out forwards; }
+@keyframes barkFloat{
+  0%{ transform: translate(var(--x), var(--y)) translate(-50%, -22px) scale(.6); opacity: 0; }
+  12%{ transform: translate(var(--x), var(--y)) translate(-50%, -24px) scale(1.15); opacity: 1; }
+  25%{ transform: translate(var(--x), var(--y)) translate(-50%, -26px) scale(1); opacity: 1; }
+  100%{ transform: translate(var(--x), var(--y)) translate(-50%, -46px); opacity: 0; }
+}
+.bark.good{ color: #b9f7a6; } .bark.bad{ color: #ffb3a7; }
+.bark.goal{ font-size: 24px; color: #ffe14d; }
+.bark.card-y{ color: #111; background: #f5d33a; text-shadow: none; border: 1px solid #000; }
+.bark.card-r{ color: #fff; background: #c42b20; text-shadow: none; border: 1px solid #000; }
+
+/* screen shake + CRT surge */
+@keyframes screenShake{
+  0%{ transform: translate(0, 0); } 15%{ transform: translate(-4px, 2px); } 30%{ transform: translate(4px, -2px); }
+  45%{ transform: translate(-3px, -2px); } 60%{ transform: translate(3px, 2px); } 80%{ transform: translate(-1px, 1px); } 100%{ transform: translate(0, 0); }
+}
+.screen-shake{ animation: screenShake .3s linear; }
+.surge{ position: absolute; inset: 0; z-index: 85; pointer-events: none; background: #fff; opacity: 0; }
+.surge.red{ background: #ff3b2f; }
+.surge-go{ animation: surge .35s ease-out; }
+@keyframes surge{ 0%{ opacity: 0; } 20%{ opacity: .2; } 100%{ opacity: 0; } }
+
+/* README.TXT — Notepad */
+#win-readme{ left: 50%; top: 4%; width: min(760px, 94%); height: 86%; transform: translateX(-50%); }
+#win-readme.open{ animation: none; }
+.np-menu{ display: flex; gap: 14px; padding: 3px 8px; font-size: 13px; color: #111; background: var(--face); border-bottom: 1px solid #7a7e78; }
+.np-menu span::first-letter{ text-decoration: underline; }
+.np-body{ background: #fbfbf6; color: #141414; font: 14px/1.55 "PT Mono", "Courier New", monospace; padding: 14px 18px;
+  border: 2px inset #d9dcd6; margin: 2px; }
+.np-head, .np-foot{ white-space: pre-wrap; font-weight: bold; color: #1b2b45; }
+.np-foot{ margin-top: 14px; font-weight: normal; color: #555; }
+.np-ver{ margin-top: 14px; }
+.np-ver h3{ margin: 0 0 4px; font: bold 15px/1.4 "PT Mono", "Courier New", monospace; color: #13213a; }
+.np-ver ul{ margin: 0; padding-left: 22px; list-style: "* "; }
+.np-ver li{ margin: 2px 0; }
+.np-ver.latest{ background: #fff6c8; outline: 1px dashed #c9a227; padding: 6px 8px; }
+.np-new{ font-size: 11px; background: #a63b30; color: #fff; padding: 1px 5px; vertical-align: 2px; }
+.ver{ height: 20px; padding: 0 6px; font: bold 11px var(--ui); color: #111; background: #e9e4d3; }
+.ver:hover{ background: #fff6c8; }
+.readme-ico .glyph{ background: linear-gradient(135deg, #f4f4ee, #c9ccc6); color: #1b2b45; }
+@media (prefers-reduced-motion: reduce){ .bark{ animation-duration: 1.2s; } .pitch.radar .ball.power{ animation: none; } }
+

@@ -1,0 +1,56 @@
+/* =========================================================
+   READABILITY PASS — clean Cyrillic-friendly font, higher contrast,
+   CRT effects off by default (toggle in the Start menu)
+   ========================================================= */
+:root{
+  --ui: "PT Sans", "Segoe UI", Tahoma, Arial, sans-serif;
+  --mono: "PT Sans", "Segoe UI", Tahoma, Arial, sans-serif;
+  --glass: rgba(20, 28, 36, 0.94);
+  --glass-deep: rgba(6, 10, 14, 0.92);
+  --text: #e9eef2;
+  --muted: #aab7c2;
+}
+html, body{ font-size: 14px; }
+.titlebar{ font-size: 13px; }
+.btn, .tk{ font-size: 13px; }
+.icon{ font-size: 13px; }
+.log{ font-size: 15px; line-height: 1.5; color: #e1e8e3; }
+.log .m{ display: inline-block; min-width: 2.6em; color: #8aa092; font-variant-numeric: tabular-nums; }
+.log .us{ color: #e6f1df; } .log .them{ color: #bccbd8; }
+.log .turn{ color: #f0a89d; } .log .shot{ color: #f5e2b0; font-weight: bold; }
+.log .goal{ font-weight: bold; } .log .whistle{ color: #9be797; font-weight: bold; }
+.log .flavor{ color: #97a6b0; }
+.kv, .statgrid{ font-size: 15px; line-height: 1.5; }
+.memo, .nb-hint{ font-size: 14px; line-height: 1.5; }
+.zones, .possession, .speed, .empty{ font-size: 13px; }
+.zones > div{ color: #95a69a; }
+.possession{ color: #b3bfc8; }
+.tag{ font-size: 13px; padding: 2px 7px; }
+.pos{ font-size: 12px; font-weight: bold; }
+.sb-team{ font-size: 18px; font-weight: bold; letter-spacing: .5px; }
+.sb-score{ font-family: "VT323", "PT Sans", monospace; }
+.sb-clock{ font-size: 16px; }
+.sb-clock .min{ font-variant-numeric: tabular-nums; }
+.card{ font-size: 14px; line-height: 22px; color: #1d1d1a; }
+.card h3{ font-size: 17px; font-weight: bold; }
+.nb-head h2{ font-size: 20px; font-weight: bold; }
+.nb-head .res{ font-size: 15px; font-weight: bold; }
+.locked-msg{ font-size: 16px; }
+.statusbar > span{ color: #b6c1ca; }
+.gb-label{ font-size: 13px; }
+.card .tag.good{ background: #3e6a3f; color: #fff; border-color: #24401f; }
+.card .tag.bad{ background: #a63b30; color: #fff; border-color: #5e1d16; }
+.card .tag.neutral{ background: #7a6a3e; color: #fff; border-color: #463b1f; }
+
+/* CRT: no flicker, no rolling band, no grille. Only a static vignette by default. */
+.rain, .crt-scan, .crt-grille, .crt-roll, .crt-flicker, .crt-glare{ display: none; }
+body.fx .rain{ display: block; opacity: .3; }
+body.fx .crt-scan{ display: block; opacity: .35; }
+body.fx .crt-glare{ display: block; }
+
+.lang{
+  height: 20px; min-width: 30px; padding: 0 5px; cursor: pointer; font: bold 11px var(--ui); color: #fff;
+  background: var(--title-a); border: 1px solid; border-color: #6d8296 #000 #000 #6d8296;
+}
+.lang:hover{ background: var(--title-b); }
+
