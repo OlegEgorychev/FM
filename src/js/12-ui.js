@@ -148,6 +148,11 @@ class UIController {
       if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.onLiveRosterClick(row.dataset.id); }
     });
     this.$('btn-sim').addEventListener('click', () => this.onDashAction());
+    // v1.6 calendar: month navigation + clickable day cells (info in the status bar)
+    this.$('cal-prev').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), -1); this.renderCalendar(); });
+    this.$('cal-next').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), 1); this.renderCalendar(); });
+    this.$('cal-grid').addEventListener('click', e => { const c = e.target.closest('.cal-day[data-date]'); if (c) this.pickDay(c.dataset.date); });
+    this.$('btn-full-table').addEventListener('click', () => this.show('table'));
     this.$('btn-startmenu').addEventListener('click', e => { e.stopPropagation(); this.toggleStart(); });
     document.addEventListener('click', e => { if (!e.target.closest('#startmenu')) this.toggleStart(false); });
     const flip = () => this.setLang(L.code === 'ru' ? 'en' : 'ru');
@@ -473,35 +478,36 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   renderDash() {
     const s = this.state, lg = s.league, phase = s.phase;
     const date = this.cal.date;
-    this.$('datebox').innerHTML = `
-      <div class="wd">${fmtDate(date, { weekday: 'long' })}</div>
-      <div class="dn">${fmtDate(date, { day: 'numeric' })}</div>
-      <div class="my">${fmtDate(date, { day: 'numeric', month: 'long', year: 'numeric' }).replace(/^\d+\.?\s*/, '')}</div>`;
 
-    // upcoming event widget
+    // LEFT: next event with a big opponent badge
     const ev = this.cal.nextEvent();
+    const ctx = s.matchContext();
     if (ev) {
       const n = daysBetween(date, ev.date);
       const when = n <= 0 ? `<span class="today">${L.t('dash.today')}</span>` : n === 1 ? L.t('dash.tomorrow') : L.t('dash.inDays', { n });
-      let sub = '';
-      const ctx = s.matchContext();
+      let sub = '', badge = emblemHTML(lg.team(0), 'lg');
       if (ev.type === 'match' && ctx) {
-        sub = L.t('ev.match.sub', { date: fmtDate(ev.date, { weekday: 'short', day: 'numeric', month: 'short' }), pos: lg.position(ctx.opp.id), f: ctx.opp.formation });
+        badge = emblemHTML(ctx.opp, 'lg');
+        sub = `<span class="tag t-${ctx.venue}">${L.t('venue.' + ctx.venue)}</span> `
+          + L.t('ev.match.sub', { date: fmtDate(ev.date, { weekday: 'short', day: 'numeric', month: 'short' }), pos: lg.position(ctx.opp.id), f: ctx.opp.formation });
       }
       this.$('next-event').innerHTML = `
-        <div class="ev-when">${when}</div>
-        <div class="ev-title"><span class="ev-ico">&#9917;</span>${this.cal.label(ev)}</div>
+        <div class="ne-row">${badge}<div class="ne-date"><div class="ev-when">${when}</div>
+          <div class="ne-day">${fmtDate(ev.date, { day: 'numeric' })}</div>
+          <div class="ne-month">${fmtDate(ev.date, { weekday: 'short', month: 'short' })}</div></div></div>
+        <div class="ev-title">${this.cal.label(ev)}</div>
         <div class="ev-sub">${sub}</div>`;
     } else {
-      this.$('next-event').innerHTML = `<div class="ev-title">${L.t('dash.none')}</div>`;
+      this.$('next-event').innerHTML = `<div class="ne-row">${emblemHTML(lg.team(0), 'lg')}</div><div class="ev-title">${L.t('dash.none')}</div>`;
     }
+    this.$('cal-legend').innerHTML = ['match', 'W', 'D', 'L', 'rest', 'today']
+      .map(k => `<li><i class="sw sw-${k}"></i>${L.t('cal.lg.' + k)}</li>`).join('');
 
     // club panel
     const row = s.userRow();
     const avg = Math.round(s.squad.reduce((a, p) => a + p.energy, 0) / s.squad.length);
     const tired = s.squad.filter(p => p.energy < ENERGY.TIRED).length;
     this.$('club-kv').innerHTML = `
-      <dt>${L.t('dash.position')}</dt><dd><b>${L.t('dash.posVal', { p: lg.position(0) })}</b></dd>
       <dt>${L.t('dash.record')}</dt><dd>${L.t('dash.recordVal', row)}</dd>
       <dt>${L.t('dash.form')}</dt><dd>${this.formChips(row.form) || '—'}</dd>
       <dt>${L.t('dash.formation')}</dt><dd>${s.formation}</dd>
@@ -520,17 +526,91 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       ? L.t('dash.hint.seasonEnd', { pos: lg.position(0), pts: row.pts })
       : L.t('dash.hint.' + phase, { n: ENERGY.DAILY_REST });
 
-    // diary
+    // CENTER: month grid + diary
+    this.renderCalendar();
     this.renderTicker();
 
-    // fixtures of the current / next matchday
-    const md = ev?.type === 'match' ? ev.md : lg.matchdays;
-    this.$('md-fx-label').textContent = L.t('dash.thisMd', { md });
+    // RIGHT: latest played matchday (or the first fixtures before any game), then the top 5
+    const last = lg.playedMatchdays();
+    const md = last || 1;
+    this.$('md-fx-label').textContent = L.t(last ? 'dash.results' : 'dash.thisMd', { md });
     this.$('md-fixtures').innerHTML = lg.fixturesOf(md).map(f => this.fixtureHTML(f)).join('');
+    this.renderMiniTable();
 
     this.$('dash-status').textContent = L.t('dash.status.' + phase);
     this.$('dash-season').textContent = `${L.t('dash.season', this.seasonVars())} · v${APP_VERSION}`;
     this.syncLocks();
+  }
+
+  /* ---------- v1.6 CALENDAR GRID (month view, Sunday first) ---------- */
+  viewMonth() { return this.calMonth || this.cal.date.slice(0, 7); }      // 'YYYY-MM'; null = follow the current date
+  shiftMonth(ym, k) { const d = new Date(ym + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + k); return d.toISOString().slice(0, 7); }
+
+  /** Everything the calendar knows about one day (done events included). */
+  dayInfo(iso) {
+    const s = this.state, lg = s.league;
+    const ev = s.calendar.events.find(e => e.date === iso);
+    if (ev?.type === 'match') {
+      const f = lg.userFixture(ev.md), home = f.home === 0;
+      const opp = lg.team(home ? f.away : f.home);
+      let res = null;
+      if (lg.played(f)) { const gf = home ? f.hg : f.ag, ga = home ? f.ag : f.hg; res = { r: gf > ga ? 'W' : gf < ga ? 'L' : 'D', gf, ga }; }
+      return { kind: 'match', ev, f, opp, venue: home ? 'home' : 'away', res };
+    }
+    const start = s.calendar.events[0] && isoAdd(s.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
+    const end = s.calendar.events[s.calendar.events.length - 1]?.date;
+    return { kind: start && iso >= start && iso <= end ? 'rest' : 'off' };
+  }
+
+  renderCalendar() {
+    const ym = this.viewMonth(), today = this.cal.date;
+    const first = ym + '-01', lead = new Date(first + 'T00:00:00Z').getUTCDay();
+    const days = daysBetween(first, this.shiftMonth(ym, 1) + '-01');
+    this.$('cal-month').textContent = fmtDate(first, { month: 'long', year: 'numeric' });
+    this.$('cal-today').textContent = fmtDate(today, { weekday: 'long', day: 'numeric', month: 'long' });
+    const wd = Array.from({ length: 7 }, (_, i) => `<div class="cal-wd">${fmtDate(isoAdd('2002-09-01', i), { weekday: 'short' })}</div>`).join('');
+    let cells = '';
+    for (let i = 0; i < 42; i++) {
+      const n = i - lead + 1;
+      if (i >= 35 && n > days) break;
+      if (n < 1 || n > days) { cells += '<div class="cal-day out"></div>'; continue; }
+      const iso = `${ym}-${String(n).padStart(2, '0')}`, d = this.dayInfo(iso);
+      const cls = ['cal-day', d.kind, iso === today ? 'today' : '', iso < today ? 'past' : '', d.res ? 'r-' + d.res.r : ''].filter(Boolean).join(' ');
+      let body = '';
+      if (d.kind === 'match') {
+        const tag = d.res ? `${d.res.gf}-${d.res.ga}` : `${L.t('cal.md')}${d.ev.md}`;
+        body = `<div class="cd-ev">${emblemHTML(d.opp, 'xs')}<span class="cd-tag ${d.res ? 't-' + d.res.r : 't-match'}">${tag}</span></div>
+          <div class="cd-opp">${esc(L.team(d.opp.name))}</div>`;
+      } else if (d.kind === 'rest') body = '<div class="cd-rest"></div>';
+      cells += `<div class="${cls}" data-date="${iso}" role="gridcell" tabindex="-1" title="${esc(this.dayText(iso, d))}"><span class="cd-n">${n}</span>${body}</div>`;
+    }
+    this.$('cal-grid').innerHTML = wd + cells;
+    const span = this.state.calendar.events;
+    this.$('cal-prev').disabled = span.length && this.shiftMonth(ym, -1) < span[0].date.slice(0, 7);
+    this.$('cal-next').disabled = span.length && this.shiftMonth(ym, 1) > span[span.length - 1].date.slice(0, 7);
+  }
+
+  dayText(iso, d = this.dayInfo(iso)) {
+    const when = fmtDate(iso, { weekday: 'short', day: 'numeric', month: 'short' });
+    if (d.kind === 'match') return `${when}: ` + L.t(d.res ? 'cal.info.played' : 'cal.info.match',
+      { md: d.ev.md, o: L.team(d.opp.name), v: L.t('venue.' + d.venue), x: d.res?.gf, y: d.res?.ga });
+    return `${when}: ` + L.t(d.kind === 'rest' ? 'cal.info.rest' : 'cal.info.off', { n: ENERGY.DAILY_REST });
+  }
+
+  pickDay(iso) {
+    this.$('cal-grid').querySelectorAll('.cal-day.sel').forEach(c => c.classList.remove('sel'));
+    this.$('cal-grid').querySelector(`[data-date="${iso}"]`)?.classList.add('sel');
+    this.$('dash-status').textContent = this.dayText(iso);
+  }
+
+  renderMiniTable() {
+    const rows = this.state.league.table();
+    const top = rows.slice(0, 5), mi = rows.findIndex(r => r.team.user);
+    const tr = (r, i) => `<tr class="${r.team.user ? 'me' : ''}${i === 0 && r.p ? ' lead' : ''}"><td class="c pos-n">${i + 1}</td>
+      <td class="tm"><div class="tm-in">${emblemHTML(r.team, 'xs')}<span>${esc(L.team(r.team.name))}</span></div></td><td class="c">${r.p}</td>
+      <td class="c">${r.gd > 0 ? '+' : ''}${r.gd}</td><td class="c pts">${r.pts}</td></tr>`;
+    this.$('mini-table').innerHTML = `<tr class="hd"><th class="c">${L.t('table.pos')}</th><th>${L.t('table.team')}</th><th class="c">${L.t('table.p')}</th><th class="c">${L.t('table.gd')}</th><th class="c">${L.t('table.pts')}</th></tr>`
+      + top.map(tr).join('') + (mi >= 5 ? `<tr class="gap"><td colspan="5">⋯</td></tr>` + tr(rows[mi], mi) : '');
   }
 
   renderTicker() {
@@ -546,7 +626,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const lg = this.state.league;
     const me = f.home === 0 || f.away === 0;
     const score = lg.played(f) ? `${f.hg} - ${f.ag}` : 'vs';
-    return `<div class="fx${me ? ' me' : ''}"><span class="h">${esc(L.team(lg.team(f.home).name))}</span><b>${score}</b><span class="a">${esc(L.team(lg.team(f.away).name))}</span></div>`;
+    const H = lg.team(f.home), A = lg.team(f.away);
+    return `<div class="fx${me ? ' me' : ''}"><span class="h">${esc(L.team(H.name))}${emblemHTML(H, 'xs')}</span><b>${score}</b><span class="a">${emblemHTML(A, 'xs')}${esc(L.team(A.name))}</span></div>`;
   }
 
   /** The one big button on the Dashboard changes with the phase of the matchday loop. */
@@ -561,6 +642,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       this.prepareMatch(); this.renderAll();
       return;
     }
+    this.calMonth = null;   // calendar view follows the days as they pass
     this.cal.simulate({
       stepMs: 180,
       onStep: (date, infos) => {
@@ -616,7 +698,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const rows = lg.table();
     this.$('table-body').innerHTML = rows.map((r, i) => `
       <tr class="${r.team.user ? 'me' : ''}${i === 0 && r.p ? ' lead' : ''}">
-        <td class="c pos-n">${i + 1}</td><td class="tm">${esc(L.team(r.team.name))}</td>
+        <td class="c pos-n">${i + 1}</td><td class="tm"><div class="tm-in">${emblemHTML(r.team, 'sm')}<span>${esc(L.team(r.team.name))}</span></div></td>
         <td class="c">${r.p}</td><td class="c">${r.w}</td><td class="c">${r.d}</td><td class="c">${r.l}</td>
         <td class="c">${r.gf}</td><td class="c">${r.ga}</td><td class="c">${r.gd > 0 ? '+' : ''}${r.gd}</td>
         <td class="c pts">${r.pts}</td><td class="form">${this.formChips(r.form)}</td>

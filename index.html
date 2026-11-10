@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.5</title>
+<title>Youth Academy Manager v1.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -513,27 +513,8 @@ body.fx .crt-glare{ display: block; }
 /* =========================================================
    DASHBOARD, CALENDAR, STANDINGS
    ========================================================= */
-#win-dash{ left: 50%; top: 3%; width: min(1040px, 95%); transform: translateX(-50%); }
+#win-dash{ left: 50%; top: 2%; width: min(1180px, 97%); transform: translateX(-50%); max-height: calc(100% - 16px); }
 #win-table{ left: 50%; top: 3%; width: min(1100px, 96%); transform: translateX(-50%); }
-.dash-top{ display: grid; grid-template-columns: 170px 1fr 300px; gap: 12px; align-items: stretch; }
-.dash-top .groupbox{ margin-top: 8px; }
-.datebox{ display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 6px; text-align: center;
-  background: linear-gradient(#e9e4d3, #d6cfba); color: #1f2a38; border-top: 14px solid #a63b30; box-shadow: 3px 4px 0 rgba(0,0,0,.45); }
-.datebox .wd{ font-weight: bold; text-transform: capitalize; font-size: 14px; }
-.datebox .dn{ font: 64px/1 "VT323", var(--ui); color: #13213a; }
-.datebox .my{ font-size: 13px; }
-.next-card .ev-when{ font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-.next-card .ev-when .today{ color: #fff; background: #a63b30; padding: 1px 6px; animation: blink .8s steps(2) infinite; }
-.next-card .ev-title{ font-size: 19px; font-weight: bold; margin: 6px 0; color: #f1f4ee; }
-.next-card .ev-ico{ margin-right: 8px; }
-.next-card .ev-sub{ font-size: 13px; color: #b9c6cf; }
-#club-kv{ grid-template-columns: auto 1fr; font-size: 14px; }
-.dash-actions{ display: flex; align-items: center; gap: 16px; margin: 12px 0 4px; flex-wrap: wrap; }
-.btn.big{ font-size: 17px; font-weight: bold; padding: 12px 26px; min-width: 300px; }
-.btn.pulse{ animation: pulse 1.2s ease-in-out infinite; }
-@keyframes pulse{ 50%{ background: #79a464; } }
-.sim-hint{ flex: 1; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; min-width: 220px; }
-.dash-bottom{ display: grid; grid-template-columns: 1fr 340px; gap: 12px; }
 .ticker{ height: clamp(120px, 30vh, 320px); overflow-y: auto; padding: 6px 8px; font-size: 14px; line-height: 1.5; }
 .tk-line .d{ display: inline-block; min-width: 92px; color: #7f9686; margin-right: 6px; }
 .tk-line.hl{ color: #f5e2b0; font-weight: bold; }
@@ -554,7 +535,7 @@ body.fx .crt-glare{ display: block; }
 .notes-foot{ margin-top: 14px; }
 #notes-body .row-btns{ justify-content: center; margin-top: 16px; }
 @media (max-width: 820px){
-  .dash-top, .dash-bottom, .table-grid{ grid-template-columns: 1fr; }
+  .table-grid{ grid-template-columns: 1fr; }
   .btn.big{ min-width: 0; width: 100%; }
   #win-dash, #win-table{ top: 6px; }
 }
@@ -978,6 +959,103 @@ body.fx .crt-scan{ opacity: .9; }
   .pi-left{ flex-direction: row; align-items: flex-start; }
 }
 /* =========================================================
+   v1.6 — PROCEDURAL CLUB EMBLEMS + CALENDAR DASHBOARD (3 panes)
+   ========================================================= */
+.emblem{ display: inline-block; flex: none; line-height: 0; vertical-align: middle; }
+.emblem svg{ width: 100%; height: 100%; display: block; image-rendering: pixelated;
+  filter: saturate(.7) brightness(.92) drop-shadow(1px 1px 0 rgba(0,0,0,.55)); }          /* rainy-dusk mood */
+.emblem.xs{ width: 16px; height: 16px; } .emblem.sm{ width: 20px; height: 20px; }
+.emblem.lg{ width: 64px; height: 64px; }
+.emblem.lg svg{ filter: saturate(.75) brightness(.95) drop-shadow(2px 3px 0 rgba(0,0,0,.6)); }
+
+/* --- layout --- */
+.dash3{ display: grid; grid-template-columns: 236px minmax(0, 1fr) 286px; gap: 12px; align-items: start; }
+.dash-left, .dash-center, .dash-right{ display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dash3 .groupbox{ margin-top: 8px; background: rgba(20,26,32,.35); }
+.dash-left .btn.big{ min-width: 0; width: 100%; font-size: 15px; padding: 11px 8px; }
+.dash-left .sim-hint{ font-size: 12px; min-width: 0; }
+
+/* next event */
+.ne-row{ display: flex; gap: 10px; align-items: center; }
+.ne-row .emblem.lg{ padding: 4px; background: #11161b; border: 2px solid; border-color: var(--frame-lo) var(--frame-hi) var(--frame-hi) var(--frame-lo); width: 76px; height: 76px; }
+.ne-date{ display: flex; flex-direction: column; min-width: 0; }
+.ne-day{ font: 46px/.9 var(--mono); color: var(--amber); text-shadow: 0 0 6px rgba(226,184,90,.35); }
+.ne-month{ font-size: 12px; color: #b9c6cf; text-transform: capitalize; }
+.next-card .ev-title{ font-size: 15px; margin: 8px 0 4px; }
+.next-card .ev-sub{ font-size: 12px; line-height: 1.4; }
+.tag{ display: inline-block; padding: 0 5px; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #fff; border: 1px solid rgba(0,0,0,.6); }
+.tag.t-home{ background: #2f5f9e; } .tag.t-away{ background: #6b5a8a; }
+
+/* legend swatches (shared with cell tags) */
+.cal-legend{ list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; font-size: 12px; }
+.cal-legend li{ display: flex; align-items: center; gap: 6px; }
+.sw{ display: inline-block; width: 12px; height: 12px; border: 1px solid #000; box-shadow: inset 1px 1px 0 rgba(255,255,255,.25); }
+.sw-match, .t-match{ background: #2f5f9e; } .sw-W, .t-W{ background: #3e6a3f; } .sw-D, .t-D{ background: #7a6a3e; }
+.sw-L, .t-L{ background: #a63b30; } .sw-rest{ background: #4a5157; } .sw-today{ background: #b8902f; }
+.dash-left .kv{ font: 12px/1.35 var(--ui); gap: 3px 8px; }
+.dash-left .kv dt{ white-space: nowrap; }
+
+/* --- month grid --- */
+.cal-head{ display: flex; align-items: center; gap: 8px; padding: 4px; background: var(--face); color: #111;
+  border: 2px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi); }
+.cal-title{ flex: 1; display: flex; align-items: baseline; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.cal-title b{ font: 24px/1 var(--mono); text-transform: uppercase; letter-spacing: 1px; }
+.cal-title span{ font-size: 12px; color: #3b4148; text-transform: capitalize; }
+.cal-grid{ display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; padding: 2px; background: #0c1014; }
+.cal-wd{ padding: 3px 0; text-align: center; font-size: 11px; text-transform: uppercase; color: #111; background: var(--face);
+  border: 1px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi); }
+.cal-day{ position: relative; min-height: 58px; padding: 3px 4px; overflow: hidden; cursor: pointer;
+  background: #2a333b; border: 1px solid; border-color: #4e5b66 #12171c #12171c #4e5b66;            /* raised tile */
+  transition: background .12s, border-color .12s; }
+.cal-day:hover{ background: #384552; border-color: #7f8b95 #0a0d10 #0a0d10 #7f8b95; }
+.cal-day:active, .cal-day.sel{ border-color: #0a0d10 #7f8b95 #7f8b95 #0a0d10; background: #33404c; }    /* pressed */
+.cal-day.sel{ outline: 1px dotted #e2b85a; outline-offset: -4px; }
+.cal-day.out{ background: transparent; border-color: transparent; cursor: default; }
+.cal-day.off{ background: #20262c; color: #6d7881; }
+.cal-day.past{ filter: brightness(.78) saturate(.7); }
+.cal-day.today{ background: #5c4a1e; border-color: #e2b85a #3a2c0c #3a2c0c #e2b85a; filter: none;
+  box-shadow: inset 0 0 0 1px #e2b85a, 0 0 8px rgba(226,184,90,.35); }
+.cal-day.match{ background: #24364e; } .cal-day.match:hover{ background: #2e4562; }
+.cal-day.today.match{ background: #5c4a1e; }
+.cd-n{ font: 18px/1 var(--mono); color: #c9d2d9; }
+.cal-day.today .cd-n{ color: #ffe9a8; }
+.cd-ev{ display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.cd-tag{ padding: 0 4px; font: 15px/1.1 var(--mono); color: #fff; border: 1px solid rgba(0,0,0,.6); white-space: nowrap; }
+.cd-opp{ margin-top: 2px; font-size: 10px; color: #b9c6cf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-rest{ position: absolute; right: 5px; bottom: 5px; width: 6px; height: 6px; background: #4a5157; border: 1px solid #000; }
+.dash-center .ticker{ height: clamp(90px, 18vh, 200px); }
+
+/* --- right pane --- */
+.fx-list.mini .fx{ grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); font-size: 11px; padding: 3px 4px; gap: 4px; }
+.fx-list.mini .fx b{ font-size: 17px; }
+.fx span{ display: flex; align-items: center; gap: 4px; min-width: 0; }
+.fx .h{ justify-content: flex-end; }
+.mini-table{ font-size: 12px; }
+.mini-table th{ position: static; padding: 2px 4px; font-size: 11px; }
+.mini-table td{ padding: 3px 4px; }
+.mini-table .tm-in{ display: flex; align-items: center; gap: 5px; max-width: 160px; color: #eef1ec; }
+.mini-table .tm-in span{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-table tr.me td{ background: rgba(47,111,208,.3) !important; font-weight: bold; }
+.mini-table tr.lead .pos-n{ background: #b8902f; color: #111; font-weight: bold; }
+.mini-table .pts{ color: var(--amber); font-weight: bold; }
+.mini-table tr.gap td{ text-align: center; color: var(--muted); padding: 0; }
+.btn.full{ width: 100%; margin-top: 8px; }
+
+/* league table tab: badge before the name */
+.grid.league .tm-in{ display: flex; align-items: center; gap: 8px; }
+
+@media (max-width: 1100px){
+  .dash3{ grid-template-columns: 220px minmax(0, 1fr); }
+  .dash-right{ grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+}
+@media (max-width: 820px){
+  .dash3, .dash-right{ grid-template-columns: 1fr; }
+  .cal-day{ min-height: 46px; padding: 2px; }
+  .cd-opp{ display: none; }
+  .cd-tag{ font-size: 12px; padding: 0 2px; }
+  .cd-ev .emblem{ display: none; }
+}
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1021,26 +1099,43 @@ body.fx .crt-scan{ opacity: .9; }
       <div class="titlebar"><span class="t-ico">&#8962;</span><span class="t-txt" data-i18n="dash.title"></span>
         <button class="tb-btn" data-i18n-aria="ui.min">_</button><button class="tb-btn" data-i18n-aria="ui.close">&times;</button></div>
       <div class="win-body">
-        <div class="dash-top">
-          <div class="datebox sunken" id="datebox"></div>
-          <div class="groupbox next-card"><span class="gb-label" data-i18n="dash.next"></span>
-            <div id="next-event"></div>
+        <div class="dash3">
+          <!-- LEFT: next event, main button, legend, club -->
+          <aside class="dash-left">
+            <div class="groupbox next-card"><span class="gb-label" data-i18n="dash.next"></span>
+              <div id="next-event"></div>
+            </div>
+            <button class="btn go big" id="btn-sim"></button>
+            <p class="sim-hint" id="sim-hint"></p>
+            <div class="groupbox"><span class="gb-label" data-i18n="cal.legend"></span>
+              <ul class="cal-legend" id="cal-legend"></ul>
+            </div>
+            <div class="groupbox"><span class="gb-label" data-i18n="dash.club"></span>
+              <dl class="kv" id="club-kv"></dl>
+            </div>
+          </aside>
+          <!-- CENTER: month grid + diary -->
+          <div class="dash-center">
+            <div class="cal-head">
+              <button class="btn small" id="cal-prev" data-i18n-aria="cal.prevMonth">&#9664;</button>
+              <div class="cal-title"><b id="cal-month"></b><span id="cal-today"></span></div>
+              <button class="btn small" id="cal-next" data-i18n-aria="cal.nextMonth">&#9654;</button>
+            </div>
+            <div class="cal-grid sunken" id="cal-grid" role="grid"></div>
+            <div class="groupbox"><span class="gb-label" data-i18n="dash.ticker"></span>
+              <div class="ticker sunken" id="ticker" role="log" aria-live="polite"></div>
+            </div>
           </div>
-          <div class="groupbox"><span class="gb-label" data-i18n="dash.club"></span>
-            <dl class="kv" id="club-kv"></dl>
-          </div>
-        </div>
-        <div class="dash-actions">
-          <button class="btn go big" id="btn-sim"></button>
-          <p class="sim-hint" id="sim-hint"></p>
-        </div>
-        <div class="dash-bottom">
-          <div class="groupbox"><span class="gb-label" data-i18n="dash.ticker"></span>
-            <div class="ticker sunken" id="ticker" role="log" aria-live="polite"></div>
-          </div>
-          <div class="groupbox"><span class="gb-label" id="md-fx-label"></span>
-            <div class="fx-list" id="md-fixtures"></div>
-          </div>
+          <!-- RIGHT: latest results + mini table -->
+          <aside class="dash-right">
+            <div class="groupbox"><span class="gb-label" id="md-fx-label"></span>
+              <div class="fx-list mini" id="md-fixtures"></div>
+            </div>
+            <div class="groupbox"><span class="gb-label" data-i18n="dash.top5"></span>
+              <table class="grid mini-table"><tbody id="mini-table"></tbody></table>
+              <button class="btn small full" id="btn-full-table" data-i18n="dash.fullTable"></button>
+            </div>
+          </aside>
         </div>
       </div>
       <div class="statusbar"><span id="dash-status"></span><span id="dash-season"></span></div>
@@ -1735,6 +1830,11 @@ Object.assign(I18N.en, {
   'cal.rest': 'Rest day. Squad energy +{n}%.',
   'cal.arrive': 'MATCHDAY {md}: {o} ({v}). The Match tab is unlocked.',
   'cal.closed': 'Matchday {md} closed: {x}-{y} vs {o}. We are {pos} in the table.',
+  'cal.legend': 'Legend', 'cal.prevMonth': 'Previous month', 'cal.nextMonth': 'Next month', 'cal.md': 'MD',
+  'cal.lg.match': 'League match', 'cal.lg.W': 'Win', 'cal.lg.D': 'Draw', 'cal.lg.L': 'Defeat', 'cal.lg.rest': 'Rest day', 'cal.lg.today': 'Today',
+  'cal.info.match': 'Matchday {md} vs {o} ({v}).', 'cal.info.played': 'Matchday {md} vs {o} ({v}): {x}-{y}.',
+  'cal.info.rest': 'Rest day, squad +{n}% energy.', 'cal.info.off': 'Outside the season.',
+  'dash.results': 'Results · Matchday {md}', 'dash.top5': 'League Table · Top 5', 'dash.fullTable': 'Full table &#9656;',
   'dlg.matchdayTitle': 'Matchday!', 'dlg.matchday': 'Matchday {md} is today: {o} ({v}).<br>The Match tab is unlocked.',
   'dlg.noMatch': 'No match today.<br>Use &ldquo;Simulate Calendar&rdquo; on the Dashboard to reach the next matchday.',
   'table.title': 'LEAGUE.DBF — Sunday League, Division 3', 'table.pos': '#', 'table.team': 'Team', 'table.p': 'P', 'table.w': 'W',
@@ -1765,6 +1865,11 @@ Object.assign(I18N.ru, {
   'cal.rest': 'День отдыха. Энергия состава +{n}%.',
   'cal.arrive': 'ТУР {md}: {o} ({v}). Вкладка «Матч» открыта.',
   'cal.closed': 'Тур {md} завершён: {x}-{y} против {o}. Мы на {pos}-м месте.',
+  'cal.legend': 'Обозначения', 'cal.prevMonth': 'Предыдущий месяц', 'cal.nextMonth': 'Следующий месяц', 'cal.md': 'Т',
+  'cal.lg.match': 'Матч лиги', 'cal.lg.W': 'Победа', 'cal.lg.D': 'Ничья', 'cal.lg.L': 'Поражение', 'cal.lg.rest': 'День отдыха', 'cal.lg.today': 'Сегодня',
+  'cal.info.match': 'Тур {md}: против {o} ({v}).', 'cal.info.played': 'Тур {md}: против {o} ({v}), {x}-{y}.',
+  'cal.info.rest': 'День отдыха, состав +{n}% энергии.', 'cal.info.off': 'Вне сезона.',
+  'dash.results': 'Результаты · Тур {md}', 'dash.top5': 'Таблица · Топ-5', 'dash.fullTable': 'Вся таблица &#9656;',
   'dlg.matchdayTitle': 'День матча!', 'dlg.matchday': 'Сегодня {md}-й тур: {o} ({v}).<br>Вкладка «Матч» открыта.',
   'dlg.noMatch': 'Сегодня матча нет.<br>Нажми «Промотать календарь» в Штабе, чтобы дойти до следующего тура.',
   'table.title': 'LEAGUE.DBF — Воскресная лига, 3-й дивизион', 'table.pos': '№', 'table.team': 'Команда', 'table.p': 'И', 'table.w': 'В',
@@ -1919,6 +2024,87 @@ const fmtDate = (iso, opts) => new Date(iso + 'T00:00:00Z').toLocaleDateString(L
 const SEASON = { START_MONTH_DAY: '09-01', FIRST_MATCH_OFFSET: 6, MATCH_INTERVAL: 7, FIRST_YEAR: 2002 };
 
 /* =========================================================
+   EMBLEM GENERATOR (v1.6) — procedural 32x32 pixel-art club badges.
+   A crest is 4 indices [shape, pattern, primary, secondary]. The badge is
+   rasterised on a 32x32 grid and written as ONE <path> per colour
+   (row runs), so there are no <clipPath> ids and no bloat.
+   ========================================================= */
+const EmblemGenerator = (() => {
+  const SHAPES   = ['shield', 'circle', 'hexagon'];
+  const PATTERNS = ['solid', 'stripes', 'halved'];
+  const COLORS   = ['#2f4f86', '#8c2f2a', '#2f6a3c', '#b8902f', '#5e2a55', '#c86f2a',     // muted kit colours
+                    '#3f87a8', '#6e1f2c', '#3b3b3e', '#7a7f34', '#1f5f5c', '#9b4f7a'];
+  const LIGHT    = ['#e9e2cc', '#f1f4ee', '#d8c27a', '#1c1c1e'];                          // secondary / trim
+  const SIZES = [SHAPES.length, PATTERNS.length, COLORS.length, LIGHT.length];
+  const C = 16;                                                                           // centre
+  const inside = {
+    shield:  (x, y) => y >= 3 && y < 30 && (y < 17 ? x >= 4 && x < 28 : Math.abs(x + .5 - C) <= 12 * Math.sqrt(1 - ((y + .5 - 17) / 13) ** 2)),
+    circle:  (x, y) => (x + .5 - C) ** 2 + (y + .5 - C) ** 2 <= 14 ** 2,
+    hexagon: (x, y) => { const dx = Math.abs(x + .5 - C), dy = Math.abs(y + .5 - C); return dx <= 12.5 && dy + dx * .577 <= 14.6; },
+  };
+  const fillAt = { solid: () => 0, stripes: x => Math.floor((x - 2) / 4) % 2, halved: x => (x < C ? 0 : 1) };
+  const lum = hex => [1, 3, 5].reduce((a, i, k) => a + parseInt(hex.slice(i, i + 2), 16) * [.3, .59, .11][k], 0);
+  const hash = str => { let h = 2166136261; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    return SIZES.map(n => { h = Math.imul(h ^ (h >>> 13), 2654435761) >>> 0; return h % n; }); };
+  const cache = new Map();
+
+  return {
+    /** Unique primary colours for a whole league (user club keeps the academy blue). */
+    rollLeague(n) {
+      const prim = shuffle(COLORS.map((_, i) => i).slice(1));
+      return Array.from({ length: n }, (_, i) => i === 0 ? [0, 2, 0, 0]
+        : [rnd(0, 2), rnd(0, 2), prim[(i - 1) % prim.length], rnd(0, LIGHT.length - 1)]);
+    },
+    valid: c => Array.isArray(c) && c.length === SIZES.length && c.every((v, i) => Number.isInteger(v) && v >= 0 && v < SIZES[i]),
+    hash,
+    /** Returns an inline SVG string; cached per crest + letter (pure function of its inputs). */
+    svg(crest, letter = '') {
+      const key = crest.join('.') + letter;
+      if (cache.has(key)) return cache.get(key);
+      const [sh, pt, ci, si] = crest, shape = inside[SHAPES[sh]], fill = fillAt[PATTERNS[pt]];
+      let c1 = COLORS[ci], c2 = LIGHT[si];
+      if (PATTERNS[pt] === 'solid') c2 = c1;
+      const d = ['', '', ''];                                         // 0 primary, 1 secondary, 2 outline
+      for (let y = 0; y < 32; y++) {
+        let run = null;
+        const flush = x => { if (run) d[run.k] += `M${run.x} ${y}h${x - run.x}v1h${run.x - x}z`; };
+        for (let x = 0; x <= 32; x++) {
+          let k = null;
+          if (x < 32 && shape(x, y)) {
+            const edge = !shape(x - 1, y) || !shape(x + 1, y) || !shape(x, y - 1) || !shape(x, y + 1);
+            k = edge ? 2 : fill(x);
+          }
+          if (!run || run.k !== k) { flush(x); run = k === null ? null : { k, x }; }
+        }
+      }
+      // letter colour: pick the readable one against the primary
+      const ink = lum(c1) > 140 ? '#1c1c1e' : '#f1ecd8';
+      const out = `<svg class="emblem-svg" viewBox="0 0 32 32" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`
+        + `<path fill="${c1}" d="${d[0]}"/>` + (d[1] ? `<path fill="${c2}" d="${d[1]}"/>` : '') + `<path fill="#121315" d="${d[2]}"/>`
+        + `<rect x="10" y="10" width="12" height="12" fill="${c1}" opacity=".85"/>`
+        + `<text x="16" y="21.5" text-anchor="middle" font-family="VT323,monospace" font-size="15" fill="${ink}" stroke="#121315" stroke-width="1.4" paint-order="stroke">${esc(letter)}</text>`
+        + '</svg>';
+      cache.set(key, out);
+      return out;
+    },
+  };
+})();
+
+/** Badge letter = first letter of the localized club name, skipping "St." style prefixes. */
+const crestLetter = name => (L.team(name).replace(/^(St\.|Св\.)\s*/, '').match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase();
+
+/** Gives a team its crest + a non-enumerable `emblemSvg` (rebuilt from `crest`, never saved). */
+function attachEmblem(team) {
+  if (!EmblemGenerator.valid(team.crest)) team.crest = EmblemGenerator.hash(team.name + '#crest');
+  Object.defineProperty(team, 'emblemSvg', { configurable: true, enumerable: false,
+    get() { return EmblemGenerator.svg(this.crest, crestLetter(this.name)); } });
+  return team;
+}
+/** HTML helper: <span class="emblem sm">…svg…</span> */
+const emblemHTML = (team, size = 'sm') => team ? `<span class="emblem ${size}" title="${esc(L.team(team.name))}">${team.emblemSvg}</span>` : '';
+
+
+/* =========================================================
    LEAGUE — 10 teams, double round-robin (18 matchdays x 5 fixtures)
    Team strength is HIDDEN: it drives AI rosters and AI-vs-AI results.
    ========================================================= */
@@ -1928,13 +2114,16 @@ class League {
   constructor({ teams, fixtures }) {
     this.teams = teams;
     this.fixtures = fixtures;
-    for (const t of this.teams) if (t.roster) t.roster = t.roster.map(p => new Player(p));
+    for (const t of this.teams) { if (t.roster) t.roster = t.roster.map(p => new Player(p)); attachEmblem(t); }
   }
 
-  static create(userName) {
+  /** prevTeams: last season's clubs, so every badge survives the summer. */
+  static create(userName, prevTeams = []) {
     const strengths = shuffle(League.STRENGTHS);
-    const teams = [{ id: 0, name: userName, user: true }];
-    OPPONENTS.forEach((name, i) => teams.push({ id: i + 1, name, strength: strengths[i], formation: pick(FORMATION_KEYS), roster: null }));
+    const rolled = EmblemGenerator.rollLeague(OPPONENTS.length + 1);
+    const crests = [userName, ...OPPONENTS].map((n, i) => prevTeams.find(t => t.name === n)?.crest || rolled[i]);
+    const teams = [{ id: 0, name: userName, user: true, crest: crests[0] }];
+    OPPONENTS.forEach((name, i) => teams.push({ id: i + 1, name, strength: strengths[i], formation: pick(FORMATION_KEYS), roster: null, crest: crests[i + 1] }));
     return new League({ teams, fixtures: League.roundRobin(teams.map(t => t.id)) });
   }
 
@@ -2094,7 +2283,7 @@ class GameState {
 
   newSeason(year) {
     this.season = year;
-    this.league = League.create(this.clubName);
+    this.league = League.create(this.clubName, this.league?.teams);
     const start = `${year}-${SEASON.START_MONTH_DAY}`;
     const events = [];
     for (let md = 1; md <= this.league.matchdays; md++) {
@@ -2782,8 +2971,25 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.6', name: { en: 'Fixture Calendar', ru: 'Календарь матчей' },
+    en: [
+      'Every club now has its own badge: a procedural 32x32 pixel-art crest (shield, circle or hexagon; solid, striped or halved; two club colours and the first letter of the name). Badges are drawn in code and kept across seasons.',
+      'Dashboard rebuilt as a classic manager calendar in three panes. Centre: a month grid (Sun–Sat) with today highlighted; matchdays show the opponent\'s badge and a coloured tag (MD number, or the score once played). Browse months with the arrows.',
+      'Calendar days are clickable tiles: hover lights them up, a click shows what happens that day in the status bar.',
+      'Left pane: the next opponent\'s big badge, the exact date and venue, the Simulate Calendar button, a colour legend and your club summary.',
+      'Right pane: results of the latest matchday with team badges, and a mini top-5 table (your club is added below if you are outside the top 5).',
+      'League table and result lists now show the small club badges too.',
+    ],
+    ru: [
+      'У каждого клуба теперь свой герб: процедурный пиксельный значок 32x32 (щит, круг или шестиугольник; однотонный, в полоску или из двух половин; два клубных цвета и первая буква названия). Гербы рисуются кодом и сохраняются между сезонами.',
+      'Главный экран переделан в классический календарь менеджера из трёх панелей. В центре сетка месяца (Вс–Сб), сегодняшний день подсвечен; в дни матчей виден герб соперника и цветная метка (номер тура, после игры счёт). Месяцы листаются стрелками.',
+      'Дни календаря стали плитками: при наведении подсвечиваются, по щелчку в строке состояния видно, что в этот день.',
+      'Левая панель: крупный герб следующего соперника, точная дата и место, кнопка «Промотать календарь», обозначения цветов и сводка по клубу.',
+      'Правая панель: результаты последнего тура с гербами команд и мини-таблица топ-5 (если ты ниже пятого места, твоя строка добавляется снизу).',
+      'В таблице лиги и в списках результатов тоже появились маленькие гербы клубов.',
+    ] },
   { v: '1.5', name: { en: 'Player Profiles', ru: 'Профили игроков' },
     en: [
       'New PLAYER_INFO.EXE window: right-click any player (roster, team list, pitch, Notebook card) to open his Profile Card.',
@@ -3832,6 +4038,11 @@ class UIController {
       if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.onLiveRosterClick(row.dataset.id); }
     });
     this.$('btn-sim').addEventListener('click', () => this.onDashAction());
+    // v1.6 calendar: month navigation + clickable day cells (info in the status bar)
+    this.$('cal-prev').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), -1); this.renderCalendar(); });
+    this.$('cal-next').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), 1); this.renderCalendar(); });
+    this.$('cal-grid').addEventListener('click', e => { const c = e.target.closest('.cal-day[data-date]'); if (c) this.pickDay(c.dataset.date); });
+    this.$('btn-full-table').addEventListener('click', () => this.show('table'));
     this.$('btn-startmenu').addEventListener('click', e => { e.stopPropagation(); this.toggleStart(); });
     document.addEventListener('click', e => { if (!e.target.closest('#startmenu')) this.toggleStart(false); });
     const flip = () => this.setLang(L.code === 'ru' ? 'en' : 'ru');
@@ -4157,35 +4368,36 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   renderDash() {
     const s = this.state, lg = s.league, phase = s.phase;
     const date = this.cal.date;
-    this.$('datebox').innerHTML = `
-      <div class="wd">${fmtDate(date, { weekday: 'long' })}</div>
-      <div class="dn">${fmtDate(date, { day: 'numeric' })}</div>
-      <div class="my">${fmtDate(date, { day: 'numeric', month: 'long', year: 'numeric' }).replace(/^\d+\.?\s*/, '')}</div>`;
 
-    // upcoming event widget
+    // LEFT: next event with a big opponent badge
     const ev = this.cal.nextEvent();
+    const ctx = s.matchContext();
     if (ev) {
       const n = daysBetween(date, ev.date);
       const when = n <= 0 ? `<span class="today">${L.t('dash.today')}</span>` : n === 1 ? L.t('dash.tomorrow') : L.t('dash.inDays', { n });
-      let sub = '';
-      const ctx = s.matchContext();
+      let sub = '', badge = emblemHTML(lg.team(0), 'lg');
       if (ev.type === 'match' && ctx) {
-        sub = L.t('ev.match.sub', { date: fmtDate(ev.date, { weekday: 'short', day: 'numeric', month: 'short' }), pos: lg.position(ctx.opp.id), f: ctx.opp.formation });
+        badge = emblemHTML(ctx.opp, 'lg');
+        sub = `<span class="tag t-${ctx.venue}">${L.t('venue.' + ctx.venue)}</span> `
+          + L.t('ev.match.sub', { date: fmtDate(ev.date, { weekday: 'short', day: 'numeric', month: 'short' }), pos: lg.position(ctx.opp.id), f: ctx.opp.formation });
       }
       this.$('next-event').innerHTML = `
-        <div class="ev-when">${when}</div>
-        <div class="ev-title"><span class="ev-ico">&#9917;</span>${this.cal.label(ev)}</div>
+        <div class="ne-row">${badge}<div class="ne-date"><div class="ev-when">${when}</div>
+          <div class="ne-day">${fmtDate(ev.date, { day: 'numeric' })}</div>
+          <div class="ne-month">${fmtDate(ev.date, { weekday: 'short', month: 'short' })}</div></div></div>
+        <div class="ev-title">${this.cal.label(ev)}</div>
         <div class="ev-sub">${sub}</div>`;
     } else {
-      this.$('next-event').innerHTML = `<div class="ev-title">${L.t('dash.none')}</div>`;
+      this.$('next-event').innerHTML = `<div class="ne-row">${emblemHTML(lg.team(0), 'lg')}</div><div class="ev-title">${L.t('dash.none')}</div>`;
     }
+    this.$('cal-legend').innerHTML = ['match', 'W', 'D', 'L', 'rest', 'today']
+      .map(k => `<li><i class="sw sw-${k}"></i>${L.t('cal.lg.' + k)}</li>`).join('');
 
     // club panel
     const row = s.userRow();
     const avg = Math.round(s.squad.reduce((a, p) => a + p.energy, 0) / s.squad.length);
     const tired = s.squad.filter(p => p.energy < ENERGY.TIRED).length;
     this.$('club-kv').innerHTML = `
-      <dt>${L.t('dash.position')}</dt><dd><b>${L.t('dash.posVal', { p: lg.position(0) })}</b></dd>
       <dt>${L.t('dash.record')}</dt><dd>${L.t('dash.recordVal', row)}</dd>
       <dt>${L.t('dash.form')}</dt><dd>${this.formChips(row.form) || '—'}</dd>
       <dt>${L.t('dash.formation')}</dt><dd>${s.formation}</dd>
@@ -4204,17 +4416,91 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       ? L.t('dash.hint.seasonEnd', { pos: lg.position(0), pts: row.pts })
       : L.t('dash.hint.' + phase, { n: ENERGY.DAILY_REST });
 
-    // diary
+    // CENTER: month grid + diary
+    this.renderCalendar();
     this.renderTicker();
 
-    // fixtures of the current / next matchday
-    const md = ev?.type === 'match' ? ev.md : lg.matchdays;
-    this.$('md-fx-label').textContent = L.t('dash.thisMd', { md });
+    // RIGHT: latest played matchday (or the first fixtures before any game), then the top 5
+    const last = lg.playedMatchdays();
+    const md = last || 1;
+    this.$('md-fx-label').textContent = L.t(last ? 'dash.results' : 'dash.thisMd', { md });
     this.$('md-fixtures').innerHTML = lg.fixturesOf(md).map(f => this.fixtureHTML(f)).join('');
+    this.renderMiniTable();
 
     this.$('dash-status').textContent = L.t('dash.status.' + phase);
     this.$('dash-season').textContent = `${L.t('dash.season', this.seasonVars())} · v${APP_VERSION}`;
     this.syncLocks();
+  }
+
+  /* ---------- v1.6 CALENDAR GRID (month view, Sunday first) ---------- */
+  viewMonth() { return this.calMonth || this.cal.date.slice(0, 7); }      // 'YYYY-MM'; null = follow the current date
+  shiftMonth(ym, k) { const d = new Date(ym + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + k); return d.toISOString().slice(0, 7); }
+
+  /** Everything the calendar knows about one day (done events included). */
+  dayInfo(iso) {
+    const s = this.state, lg = s.league;
+    const ev = s.calendar.events.find(e => e.date === iso);
+    if (ev?.type === 'match') {
+      const f = lg.userFixture(ev.md), home = f.home === 0;
+      const opp = lg.team(home ? f.away : f.home);
+      let res = null;
+      if (lg.played(f)) { const gf = home ? f.hg : f.ag, ga = home ? f.ag : f.hg; res = { r: gf > ga ? 'W' : gf < ga ? 'L' : 'D', gf, ga }; }
+      return { kind: 'match', ev, f, opp, venue: home ? 'home' : 'away', res };
+    }
+    const start = s.calendar.events[0] && isoAdd(s.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
+    const end = s.calendar.events[s.calendar.events.length - 1]?.date;
+    return { kind: start && iso >= start && iso <= end ? 'rest' : 'off' };
+  }
+
+  renderCalendar() {
+    const ym = this.viewMonth(), today = this.cal.date;
+    const first = ym + '-01', lead = new Date(first + 'T00:00:00Z').getUTCDay();
+    const days = daysBetween(first, this.shiftMonth(ym, 1) + '-01');
+    this.$('cal-month').textContent = fmtDate(first, { month: 'long', year: 'numeric' });
+    this.$('cal-today').textContent = fmtDate(today, { weekday: 'long', day: 'numeric', month: 'long' });
+    const wd = Array.from({ length: 7 }, (_, i) => `<div class="cal-wd">${fmtDate(isoAdd('2002-09-01', i), { weekday: 'short' })}</div>`).join('');
+    let cells = '';
+    for (let i = 0; i < 42; i++) {
+      const n = i - lead + 1;
+      if (i >= 35 && n > days) break;
+      if (n < 1 || n > days) { cells += '<div class="cal-day out"></div>'; continue; }
+      const iso = `${ym}-${String(n).padStart(2, '0')}`, d = this.dayInfo(iso);
+      const cls = ['cal-day', d.kind, iso === today ? 'today' : '', iso < today ? 'past' : '', d.res ? 'r-' + d.res.r : ''].filter(Boolean).join(' ');
+      let body = '';
+      if (d.kind === 'match') {
+        const tag = d.res ? `${d.res.gf}-${d.res.ga}` : `${L.t('cal.md')}${d.ev.md}`;
+        body = `<div class="cd-ev">${emblemHTML(d.opp, 'xs')}<span class="cd-tag ${d.res ? 't-' + d.res.r : 't-match'}">${tag}</span></div>
+          <div class="cd-opp">${esc(L.team(d.opp.name))}</div>`;
+      } else if (d.kind === 'rest') body = '<div class="cd-rest"></div>';
+      cells += `<div class="${cls}" data-date="${iso}" role="gridcell" tabindex="-1" title="${esc(this.dayText(iso, d))}"><span class="cd-n">${n}</span>${body}</div>`;
+    }
+    this.$('cal-grid').innerHTML = wd + cells;
+    const span = this.state.calendar.events;
+    this.$('cal-prev').disabled = span.length && this.shiftMonth(ym, -1) < span[0].date.slice(0, 7);
+    this.$('cal-next').disabled = span.length && this.shiftMonth(ym, 1) > span[span.length - 1].date.slice(0, 7);
+  }
+
+  dayText(iso, d = this.dayInfo(iso)) {
+    const when = fmtDate(iso, { weekday: 'short', day: 'numeric', month: 'short' });
+    if (d.kind === 'match') return `${when}: ` + L.t(d.res ? 'cal.info.played' : 'cal.info.match',
+      { md: d.ev.md, o: L.team(d.opp.name), v: L.t('venue.' + d.venue), x: d.res?.gf, y: d.res?.ga });
+    return `${when}: ` + L.t(d.kind === 'rest' ? 'cal.info.rest' : 'cal.info.off', { n: ENERGY.DAILY_REST });
+  }
+
+  pickDay(iso) {
+    this.$('cal-grid').querySelectorAll('.cal-day.sel').forEach(c => c.classList.remove('sel'));
+    this.$('cal-grid').querySelector(`[data-date="${iso}"]`)?.classList.add('sel');
+    this.$('dash-status').textContent = this.dayText(iso);
+  }
+
+  renderMiniTable() {
+    const rows = this.state.league.table();
+    const top = rows.slice(0, 5), mi = rows.findIndex(r => r.team.user);
+    const tr = (r, i) => `<tr class="${r.team.user ? 'me' : ''}${i === 0 && r.p ? ' lead' : ''}"><td class="c pos-n">${i + 1}</td>
+      <td class="tm"><div class="tm-in">${emblemHTML(r.team, 'xs')}<span>${esc(L.team(r.team.name))}</span></div></td><td class="c">${r.p}</td>
+      <td class="c">${r.gd > 0 ? '+' : ''}${r.gd}</td><td class="c pts">${r.pts}</td></tr>`;
+    this.$('mini-table').innerHTML = `<tr class="hd"><th class="c">${L.t('table.pos')}</th><th>${L.t('table.team')}</th><th class="c">${L.t('table.p')}</th><th class="c">${L.t('table.gd')}</th><th class="c">${L.t('table.pts')}</th></tr>`
+      + top.map(tr).join('') + (mi >= 5 ? `<tr class="gap"><td colspan="5">⋯</td></tr>` + tr(rows[mi], mi) : '');
   }
 
   renderTicker() {
@@ -4230,7 +4516,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const lg = this.state.league;
     const me = f.home === 0 || f.away === 0;
     const score = lg.played(f) ? `${f.hg} - ${f.ag}` : 'vs';
-    return `<div class="fx${me ? ' me' : ''}"><span class="h">${esc(L.team(lg.team(f.home).name))}</span><b>${score}</b><span class="a">${esc(L.team(lg.team(f.away).name))}</span></div>`;
+    const H = lg.team(f.home), A = lg.team(f.away);
+    return `<div class="fx${me ? ' me' : ''}"><span class="h">${esc(L.team(H.name))}${emblemHTML(H, 'xs')}</span><b>${score}</b><span class="a">${emblemHTML(A, 'xs')}${esc(L.team(A.name))}</span></div>`;
   }
 
   /** The one big button on the Dashboard changes with the phase of the matchday loop. */
@@ -4245,6 +4532,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       this.prepareMatch(); this.renderAll();
       return;
     }
+    this.calMonth = null;   // calendar view follows the days as they pass
     this.cal.simulate({
       stepMs: 180,
       onStep: (date, infos) => {
@@ -4300,7 +4588,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const rows = lg.table();
     this.$('table-body').innerHTML = rows.map((r, i) => `
       <tr class="${r.team.user ? 'me' : ''}${i === 0 && r.p ? ' lead' : ''}">
-        <td class="c pos-n">${i + 1}</td><td class="tm">${esc(L.team(r.team.name))}</td>
+        <td class="c pos-n">${i + 1}</td><td class="tm"><div class="tm-in">${emblemHTML(r.team, 'sm')}<span>${esc(L.team(r.team.name))}</span></div></td>
         <td class="c">${r.p}</td><td class="c">${r.w}</td><td class="c">${r.d}</td><td class="c">${r.l}</td>
         <td class="c">${r.gf}</td><td class="c">${r.ga}</td><td class="c">${r.gd > 0 ? '+' : ''}${r.gd}</td>
         <td class="c pts">${r.pts}</td><td class="form">${this.formChips(r.form)}</td>

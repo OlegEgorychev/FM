@@ -35,26 +35,43 @@
       <div class="titlebar"><span class="t-ico">&#8962;</span><span class="t-txt" data-i18n="dash.title"></span>
         <button class="tb-btn" data-i18n-aria="ui.min">_</button><button class="tb-btn" data-i18n-aria="ui.close">&times;</button></div>
       <div class="win-body">
-        <div class="dash-top">
-          <div class="datebox sunken" id="datebox"></div>
-          <div class="groupbox next-card"><span class="gb-label" data-i18n="dash.next"></span>
-            <div id="next-event"></div>
+        <div class="dash3">
+          <!-- LEFT: next event, main button, legend, club -->
+          <aside class="dash-left">
+            <div class="groupbox next-card"><span class="gb-label" data-i18n="dash.next"></span>
+              <div id="next-event"></div>
+            </div>
+            <button class="btn go big" id="btn-sim"></button>
+            <p class="sim-hint" id="sim-hint"></p>
+            <div class="groupbox"><span class="gb-label" data-i18n="cal.legend"></span>
+              <ul class="cal-legend" id="cal-legend"></ul>
+            </div>
+            <div class="groupbox"><span class="gb-label" data-i18n="dash.club"></span>
+              <dl class="kv" id="club-kv"></dl>
+            </div>
+          </aside>
+          <!-- CENTER: month grid + diary -->
+          <div class="dash-center">
+            <div class="cal-head">
+              <button class="btn small" id="cal-prev" data-i18n-aria="cal.prevMonth">&#9664;</button>
+              <div class="cal-title"><b id="cal-month"></b><span id="cal-today"></span></div>
+              <button class="btn small" id="cal-next" data-i18n-aria="cal.nextMonth">&#9654;</button>
+            </div>
+            <div class="cal-grid sunken" id="cal-grid" role="grid"></div>
+            <div class="groupbox"><span class="gb-label" data-i18n="dash.ticker"></span>
+              <div class="ticker sunken" id="ticker" role="log" aria-live="polite"></div>
+            </div>
           </div>
-          <div class="groupbox"><span class="gb-label" data-i18n="dash.club"></span>
-            <dl class="kv" id="club-kv"></dl>
-          </div>
-        </div>
-        <div class="dash-actions">
-          <button class="btn go big" id="btn-sim"></button>
-          <p class="sim-hint" id="sim-hint"></p>
-        </div>
-        <div class="dash-bottom">
-          <div class="groupbox"><span class="gb-label" data-i18n="dash.ticker"></span>
-            <div class="ticker sunken" id="ticker" role="log" aria-live="polite"></div>
-          </div>
-          <div class="groupbox"><span class="gb-label" id="md-fx-label"></span>
-            <div class="fx-list" id="md-fixtures"></div>
-          </div>
+          <!-- RIGHT: latest results + mini table -->
+          <aside class="dash-right">
+            <div class="groupbox"><span class="gb-label" id="md-fx-label"></span>
+              <div class="fx-list mini" id="md-fixtures"></div>
+            </div>
+            <div class="groupbox"><span class="gb-label" data-i18n="dash.top5"></span>
+              <table class="grid mini-table"><tbody id="mini-table"></tbody></table>
+              <button class="btn small full" id="btn-full-table" data-i18n="dash.fullTable"></button>
+            </div>
+          </aside>
         </div>
       </div>
       <div class="statusbar"><span id="dash-status"></span><span id="dash-season"></span></div>

@@ -52,3 +52,8 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Shows: portrait (100px), name, number, `player.age` (14–16, rolled in `Player.generate()`, hashed for old saves), position, status, energy (live engine value during a match), role tag, season totals from `state.seasonOf()` (apps, goals, shots/on target, tackles won/duels, pass %), plus a live "today" column while a match runs (season totals are only added at full time).
 - Coach's Note: `state.coachNotes[id]` keeps the last note shown in the Notebook (only the 3 players per match the Notebook covers — scarcity is intentional). Opponents get a card with today's numbers only.
 - Hidden attributes are never rendered; smoke test checks the card text for attribute-like output.
+
+## Club emblems + Calendar dashboard (v1.6)
+- `EmblemGenerator` (04-league-calendar.js): crest = `[shape, pattern, primary, secondary]` (shield/circle/hexagon × solid/stripes/halved). Rasterised on a 32x32 grid, one `<path>` per colour + 1px dark outline, letter = first letter of the localized name. No `<clipPath>` ids. SVG strings cached per crest+letter.
+- `team.crest` is saved; `team.emblemSvg` is a non-enumerable getter (never saved, follows the language). Old saves get a crest hashed from the name. `League.create(name, prevTeams)` keeps crests across seasons; the user club is always shield/halved academy blue.
+- Dashboard = 3 panes: left (next event + 64px badge, main button, legend, club), centre (Sun–Sat month grid, `calMonth` = null follows the date, arrows browse the season; cells clickable → status bar text; diary below), right (latest played matchday with badges, top-5 mini table + user row if outside). Badges also in the League table and every fixture list (`fixtureHTML`).

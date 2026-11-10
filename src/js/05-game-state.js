@@ -22,7 +22,7 @@ class GameState {
 
   newSeason(year) {
     this.season = year;
-    this.league = League.create(this.clubName);
+    this.league = League.create(this.clubName, this.league?.teams);
     const start = `${year}-${SEASON.START_MONTH_DAY}`;
     const events = [];
     for (let md = 1; md <= this.league.matchdays; md++) {

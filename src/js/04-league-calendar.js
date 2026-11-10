@@ -7,6 +7,87 @@ const fmtDate = (iso, opts) => new Date(iso + 'T00:00:00Z').toLocaleDateString(L
 const SEASON = { START_MONTH_DAY: '09-01', FIRST_MATCH_OFFSET: 6, MATCH_INTERVAL: 7, FIRST_YEAR: 2002 };
 
 /* =========================================================
+   EMBLEM GENERATOR (v1.6) — procedural 32x32 pixel-art club badges.
+   A crest is 4 indices [shape, pattern, primary, secondary]. The badge is
+   rasterised on a 32x32 grid and written as ONE <path> per colour
+   (row runs), so there are no <clipPath> ids and no bloat.
+   ========================================================= */
+const EmblemGenerator = (() => {
+  const SHAPES   = ['shield', 'circle', 'hexagon'];
+  const PATTERNS = ['solid', 'stripes', 'halved'];
+  const COLORS   = ['#2f4f86', '#8c2f2a', '#2f6a3c', '#b8902f', '#5e2a55', '#c86f2a',     // muted kit colours
+                    '#3f87a8', '#6e1f2c', '#3b3b3e', '#7a7f34', '#1f5f5c', '#9b4f7a'];
+  const LIGHT    = ['#e9e2cc', '#f1f4ee', '#d8c27a', '#1c1c1e'];                          // secondary / trim
+  const SIZES = [SHAPES.length, PATTERNS.length, COLORS.length, LIGHT.length];
+  const C = 16;                                                                           // centre
+  const inside = {
+    shield:  (x, y) => y >= 3 && y < 30 && (y < 17 ? x >= 4 && x < 28 : Math.abs(x + .5 - C) <= 12 * Math.sqrt(1 - ((y + .5 - 17) / 13) ** 2)),
+    circle:  (x, y) => (x + .5 - C) ** 2 + (y + .5 - C) ** 2 <= 14 ** 2,
+    hexagon: (x, y) => { const dx = Math.abs(x + .5 - C), dy = Math.abs(y + .5 - C); return dx <= 12.5 && dy + dx * .577 <= 14.6; },
+  };
+  const fillAt = { solid: () => 0, stripes: x => Math.floor((x - 2) / 4) % 2, halved: x => (x < C ? 0 : 1) };
+  const lum = hex => [1, 3, 5].reduce((a, i, k) => a + parseInt(hex.slice(i, i + 2), 16) * [.3, .59, .11][k], 0);
+  const hash = str => { let h = 2166136261; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    return SIZES.map(n => { h = Math.imul(h ^ (h >>> 13), 2654435761) >>> 0; return h % n; }); };
+  const cache = new Map();
+
+  return {
+    /** Unique primary colours for a whole league (user club keeps the academy blue). */
+    rollLeague(n) {
+      const prim = shuffle(COLORS.map((_, i) => i).slice(1));
+      return Array.from({ length: n }, (_, i) => i === 0 ? [0, 2, 0, 0]
+        : [rnd(0, 2), rnd(0, 2), prim[(i - 1) % prim.length], rnd(0, LIGHT.length - 1)]);
+    },
+    valid: c => Array.isArray(c) && c.length === SIZES.length && c.every((v, i) => Number.isInteger(v) && v >= 0 && v < SIZES[i]),
+    hash,
+    /** Returns an inline SVG string; cached per crest + letter (pure function of its inputs). */
+    svg(crest, letter = '') {
+      const key = crest.join('.') + letter;
+      if (cache.has(key)) return cache.get(key);
+      const [sh, pt, ci, si] = crest, shape = inside[SHAPES[sh]], fill = fillAt[PATTERNS[pt]];
+      let c1 = COLORS[ci], c2 = LIGHT[si];
+      if (PATTERNS[pt] === 'solid') c2 = c1;
+      const d = ['', '', ''];                                         // 0 primary, 1 secondary, 2 outline
+      for (let y = 0; y < 32; y++) {
+        let run = null;
+        const flush = x => { if (run) d[run.k] += `M${run.x} ${y}h${x - run.x}v1h${run.x - x}z`; };
+        for (let x = 0; x <= 32; x++) {
+          let k = null;
+          if (x < 32 && shape(x, y)) {
+            const edge = !shape(x - 1, y) || !shape(x + 1, y) || !shape(x, y - 1) || !shape(x, y + 1);
+            k = edge ? 2 : fill(x);
+          }
+          if (!run || run.k !== k) { flush(x); run = k === null ? null : { k, x }; }
+        }
+      }
+      // letter colour: pick the readable one against the primary
+      const ink = lum(c1) > 140 ? '#1c1c1e' : '#f1ecd8';
+      const out = `<svg class="emblem-svg" viewBox="0 0 32 32" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`
+        + `<path fill="${c1}" d="${d[0]}"/>` + (d[1] ? `<path fill="${c2}" d="${d[1]}"/>` : '') + `<path fill="#121315" d="${d[2]}"/>`
+        + `<rect x="10" y="10" width="12" height="12" fill="${c1}" opacity=".85"/>`
+        + `<text x="16" y="21.5" text-anchor="middle" font-family="VT323,monospace" font-size="15" fill="${ink}" stroke="#121315" stroke-width="1.4" paint-order="stroke">${esc(letter)}</text>`
+        + '</svg>';
+      cache.set(key, out);
+      return out;
+    },
+  };
+})();
+
+/** Badge letter = first letter of the localized club name, skipping "St." style prefixes. */
+const crestLetter = name => (L.team(name).replace(/^(St\.|Св\.)\s*/, '').match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase();
+
+/** Gives a team its crest + a non-enumerable `emblemSvg` (rebuilt from `crest`, never saved). */
+function attachEmblem(team) {
+  if (!EmblemGenerator.valid(team.crest)) team.crest = EmblemGenerator.hash(team.name + '#crest');
+  Object.defineProperty(team, 'emblemSvg', { configurable: true, enumerable: false,
+    get() { return EmblemGenerator.svg(this.crest, crestLetter(this.name)); } });
+  return team;
+}
+/** HTML helper: <span class="emblem sm">…svg…</span> */
+const emblemHTML = (team, size = 'sm') => team ? `<span class="emblem ${size}" title="${esc(L.team(team.name))}">${team.emblemSvg}</span>` : '';
+
+
+/* =========================================================
    LEAGUE — 10 teams, double round-robin (18 matchdays x 5 fixtures)
    Team strength is HIDDEN: it drives AI rosters and AI-vs-AI results.
    ========================================================= */
@@ -16,13 +97,16 @@ class League {
   constructor({ teams, fixtures }) {
     this.teams = teams;
     this.fixtures = fixtures;
-    for (const t of this.teams) if (t.roster) t.roster = t.roster.map(p => new Player(p));
+    for (const t of this.teams) { if (t.roster) t.roster = t.roster.map(p => new Player(p)); attachEmblem(t); }
   }
 
-  static create(userName) {
+  /** prevTeams: last season's clubs, so every badge survives the summer. */
+  static create(userName, prevTeams = []) {
     const strengths = shuffle(League.STRENGTHS);
-    const teams = [{ id: 0, name: userName, user: true }];
-    OPPONENTS.forEach((name, i) => teams.push({ id: i + 1, name, strength: strengths[i], formation: pick(FORMATION_KEYS), roster: null }));
+    const rolled = EmblemGenerator.rollLeague(OPPONENTS.length + 1);
+    const crests = [userName, ...OPPONENTS].map((n, i) => prevTeams.find(t => t.name === n)?.crest || rolled[i]);
+    const teams = [{ id: 0, name: userName, user: true, crest: crests[0] }];
+    OPPONENTS.forEach((name, i) => teams.push({ id: i + 1, name, strength: strengths[i], formation: pick(FORMATION_KEYS), roster: null, crest: crests[i + 1] }));
     return new League({ teams, fixtures: League.roundRobin(teams.map(t => t.id)) });
   }
 

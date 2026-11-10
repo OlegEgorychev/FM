@@ -2,8 +2,25 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.6', name: { en: 'Fixture Calendar', ru: 'Календарь матчей' },
+    en: [
+      'Every club now has its own badge: a procedural 32x32 pixel-art crest (shield, circle or hexagon; solid, striped or halved; two club colours and the first letter of the name). Badges are drawn in code and kept across seasons.',
+      'Dashboard rebuilt as a classic manager calendar in three panes. Centre: a month grid (Sun–Sat) with today highlighted; matchdays show the opponent\'s badge and a coloured tag (MD number, or the score once played). Browse months with the arrows.',
+      'Calendar days are clickable tiles: hover lights them up, a click shows what happens that day in the status bar.',
+      'Left pane: the next opponent\'s big badge, the exact date and venue, the Simulate Calendar button, a colour legend and your club summary.',
+      'Right pane: results of the latest matchday with team badges, and a mini top-5 table (your club is added below if you are outside the top 5).',
+      'League table and result lists now show the small club badges too.',
+    ],
+    ru: [
+      'У каждого клуба теперь свой герб: процедурный пиксельный значок 32x32 (щит, круг или шестиугольник; однотонный, в полоску или из двух половин; два клубных цвета и первая буква названия). Гербы рисуются кодом и сохраняются между сезонами.',
+      'Главный экран переделан в классический календарь менеджера из трёх панелей. В центре сетка месяца (Вс–Сб), сегодняшний день подсвечен; в дни матчей виден герб соперника и цветная метка (номер тура, после игры счёт). Месяцы листаются стрелками.',
+      'Дни календаря стали плитками: при наведении подсвечиваются, по щелчку в строке состояния видно, что в этот день.',
+      'Левая панель: крупный герб следующего соперника, точная дата и место, кнопка «Промотать календарь», обозначения цветов и сводка по клубу.',
+      'Правая панель: результаты последнего тура с гербами команд и мини-таблица топ-5 (если ты ниже пятого места, твоя строка добавляется снизу).',
+      'В таблице лиги и в списках результатов тоже появились маленькие гербы клубов.',
+    ] },
   { v: '1.5', name: { en: 'Player Profiles', ru: 'Профили игроков' },
     en: [
       'New PLAYER_INFO.EXE window: right-click any player (roster, team list, pitch, Notebook card) to open his Profile Card.',
