@@ -280,6 +280,7 @@ class MatchEngine {
     if (this.subsUsed >= MatchEngine.MAX_SUBS) return 'limit';
     const line = side.entries[idx].line;
     if (inP.available === false) return 'unavail';   // v2.2: injured / suspended kids can't come on
+    if (side.entries[idx].p.hasFlag?.('Showcase')) return 'showcase';   // v2.3: the scout wants the full 90
     if (line === 'GK' && inP.position !== 'GK') return 'gkOnly';
     if (line !== 'GK' && inP.position === 'GK') return 'gkTwo';
     const out = side.entries[idx].p;

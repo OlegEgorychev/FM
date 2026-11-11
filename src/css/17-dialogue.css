@@ -62,3 +62,5 @@
 .r-row.unavail .energy{ opacity: .5; }
 .pi-out{ color: #f08a7e; }
 .budget.debt, dd.money.debt{ color: #ff6b5e !important; text-shadow: 0 0 6px rgba(255,60,40,.5); }
+.st-badge.home{ background: #2c3a4a; color: #cfe3ff; }
+.tag.flag[title*="scout"], .tag.flag[title*="Скаут"]{ background: #10243a; color: #9fd3ff; border-color: #2f5f8a; }

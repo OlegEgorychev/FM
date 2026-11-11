@@ -698,6 +698,14 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     for (const p of s.squad) {
       if (p.suspensionMatches > 0 && !eng.everPlayed.has(p.id)) p.suspensionMatches--;
       if (p.hasFlag('Benched')) p.flags = p.flags.filter(f => f !== 'Benched');
+      if (p.hasFlag('Showcase')) {   // v2.3: 90 minutes in front of the scout, whatever his legs said
+        p.flags = p.flags.filter(f => f !== 'Showcase');
+        if (!eng.everPlayed.has(p.id)) continue;
+        p.energy = clamp(p.energy - EVENTS_CFG.SHOWCASE_DRAIN, 0, 100);
+        const hurt = Math.random() < EVENTS_CFG.SHOWCASE_INJURY * (p.energy < ENERGY.TIRED ? 2 : 1);
+        if (hurt) p.injuryDays = Math.max(p.injuryDays, rnd(...EVENTS_CFG.SHOWCASE_DAYS));
+        s.addDiary({ date, key: hurt ? 'scout.hurt' : 'scout.done', vars: { k: { pid: p.id }, d: p.injuryDays }, cls: 'ev' });
+      }
     }
     for (const p of eng.sides[0].all) {
       const own = s.player(p.id); if (!own) continue;
@@ -715,8 +723,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   statusBadge(p) {
     const r = p.unavailableReason;
     if (!r) return '';
-    const n = r === 'inj' ? p.injuryDays : r === 'sus' ? p.suspensionMatches : '';
-    return `<span class="st-badge ${r}" title="${esc(L.t('st.' + r, { n }))}">${r === 'inj' ? '\u271A' : r === 'sus' ? '<i></i>' : '$'}${n}</span>`;
+    const n = r === 'inj' ? p.injuryDays : r === 'sus' ? p.suspensionMatches : r === 'home' ? p.awayDays : '';
+    return `<span class="st-badge ${r}" title="${esc(L.t('st.' + r, { n }))}">${{ inj: '\u271A', sus: '<i></i>', home: '\u2302', deal: '$' }[r]}${n}</span>`;
   }
 
   /** v1.9: Promised_Start is checked at kick-off — kept quietly, or broken (morale crash + the parent wants money back). */
@@ -724,11 +732,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const s = this.state;
     for (const p of s.squad.filter(x => x.hasFlag('Promised_Start'))) {
       p.flags = p.flags.filter(f => f !== 'Promised_Start');
-      const kept = s.isStarter(p.id);
+      const kept = s.isStarter(p.id), pool = p.promiseBy === 'pool';
+      p.promiseBy = null;
       let refund = 0;
-      if (!kept) { p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.PROMISE_BROKEN_MORALE, 0, 100); refund = -s.addMoney(-EVENTS_CFG.DAD_REFUND); }
-      s.addDiary({ date: s.calendar.date, key: kept ? 'ev.promise.kept' : 'ev.promise.broken', vars: { k: { pid: p.id }, m: '$' + refund }, cls: 'ev' });
-      if (this.engine) this.engine.log(kept ? 'coach' : 'turn', kept ? 'ev.promise.kept' : 'ev.promise.brokenLog', { k: p, m: '$' + refund }, 0);
+      if (!kept && pool) {   // v2.3: the dad who lost at the pub keeps his son at home
+        p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.POOL_BROKEN_MORALE, 0, 100);
+        p.awayDays = Math.max(p.awayDays, EVENTS_CFG.HOME_DAYS);
+      } else if (!kept) { p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.PROMISE_BROKEN_MORALE, 0, 100); refund = -s.addMoney(-EVENTS_CFG.DAD_REFUND); }
+      const key = kept ? 'ev.promise.kept' : pool ? 'ev.promise.brokenPool' : 'ev.promise.broken';
+      s.addDiary({ date: s.calendar.date, key, vars: { k: { pid: p.id }, m: '$' + refund, d: EVENTS_CFG.HOME_DAYS }, cls: 'ev' });
+      if (this.engine) this.engine.log(kept ? 'coach' : 'turn', kept ? 'ev.promise.kept' : pool ? 'ev.promise.brokenPool' : 'ev.promise.brokenLog', { k: p, m: '$' + refund, d: EVENTS_CFG.HOME_DAYS }, 0);
     }
     s.save();
   }
@@ -933,7 +946,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   }
 
   /** v1.9: story flags (e.g. PROMISED START) — visible, unlike the hidden numbers. */
-  flagChips(p) { return (p.flags || []).map(f => `<span class="tag flag" title="${esc(FLAGS[f][L.code][1])}">$ ${esc(FLAGS[f][L.code][0])}</span>`).join(''); }
+  flagChips(p) { return (p.flags || []).map(f => `<span class="tag flag" title="${esc(FLAGS[f][L.code][1])}">${f === 'Showcase' ? '\u25C9' : '$'} ${esc(FLAGS[f][L.code][0])}</span>`).join(''); }
   tagChip(tag, id, removable) {
     const tone = TAGS[tag]?.tone || 'neutral';
     const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(L.t('squad.remove'))}" title="${esc(L.t('squad.remove'))}">&times;</button>` : '';
@@ -1054,6 +1067,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   createEngine() {
     if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return null; }
     if (this.events.active) { this.events.open(); return null; }   // v2.2: answer the match-day dilemma first
+    this.state.ensureShowcaseXI();                                  // v2.3: the scout's three start
     const fixes = this.state.ensureAvailableXI();                   // v2.2: nobody injured / suspended kicks off
     if (fixes.length) { this.renderTeam(); this.prepareMatch(); }
     if (this.state.starters().some(p => !p.available)) { this.alert(L.t('xi.noFit'), L.t('team.err.title'), 'error'); return null; }

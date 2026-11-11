@@ -108,50 +108,105 @@ const NARRATIVE_EVENTS = [
     },
   },
 
-  /* ---------- 5. SHADY SPONSOR — sets up a time bomb ---------- */
+  /* ---------- 5. THE SCOUT — kit money now, a showcase later (time bomb) ---------- */
   {
-    id: 'sponsor', when: 'day',
-    trigger: (s) => s.budget < EVENTS_CFG.SPONSOR_BUDGET && Math.random() < EVENTS_CFG.SPONSOR_CHANCE
-      && !s.eventQueue.some(q => q.id === 'favor') && !s.eventLog.some(e => e.id === 'sponsor' && e.season === s.season),
+    id: 'scout', when: 'day',
+    trigger: (s) => Math.random() < EVENTS_CFG.SCOUT_CHANCE && s.league.playedMatchdays() >= 1
+      && !s.eventQueue.some(q => q.id === 'scoutvisit') && !s.eventLog.some(e => e.id === 'scout' && e.season === s.season),
     cast: () => ({}),
     execute(ctx) {
       ctx.show({
-        face: PortraitGenerator.silhouette('#c9a227'), name: L.t('talk.bizName'), role: L.t('talk.roleBiz'),
-        text: L.t('ev.sponsor.text'),
+        face: PortraitGenerator.silhouette('#1f4f8a'), name: L.t('talk.scoutName'), role: L.t('talk.roleScout'),
+        text: L.t('ev.scout.text', { g: EVENTS_CFG.SCOUT_GIFT }),
         choices: [
-          { key: 'ev.sponsor.a', tone: 'green', gain: EVENTS_CFG.SPONSOR_GIFT,
-            run: () => { ctx.schedule('favor', { days: EVENTS_CFG.FAVOR_DAYS, matchDay: true }); return {}; } },
-          { key: 'ev.sponsor.b', tone: 'gray', run: () => ({}) },
+          { key: 'ev.scout.a', tone: 'green', gain: EVENTS_CFG.SCOUT_GIFT,
+            run: () => { ctx.schedule('scoutvisit', { days: EVENTS_CFG.SCOUT_DAYS, matchDay: true }); return {}; } },
+          { key: 'ev.scout.b', tone: 'gray', run: () => ({}) },
         ],
       });
     },
   },
 
-  /* ---------- 6. CALLING IN THE FAVOR — only ever fired by the queue (match day, 14+ days after the sponsor) ---------- */
+  /* ---------- 6. THE SCOUT IN THE STANDS — only ever fired by the queue (match day, 14+ days later) ---------- */
   {
-    id: 'favor', when: 'scheduled',
+    id: 'scoutvisit', when: 'scheduled',
     trigger: () => false,
-    cast(s) {   // the three best kids in today's XI (hidden overall)
-      const top = s.starters().filter(p => p.available).sort((a, b) => b.overall - a.overall).slice(0, 3);
-      return { top: top.map(p => p.id) };
+    cast(s) {   // the three best FIT kids in the whole squad (hidden overall)
+      const top = s.squad.filter(p => p.available).sort((a, b) => b.overall - a.overall).slice(0, 3);
+      return top.length ? { top: top.map(p => p.id) } : null;
     },
     execute(ctx) {
-      const s = ctx.state, top = ctx.cast.top, opp = s.matchContext()?.opp;
+      const s = ctx.state, top = ctx.cast.top;
       const names = top.map(p => L.name(p.name)).join(', ');
+      const tired = top.filter(p => p.energy < ENERGY.TIRED).length;
       ctx.show({
-        face: PortraitGenerator.silhouette('#c9a227'), name: L.t('talk.bizName'), role: L.t('talk.roleBizBack'),
-        text: L.t('ev.favor.text', { o: L.team(opp?.name || '?'), t: names }),
+        face: PortraitGenerator.silhouette('#1f4f8a'), name: L.t('talk.scoutName'), role: L.t('talk.roleScoutBack'),
+        text: L.t('ev.scoutvisit.text', { t: names }) + (tired ? ' ' + L.t('ev.scoutvisit.tired', { n: tired }) : ''),
         choices: [
-          { key: 'ev.favor.a', tone: 'gray',
+          { key: 'ev.scoutvisit.a', tone: 'gray',
             run: () => {
-              for (const p of top) if (!p.hasFlag('Benched')) p.flags.push('Benched');   // locked out of THIS match → ensureAvailableXI benches them
-              for (const p of s.squad) p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.FAVOR_MORALE, 0, 100);
+              for (const p of top) {
+                if (!p.hasFlag('Showcase')) p.flags.push('Showcase');   // must start, can't be subbed off (see ensureShowcaseXI / substitute)
+                p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.SHOWCASE_MORALE, 0, 100);
+              }
+              s.ensureShowcaseXI();
               return { t: names };
             } },
-          { key: 'ev.favor.b', tone: 'red', debt: EVENTS_CFG.FAVOR_DEBT,
+          { key: 'ev.scoutvisit.b', tone: 'red', debt: EVENTS_CFG.SCOUT_GIFT,
             run: () => {
-              if (s.budget < 0) for (const p of s.squad) p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.FAVOR_DEBT_MORALE, 0, 100);
+              if (s.budget < 0) for (const p of s.squad) p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.DEBT_MORALE, 0, 100);
               return { b: money(s.budget) };
+            } },
+        ],
+      });
+    },
+  },
+
+  /* ---------- 7. THE DADS' POOL — a winning dad donates now… ---------- */
+  {
+    id: 'pool', when: 'day',
+    trigger: (s) => Math.random() < EVENTS_CFG.POOL_CHANCE && s.league.playedMatchdays() >= 1
+      && !s.eventQueue.some(q => q.id === 'poolloss') && !s.eventLog.some(e => e.id === 'pool' && e.season === s.season),
+    cast(s) {
+      const [w, l] = shuffle(s.squad.filter(p => !p.hasFlag('Promised_Start')));   // winner's son, loser's son (named later)
+      return w && l ? { winner: w.id, loser: l.id } : null;
+    },
+    execute(ctx) {
+      const { winner } = ctx.cast;
+      ctx.show({
+        face: PortraitGenerator.silhouette('#3a6b2a'), name: L.t('talk.parentName', { s: L.name(winner.surname) }), role: L.t('talk.rolePub'),
+        text: L.t('ev.pool.text', { k: L.name(winner.name), g: EVENTS_CFG.POOL_GIFT }),
+        choices: [
+          { key: 'ev.pool.a', tone: 'green', gain: EVENTS_CFG.POOL_GIFT, who: winner.id,
+            run: () => { ctx.schedule('poolloss', { days: EVENTS_CFG.POOL_DAYS, cast: { kid: ctx.cast.loser.id } }); return { k: { pid: winner.id } }; } },
+          { key: 'ev.pool.b', tone: 'gray', who: winner.id,
+            run: () => { winner.dyn.morale = clamp(winner.dyn.morale + EVENTS_CFG.POOL_REFUSE_MORALE, 0, 100); return { k: { pid: winner.id } }; } },
+        ],
+      });
+    },
+  },
+
+  /* ---------- 8. …and a losing dad comes for his son's minutes (scheduled, 14 days later) ---------- */
+  {
+    id: 'poolloss', when: 'scheduled',
+    trigger: () => false,
+    cast(s) {   // fallback if the scheduled cast is gone: the kid with the fewest appearances
+      const kid = [...s.squad].sort((a, b) => (s.seasonOf(a.id).apps - s.seasonOf(b.id).apps))[0];
+      return kid ? { kid: kid.id } : null;
+    },
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast;
+      ctx.show({
+        face: PortraitGenerator.silhouette('#6b2a2a'), name: L.t('talk.parentName', { s: L.name(kid.surname) }), role: L.t('talk.rolePubBack'),
+        text: L.t('ev.poolloss.text', { k: L.name(kid.name), d: EVENTS_CFG.HOME_DAYS }),
+        choices: [
+          { key: 'ev.poolloss.a', tone: 'gray', who: kid.id,
+            run: () => { if (!kid.hasFlag('Promised_Start')) kid.flags.push('Promised_Start'); kid.promiseBy = 'pool'; return { k: { pid: kid.id } }; } },
+          { key: 'ev.poolloss.b', tone: 'red', who: kid.id,
+            run: () => {
+              kid.awayDays = Math.max(kid.awayDays, EVENTS_CFG.HOME_DAYS);
+              kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.HOME_MORALE, 0, 100);
+              return { k: { pid: kid.id }, d: EVENTS_CFG.HOME_DAYS };
             } },
         ],
       });
@@ -205,9 +260,9 @@ class EventEngine {
 
   /* ---------- v2.2 time bombs: state.eventQueue = [{ id, due, matchDay, from }] ---------- */
   /** Schedules `id` for `days` after `from` (ISO date). matchDay = fire on the first MATCH day on/after that date. */
-  schedule(id, { days = 0, date = null, matchDay = false, from = this.state.calendar.date, by = null } = {}) {
+  schedule(id, { days = 0, date = null, matchDay = false, from = this.state.calendar.date, by = null, cast = null } = {}) {
     const due = date || isoAdd(from, days);
-    this.state.eventQueue.push({ id, due, matchDay: !!matchDay, from: by });
+    this.state.eventQueue.push({ id, due, matchDay: !!matchDay, from: by, ...(cast ? { cast } : {}) });
     this.state.eventQueue.sort((a, b) => a.due.localeCompare(b.due));
   }
   takeDue(date, matchDay) {
@@ -219,7 +274,7 @@ class EventEngine {
   roll(date) {
     if (this.active) return false;
     const due = this.takeDue(date, false);
-    if (due && this.fire(due.id, date, { resume: true })) return true;
+    if (due && this.fire(due.id, date, { resume: true, cast: due.cast })) return true;
     if (!this.enabled) return false;
     const s = this.state, last = s.eventLog[s.eventLog.length - 1];
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
@@ -232,17 +287,19 @@ class EventEngine {
     if (this.active) return false;
     const s = this.state, date = mev.date, ctx = s.matchContext();
     const due = this.takeDue(date, true);
-    if (due && this.fire(due.id, date, { after: 'matchday' })) return true;
+    if (due && this.fire(due.id, date, { after: 'matchday', cast: due.cast })) return true;
     if (!this.enabled) return false;
     for (const ev of shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'matchday')))
       if (ev.trigger(s, date, ctx) && this.fire(ev.id, date, { after: 'matchday' })) return true;
     return false;
   }
   /** Starts an event now (also used by DEBUG.EXE). resume = continue the calendar afterwards; after = 'matchday' → matchday dialog. */
-  fire(id, date = this.state.calendar.date, { resume = false, after = null } = {}) {
+  fire(id, date = this.state.calendar.date, { resume = false, after = null, cast: preset = null } = {}) {
     const ev = this.find(id);
     if (!ev || this.active) return false;
-    const cast = ev.cast ? ev.cast(this.state) : {};
+    // v2.3: a scheduled event may carry its actors from the moment it was planned (if they are still in the squad)
+    const keep = preset && Object.values(preset).every(v => [].concat(v).every(pid => this.state.player(pid)));
+    const cast = keep ? preset : ev.cast ? ev.cast(this.state) : {};
     if (!cast) return false;
     this.state.pendingEvent = { id, date, cast, resume, after, step: 'start' };
     this.state.save();

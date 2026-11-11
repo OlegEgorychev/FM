@@ -259,7 +259,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const dd2 = await page.evaluate(k => ({ b: YAM.game.budget, flag: YAM.game.player(k).flags.includes('Promised_Start'), hdr: document.getElementById('hdr-budget').textContent,
       chip: !!document.querySelector(`#roster .r-row[data-id="${k}"] .tag.flag`) }), dd.kid);
     check("Rich Kid's Dad: worst player, take money = +$300 + Promised_Start chip", dd.kid === dd.worst && dd.sil && dd2.b === 400 && dd2.flag && /\$400/.test(dd2.hdr) && dd2.chip, JSON.stringify({ dd, dd2 }));
-    // v2.2: injuries (multi-day), multi-step dialogue + suspension, match-day bus, sponsor → scheduled favor
+    // v2.2/2.3: injuries, multi-step dialogue + suspension, match-day bus, dads' pool → losing dad, scout → showcase
     const talk = async i => { await page.click(`#talk-choices .talk-btn[data-i="${i}"]`); await page.waitForTimeout(30); };
     await page.evaluate(() => { YAM.game.budget = 1000; YAM.ui.events.fire('knock'); });
     const kn = await page.evaluate(() => YAM.game.pendingEvent.cast.kid);
@@ -283,11 +283,30 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.evaluate(() => { YAM.game.squad.forEach(p => { p.energy = 80; }); YAM.ui.events.fire('bus'); });
     await talk(1);   // jog
     const bus = await page.evaluate(() => YAM.game.squad.every(p => p.energy === 56));
-    await page.evaluate(() => { YAM.game.budget = 100; YAM.ui.renderBudget(); YAM.ui.events.fire('sponsor'); });
-    await talk(0);   // take the money → time bomb
+    const plus14 = d0 => { const d = new Date(d0 + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 14); return d.toISOString().slice(0, 10); };
+    // v2.3: the dads' pool → a losing dad 14 days later (the actor is chosen NOW and carried by the queue)
+    await page.evaluate(() => { YAM.game.budget = 100; YAM.ui.renderBudget(); YAM.ui.events.fire('pool'); });
+    const loser = await page.evaluate(() => YAM.game.pendingEvent.cast.loser);
+    await talk(0);   // accept the donation
+    const pl = await page.evaluate(() => ({ b: YAM.game.budget, q: JSON.parse(JSON.stringify(YAM.game.eventQueue)), date: YAM.game.calendar.date }));
+    await page.evaluate(() => { const q = YAM.game.eventQueue.splice(0, 1)[0]; YAM.ui.events.fire(q.id, undefined, { cast: q.cast }); });
+    const pl2 = await page.evaluate(() => ({ id: YAM.game.pendingEvent?.id, kid: YAM.game.pendingEvent?.cast.kid }));
+    await talk(1);   // "he plays when he earns it" → kept at home 10 days
+    const pl3 = await page.evaluate(k => { const p = YAM.game.player(k), r = { away: p.awayDays, avail: p.available, starter: YAM.game.isStarter(k) };
+      YAM.game.restDay(); r.after = p.awayDays; p.awayDays = 0; return r; }, loser);
+    await page.evaluate(k => YAM.ui.events.fire('poolloss', undefined, { cast: { kid: k } }), loser);
+    await talk(0);   // promise the start
+    const pl4 = await page.evaluate(k => { const p = YAM.game.player(k), r = { flag: p.hasFlag('Promised_Start'), by: p.promiseBy };
+      p.flags = p.flags.filter(f => f !== 'Promised_Start'); p.promiseBy = null; return r; }, loser);
+    check("Dads' pool: +$200, schedules the losing dad 14 days later with the SAME kid; refuse = kept home 10 days; promise = pool start",
+      pl.b === 300 && pl.q.length === 1 && pl.q[0].id === 'poolloss' && !pl.q[0].matchDay && pl.q[0].due === plus14(pl.date) && pl.q[0].cast?.kid === loser
+      && pl2.id === 'poolloss' && pl2.kid === loser && pl3.away === 10 && !pl3.avail && !pl3.starter && pl3.after === 9 && pl4.flag && pl4.by === 'pool', JSON.stringify({ pl, pl2, pl3, pl4 }));
+    // v2.3: the scout → showcase on a match day 14 days later
+    await page.evaluate(() => { YAM.game.budget = 100; YAM.ui.renderBudget(); YAM.ui.events.fire('scout'); });
+    await talk(0);   // accept the kit money → time bomb
     const sp = await page.evaluate(() => ({ b: YAM.game.budget, q: JSON.parse(JSON.stringify(YAM.game.eventQueue)), date: YAM.game.calendar.date }));
-    check('Broken Bus jog = condition ×0.7; Shady Sponsor +$500 schedules "favor" 14 days later (match day)', bus && sp.b === 600 && sp.q.length === 1 && sp.q[0].id === 'favor'
-      && sp.q[0].matchDay && sp.q[0].due === (() => { const d = new Date(sp.date + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 14); return d.toISOString().slice(0, 10); })(), JSON.stringify(sp));
+    check('Broken Bus jog = condition ×0.7; Scout +$500 schedules "scoutvisit" 14 days later (match day)', bus && sp.b === 600 && sp.q.length === 1 && sp.q[0].id === 'scoutvisit'
+      && sp.q[0].matchDay && sp.q[0].due === plus14(sp.date), JSON.stringify(sp));
     await page.evaluate(d => { YAM.game.eventQueue[0].due = d; YAM.game.save(); }, sp.date);   // fast-forward the bomb: due today → next match day
 
     // a dilemma survives a reload, then the calendar pauses on a random event and resumes after the choice
@@ -298,8 +317,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.click('#talk-choices .talk-btn[data-i="0"]');
     const re2 = await page.evaluate(k => ({ b: YAM.game.budget, mor: YAM.game.player(k).dyn.morale }), re.kid);
     await closeModal();
-    const qPersist = await page.evaluate(() => YAM.game.eventQueue.length === 1 && YAM.game.eventQueue[0].id === 'favor');
-    await page.evaluate(() => { Object.assign(EVENTS_CFG, { DAD_CHANCE: 0, KNOCK_CHANCE: 0, SPONSOR_CHANCE: 0, ULTI_CHANCE: 0, BUS_CHANCE: 0, BOOTS_CHANCE: 1 }); YAM.game.eventLog = []; });
+    const qPersist = await page.evaluate(() => YAM.game.eventQueue.length === 1 && YAM.game.eventQueue[0].id === 'scoutvisit');
+    await page.evaluate(() => { Object.assign(EVENTS_CFG, { DAD_CHANCE: 0, KNOCK_CHANCE: 0, SCOUT_CHANCE: 0, POOL_CHANCE: 0, ULTI_CHANCE: 0, BUS_CHANCE: 0, BOOTS_CHANCE: 1 }); YAM.game.eventLog = []; });
     await page.click('#btn-sim');
     await page.waitForFunction(() => !document.getElementById('talk-layer').hidden, null, { timeout: 10000 });
     const paused = await page.evaluate(() => ({ running: YAM.ui.cal.running, date: YAM.ui.cal.date, btn: document.getElementById('btn-sim').disabled }));
@@ -311,11 +330,14 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     // the time bomb goes off on the match day, BEFORE kick-off
     await page.waitForFunction(() => !document.getElementById('talk-layer').hidden, null, { timeout: 3000 });
     const fv = await page.evaluate(() => ({ id: YAM.game.pendingEvent?.id, top: YAM.game.pendingEvent?.cast.top, q: YAM.game.eventQueue.length, modal: !document.getElementById('modal-layer').hidden }));
-    await talk(0);   // bench the top 3
-    const fv2 = await page.evaluate(t => ({ benched: t.every(id => !YAM.game.isStarter(id) && YAM.game.player(id).hasFlag('Benched')), modal: !document.getElementById('modal-layer').hidden,
-      sub: YAM.ui.createEngine ? null : null }), fv.top);
-    check('scheduled favor: queue persisted (reload), fires on match day before the matchday dialog, benches top 3', qPersist && fv.id === 'favor' && fv.top.length === 3 && fv.q === 0
-      && !fv.modal && fv2.benched && fv2.modal, JSON.stringify({ qPersist, fv, fv2 }));
+    await talk(0);   // they start and play the full match
+    const fv2 = await page.evaluate(t => {
+      const s = YAM.game, bench = s.bench().find(b => b.available && b.position !== 'GK');
+      return { showcase: t.every(id => s.isStarter(id) && s.player(id).hasFlag('Showcase')), modal: !document.getElementById('modal-layer').hidden,
+        lock: bench ? s.swapPlayers(t.find(id => s.player(id).position !== 'GK') || t[0], bench.id) : 'showcase' };
+    }, fv.top);
+    check('scheduled scout visit: queue persisted (reload), fires on match day before the matchday dialog, top 3 start and are locked in', qPersist && fv.id === 'scoutvisit' && fv.top.length === 3 && fv.q === 0
+      && !fv.modal && fv2.showcase && fv2.modal && fv2.lock === 'showcase', JSON.stringify({ qPersist, fv, fv2 }));
     await closeModal();
     const pr = await page.evaluate(() => {
       const p = YAM.game.squad.find(x => x.flags.includes('Promised_Start'));
@@ -359,8 +381,9 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       md2: YAM.game.league.fixturesOf(2).every(f => f.hg !== null), modal: !document.getElementById('modal-layer').hidden,
       apps: Object.values(YAM.game.seasonStats).reduce((a, s) => a + s.apps, 0), tired: YAM.game.lastReport && YAM.game.starters().some((p, i) => p.energy < e0[i]),
       score: document.getElementById('sb-score').textContent, rep: YAM.game.lastReport.gf + '-' + YAM.game.lastReport.ga }), qs0.energy);
-    const after = await page.evaluate(([t, u]) => ({ benched: t.some(id => YAM.game.player(id).hasFlag('Benched')), sus: YAM.game.player(u).suspensionMatches }), [fv.top, ul]);
-    check('after the match: deal bench cleared, suspension served (2 → 1)', !after.benched && after.sus === 1, JSON.stringify(after));
+    const after = await page.evaluate(([t, u]) => ({ showcase: t.some(id => YAM.game.player(id).hasFlag('Showcase')), sus: YAM.game.player(u).suspensionMatches,
+      diary: YAM.game.diary.filter(d => /^scout\.(done|hurt)$/.test(d.key)).length }), [fv.top, ul]);
+    check('after the match: showcase cleared (+ diary per kid), suspension served (2 → 1)', !after.showcase && after.sus === 1 && after.diary === 3, JSON.stringify(after));
     check('Quick Sim: button → result in ms, Notebook opens, stats/energy/fixtures recorded', qs0.btn && qs.ms < 250 && qs.view === 'notes' && qs.cards === 3 && qs.md2 && !qs.modal
       && qs.apps >= qs0.apps + 11 && qs.tired && qs.score.replace(/\s/g, '') === qs.rep, JSON.stringify(qs));
     await page.click('#btn-lang'); await page.click('#btn-lang');

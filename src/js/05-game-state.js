@@ -99,6 +99,7 @@ class GameState {
     const pa = this.player(a), pb = this.player(b);
     if (!pa || !pb || (ia < 0 && ib < 0)) return 'bench';
     if ((ia < 0 && !pa.available) || (ib < 0 && !pb.available)) return 'unavail_' + (ia < 0 ? pa : pb).unavailableReason;   // v2.2
+    if ((ia < 0) !== (ib < 0) && (ia >= 0 ? pa : pb).hasFlag('Showcase')) return 'showcase';   // v2.3: the scout came for him
     if (ia >= 0 && ib >= 0) {
       if (ia === 0 || ib === 0) return 'gkSlot';
       [this.lineup[ia], this.lineup[ib]] = [b, a];
@@ -129,10 +130,24 @@ class GameState {
     const healed = [];
     for (const p of this.squad) if (p.injuryDays > 0 && --p.injuryDays === 0) healed.push(p);
     for (const p of healed) this.addDiary({ date: this.calendar.date, key: 'inj.healed', vars: { k: { pid: p.id } }, cls: 'ev' });
+    for (const p of this.squad) if (p.awayDays > 0 && --p.awayDays === 0)   // v2.3: back from "home arrest"
+      this.addDiary({ date: this.calendar.date, key: 'home.back', vars: { k: { pid: p.id } }, cls: 'ev' });
     return healed;
   }
   /** v2.2: injured / suspended / benched-by-deal starters are replaced by the best available bench kid
       (same position first). Returns [{ out, in }] so the UI can tell the coach. */
+  /** v2.3: scout showcase — flagged kids must be in the XI (they replace the weakest starter of their line). */
+  ensureShowcaseXI() {
+    const slots = this.slots();
+    for (const p of this.squad.filter(x => x.hasFlag('Showcase') && x.available && !this.isStarter(x.id))) {
+      const idx = this.lineup.map((id, i) => ({ i, q: this.player(id) }))
+        .filter(({ i, q }) => i > 0 && p.position !== 'GK' && !q.hasFlag('Showcase'))
+        .sort((a, b) => (LINE_POS[slots[b.i].line] === p.position) - (LINE_POS[slots[a.i].line] === p.position) || a.q.overall - b.q.overall)[0]
+        || (p.position === 'GK' && !this.player(this.lineup[0]).hasFlag('Showcase') ? { i: 0 } : null);
+      if (idx) this.lineup[idx.i] = p.id;
+    }
+    this.save();
+  }
   ensureAvailableXI() {
     const slots = this.slots(), changes = [];
     this.lineup.forEach((id, i) => {

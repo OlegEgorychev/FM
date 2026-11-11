@@ -72,13 +72,17 @@ const EVENTS_CFG = { COOLDOWN: 6, BOOTS_CHANCE: 0.05, DAD_CHANCE: 0.05, BOOTS_CO
   // v2.2
   BUS_CHANCE: 0.2, BUS_COST: 50, BUS_CONDITION: 0.3,                       // away match days only; jog = condition ×0.7
   KNOCK_CHANCE: 0.04, CLINIC_COST: 200, CLINIC_DAYS: 3, ICE_DAYS: 14,
-  SPONSOR_CHANCE: 0.06, SPONSOR_BUDGET: 300, SPONSOR_GIFT: 500, FAVOR_DAYS: 14,
-  FAVOR_MORALE: -20, FAVOR_DEBT: 500, FAVOR_DEBT_MORALE: -30,
+  // v2.3: the scout (kit money → showcase 14 days later) and the dads' pool (donation → angry dad 14 days later)
+  SCOUT_CHANCE: 0.05, SCOUT_GIFT: 500, SCOUT_DAYS: 14, SHOWCASE_MORALE: 10, SHOWCASE_DRAIN: 15, SHOWCASE_INJURY: 0.25, SHOWCASE_DAYS: [3, 8],
+  DEBT_MORALE: -20,
+  POOL_CHANCE: 0.05, POOL_GIFT: 200, POOL_DAYS: 14, POOL_REFUSE_MORALE: -5, HOME_DAYS: 10, HOME_MORALE: -15, POOL_BROKEN_MORALE: -30,
   ULTI_CHANCE: 0.05, ULTI_DISCIPLINE: 8, ULTI_FINE: 20, ULTI_FINE_MORALE: -10, ULTI_SUSPEND: 2, ULTI_SORRY_DISC: -2, ULTI_SORRY_MORALE: 5,
   RED_BAN: 1, KNOCK_TO_INJURY: 0.35, KNOCK_DAYS: [4, 12] };
 /* Story flags on academy kids (separate from the one-per-kid ROLE tag). Shown as chips, never as numbers. */
 const FLAGS = { Promised_Start: { en: ['PROMISED START', 'A parent paid for this kid to start the next match.'],
   ru: ['ОБЕЩАН СТАРТ', 'Родитель заплатил, чтобы этот игрок вышел в старте в следующем матче.'] },
+  Showcase: { en: ['SCOUT WATCHING', 'A big-club scout is here for him: he starts and plays the full 90.'],
+    ru: ['СМОТРИТ СКАУТ', 'Скаут большого клуба приехал на него: выходит в старте и играет все 90 минут.'] },
   Benched: { en: ['BENCHED (DEAL)', 'You promised a businessman he sits out this match.'],
     ru: ['В ЗАПАСЕ (СДЕЛКА)', 'Ты пообещал бизнесмену, что он пропустит этот матч.'] } };
 const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -1, FLOOR: 20 };

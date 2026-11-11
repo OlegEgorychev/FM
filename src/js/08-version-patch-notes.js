@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.2';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.3', name: { en: 'Scouts & the Dads\' Pool', ru: 'Скаут и папин тотализатор' },
+    en: [
+      'The shady businessman is gone: this is a kids\' league.',
+      'New chain "The Scout": a big-club scout pays $500 for kit. 14 days later he is in the stands on match day and wants your three best kids to start and play the full 90 — tired or not. Agree (they are locked in the XI, extra fatigue, a chance of injury) or give the money back (even into debt).',
+      'New chain "The Dads\' Pool": the dads bet on the under-14 league at the pub. A winning dad donates $200. Two weeks later a losing dad storms in: his son starts the next match, or he keeps him at home for 10 days.',
+      'New status: "kept at home" (house icon). Like injuries and bans, it locks the kid out of the XI and the bench, and counts down day by day.',
+      'Scheduled events can now remember who they are about, so the same kid comes back in the follow-up.',
+    ],
+    ru: [
+      'Тёмного бизнесмена больше нет: у нас детская лига.',
+      'Новая цепочка «Скаут»: скаут большого клуба даёт $500 на форму. Через 14 дней в день матча он сидит на трибуне и хочет, чтобы трое твоих лучших вышли в старте и отыграли все 90 минут — уставшие или нет. Согласиться (они закреплены в основе, лишняя усталость, риск травмы) или вернуть деньги (даже в долг).',
+      'Новая цепочка «Папин тотализатор»: отцы ставят на детскую лигу в пабе. Выигравший папа жертвует $200. Через две недели приходит проигравший: его сын выходит в старте в следующем матче, или он держит его дома 10 дней.',
+      'Новый статус «дома у отца» (значок домика). Как травма и дисквалификация, он не пускает игрока в основу и на замену и уменьшается день за днём.',
+      'Запланированные события теперь помнят, о ком они, поэтому в продолжении возвращается тот же игрок.',
+    ] },
   { v: '2.2', name: { en: 'Consequences', ru: 'Последствия' },
     en: [
       'Time bombs: a choice can now come back to haunt you days later. Scheduled events survive saving and calendar simulation.',
