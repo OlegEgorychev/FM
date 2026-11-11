@@ -553,3 +553,14 @@ Object.assign(I18N.ru, {
   'dbg.doneMoney': 'OK: в бюджете теперь ${b}.', 'dbg.busy': 'Не сейчас: идёт матч или открыт диалог.',
   'dbg.ev.boots': 'Порванные бутсы', 'dbg.ev.dad': 'Папа богатого мальчика',
 });
+
+
+/* ---- v2.0: Quick Sim ---- */
+Object.assign(I18N.en, {
+  'match.instant': '[ &#9197; INSTANT SIM MATCH ]', 'match.instantRest': '[ &#9197; SIM TO FULL TIME ]',
+  'match.instantDone': 'Quick Sim: the match was played out instantly with the same engine. Report in the Notebook.',
+});
+Object.assign(I18N.ru, {
+  'match.instant': '[ &#9197; МГНОВЕННЫЙ МАТЧ ]', 'match.instantRest': '[ &#9197; ДОИГРАТЬ МГНОВЕННО ]',
+  'match.instantDone': 'Быстрая симуляция: матч доигран мгновенно тем же движком. Отчёт в Блокноте.',
+});

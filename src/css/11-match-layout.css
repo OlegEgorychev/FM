@@ -76,3 +76,9 @@
   .mc-controls{ grid-template-columns: 1fr; }
 }
 
+
+/* v2.0: [ INSTANT SIM MATCH ] — dark fast-forward button under Start */
+.ctrl .btn.ff{ padding: 6px 10px; font: bold 12px/1.1 var(--mono); letter-spacing: .5px; color: #ffcf5a;
+  background: #1c2226; box-shadow: inset -1px -1px 0 #000, inset 1px 1px 0 #4a5660; border-color: #5b6770 #0a0d0f #0a0d0f #5b6770; }
+.ctrl .btn.ff:hover:not(:disabled){ background: #26303a; color: #ffe08a; }
+.ctrl .btn.ff:disabled{ color: #5d6670; background: #1a1e21; }

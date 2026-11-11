@@ -256,6 +256,36 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('event persists over reload; random event pauses + resumes calendar; broken promise refunds $150',
       re.open && re2.b === re.b - 150 && re2.mor === 100 && !paused.running && paused.btn && resumed && pr.refund === 150 && pr.morale && pr.cleared && !pr.starter,
       JSON.stringify({ re, re2, paused, resumed, pr }));
+    // v2.0: Quick Sim — same tick() maths: seeded runs give identical results in visual and instant mode
+    const same = await page.evaluate(async () => {
+      const seeded = s => () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      const R = Math.random, home = YAM.ui.homeTeam(), opp = YAM.game.matchContext().team, out = [];
+      const sig = e => JSON.stringify([e.sides.map(x => x.score), [...e.stats.values()], [...e.energy.values()].map(v => v.toFixed(3))]);
+      for (const seed of [7, 42, 2002]) {
+        Math.random = seeded(seed);
+        const a = new YAM.MatchEngine(home, opp, { onLog() {}, onUpdate() {}, onEnd() {} }, {}).runInstant();
+        Math.random = seeded(seed);
+        const b = await new Promise(res => {
+          const e = new YAM.MatchEngine(home, opp, { onLog() {}, onUpdate() {}, onEnd: x => res(x), onHalfTime: x => setTimeout(() => x.resume(), 0) }, { speed: 5 });
+          e.start();
+        });
+        out.push(sig(a) === sig(b));
+      }
+      Math.random = R;
+      return out;
+    });
+    check('Quick Sim: instant and visual drivers give identical results (3 seeds)', same.every(Boolean), JSON.stringify(same));
+    await page.click('.tk[data-view=match]');
+    const qs0 = await page.evaluate(() => ({ btn: !document.getElementById('btn-instant').disabled, apps: Object.values(YAM.game.seasonStats).reduce((a, s) => a + s.apps, 0),
+      energy: YAM.game.starters().map(p => p.energy) }));
+    await page.click('#btn-instant');
+    await page.waitForFunction(() => YAM.game.phase === 'post', null, { timeout: 5000 });
+    const qs = await page.evaluate(e0 => ({ ms: YAM.ui.lastSimMs, view: YAM.ui.view, cards: document.querySelectorAll('#notes-body .card').length,
+      md2: YAM.game.league.fixturesOf(2).every(f => f.hg !== null), modal: !document.getElementById('modal-layer').hidden,
+      apps: Object.values(YAM.game.seasonStats).reduce((a, s) => a + s.apps, 0), tired: YAM.game.lastReport && YAM.game.starters().some((p, i) => p.energy < e0[i]),
+      score: document.getElementById('sb-score').textContent, rep: YAM.game.lastReport.gf + '-' + YAM.game.lastReport.ga }), qs0.energy);
+    check('Quick Sim: button → result in ms, Notebook opens, stats/energy/fixtures recorded', qs0.btn && qs.ms < 250 && qs.view === 'notes' && qs.cards === 3 && qs.md2 && !qs.modal
+      && qs.apps >= qs0.apps + 11 && qs.tired && qs.score.replace(/\s/g, '') === qs.rep, JSON.stringify(qs));
     await page.click('#btn-lang'); await page.click('#btn-lang');
     check('frame loop cost < 2 ms', await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0) < 2), (await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0).toFixed(2))) + ' ms');
   } catch (e) {

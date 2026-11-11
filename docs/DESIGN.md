@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v1.9)
+# Youth Academy Manager — design notes (current: v2.0)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -87,3 +87,8 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Torn Boots: snitch = random kid (his portrait), talented kid = one of the 6 highest potentials (not twice per season). A: −$150, morale 100. B: agility −2 (permanent).
 - Rich Kid's Dad: silhouette portrait (`PortraitGenerator.silhouette()`), son = lowest hidden `player.overall`. A: +$300 and story flag `Promised_Start` (`player.flags`, separate from the role tag, shown as a "$ PROMISED START" chip). B: his morale −20. At kick-off `checkPromises()`: starter → kept; not starting → morale −30 and the father takes back $150. Pre-match log warns either way.
 - DEBUG.EXE GOD MODE: +$500, fire any event, toggle random events. DATABASE: OVR + FLAGS columns.
+
+## Quick Sim (v2.0)
+- `MatchEngine.tick()` is the whole match maths for one beat (minute, drain, action, ambient, half/full time). Drivers: `start()` = setInterval paced by SPEED/HIGHLIGHT with `notify()` → `hooks.onUpdate` each beat; `runInstant()` = synchronous loop over the same `tick()` (≈110 iterations, ~2 ms), `instant = true` → no timers, no onUpdate/onGoal, half-time gives the same +4% without pausing. `onLog`, `onEnd` still fire.
+- UI: `createEngine()` shared by Start and `#btn-instant` (`onInstantSim()`): pre-match → whole match; half-time / mid-match → "SIM TO FULL TIME" plays the rest (subs + shouts kept). `onMatchEnd` records everything as usual; with `eng.instant` it skips the full-time dialog and opens the Notebook.
+- Smoke test: with a seeded `Math.random` the visual and instant drivers produce identical scores, stats and energy (3 seeds).

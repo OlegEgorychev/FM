@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.9</title>
+<title>Youth Academy Manager v2.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -870,6 +870,12 @@ body.fx .crt-scan{ opacity: .9; }
   .mc-controls{ grid-template-columns: 1fr; }
 }
 
+
+/* v2.0: [ INSTANT SIM MATCH ] — dark fast-forward button under Start */
+.ctrl .btn.ff{ padding: 6px 10px; font: bold 12px/1.1 var(--mono); letter-spacing: .5px; color: #ffcf5a;
+  background: #1c2226; box-shadow: inset -1px -1px 0 #000, inset 1px 1px 0 #4a5660; border-color: #5b6770 #0a0d0f #0a0d0f #5b6770; }
+.ctrl .btn.ff:hover:not(:disabled){ background: #26303a; color: #ffe08a; }
+.ctrl .btn.ff:disabled{ color: #5d6670; background: #1a1e21; }
 /* =========================================================
    v1.4 — PROCEDURAL PORTRAITS (paper doll, 32x32 SVG)
    ========================================================= */
@@ -1363,6 +1369,7 @@ body.fx .crt-scan{ opacity: .9; }
             </div>
             <div class="ctrl">
               <button class="btn go" id="btn-start"></button>
+              <button class="btn ff" id="btn-instant" type="button"></button>
               <div class="speed" id="speed"></div>
             </div>
           </div>
@@ -2260,6 +2267,17 @@ Object.assign(I18N.ru, {
   'dbg.doneMoney': 'OK: в бюджете теперь ${b}.', 'dbg.busy': 'Не сейчас: идёт матч или открыт диалог.',
   'dbg.ev.boots': 'Порванные бутсы', 'dbg.ev.dad': 'Папа богатого мальчика',
 });
+
+
+/* ---- v2.0: Quick Sim ---- */
+Object.assign(I18N.en, {
+  'match.instant': '[ &#9197; INSTANT SIM MATCH ]', 'match.instantRest': '[ &#9197; SIM TO FULL TIME ]',
+  'match.instantDone': 'Quick Sim: the match was played out instantly with the same engine. Report in the Notebook.',
+});
+Object.assign(I18N.ru, {
+  'match.instant': '[ &#9197; МГНОВЕННЫЙ МАТЧ ]', 'match.instantRest': '[ &#9197; ДОИГРАТЬ МГНОВЕННО ]',
+  'match.instantDone': 'Быстрая симуляция: матч доигран мгновенно тем же движком. Отчёт в Блокноте.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -3155,21 +3173,42 @@ class MatchEngine {
   }
   setSpeedMode(s) { this.speed = s; if (this.started && !this.finished && !this.paused) this.updateSpeed(); }
 
-  /* ---------- clock & pacing ---------- */
-  start() {
+  /* ---------- clock & pacing ----------
+     v2.0: the MATH lives in tick() (one in-game beat: minute, drain, action, background play, half/full time).
+     The clock is only a DRIVER around it:
+       • visual  — start(): setInterval(tick) paced by SPEED / HIGHLIGHT, with UI hooks every beat;
+       • instant — runInstant(): a plain synchronous loop over the very same tick(), no timers, no render hooks.
+     Same RNG checks, attributes, tactics, fatigue, cards, subs and stats either way. */
+  begin() {
+    if (this.started) return;
     this.started = true;
     this.kickoff(0);
     this.log('whistle', 'eng.kickoff', { a: this.team(0) }, 0);
-    this.updateSpeed();
-    this.hooks.onUpdate(this);
   }
+  start() {
+    this.begin();
+    this.updateSpeed();
+    this.notify();
+  }
+  /** Instant simulation: from kick-off (or from the current minute, mid-match) to full time in one call. */
+  runInstant() {
+    if (this.finished) return this;
+    this.instant = true;
+    this.stop();
+    this.begin();
+    this.paused = false;
+    for (let guard = 0; !this.finished && guard < 1000; guard++) this.tick();   // 90 minutes + shot beats ≈ 110 ticks
+    return this;
+  }
+  /** Render hook: every beat in visual mode, never in instant mode (onEnd still fires). */
+  notify() { if (!this.instant) this.hooks.onUpdate(this); }
   /* Highlight pacing: a shot sequence is ALWAYS played slowly, whatever the chosen speed. */
   desiredDelay() {
     if (this.pendingShot || this.hold > 0) return MatchEngine.HIGHLIGHT[this.speed] ?? 1200;
     return MatchEngine.SPEED[this.speed] ?? 600;
   }
   updateSpeed() {
-    if (this.paused) return;
+    if (this.paused || this.instant) return;
     const d = this.desiredDelay();
     if (d === this.delay && this.timer) return;
     this.delay = d;
@@ -3213,7 +3252,7 @@ class MatchEngine {
       if (this.minute >= 90) { this.finish(); return; }
     }
     this.updateSpeed();
-    this.hooks.onUpdate(this);
+    this.notify();
   }
 
   /* ---------- half-time (v1.1): the loop PAUSES until the coach resumes ---------- */
@@ -3223,6 +3262,7 @@ class MatchEngine {
     }
     this.log('flavor', 'ht.rest', { n: ENERGY.HT_REST }, -1);
     this.setEv({ kind: 'halftime' });
+    if (this.instant) return;   // instant sim: same +4% rest, no pause
     this.pause();
     this.hooks.onUpdate(this);
     this.hooks.onHalfTime?.(this);
@@ -3265,7 +3305,7 @@ class MatchEngine {
     if (this.pendingShot && this.pendingShot.shooter === out) this.pendingShot.shooter = inP;
     this.log('coach', 'eng.sub', { a: inP, b: out }, 0);
     this.hooks.onSub?.(out, inP);
-    this.hooks.onUpdate(this);
+    this.notify();
     return null;
   }
 
@@ -3273,7 +3313,7 @@ class MatchEngine {
     this.stop();
     this.finished = true;
     this.log('whistle', 'eng.ft', this.scoreVars());
-    this.hooks.onUpdate(this);
+    this.notify();
     this.hooks.onEnd(this);
   }
 
@@ -3437,7 +3477,7 @@ class MatchEngine {
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
-      this.hooks.onGoal?.(side);
+      if (!this.instant) this.hooks.onGoal?.(side);
       this.kickoff(opp);
       this.hold = 1;   // celebration beat
       this.setEv({ kind: 'goal', side, a: shooter });
@@ -3539,8 +3579,21 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.0', name: { en: 'Quick Sim', ru: 'Быстрая симуляция' },
+    en: [
+      'New [ INSTANT SIM MATCH ] button under Start Match: skip the 2D match and get the final result in a few milliseconds.',
+      'Same engine, same maths: the instant mode runs the very same minute-by-minute logic (attributes, tactics, shouts, fatigue, cards, background play) in one loop instead of on a timer.',
+      'After a Quick Sim you go straight to the Coach\'s Notebook: goals, stats, coach\'s notes, energy loss, sharpness and morale all come from the simulated 90 minutes.',
+      'Started watching and changed your mind? At half-time or mid-match the button becomes [ SIM TO FULL TIME ] and plays out the rest instantly (your subs and shouts stay).',
+    ],
+    ru: [
+      'Новая кнопка [ МГНОВЕННЫЙ МАТЧ ] под «Начать матч»: пропусти 2D-матч и получи итог за несколько миллисекунд.',
+      'Тот же движок, та же математика: мгновенный режим прогоняет ту же поминутную логику (атрибуты, тактика, установки, усталость, карточки, фоновая игра) одним циклом вместо таймера.',
+      'После быстрой симуляции сразу открывается Блокнот тренера: голы, статистика, заметки, потеря энергии, тонус и мораль считаются по сыгранным 90 минутам.',
+      'Начал смотреть и передумал? В перерыве или по ходу матча кнопка превращается в [ ДОИГРАТЬ МГНОВЕННО ] и мгновенно доигрывает остаток (замены и установки сохраняются).',
+    ] },
   { v: '1.9', name: { en: 'Locker Room Drama', ru: 'Драмы раздевалки' },
     en: [
       'Club budget: the academy starts with $500. The budget is always visible in the taskbar header and in the club summary.',
@@ -5050,6 +5103,7 @@ class UIController {
     document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => { this.toggleStart(false); this.show(b.dataset.goto); }));
     document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => this.show('dash')));
     this.$('btn-start').addEventListener('click', () => this.onStartButton());
+    this.$('btn-instant').addEventListener('click', () => this.onInstantSim());   // v2.0
     this.$('btn-ver').addEventListener('click', () => this.show('readme'));
     this.$('btn-resume').addEventListener('click', () => this.resumeMatch());
     const lr = this.$('live-roster');
@@ -5885,13 +5939,34 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       st.textContent = s.lastReport ? L.t('match.end' + s.lastReport.result) : '';
     }
     sp.classList.toggle('slow', slow);
+    const ib = this.$('btn-instant');   // v2.0
+    ib.disabled = e ? e.finished : s.phase !== 'matchday';
+    ib.innerHTML = L.t(e && !e.finished ? 'match.instantRest' : 'match.instant');
   }
 
   onStartButton() {
     if (this.engine && this.engine.finished) { this.show('notes'); return; }
     if (this.engine && this.engine.paused) { this.resumeMatch(); return; }
     if (this.engine) return;
-    if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
+    if (!this.createEngine()) return;
+    this.engine.start();
+    this.renderAll();
+  }
+
+  /** v2.0: [ INSTANT SIM MATCH ] — the same MatchEngine and the same tick() maths, driven by a synchronous loop
+      instead of the timer. Works from the pre-match screen, at half-time or mid-match (sims the rest). */
+  onInstantSim() {
+    if (this.engine?.finished) return;
+    if (!this.engine && !this.createEngine()) return;
+    this.$('ht-banner').hidden = true;
+    const t0 = performance.now();
+    this.engine.runInstant();   // → onMatchEnd() → Notebook
+    this.lastSimMs = performance.now() - t0;
+  }
+
+  /** Builds the engine for the current matchday (shared by the visual and the instant start). */
+  createEngine() {
+    if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return null; }
     const ctx = this.state.matchContext();
     this.state.notebookUnlocked = false;
     this.syncLocks();
@@ -5911,8 +5986,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.checkPromises();   // v1.9
     this.liveSel = null;
     this.radar.setup(this.engine.sides);
-    this.engine.start();
-    this.renderAll();
+    return this.engine;
   }
 
   logLine(e) {
@@ -5999,6 +6073,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.save();
     this.tableMd = ctx.md;
     this.renderAll();
+    if (eng.instant) {   // v2.0 Quick Sim: no full-time dialog, straight to the Coach's Notebook
+      this.renderLive(eng);
+      this.appendLog({ minute: 90, type: 'coach', key: 'match.instantDone', vars: {}, side: -1, r: 0 });
+      this.show('notes');
+      return;
+    }
     this.$('tk-notes').classList.add('alert');
     this.alert(L.t('modal.ft', { h: esc(L.team(s.clubName)), x: a.score, y: b.score, a: esc(L.team(ctx.opp.name)) }), L.t('modal.ftTitle'),
       result === 'W' ? 'ok' : result === 'D' ? 'info' : 'warn', [

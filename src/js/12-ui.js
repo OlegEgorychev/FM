@@ -148,6 +148,7 @@ class UIController {
     document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => { this.toggleStart(false); this.show(b.dataset.goto); }));
     document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => this.show('dash')));
     this.$('btn-start').addEventListener('click', () => this.onStartButton());
+    this.$('btn-instant').addEventListener('click', () => this.onInstantSim());   // v2.0
     this.$('btn-ver').addEventListener('click', () => this.show('readme'));
     this.$('btn-resume').addEventListener('click', () => this.resumeMatch());
     const lr = this.$('live-roster');
@@ -983,13 +984,34 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       st.textContent = s.lastReport ? L.t('match.end' + s.lastReport.result) : '';
     }
     sp.classList.toggle('slow', slow);
+    const ib = this.$('btn-instant');   // v2.0
+    ib.disabled = e ? e.finished : s.phase !== 'matchday';
+    ib.innerHTML = L.t(e && !e.finished ? 'match.instantRest' : 'match.instant');
   }
 
   onStartButton() {
     if (this.engine && this.engine.finished) { this.show('notes'); return; }
     if (this.engine && this.engine.paused) { this.resumeMatch(); return; }
     if (this.engine) return;
-    if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
+    if (!this.createEngine()) return;
+    this.engine.start();
+    this.renderAll();
+  }
+
+  /** v2.0: [ INSTANT SIM MATCH ] — the same MatchEngine and the same tick() maths, driven by a synchronous loop
+      instead of the timer. Works from the pre-match screen, at half-time or mid-match (sims the rest). */
+  onInstantSim() {
+    if (this.engine?.finished) return;
+    if (!this.engine && !this.createEngine()) return;
+    this.$('ht-banner').hidden = true;
+    const t0 = performance.now();
+    this.engine.runInstant();   // → onMatchEnd() → Notebook
+    this.lastSimMs = performance.now() - t0;
+  }
+
+  /** Builds the engine for the current matchday (shared by the visual and the instant start). */
+  createEngine() {
+    if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return null; }
     const ctx = this.state.matchContext();
     this.state.notebookUnlocked = false;
     this.syncLocks();
@@ -1009,8 +1031,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.checkPromises();   // v1.9
     this.liveSel = null;
     this.radar.setup(this.engine.sides);
-    this.engine.start();
-    this.renderAll();
+    return this.engine;
   }
 
   logLine(e) {
@@ -1097,6 +1118,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.save();
     this.tableMd = ctx.md;
     this.renderAll();
+    if (eng.instant) {   // v2.0 Quick Sim: no full-time dialog, straight to the Coach's Notebook
+      this.renderLive(eng);
+      this.appendLog({ minute: 90, type: 'coach', key: 'match.instantDone', vars: {}, side: -1, r: 0 });
+      this.show('notes');
+      return;
+    }
     this.$('tk-notes').classList.add('alert');
     this.alert(L.t('modal.ft', { h: esc(L.team(s.clubName)), x: a.score, y: b.score, a: esc(L.team(ctx.opp.name)) }), L.t('modal.ftTitle'),
       result === 'W' ? 'ok' : result === 'D' ? 'info' : 'warn', [

@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.0', name: { en: 'Quick Sim', ru: 'Быстрая симуляция' },
+    en: [
+      'New [ INSTANT SIM MATCH ] button under Start Match: skip the 2D match and get the final result in a few milliseconds.',
+      'Same engine, same maths: the instant mode runs the very same minute-by-minute logic (attributes, tactics, shouts, fatigue, cards, background play) in one loop instead of on a timer.',
+      'After a Quick Sim you go straight to the Coach\'s Notebook: goals, stats, coach\'s notes, energy loss, sharpness and morale all come from the simulated 90 minutes.',
+      'Started watching and changed your mind? At half-time or mid-match the button becomes [ SIM TO FULL TIME ] and plays out the rest instantly (your subs and shouts stay).',
+    ],
+    ru: [
+      'Новая кнопка [ МГНОВЕННЫЙ МАТЧ ] под «Начать матч»: пропусти 2D-матч и получи итог за несколько миллисекунд.',
+      'Тот же движок, та же математика: мгновенный режим прогоняет ту же поминутную логику (атрибуты, тактика, установки, усталость, карточки, фоновая игра) одним циклом вместо таймера.',
+      'После быстрой симуляции сразу открывается Блокнот тренера: голы, статистика, заметки, потеря энергии, тонус и мораль считаются по сыгранным 90 минутам.',
+      'Начал смотреть и передумал? В перерыве или по ходу матча кнопка превращается в [ ДОИГРАТЬ МГНОВЕННО ] и мгновенно доигрывает остаток (замены и установки сохраняются).',
+    ] },
   { v: '1.9', name: { en: 'Locker Room Drama', ru: 'Драмы раздевалки' },
     en: [
       'Club budget: the academy starts with $500. The budget is always visible in the taskbar header and in the club summary.',

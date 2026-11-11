@@ -148,21 +148,42 @@ class MatchEngine {
   }
   setSpeedMode(s) { this.speed = s; if (this.started && !this.finished && !this.paused) this.updateSpeed(); }
 
-  /* ---------- clock & pacing ---------- */
-  start() {
+  /* ---------- clock & pacing ----------
+     v2.0: the MATH lives in tick() (one in-game beat: minute, drain, action, background play, half/full time).
+     The clock is only a DRIVER around it:
+       • visual  — start(): setInterval(tick) paced by SPEED / HIGHLIGHT, with UI hooks every beat;
+       • instant — runInstant(): a plain synchronous loop over the very same tick(), no timers, no render hooks.
+     Same RNG checks, attributes, tactics, fatigue, cards, subs and stats either way. */
+  begin() {
+    if (this.started) return;
     this.started = true;
     this.kickoff(0);
     this.log('whistle', 'eng.kickoff', { a: this.team(0) }, 0);
-    this.updateSpeed();
-    this.hooks.onUpdate(this);
   }
+  start() {
+    this.begin();
+    this.updateSpeed();
+    this.notify();
+  }
+  /** Instant simulation: from kick-off (or from the current minute, mid-match) to full time in one call. */
+  runInstant() {
+    if (this.finished) return this;
+    this.instant = true;
+    this.stop();
+    this.begin();
+    this.paused = false;
+    for (let guard = 0; !this.finished && guard < 1000; guard++) this.tick();   // 90 minutes + shot beats ≈ 110 ticks
+    return this;
+  }
+  /** Render hook: every beat in visual mode, never in instant mode (onEnd still fires). */
+  notify() { if (!this.instant) this.hooks.onUpdate(this); }
   /* Highlight pacing: a shot sequence is ALWAYS played slowly, whatever the chosen speed. */
   desiredDelay() {
     if (this.pendingShot || this.hold > 0) return MatchEngine.HIGHLIGHT[this.speed] ?? 1200;
     return MatchEngine.SPEED[this.speed] ?? 600;
   }
   updateSpeed() {
-    if (this.paused) return;
+    if (this.paused || this.instant) return;
     const d = this.desiredDelay();
     if (d === this.delay && this.timer) return;
     this.delay = d;
@@ -206,7 +227,7 @@ class MatchEngine {
       if (this.minute >= 90) { this.finish(); return; }
     }
     this.updateSpeed();
-    this.hooks.onUpdate(this);
+    this.notify();
   }
 
   /* ---------- half-time (v1.1): the loop PAUSES until the coach resumes ---------- */
@@ -216,6 +237,7 @@ class MatchEngine {
     }
     this.log('flavor', 'ht.rest', { n: ENERGY.HT_REST }, -1);
     this.setEv({ kind: 'halftime' });
+    if (this.instant) return;   // instant sim: same +4% rest, no pause
     this.pause();
     this.hooks.onUpdate(this);
     this.hooks.onHalfTime?.(this);
@@ -258,7 +280,7 @@ class MatchEngine {
     if (this.pendingShot && this.pendingShot.shooter === out) this.pendingShot.shooter = inP;
     this.log('coach', 'eng.sub', { a: inP, b: out }, 0);
     this.hooks.onSub?.(out, inP);
-    this.hooks.onUpdate(this);
+    this.notify();
     return null;
   }
 
@@ -266,7 +288,7 @@ class MatchEngine {
     this.stop();
     this.finished = true;
     this.log('whistle', 'eng.ft', this.scoreVars());
-    this.hooks.onUpdate(this);
+    this.notify();
     this.hooks.onEnd(this);
   }
 
@@ -430,7 +452,7 @@ class MatchEngine {
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
-      this.hooks.onGoal?.(side);
+      if (!this.instant) this.hooks.onGoal?.(side);
       this.kickoff(opp);
       this.hold = 1;   // celebration beat
       this.setEv({ kind: 'goal', side, a: shooter });
