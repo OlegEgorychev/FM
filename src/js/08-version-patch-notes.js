@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.2';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.2', name: { en: 'Consequences', ru: 'Последствия' },
+    en: [
+      'Time bombs: a choice can now come back to haunt you days later. Scheduled events survive saving and calendar simulation.',
+      'Injuries and suspensions: injured kids (red cross + days left) and suspended kids (red card + matches left) cannot start or come on as subs. Injuries heal day by day; bans are served match by match. A red card now also means a one-match ban, and some hard knocks turn into real injuries.',
+      'Match-day events: something can happen on the morning of a match, before kick-off (and before Quick Sim).',
+      'Multi-step dialogues: some conversations go on after your first answer.',
+      'Five new events: Broken Bus, Training Ground Knock, Shady Sponsor, Calling in the Favor and The Ultimatum. The club can now fall into debt.',
+    ],
+    ru: [
+      'Отложенные последствия: выбор может аукнуться через несколько дней. Запланированные события переживают сохранение и прокрутку календаря.',
+      'Травмы и дисквалификации: травмированные (красный крест и дни до выздоровления) и дисквалифицированные (красная карточка и оставшиеся матчи) не могут играть в основе и выходить на замену. Травмы заживают день за днём, дисквалификации отбываются матч за матчем. Красная карточка теперь означает пропуск следующего матча, а часть жёстких ушибов превращается в настоящие травмы.',
+      'События в день матча: утром перед игрой (и перед быстрой симуляцией) что-то может случиться.',
+      'Многошаговые диалоги: некоторые разговоры продолжаются после первого ответа.',
+      'Пять новых событий: Сломанный автобус, Травма на тренировке, Тёмный спонсор, Ответная услуга и Ультиматум. Клуб теперь может уйти в долг.',
+    ] },
   { v: '2.1', name: { en: 'Boot Screen & Match Summary', ru: 'Загрузочный экран и итоги матча' },
     en: [
       'New atmospheric boot screen: the "Created by" credits, then the chrome pixel logo with sparks, a classic installer progress bar and funny loading messages (5–8 seconds; click or press any key to skip).',

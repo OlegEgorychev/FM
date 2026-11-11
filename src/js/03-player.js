@@ -115,6 +115,8 @@ class Player {
     if (tags) {                      // only the academy squad carries tags (+ v1.9 story flags)
       this.tags = tags;
       this.flags = Array.isArray(o.flags) ? o.flags.filter(f => FLAGS[f]) : [];
+      this.injuryDays = Math.max(0, Math.round(o.injuryDays || 0));                // v2.2: calendar days out
+      this.suspensionMatches = Math.max(0, Math.round(o.suspensionMatches || 0));  // v2.2: matches banned
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
@@ -156,6 +158,9 @@ class Player {
     return keys.reduce((a, k) => a + this.rating(k), 0) / keys.length;
   }
   hasFlag(f) { return !!this.flags?.includes(f); }
+  /** v2.2: can he be picked for the XI / come on as a sub? (AI kids are always available) */
+  get available() { return !(this.injuryDays > 0) && !(this.suspensionMatches > 0) && !this.hasFlag('Benched'); }
+  get unavailableReason() { return this.injuryDays > 0 ? 'inj' : this.suspensionMatches > 0 ? 'sus' : this.hasFlag('Benched') ? 'deal' : null; }
   /** Morale swing on every roll: ±2 at the extremes, amplified by passion (0.6×–1.5×). */
   get moodBonus() { return clamp((this.dyn.morale - 50) / 25 * (0.55 + this.psych.passion / 20), -2.5, 2.5); }
   /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */

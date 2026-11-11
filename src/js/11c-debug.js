@@ -25,6 +25,8 @@ class DebugConsole {
     add('ENGINE', 'OVR', p => +p.overall.toFixed(1), 20, 'hidden overall (position composites) — v1.9 "worst player"');
     add('ENGINE', 'MOOD', p => +p.moodBonus.toFixed(1), null, 'morale × passion roll bonus');
     add('ENGINE', 'ROLE', p => (p.tags || [])[0] || '—');
+    add('ENGINE', 'INJ', p => p.injuryDays || 0, null, 'v2.2 injury: calendar days left');
+    add('ENGINE', 'SUS', p => p.suspensionMatches || 0, null, 'v2.2 suspension: matches left');
     add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
     return c;
   })();
@@ -101,9 +103,10 @@ class DebugConsole {
       ${btn('maxms', L.t('dbg.maxMs'), L.t('dbg.maxMsD'))}
       ${btn('force', L.t('dbg.force') + ` <b class="dbg-flag ${on ? 'on' : ''}">[${L.t(on ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.forceD'), on ? ' armed' : '')}
       <hr class="dbg-hr">
-      ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[$${this.ui.state.budget}]</b>`, L.t('dbg.moneyD'))}
+      ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[${money(this.ui.state.budget)}]</b>`, L.t('dbg.moneyD'))}
       ${NARRATIVE_EVENTS.map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
       ${btn('events', L.t('dbg.events') + ` <b class="dbg-flag ${ev ? '' : 'on'}">[${L.t(ev ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.eventsD'))}
+      <div class="dbg-queue"><b>EVENT_QUEUE</b> ${this.ui.state.eventQueue.length ? this.ui.state.eventQueue.map(q => `<code>${esc(q.id)} @ ${q.due}${q.matchDay ? ' (match day)' : ''}${q.from ? ' ← ' + esc(q.from) : ''}</code>`).join(' ') : '<i>empty</i>'}</div>
     </div>`;
   }
 
@@ -124,7 +127,7 @@ class DebugConsole {
         + (s.cheats.forceWin && eng ? ' ' + L.t('dbg.forceLive') : '');
     } else if (id === 'money') {
       s.addMoney(500);
-      this.msg = L.t('dbg.doneMoney', { b: s.budget });
+      this.msg = L.t('dbg.doneMoney', { b: money(s.budget) });
     } else if (id === 'events') {
       ui.events.enabled = !ui.events.enabled;
       this.msg = L.t('dbg.events') + ': ' + L.t(ui.events.enabled ? 'dbg.forceOn' : 'dbg.forceOff');

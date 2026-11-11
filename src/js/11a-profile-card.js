@@ -55,7 +55,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -108,6 +108,7 @@ class ProfileCard {
           <dt>${L.t('pi.foot')}</dt><dd>${L.t(p.bio.strongFoot === 'L' ? 'pi.footL' : 'pi.footR')}</dd>
           <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.position}">${L.pos(p.position)}</span></dd>
           <dt>${L.t('pi.status')}</dt><dd>${where}</dd>
+          ${own && !p.available ? `<dt>${L.t('pi.avail')}</dt><dd class="pi-out">${ui.statusBadge(p)} ${esc(L.t('st.' + p.unavailableReason, { n: p.unavailableReason === 'inj' ? p.injuryDays : p.suspensionMatches }))}</dd>` : ''}
         </dl>
       </div>
       <div class="pi-right">

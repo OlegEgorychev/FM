@@ -16,6 +16,7 @@ class GameState {
     this.budget = ECONOMY.START;   // v1.9: club money ($), carried across seasons
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
+    this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
     const used = new Set();
     this.squad = SQUAD_POS.map((pos, i) => Player.generate(`a${i}`, pos, used, 0, true, i + 1));
     this.lineup = this.squad.slice(0, 11).map(p => p.id);
@@ -97,6 +98,7 @@ class GameState {
     const ia = this.lineup.indexOf(a), ib = this.lineup.indexOf(b);
     const pa = this.player(a), pb = this.player(b);
     if (!pa || !pb || (ia < 0 && ib < 0)) return 'bench';
+    if ((ia < 0 && !pa.available) || (ib < 0 && !pb.available)) return 'unavail_' + (ia < 0 ? pa : pb).unavailableReason;   // v2.2
     if (ia >= 0 && ib >= 0) {
       if (ia === 0 || ib === 0) return 'gkSlot';
       [this.lineup[ia], this.lineup[ib]] = [b, a];
@@ -120,6 +122,32 @@ class GameState {
       p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
+    this.tickInjuries();
+  }
+  /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
+  tickInjuries() {
+    const healed = [];
+    for (const p of this.squad) if (p.injuryDays > 0 && --p.injuryDays === 0) healed.push(p);
+    for (const p of healed) this.addDiary({ date: this.calendar.date, key: 'inj.healed', vars: { k: { pid: p.id } }, cls: 'ev' });
+    return healed;
+  }
+  /** v2.2: injured / suspended / benched-by-deal starters are replaced by the best available bench kid
+      (same position first). Returns [{ out, in }] so the UI can tell the coach. */
+  ensureAvailableXI() {
+    const slots = this.slots(), changes = [];
+    this.lineup.forEach((id, i) => {
+      const p = this.player(id);
+      if (!p || p.available) return;
+      const bench = this.bench().filter(b => b.available);
+      const want = i === 0 ? 'GK' : LINE_POS[slots[i].line];
+      const score = b => (b.position === want ? 100 : 0) + (i === 0 ? (b.position === 'GK' ? 1000 : 0) : (b.position === 'GK' ? -1000 : 0)) + b.overall;
+      const best = bench.sort((a, b) => score(b) - score(a))[0];
+      if (!best) return;
+      this.lineup[i] = best.id;
+      changes.push({ out: p, in: best });
+    });
+    if (changes.length) this.save();
+    return changes;
   }
   /** v1.8: after a match — sharpness from minutes (full game +12, sub +6, unused −2); morale from the result,
       goals and red cards, amplified by passion (0.6×–1.4×). */
@@ -169,9 +197,10 @@ class GameState {
   /* ----- v1.9 economy ----- */
   canAfford(cost) { return this.budget >= cost; }
   /** Positive = income, negative = spending. Never goes below $0. Returns the amount actually moved. */
-  addMoney(delta) {
+  addMoney(delta, allowDebt = false) {   // v2.2: a forced payment may push the club into debt
     const before = this.budget;
-    this.budget = Math.max(0, Math.round(this.budget + delta));
+    this.budget = Math.round(this.budget + delta);
+    if (!allowDebt) this.budget = Math.max(Math.min(0, before), this.budget);
     this.onBudget?.(this.budget - before);
     return this.budget - before;
   }
@@ -184,7 +213,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, pendingEvent: this.pendingEvent, eventLog: this.eventLog,
+        budget: this.budget, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -196,7 +225,8 @@ class GameState {
       if (!Array.isArray(d.squad) || d.squad.length < 11) return false;
       this.clubName = d.clubName || CLUB_NAME;
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
-      this.budget = Number.isFinite(d.budget) ? Math.max(0, Math.round(d.budget)) : ECONOMY.START;   // pre-v1.9 saves start with $500
+      this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
+      this.eventQueue = Array.isArray(d.eventQueue) ? d.eventQueue.filter(q => q && q.id && q.due) : [];
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
       this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));

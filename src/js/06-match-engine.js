@@ -279,6 +279,7 @@ class MatchEngine {
     if (this.subbedOff.has(inP.id) || side.players.includes(inP)) return 'used';
     if (this.subsUsed >= MatchEngine.MAX_SUBS) return 'limit';
     const line = side.entries[idx].line;
+    if (inP.available === false) return 'unavail';   // v2.2: injured / suspended kids can't come on
     if (line === 'GK' && inP.position !== 'GK') return 'gkOnly';
     if (line !== 'GK' && inP.position === 'GK') return 'gkTwo';
     const out = side.entries[idx].p;

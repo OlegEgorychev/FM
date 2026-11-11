@@ -11,6 +11,7 @@ const jit = r => (Math.random() * 2 - 1) * r;
 const pad2 = n => String(n).padStart(2, '0');
 const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = n => (n < 0 ? '−$' : '$') + Math.abs(Math.round(n));   // v2.2: budget can be in debt
 const fmt = (tpl, map) => tpl.replace(/\{(\w+)\}/g, (_, k) => map[k] ?? '');
 
 const CLUB_NAME = 'Ashford Rovers U-14';
@@ -67,10 +68,19 @@ const TECH = new Set(ATTR_GROUPS.technical);
 /* v1.9 CLUB ECONOMY + NARRATIVE EVENTS */
 const ECONOMY = { START: 500 };
 const EVENTS_CFG = { COOLDOWN: 6, BOOTS_CHANCE: 0.05, DAD_CHANCE: 0.05, BOOTS_COST: 150, DAD_GIFT: 300, DAD_REFUND: 150,
-  DAD_REFUSE_MORALE: -20, PROMISE_BROKEN_MORALE: -30, BOOTS_AGILITY: -2 };
+  DAD_REFUSE_MORALE: -20, PROMISE_BROKEN_MORALE: -30, BOOTS_AGILITY: -2,
+  // v2.2
+  BUS_CHANCE: 0.2, BUS_COST: 50, BUS_CONDITION: 0.3,                       // away match days only; jog = condition ×0.7
+  KNOCK_CHANCE: 0.04, CLINIC_COST: 200, CLINIC_DAYS: 3, ICE_DAYS: 14,
+  SPONSOR_CHANCE: 0.06, SPONSOR_BUDGET: 300, SPONSOR_GIFT: 500, FAVOR_DAYS: 14,
+  FAVOR_MORALE: -20, FAVOR_DEBT: 500, FAVOR_DEBT_MORALE: -30,
+  ULTI_CHANCE: 0.05, ULTI_DISCIPLINE: 8, ULTI_FINE: 20, ULTI_FINE_MORALE: -10, ULTI_SUSPEND: 2, ULTI_SORRY_DISC: -2, ULTI_SORRY_MORALE: 5,
+  RED_BAN: 1, KNOCK_TO_INJURY: 0.35, KNOCK_DAYS: [4, 12] };
 /* Story flags on academy kids (separate from the one-per-kid ROLE tag). Shown as chips, never as numbers. */
 const FLAGS = { Promised_Start: { en: ['PROMISED START', 'A parent paid for this kid to start the next match.'],
-  ru: ['ОБЕЩАН СТАРТ', 'Родитель заплатил, чтобы этот игрок вышел в старте в следующем матче.'] } };
+  ru: ['ОБЕЩАН СТАРТ', 'Родитель заплатил, чтобы этот игрок вышел в старте в следующем матче.'] },
+  Benched: { en: ['BENCHED (DEAL)', 'You promised a businessman he sits out this match.'],
+    ru: ['В ЗАПАСЕ (СДЕЛКА)', 'Ты пообещал бизнесмену, что он пропустит этот матч.'] } };
 const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -1, FLOOR: 20 };
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */

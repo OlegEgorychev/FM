@@ -298,13 +298,14 @@ class UIController {
     const over = !!(eng && eng.finished) || (!eng && s.phase !== 'matchday');
     const row = (p, i, pitch) => {
       const status = eng?.sentOff.has(p.id) ? 'sent' : eng?.subbedOff.has(p.id) ? 'off' : '';
-      const disabled = over || !!status;
+      const out = !pitch && !p.available;   // v2.2: can't come on
+      const disabled = over || !!status || out;
       const hint = selP && p.id !== selP.id && !disabled ? (p.position === selP.position ? ' suggested-swap' : ' dimmed-swap') : '';
-      const sub = status ? L.t('lr.' + status) : pitch ? L.line(lines[i]) : L.t('team.onBench');
+      const sub = status ? L.t('lr.' + status) : out ? L.t('st.short.' + p.unavailableReason) : pitch ? L.line(lines[i]) : L.t('team.onBench');
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
         <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
-        <span class="lr-name"><b>${esc(L.name(p.surname))}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
+        <span class="lr-name"><b>${esc(L.name(p.surname))}${this.statusBadge(p)}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
         <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
       </div>`;
     };
@@ -528,7 +529,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       <dt>${L.t('dash.record')}</dt><dd>${L.t('dash.recordVal', row)}</dd>
       <dt>${L.t('dash.form')}</dt><dd>${this.formChips(row.form) || '—'}</dd>
       <dt>${L.t('dash.formation')}</dt><dd>${s.formation}</dd>
-      <dt>${L.t('dash.budget')}</dt><dd class="money">$${s.budget}</dd>
+      <dt>${L.t('dash.budget')}</dt><dd class="money${s.budget < 0 ? " debt" : ""}">${money(s.budget)}</dd>
       <dt>${L.t('dash.energy')}</dt><dd${tired ? ' class="warn"' : ''}>${L.t('dash.energyVal', { a: avg, t: tired })}</dd>`;
 
     // main action button
@@ -687,8 +688,35 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   renderBudget(delta = 0) {
     const el = this.$('hdr-budget');
     if (!el) return;
-    el.innerHTML = L.t('hdr.budget', { b: this.state.budget });
+    el.innerHTML = L.t('hdr.budget', { b: money(this.state.budget) }); el.classList.toggle('debt', this.state.budget < 0);
     if (delta) { el.classList.remove('up', 'down'); void el.offsetWidth; el.classList.add(delta > 0 ? 'up' : 'down'); }
+  }
+
+  /** v2.2: after a match — served bans tick down, deal benches end, red cards = 1-match ban, some knocks become injuries. */
+  applyAvailabilityAfterMatch(eng, ctx) {
+    const s = this.state, date = s.calendar.date;
+    for (const p of s.squad) {
+      if (p.suspensionMatches > 0 && !eng.everPlayed.has(p.id)) p.suspensionMatches--;
+      if (p.hasFlag('Benched')) p.flags = p.flags.filter(f => f !== 'Benched');
+    }
+    for (const p of eng.sides[0].all) {
+      const own = s.player(p.id); if (!own) continue;
+      if (eng.st(p).red) {
+        own.suspensionMatches = Math.max(own.suspensionMatches, EVENTS_CFG.RED_BAN);
+        s.addDiary({ date, key: 'sus.red', vars: { k: { pid: own.id }, n: EVENTS_CFG.RED_BAN }, cls: 'ev' });
+      }
+      if (eng.injured.has(p.id) && Math.random() < EVENTS_CFG.KNOCK_TO_INJURY) {
+        own.injuryDays = Math.max(own.injuryDays, rnd(...EVENTS_CFG.KNOCK_DAYS));
+        s.addDiary({ date, key: 'inj.match', vars: { k: { pid: own.id }, d: own.injuryDays }, cls: 'ev' });
+      }
+    }
+  }
+  /** v2.2: red cross (injured, days left) / red card (suspended, matches left) / deal lock. */
+  statusBadge(p) {
+    const r = p.unavailableReason;
+    if (!r) return '';
+    const n = r === 'inj' ? p.injuryDays : r === 'sus' ? p.suspensionMatches : '';
+    return `<span class="st-badge ${r}" title="${esc(L.t('st.' + r, { n }))}">${r === 'inj' ? '\u271A' : r === 'sus' ? '<i></i>' : '$'}${n}</span>`;
   }
 
   /** v1.9: Promised_Start is checked at kick-off — kept quietly, or broken (morale crash + the parent wants money back). */
@@ -711,11 +739,20 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const ctx = s.matchContext();
     const vars = { md: ev.md, o: { team: ctx.opp.name }, v: L.t('venue.' + ctx.venue) };
     s.addDiary({ date: ev.date, key: 'cal.arrive', vars: { ...vars, v: { venue: ctx.venue } }, cls: 'hl' });
+    for (const c of s.ensureAvailableXI()) s.addDiary({ date: ev.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
     s.save();
     this.engine = null;
     this.prepareMatch();
     this.renderAll();
     this.$('tk-match').classList.add('alert');
+    if (this.events.rollMatchDay(ev)) return;   // v2.2: match-day event BEFORE kick-off; the matchday dialog follows the choice
+    this.showMatchdayDialog();
+  }
+  /** v2.2: called by EventEngine.choose() after a match-day event. */
+  afterMatchdayEvent() { this.prepareMatch(); this.renderAll(); this.showMatchdayDialog(); }
+  showMatchdayDialog() {
+    const s = this.state, ctx = s.matchContext(), ev = s.nextMatchEvent();
+    if (!ctx || s.phase !== 'matchday') return;
     this.alert(L.t('dlg.matchday', { md: ev.md, o: esc(L.team(ctx.opp.name)), v: L.t('venue.' + ctx.venue) }), L.t('dlg.matchdayTitle'), 'match', [
       { label: L.t('modal.toMatch'), primary: true, onClick: () => this.show('match') },
       { label: L.t('modal.toTeam'), onClick: () => this.show('team') },
@@ -730,6 +767,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const ev = s.nextMatchEvent();
     const rep = s.lastReport;
     this.cal.completeEvent(ev.id);
+    s.tickInjuries();   // v2.2: the match day counts as a day of healing too
     this.cal.advanceDay();
     s.addDiary({ date: ev.date, key: 'cal.closed', vars: { md: ev.md, x: rep.gf, y: rep.ga, o: { team: rep.opponent }, pos: s.league.position(0) } });
     s.phase = this.cal.nextEvent() ? 'calendar' : 'seasonEnd';
@@ -801,10 +839,11 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         : `<small class="r-slot">${L.t('team.onBench')}</small>`;
       const sel = this.selected === p.id;
       const hint = this.swapClass(p);
-      return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}" data-id="${p.id}"
+      const out = !p.available;   // v2.2: injured / suspended → locked out of the XI
+      return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}${out ? ' unavail' : ''}" data-id="${p.id}"
           role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
-        <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.infoBtn(p)}</span>${sub}</span>
+        <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.statusBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×0.5' : ''}</span></div>
         <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
@@ -1014,6 +1053,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** Builds the engine for the current matchday (shared by the visual and the instant start). */
   createEngine() {
     if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return null; }
+    if (this.events.active) { this.events.open(); return null; }   // v2.2: answer the match-day dilemma first
+    const fixes = this.state.ensureAvailableXI();                   // v2.2: nobody injured / suspended kicks off
+    if (fixes.length) { this.renderTeam(); this.prepareMatch(); }
+    if (this.state.starters().some(p => !p.available)) { this.alert(L.t('xi.noFit'), L.t('team.err.title'), 'error'); return null; }
     const ctx = this.state.matchContext();
     this.state.notebookUnlocked = false;
     this.syncLocks();
@@ -1117,6 +1160,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
     s.applyMatchDynamics(eng, result);
+    this.applyAvailabilityAfterMatch(eng, ctx);   // v2.2
     if (s.cheats?.forceWin) s.cheats.forceWin = false;   // v1.8: one-shot debug cheat
     this.debug?.render();
     s.phase = 'post';
