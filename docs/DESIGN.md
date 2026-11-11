@@ -57,3 +57,11 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - `EmblemGenerator` (04-league-calendar.js): crest = `[shape, pattern, primary, secondary]` (shield/circle/hexagon × solid/stripes/halved). Rasterised on a 32x32 grid, one `<path>` per colour + 1px dark outline, letter = first letter of the localized name. No `<clipPath>` ids. SVG strings cached per crest+letter.
 - `team.crest` is saved; `team.emblemSvg` is a non-enumerable getter (never saved, follows the language). Old saves get a crest hashed from the name. `League.create(name, prevTeams)` keeps crests across seasons; the user club is always shield/halved academy blue.
 - Dashboard = 3 panes: left (next event + 64px badge, main button, legend, club), centre (Sun–Sat month grid, `calMonth` = null follows the date, arrows browse the season; cells clickable → status bar text; diary below), right (latest played matchday with badges, top-5 mini table + user row if outside). Badges also in the League table and every fixture list (`fixtureHTML`).
+
+## League statistics (v1.7)
+- Assists: `MatchEngine.lastPass` = last completed pass of the side in possession (reset on turnover/kick-off). A goal credits it unless it was a free kick or the passer is the shooter. `blankStats()` now has `assists`.
+- Every AI club has `team.squad`: 14 lightweight kids `{ id, name, pos, mp, goals, assists }` (no attrs, no faces). Ids are `t{teamId}_{i}`; the full match roster (`League.roster`) is built FROM this squad, so names and ids match.
+- Background match (`simulateFixture` → `distributeStats`): GK + 10 random outfielders get `mp++`; each goal goes to a weighted scorer (`GOAL_W`: FWD 5, MID 2.2, DEF 0.6), 72% get a weighted assister (`ASSIST_W`: MID 3.6, FWD 2.4, DEF 1.1).
+- User match: opponent kids are credited from live engine stats (`League.recordKids`); our kids use `seasonStats` (now with `assists`).
+- UI: League tab = standings + results (left), Top Scorers / Top Assists top-7 (right, `renderLeaders`). Clicking a club opens `TeamRosterCard` (`11b-team-roster.js`, reuses the `.pinfo` chrome): badge, position, W-D-L, MP/G/A sorted by goals.
+- Old saves: missing `squad` is generated on load, keeping the names of an already generated match roster.

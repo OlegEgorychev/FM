@@ -65,6 +65,7 @@ class ProfileCard {
     const rows = st => [
       [L.t('pi.apps'), st.apps ?? (st === live ? 1 : 0)],
       [L.t('pi.goals'), st.goals],
+      [L.t('pi.assists'), st.assists ?? 0],
       [L.t('pi.shots'), `${st.shots} <small>(${L.t('pi.onTarget', { n: st.onTarget })})</small>`],
       [L.t('pi.tackles'), `${st.tackles} <small>/ ${st.tackles + st.tacklesLost}</small>`, pct(st.tackles, st.tacklesLost)],
       [L.t('pi.passAcc'), pct(st.passOk, st.passFail) == null ? '—' : pct(st.passOk, st.passFail) + '% <small>(' + st.passOk + '/' + (st.passOk + st.passFail) + ')</small>', pct(st.passOk, st.passFail)],

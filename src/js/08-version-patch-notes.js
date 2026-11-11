@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.7', name: { en: 'League Statistics', ru: 'Статистика лиги' },
+    en: [
+      'The "League Table" tab is now simply "League", split in two: standings and results on the left, League Leaders on the right.',
+      'League Leaders: Top Scorers and Top Assists (top 7), with club badges. Your own kids compete in the same lists.',
+      'Assists are now counted: the last completed pass before a goal. Shown on the Profile Card as well.',
+      'Every rival club has a squad of 14 named kids. Background matches hand out goals and assists among them (strikers score more, midfielders set up more).',
+      'Click any club in the standings (or a name in the leaders) to open its TEAM_ROSTER.EXE: badge, league position, W-D-L and each kid\'s matches, goals and assists.',
+    ],
+    ru: [
+      'Вкладка «Таблица лиги» теперь просто «Лига» и разделена надвое: слева таблица и результаты, справа лидеры лиги.',
+      'Лидеры лиги: лучшие бомбардиры и ассистенты (топ-7) с гербами клубов. Твои ребята борются в тех же списках.',
+      'Теперь считаются голевые передачи: последний точный пас перед голом. Их видно и в карточке игрока.',
+      'У каждого клуба-соперника состав из 14 ребят с именами. Голы и передачи в фоновых матчах распределяются между ними (нападающие чаще забивают, полузащитники чаще отдают).',
+      'Щёлкни по любому клубу в таблице (или по имени в списке лидеров), чтобы открыть его TEAM_ROSTER.EXE: герб, место в лиге, В-Н-П, а также матчи, голы и передачи каждого игрока.',
+    ] },
   { v: '1.6', name: { en: 'Fixture Calendar', ru: 'Календарь матчей' },
     en: [
       'Every club now has its own badge: a procedural 32x32 pixel-art crest (shield, circle or hexagon; solid, striped or halved; two club colours and the first letter of the name). Badges are drawn in code and kept across seasons.',

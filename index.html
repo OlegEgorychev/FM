@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.6</title>
+<title>Youth Academy Manager v1.7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1056,6 +1056,63 @@ body.fx .crt-scan{ opacity: .9; }
   .cd-ev .emblem{ display: none; }
 }
 /* =========================================================
+   v1.7 — LEAGUE split view (standings | leaders) + TEAM_ROSTER.EXE
+   ========================================================= */
+#win-table .table-grid{ grid-template-columns: minmax(0, 1fr) 320px; }
+.tbl-left, .tbl-right{ display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* clickable standings rows */
+.grid.league.clickable tbody tr{ cursor: pointer; transition: background-color .08s steps(2); }
+.grid.league.clickable tbody tr:hover td{ background: rgba(216,194,122,.13) !important; }
+.grid.league.clickable tbody tr:hover .tm span{ color: var(--amber); text-decoration: underline dotted; text-underline-offset: 3px; }
+.grid.league.clickable tbody tr:focus-visible{ outline: 1px dotted var(--amber); outline-offset: -2px; }
+.grid.league.clickable tbody tr:active td{ background: rgba(216,194,122,.22) !important; }
+
+/* League leaders: two compact phosphor tables */
+.lead-tbl{ width: 100%; font-size: 13px; }
+.lead-tbl th, .lead-tbl td{ padding: 4px 6px; }
+.lead-tbl .c{ text-align: center; }
+.lead-tbl th:nth-child(3){ width: 26px; }
+.lead-tbl th:last-child{ width: 34px; }
+.lead-tbl .nm{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; color: #dfe6dc; }
+.lead-tbl .pts{ font: 19px/1 "VT323", var(--mono); color: var(--amber); }
+.lead-tbl tbody tr[data-team]{ cursor: pointer; }
+.lead-tbl tbody tr[data-team]:hover td{ background: rgba(216,194,122,.1); }
+.lead-tbl tr.lead .pos-n{ background: #b8902f; color: #111; font-weight: bold; }
+.lead-tbl tr.me td{ background: rgba(47,111,208,.3); }
+.lead-tbl tr.empty td{ color: var(--muted); font-style: italic; text-align: center; padding: 10px 6px; }
+
+/* TEAM_ROSTER.EXE (reuses the PLAYER_INFO.EXE chrome) */
+.win.troster{ width: min(640px, 100%); }
+.tr-body{ grid-template-columns: 180px minmax(0, 1fr); max-height: min(62vh, 520px); }
+.tr-left{ display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px; text-align: center;
+  background: #11171b; color: var(--text); border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); box-shadow: inset 1px 1px 0 var(--dark); }
+.emblem.xl{ width: 96px; height: 96px; padding: 6px; background: #0b0f12; border: 2px solid #000; box-shadow: 0 0 0 1px #3a4650; }
+.emblem.xl svg{ filter: saturate(.75) brightness(.95) drop-shadow(2px 3px 0 rgba(0,0,0,.6)); }
+.tr-name{ font: 22px/1 "VT323", var(--mono); color: #eef1ec; letter-spacing: .5px; }
+.tr-you{ color: #8fb4e8; font-size: 11px; margin-top: -4px; }
+.tr-left .pi-kv{ text-align: left; }
+.tr-place, .tr-pts{ color: var(--amber) !important; }
+.tr-form{ min-height: 19px; }
+.tr-right{ display: flex; flex-direction: column; min-height: 0; }
+.tr-scroll{ overflow-y: auto; max-height: min(52vh, 440px); }
+.tr-table{ width: 100%; border-collapse: collapse; font-size: 12px; }
+.tr-table th, .tr-table td{ padding: 3px 7px; border-bottom: 1px dotted #2b363e; text-align: left; }
+.tr-table .c{ text-align: center; }
+.tr-table thead th{ position: sticky; top: 0; background: #11171b; color: var(--amber); font: 15px/1 var(--mono); letter-spacing: .5px; }
+.tr-table .n{ color: var(--muted); }
+.tr-table .nm{ color: #dfe6dc; white-space: nowrap; }
+.tr-table .g, .tr-table .a{ font: 17px/1 "VT323", var(--mono); }
+.tr-table tr.has-g .g{ color: var(--amber); }
+.tr-table tbody tr:hover td{ background: rgba(255,255,255,.04); }
+
+@media (max-width: 980px){ #win-table .table-grid{ grid-template-columns: 1fr; } }
+@media (max-width: 640px){
+  .tr-body{ grid-template-columns: 1fr; max-height: none; }
+  .tr-left{ flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .emblem.xl{ width: 64px; height: 64px; }
+}
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1258,28 +1315,39 @@ body.fx .crt-scan{ opacity: .9; }
         <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
       <div class="win-body">
         <div class="table-grid">
-          <div class="tbl-wrap sunken">
-            <table class="grid league">
-              <thead><tr>
-                <th class="c" data-i18n="table.pos"></th><th data-i18n="table.team"></th>
-                <th class="c" data-i18n="table.p"></th><th class="c" data-i18n="table.w"></th><th class="c" data-i18n="table.d"></th><th class="c" data-i18n="table.l"></th>
-                <th class="c" data-i18n="table.gf"></th><th class="c" data-i18n="table.ga"></th><th class="c" data-i18n="table.gd"></th><th class="c" data-i18n="table.pts"></th>
-                <th data-i18n="table.form"></th>
-              </tr></thead>
-              <tbody id="table-body"></tbody>
-            </table>
-          </div>
-          <div class="groupbox"><span class="gb-label" data-i18n="table.results"></span>
-            <div class="md-nav">
-              <button class="btn small" id="md-prev" aria-label="Previous">&#9664;</button>
-              <b id="md-label"></b>
-              <button class="btn small" id="md-next" aria-label="Next">&#9654;</button>
+          <div class="tbl-left">
+            <div class="tbl-wrap sunken">
+              <table class="grid league clickable">
+                <thead><tr>
+                  <th class="c" data-i18n="table.pos"></th><th data-i18n="table.team"></th>
+                  <th class="c" data-i18n="table.p"></th><th class="c" data-i18n="table.w"></th><th class="c" data-i18n="table.d"></th><th class="c" data-i18n="table.l"></th>
+                  <th class="c" data-i18n="table.gf"></th><th class="c" data-i18n="table.ga"></th><th class="c" data-i18n="table.gd"></th><th class="c" data-i18n="table.pts"></th>
+                  <th data-i18n="table.form"></th>
+                </tr></thead>
+                <tbody id="table-body"></tbody>
+              </table>
             </div>
-            <div class="fx-list" id="md-results"></div>
+            <div class="groupbox"><span class="gb-label" data-i18n="table.results"></span>
+              <div class="md-nav">
+                <button class="btn small" id="md-prev" aria-label="Previous">&#9664;</button>
+                <b id="md-label"></b>
+                <button class="btn small" id="md-next" aria-label="Next">&#9654;</button>
+              </div>
+              <div class="fx-list" id="md-results"></div>
+            </div>
+          </div>
+          <!-- v1.7: League leaders -->
+          <div class="tbl-right">
+            <div class="groupbox leaders"><span class="gb-label" data-i18n="table.scorers"></span>
+              <div class="tbl-wrap sunken"><table class="grid lead-tbl" id="top-scorers"></table></div>
+            </div>
+            <div class="groupbox leaders"><span class="gb-label" data-i18n="table.assists"></span>
+              <div class="tbl-wrap sunken"><table class="grid lead-tbl" id="top-assists"></table></div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="statusbar"><span id="table-status"></span><span data-i18n="table.sort"></span></div>
+      <div class="statusbar"><span id="table-status"></span><span data-i18n="table.clickHint"></span></div>
     </section>
 
     <!-- README.TXT (patch notes, Notepad style) -->
@@ -1320,6 +1388,17 @@ body.fx .crt-scan{ opacity: .9; }
       <div class="win-body pinfo-body" id="pinfo-body"></div>
       <div class="row-btns pinfo-btns"><button class="btn go" id="pinfo-ok" type="button" data-i18n="ui.ok"></button></div>
       <div class="statusbar"><span id="pinfo-status"></span></div>
+    </section>
+  </div>
+
+  <!-- v1.7: Team Roster card (click a club in the League standings) -->
+  <div class="pinfo-layer" id="troster-layer" hidden>
+    <section class="win pinfo troster open" role="dialog" aria-modal="true" aria-labelledby="troster-title">
+      <div class="titlebar"><span class="t-ico">&#9776;</span><span class="t-txt" id="troster-title">TEAM_ROSTER.EXE</span><button class="tb-btn" id="troster-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="pinfo-tabs"><span class="pinfo-tab" data-i18n="tr.tab"></span></div>
+      <div class="win-body pinfo-body tr-body" id="troster-body"></div>
+      <div class="row-btns pinfo-btns"><button class="btn go" id="troster-ok" type="button" data-i18n="ui.ok"></button></div>
+      <div class="statusbar"><span id="troster-status"></span></div>
     </section>
   </div>
 
@@ -1906,6 +1985,25 @@ Object.assign(I18N.ru, {
   'pi.scout': 'Игрок соперника: отчёта скаута нет.', 'pi.oppNote': 'Знаем только то, что видим сегодня.',
   'pi.status.bar': 'Только цифры. Читай между строк, тренер.',
 });
+
+
+/* ---- v1.7: League stats (top scorers / assists) + TEAM_ROSTER.EXE ---- */
+Object.assign(I18N.en, {
+  'pi.assists': 'Assists', 'nav.table': 'League', 'table.standings': 'Standings', 'table.leaders': 'League leaders',
+  'table.scorers': 'Top Scorers', 'table.assists': 'Top Assists', 'table.player': 'Player', 'table.g': 'G', 'table.a': 'A',
+  'table.none': 'No one yet. The season is young.', 'table.clickHint': 'Click a club to open its roster',
+  'tr.tab': 'Roster', 'tr.place': 'League position', 'tr.placeN': '{n} of {t}', 'tr.record': 'W-D-L', 'tr.pts': 'Points', 'tr.gd': 'Goals',
+  'tr.player': 'Player', 'tr.pos': 'Pos', 'tr.mp': 'MP', 'tr.g': 'G', 'tr.a': 'A', 'tr.you': 'your academy',
+  'tr.status': 'Scouts only log matches, goals and assists.', 'tr.statusMe': 'Our kids. Full stats in the Profile Card.',
+});
+Object.assign(I18N.ru, {
+  'pi.assists': 'Голевые передачи', 'nav.table': 'Лига', 'table.standings': 'Турнирная таблица', 'table.leaders': 'Лидеры лиги',
+  'table.scorers': 'Бомбардиры', 'table.assists': 'Ассистенты', 'table.player': 'Игрок', 'table.g': 'Г', 'table.a': 'П',
+  'table.none': 'Пока никого. Сезон только начался.', 'table.clickHint': 'Щёлкни по клубу, чтобы открыть состав',
+  'tr.tab': 'Состав', 'tr.place': 'Место в лиге', 'tr.placeN': '{n} из {t}', 'tr.record': 'В-Н-П', 'tr.pts': 'Очки', 'tr.gd': 'Мячи',
+  'tr.player': 'Игрок', 'tr.pos': 'Поз', 'tr.mp': 'И', 'tr.g': 'Г', 'tr.a': 'П', 'tr.you': 'твоя академия',
+  'tr.status': 'Скауты записывают только матчи, голы и передачи.', 'tr.statusMe': 'Наши ребята. Полная статистика в карточке игрока.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -2111,20 +2209,39 @@ const emblemHTML = (team, size = 'sm') => team ? `<span class="emblem ${size}" t
 class League {
   static STRENGTHS = [3, 2, 1, 1, 0, 0, -1, -2, -3];   // spread across the 9 AI clubs
 
-  constructor({ teams, fixtures }) {
+  static SQUAD_SIZE = 14;
+  static LITE_POS = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'FWD'];
+  /* background share of goals / assists by position (weights, not %) */
+  static GOAL_W   = { GK: 0,   DEF: 0.6, MID: 2.2, FWD: 5 };
+  static ASSIST_W = { GK: 0.1, DEF: 1.1, MID: 3.6, FWD: 2.4 };
+
+  constructor({ teams, fixtures }, usedSurnames = new Set()) {
     this.teams = teams;
     this.fixtures = fixtures;
     for (const t of this.teams) { if (t.roster) t.roster = t.roster.map(p => new Player(p)); attachEmblem(t); }
+    // v1.7: every AI club carries a lightweight squad { id, name, pos, mp, goals, assists } (no attrs, no faces)
+    const used = new Set([...usedSurnames, ...this.teams.flatMap(t => (t.squad || []).map(k => k.name.split(' ').pop()))]);
+    for (const t of this.teams) if (!t.user && !Array.isArray(t.squad)) t.squad = League.liteSquad(t, used);
+  }
+
+  /** 14 kids per AI club. If a full match roster already exists (old save), its 11 names are kept. */
+  static liteSquad(team, used) {
+    return League.LITE_POS.map((pos, i) => {
+      const old = team.roster?.find(p => p.id === `t${team.id}_${i}`);
+      let name = old?.name;
+      if (!name) { let last, g = 0; do { last = pick(LAST); } while (used.has(last) && g++ < 200); used.add(last); name = `${pick(FIRST)} ${last}`; }
+      return { id: `t${team.id}_${i}`, name, pos: old?.position || pos, mp: 0, goals: 0, assists: 0 };
+    });
   }
 
   /** prevTeams: last season's clubs, so every badge survives the summer. */
-  static create(userName, prevTeams = []) {
+  static create(userName, prevTeams = [], usedSurnames = new Set()) {
     const strengths = shuffle(League.STRENGTHS);
     const rolled = EmblemGenerator.rollLeague(OPPONENTS.length + 1);
     const crests = [userName, ...OPPONENTS].map((n, i) => prevTeams.find(t => t.name === n)?.crest || rolled[i]);
     const teams = [{ id: 0, name: userName, user: true, crest: crests[0] }];
     OPPONENTS.forEach((name, i) => teams.push({ id: i + 1, name, strength: strengths[i], formation: pick(FORMATION_KEYS), roster: null, crest: crests[i + 1] }));
-    return new League({ teams, fixtures: League.roundRobin(teams.map(t => t.id)) });
+    return new League({ teams, fixtures: League.roundRobin(teams.map(t => t.id)) }, usedSurnames);
   }
 
   /** Circle method: one team fixed, the rest rotate. Second half mirrors the first with home/away swapped. */
@@ -2154,12 +2271,59 @@ class League {
   playedMatchdays() { return new Set(this.fixtures.filter(f => this.played(f)).map(f => f.md)).size; }
 
   /** AI roster is generated on first need and stored, so a club keeps the same kids all season. */
+  /** v1.7: the match roster is built from the club's lightweight squad, so names and ids match the league stats. */
   roster(team, usedSurnames) {
     if (!team.roster) {
-      team.roster = formationSlots(team.formation).map((s, i) =>
-        Player.generate(`t${team.id}_${i}`, LINE_POS[s.line], usedSurnames, team.strength, false, i + 1));
+      const free = [...team.squad];
+      team.roster = formationSlots(team.formation).map(s => {
+        const want = LINE_POS[s.line];
+        const k = Math.max(0, free.findIndex(x => x.pos === want));
+        const kid = free.splice(k, 1)[0];
+        const p = Player.generate(kid.id, want, usedSurnames, team.strength, false, team.squad.indexOf(kid) + 1);
+        p.name = kid.name;
+        return new Player(p);   // rebuild so the portrait hash matches the final name
+      });
     }
     return team.roster;
+  }
+
+  /* ---------- v1.7: LEAGUE STATS (matches, goals, assists) ---------- */
+  kid(id) { for (const t of this.teams) { const k = t.squad?.find(x => x.id === id); if (k) return k; } return null; }
+
+  /** Weighted random pick from a list of kids, never `not`. */
+  static weighted(list, wKey, not) {
+    const pool = list.filter(k => k !== not), w = pool.map(k => wKey[k.pos] + 0.05);
+    let r = Math.random() * w.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < pool.length; i++) if ((r -= w[i]) <= 0) return pool[i];
+    return pool[pool.length - 1];
+  }
+  /** Background result → stats: 11 of 14 kids play (GK always), each goal gets a scorer and usually an assist. */
+  distributeStats(team, goals) {
+    if (!team.squad) return;
+    const gk = team.squad.filter(k => k.pos === 'GK');
+    const out = shuffle(team.squad.filter(k => k.pos !== 'GK'));
+    const xi = [...gk.slice(0, 1), ...out.slice(0, 10)];
+    for (const k of xi) k.mp++;
+    for (let g = 0; g < goals; g++) {
+      const scorer = League.weighted(xi, League.GOAL_W);
+      scorer.goals++;
+      if (Math.random() < 0.72) League.weighted(xi, League.ASSIST_W, scorer).assists++;
+    }
+  }
+  /** User match: credit the opponent kids with what they did in the live engine. pairs: [[id, stats], ...] */
+  recordKids(pairs) {
+    for (const [id, st] of pairs) { const k = this.kid(id); if (k) { k.mp++; k.goals += st.goals || 0; k.assists += st.assists || 0; } }
+  }
+
+  /** All players of the league (AI kids + our academy) as { name, team, goals, assists, mp }. */
+  scorers(userSquad = [], userStats = {}) {
+    const me = this.teams.find(t => t.user);
+    const list = this.teams.filter(t => !t.user).flatMap(t => t.squad.map(k => ({ id: k.id, name: k.name, team: t, mp: k.mp, goals: k.goals, assists: k.assists })));
+    for (const p of userSquad) { const st = userStats[p.id] || {}; list.push({ id: p.id, name: p.name, team: me, mp: st.apps || 0, goals: st.goals || 0, assists: st.assists || 0, own: true }); }
+    return list;
+  }
+  static leaders(list, key, n = 7) {
+    return list.filter(x => x[key] > 0).sort((a, b) => b[key] - a[key] || a.mp - b.mp || a.name.localeCompare(b.name)).slice(0, n);
   }
 
   setUserResult(f, userGoals, oppGoals) {
@@ -2175,6 +2339,8 @@ class League {
     // base rates tuned so AI games score like the visual engine does (~2 goals per game)
     f.hg = League.poisson(clamp(1.1 + (rh - ra) * 0.035, 0.15, 3));
     f.ag = League.poisson(clamp(0.85 + (ra - rh) * 0.035, 0.1, 2.8));
+    this.distributeStats(this.team(f.home), f.hg);
+    this.distributeStats(this.team(f.away), f.ag);
   }
   /** Resolve every unplayed AI-vs-AI fixture of a matchday. Returns those fixtures. */
   simulateOthers(md) {
@@ -2283,7 +2449,7 @@ class GameState {
 
   newSeason(year) {
     this.season = year;
-    this.league = League.create(this.clubName, this.league?.teams);
+    this.league = League.create(this.clubName, this.league?.teams, new Set(this.squad.map(p => p.surname)));
     const start = `${year}-${SEASON.START_MONTH_DAY}`;
     const events = [];
     for (let md = 1; md <= this.league.matchdays; md++) {
@@ -2436,7 +2602,7 @@ class GameState {
       if (!d.v || d.v < 3 || this.player(this.lineup[0]).position !== 'GK') this.autoArrange();
       if (d.v >= 4 && d.league && d.calendar) {
         this.season = d.season;
-        this.league = new League(d.league);
+        this.league = new League(d.league, new Set(this.squad.map(p => p.surname)));
         this.calendar = d.calendar;
         this.phase = d.phase || 'calendar';
         this.lastReport = d.lastReport || null;
@@ -2509,7 +2675,7 @@ class MatchEngine {
     return { name: team.name, formation: team.formation, user, score: 0, players: [...team.players], all: [...team.players],
       entries: slots.map((s, i) => ({ ...s, p: team.players[i] })) };
   }
-  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0 }; }
+  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0, assists: 0 }; }
 
   /* ---------- background play (v1.0) ----------
      Every minute, each player may also make an OFF-BALL pass or take on a man, resolved with the same
@@ -2728,6 +2894,7 @@ class MatchEngine {
     this.zone = 1;
     this.carrier = pick(this.inZone(side, 1));
     this.boxBonus = 0;
+    this.lastPass = null;
     this.setEv({ kind: 'kickoff' });
   }
   turnover(newCarrier, zone) {
@@ -2735,6 +2902,7 @@ class MatchEngine {
     this.carrier = newCarrier;
     this.zone = zone;
     this.boxBonus = 0;
+    this.lastPass = null;
   }
 
   /* ---------- decision (tags bend the AI) ---------- */
@@ -2785,6 +2953,7 @@ class MatchEngine {
 
     if (atk >= dfn) {
       this.st(c).passOk++;
+      this.lastPass = { p: c, side };   // v1.7: the last completed pass can become an assist
       this.carrier = recv; this.zone = tz;
       this.setEv({ kind: 'pass', a: c, b: recv, d: def });
       this.log('', this.isGK(c) ? 'gkPass' : forward ? 'passFwd' : 'passOk', vars, side);
@@ -2840,14 +3009,15 @@ class MatchEngine {
     const side = this.poss;
     const long = !freeKick && this.zone < 2;
     this.st(c).shots++;
-    this.pendingShot = { shooter: c, side, long, freeKick, bonus: freeKick ? 1 : this.boxBonus, phase: 1 };
+    const lp = this.lastPass, assist = !freeKick && lp && lp.side === side && lp.p !== c ? lp.p : null;
+    this.pendingShot = { shooter: c, side, long, freeKick, assist, bonus: freeKick ? 1 : this.boxBonus, phase: 1 };
     this.boxBonus = 0;
     this.setEv({ kind: 'aim', a: c, side });
     this.log('shot', freeKick ? 'fkAim' : long ? 'aimLong' : 'aim', { a: c }, side);
   }
 
   resolveShot() {
-    const { shooter, side, long, bonus } = this.pendingShot;
+    const { shooter, side, long, bonus, assist } = this.pendingShot;
     this.pendingShot = null;
     const opp = 1 - side;
     const blocker = pick(this.inZone(opp, 0));
@@ -2867,6 +3037,7 @@ class MatchEngine {
 
     if (atk > dfn) {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
+      if (assist) this.st(assist).assists++;
       this.sides[side].score++;
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
       this.hooks.onGoal?.(side);
@@ -2971,8 +3142,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.7', name: { en: 'League Statistics', ru: 'Статистика лиги' },
+    en: [
+      'The "League Table" tab is now simply "League", split in two: standings and results on the left, League Leaders on the right.',
+      'League Leaders: Top Scorers and Top Assists (top 7), with club badges. Your own kids compete in the same lists.',
+      'Assists are now counted: the last completed pass before a goal. Shown on the Profile Card as well.',
+      'Every rival club has a squad of 14 named kids. Background matches hand out goals and assists among them (strikers score more, midfielders set up more).',
+      'Click any club in the standings (or a name in the leaders) to open its TEAM_ROSTER.EXE: badge, league position, W-D-L and each kid\'s matches, goals and assists.',
+    ],
+    ru: [
+      'Вкладка «Таблица лиги» теперь просто «Лига» и разделена надвое: слева таблица и результаты, справа лидеры лиги.',
+      'Лидеры лиги: лучшие бомбардиры и ассистенты (топ-7) с гербами клубов. Твои ребята борются в тех же списках.',
+      'Теперь считаются голевые передачи: последний точный пас перед голом. Их видно и в карточке игрока.',
+      'У каждого клуба-соперника состав из 14 ребят с именами. Голы и передачи в фоновых матчах распределяются между ними (нападающие чаще забивают, полузащитники чаще отдают).',
+      'Щёлкни по любому клубу в таблице (или по имени в списке лидеров), чтобы открыть его TEAM_ROSTER.EXE: герб, место в лиге, В-Н-П, а также матчи, голы и передачи каждого игрока.',
+    ] },
   { v: '1.6', name: { en: 'Fixture Calendar', ru: 'Календарь матчей' },
     en: [
       'Every club now has its own badge: a procedural 32x32 pixel-art crest (shield, circle or hexagon; solid, striped or halved; two club colours and the first letter of the name). Badges are drawn in code and kept across seasons.',
@@ -3836,6 +4022,7 @@ class ProfileCard {
     const rows = st => [
       [L.t('pi.apps'), st.apps ?? (st === live ? 1 : 0)],
       [L.t('pi.goals'), st.goals],
+      [L.t('pi.assists'), st.assists ?? 0],
       [L.t('pi.shots'), `${st.shots} <small>(${L.t('pi.onTarget', { n: st.onTarget })})</small>`],
       [L.t('pi.tackles'), `${st.tackles} <small>/ ${st.tackles + st.tacklesLost}</small>`, pct(st.tackles, st.tacklesLost)],
       [L.t('pi.passAcc'), pct(st.passOk, st.passFail) == null ? '—' : pct(st.passOk, st.passFail) + '% <small>(' + st.passOk + '/' + (st.passOk + st.passFail) + ')</small>', pct(st.passOk, st.passFail)],
@@ -3889,6 +4076,78 @@ class ProfileCard {
   }
 }
 /* =========================================================
+   TEAM ROSTER CARD (v1.7) — "[TEAM]_ROSTER.EXE"
+   Click any club in the League standings. Shows the badge, league position
+   and the lightweight squad stats only (MP / Goals / Assists), sorted by goals.
+   ========================================================= */
+class TeamRosterCard {
+  constructor(ui) {
+    this.ui = ui;
+    this.teamId = null;
+    this.layer = document.getElementById('troster-layer');
+    this.body = document.getElementById('troster-body');
+    const close = () => this.close();
+    document.getElementById('troster-x').addEventListener('click', close);
+    document.getElementById('troster-ok').addEventListener('click', close);
+    this.layer.addEventListener('mousedown', e => { if (e.target === this.layer) close(); });
+    document.addEventListener('keydown', e => {
+      if (!this.isOpen || e.key !== 'Escape') return;
+      e.preventDefault(); e.stopImmediatePropagation(); close();
+    }, true);
+  }
+  get isOpen() { return !this.layer.hidden; }
+
+  open(teamId) {
+    const team = this.ui.state.league.team(teamId);
+    if (!team || this.ui.modal.isOpen) return;
+    this.teamId = teamId;
+    this.render();
+    this.lastFocus = document.activeElement;
+    this.layer.hidden = false;
+    document.getElementById('troster-ok').focus();
+  }
+  close() {
+    if (!this.isOpen) return;
+    this.layer.hidden = true;
+    this.teamId = null;
+    if (this.lastFocus && document.contains(this.lastFocus)) this.lastFocus.focus();
+  }
+
+  render() {
+    if (this.teamId == null) return;
+    const s = this.ui.state, lg = s.league, team = lg.team(this.teamId);
+    const table = lg.table(), i = table.findIndex(r => r.team.id === team.id), row = table[i];
+    const posOf = id => team.user ? s.player(id)?.position : team.squad.find(k => k.id === id)?.pos;
+    const kids = lg.scorers(s.squad, s.seasonStats).filter(k => k.team === team)
+      .sort((a, b) => b.goals - a.goals || b.assists - a.assists || b.mp - a.mp || a.name.localeCompare(b.name));
+    const title = `${L.team(team.name).replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_|_$/g, '').toUpperCase()}_ROSTER.EXE`;
+    document.getElementById('troster-title').textContent = title;
+    this.body.innerHTML = `
+      <div class="tr-left">
+        <span class="emblem xl">${team.emblemSvg}</span>
+        <b class="tr-name">${esc(L.team(team.name))}</b>
+        ${team.user ? `<small class="tr-you">${L.t('tr.you')}</small>` : ''}
+        <dl class="pi-kv">
+          <dt>${L.t('tr.place')}</dt><dd><b class="tr-place">${L.t('tr.placeN', { n: i + 1, t: table.length })}</b></dd>
+          <dt>${L.t('tr.record')}</dt><dd>${row.w}-${row.d}-${row.l}</dd>
+          <dt>${L.t('tr.gd')}</dt><dd>${row.gf}:${row.ga}</dd>
+          <dt>${L.t('tr.pts')}</dt><dd><b class="tr-pts">${row.pts}</b></dd>
+        </dl>
+        <div class="tr-form">${this.ui.formChips(row.form)}</div>
+      </div>
+      <fieldset class="tr-right"><legend>${L.t('tr.tab')}</legend>
+        <div class="tr-scroll"><table class="tr-table">
+          <thead><tr><th class="c">#</th><th>${L.t('tr.player')}</th><th class="c">${L.t('tr.pos')}</th><th class="c">${L.t('tr.mp')}</th><th class="c">${L.t('tr.g')}</th><th class="c">${L.t('tr.a')}</th></tr></thead>
+          <tbody>${kids.map((k, n) => `<tr class="${k.goals ? 'has-g' : ''}">
+            <td class="c n">${n + 1}</td><td class="nm">${esc(L.name(k.name))}</td>
+            <td class="c"><span class="pos ${posOf(k.id)}">${L.pos(posOf(k.id))}</span></td>
+            <td class="c">${k.mp}</td><td class="c g">${k.goals}</td><td class="c a">${k.assists}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </fieldset>`;
+    document.getElementById('troster-status').textContent = L.t(team.user ? 'tr.statusMe' : 'tr.status');
+  }
+}
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -3915,6 +4174,7 @@ class UIController {
     });
     this.modal = new Modal();
     this.profile = new ProfileCard(this);
+    this.teamCard = new TeamRosterCard(this);   // v1.7
     this.setupCalendar();
     this.bind();
     this.applyStatic();
@@ -4063,7 +4323,7 @@ class UIController {
       this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
     });
     document.addEventListener('keydown', e => {
-      if (e.key !== 'Escape' || this.modal.isOpen || this.profile.isOpen) return;
+      if (e.key !== 'Escape' || this.modal.isOpen || this.profile.isOpen || this.teamCard.isOpen) return;
       this.toggleStart(false);
       if (this.selected) { this.clearSelection(); }
       if (this.liveSel) { this.liveSel = null; this.renderLiveRoster(); }
@@ -4137,6 +4397,11 @@ class UIController {
       this.onDropSwap(row.dataset.id, e.dataTransfer.getData('text/plain'));
     });
     this.$('md-prev').addEventListener('click', () => { this.tableMd = Math.max(1, this.tableMd - 1); this.renderTable(); });
+    const openTeam = e => { const tr = e.target.closest('tr[data-team]'); if (tr) this.teamCard.open(+tr.dataset.team); };
+    this.$('table-body').addEventListener('click', openTeam);
+    this.$('table-body').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTeam(e); } });
+    this.$('top-scorers').addEventListener('click', openTeam);
+    this.$('top-assists').addEventListener('click', openTeam);
     this.$('md-next').addEventListener('click', () => { this.tableMd = Math.min(this.state.league.matchdays, this.tableMd + 1); this.renderTable(); });
 
     this.$('notes-body').addEventListener('click', e => {
@@ -4310,7 +4575,7 @@ class UIController {
     if (view === 'dash') this.renderDash();
   }
 
-  alert(html, title, icon = 'info', buttons) { this.profile?.close(); this.modal.show({ title, html, icon, buttons }); }
+  alert(html, title, icon = 'info', buttons) { this.profile?.close(); this.teamCard?.close(); this.modal.show({ title, html, icon, buttons }); }
 
   /** Match / Notebook only exist in the navigation while the calendar has unlocked them. */
   syncLocks() {
@@ -4587,7 +4852,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const lg = this.state.league;
     const rows = lg.table();
     this.$('table-body').innerHTML = rows.map((r, i) => `
-      <tr class="${r.team.user ? 'me' : ''}${i === 0 && r.p ? ' lead' : ''}">
+      <tr class="${r.team.user ? 'me' : ''}${i === 0 && r.p ? ' lead' : ''}" data-team="${r.team.id}" tabindex="0">
         <td class="c pos-n">${i + 1}</td><td class="tm"><div class="tm-in">${emblemHTML(r.team, 'sm')}<span>${esc(L.team(r.team.name))}</span></div></td>
         <td class="c">${r.p}</td><td class="c">${r.w}</td><td class="c">${r.d}</td><td class="c">${r.l}</td>
         <td class="c">${r.gf}</td><td class="c">${r.ga}</td><td class="c">${r.gd > 0 ? '+' : ''}${r.gd}</td>
@@ -4600,6 +4865,23 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.$('md-next').disabled = this.tableMd >= lg.matchdays;
     this.$('md-results').innerHTML = lg.fixturesOf(this.tableMd).map(f => this.fixtureHTML(f)).join('');
     this.$('table-status').textContent = L.t('table.status', { n: playedMd });
+    this.renderLeaders();
+    this.teamCard.render();
+  }
+
+  /** v1.7: Top Scorers / Top Assists (AI kids + our academy). */
+  renderLeaders() {
+    const s = this.state, all = s.league.scorers(s.squad, s.seasonStats);
+    const fill = (id, key) => {
+      const top = League.leaders(all, key, 7);
+      this.$(id).innerHTML = `<thead><tr><th class="c">${L.t('table.pos')}</th><th>${L.t('table.player')}</th><th class="c"></th><th class="c">${L.t(key === 'goals' ? 'table.g' : 'table.a')}</th></tr></thead><tbody>`
+        + (top.length ? top.map((k, i) => `<tr class="${k.own ? 'me' : ''}${i === 0 ? ' lead' : ''}" data-team="${k.team.id}">
+            <td class="c pos-n">${i + 1}</td><td class="nm">${esc(L.name(k.name))}</td>
+            <td class="c">${emblemHTML(k.team, 'xs')}</td><td class="c pts">${k[key]}</td></tr>`).join('')
+          : `<tr class="empty"><td colspan="4">${L.t('table.none')}</td></tr>`) + '</tbody>';
+    };
+    fill('top-scorers', 'goals');
+    fill('top-assists', 'assists');
   }
 
   /* ---------- TEAM MANAGEMENT: roster (left) + tactics board (right) ---------- */
@@ -4907,6 +5189,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       })),
     };
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
+    s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
     s.phase = 'post';

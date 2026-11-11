@@ -1,0 +1,57 @@
+/* =========================================================
+   v1.7 — LEAGUE split view (standings | leaders) + TEAM_ROSTER.EXE
+   ========================================================= */
+#win-table .table-grid{ grid-template-columns: minmax(0, 1fr) 320px; }
+.tbl-left, .tbl-right{ display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* clickable standings rows */
+.grid.league.clickable tbody tr{ cursor: pointer; transition: background-color .08s steps(2); }
+.grid.league.clickable tbody tr:hover td{ background: rgba(216,194,122,.13) !important; }
+.grid.league.clickable tbody tr:hover .tm span{ color: var(--amber); text-decoration: underline dotted; text-underline-offset: 3px; }
+.grid.league.clickable tbody tr:focus-visible{ outline: 1px dotted var(--amber); outline-offset: -2px; }
+.grid.league.clickable tbody tr:active td{ background: rgba(216,194,122,.22) !important; }
+
+/* League leaders: two compact phosphor tables */
+.lead-tbl{ width: 100%; font-size: 13px; }
+.lead-tbl th, .lead-tbl td{ padding: 4px 6px; }
+.lead-tbl .c{ text-align: center; }
+.lead-tbl th:nth-child(3){ width: 26px; }
+.lead-tbl th:last-child{ width: 34px; }
+.lead-tbl .nm{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; color: #dfe6dc; }
+.lead-tbl .pts{ font: 19px/1 "VT323", var(--mono); color: var(--amber); }
+.lead-tbl tbody tr[data-team]{ cursor: pointer; }
+.lead-tbl tbody tr[data-team]:hover td{ background: rgba(216,194,122,.1); }
+.lead-tbl tr.lead .pos-n{ background: #b8902f; color: #111; font-weight: bold; }
+.lead-tbl tr.me td{ background: rgba(47,111,208,.3); }
+.lead-tbl tr.empty td{ color: var(--muted); font-style: italic; text-align: center; padding: 10px 6px; }
+
+/* TEAM_ROSTER.EXE (reuses the PLAYER_INFO.EXE chrome) */
+.win.troster{ width: min(640px, 100%); }
+.tr-body{ grid-template-columns: 180px minmax(0, 1fr); max-height: min(62vh, 520px); }
+.tr-left{ display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px; text-align: center;
+  background: #11171b; color: var(--text); border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); box-shadow: inset 1px 1px 0 var(--dark); }
+.emblem.xl{ width: 96px; height: 96px; padding: 6px; background: #0b0f12; border: 2px solid #000; box-shadow: 0 0 0 1px #3a4650; }
+.emblem.xl svg{ filter: saturate(.75) brightness(.95) drop-shadow(2px 3px 0 rgba(0,0,0,.6)); }
+.tr-name{ font: 22px/1 "VT323", var(--mono); color: #eef1ec; letter-spacing: .5px; }
+.tr-you{ color: #8fb4e8; font-size: 11px; margin-top: -4px; }
+.tr-left .pi-kv{ text-align: left; }
+.tr-place, .tr-pts{ color: var(--amber) !important; }
+.tr-form{ min-height: 19px; }
+.tr-right{ display: flex; flex-direction: column; min-height: 0; }
+.tr-scroll{ overflow-y: auto; max-height: min(52vh, 440px); }
+.tr-table{ width: 100%; border-collapse: collapse; font-size: 12px; }
+.tr-table th, .tr-table td{ padding: 3px 7px; border-bottom: 1px dotted #2b363e; text-align: left; }
+.tr-table .c{ text-align: center; }
+.tr-table thead th{ position: sticky; top: 0; background: #11171b; color: var(--amber); font: 15px/1 var(--mono); letter-spacing: .5px; }
+.tr-table .n{ color: var(--muted); }
+.tr-table .nm{ color: #dfe6dc; white-space: nowrap; }
+.tr-table .g, .tr-table .a{ font: 17px/1 "VT323", var(--mono); }
+.tr-table tr.has-g .g{ color: var(--amber); }
+.tr-table tbody tr:hover td{ background: rgba(255,255,255,.04); }
+
+@media (max-width: 980px){ #win-table .table-grid{ grid-template-columns: 1fr; } }
+@media (max-width: 640px){
+  .tr-body{ grid-template-columns: 1fr; max-height: none; }
+  .tr-left{ flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .emblem.xl{ width: 64px; height: 64px; }
+}

@@ -25,6 +25,7 @@ class UIController {
     });
     this.modal = new Modal();
     this.profile = new ProfileCard(this);
+    this.teamCard = new TeamRosterCard(this);   // v1.7
     this.setupCalendar();
     this.bind();
     this.applyStatic();
@@ -173,7 +174,7 @@ class UIController {
       this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
     });
     document.addEventListener('keydown', e => {
-      if (e.key !== 'Escape' || this.modal.isOpen || this.profile.isOpen) return;
+      if (e.key !== 'Escape' || this.modal.isOpen || this.profile.isOpen || this.teamCard.isOpen) return;
       this.toggleStart(false);
       if (this.selected) { this.clearSelection(); }
       if (this.liveSel) { this.liveSel = null; this.renderLiveRoster(); }
@@ -247,6 +248,11 @@ class UIController {
       this.onDropSwap(row.dataset.id, e.dataTransfer.getData('text/plain'));
     });
     this.$('md-prev').addEventListener('click', () => { this.tableMd = Math.max(1, this.tableMd - 1); this.renderTable(); });
+    const openTeam = e => { const tr = e.target.closest('tr[data-team]'); if (tr) this.teamCard.open(+tr.dataset.team); };
+    this.$('table-body').addEventListener('click', openTeam);
+    this.$('table-body').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTeam(e); } });
+    this.$('top-scorers').addEventListener('click', openTeam);
+    this.$('top-assists').addEventListener('click', openTeam);
     this.$('md-next').addEventListener('click', () => { this.tableMd = Math.min(this.state.league.matchdays, this.tableMd + 1); this.renderTable(); });
 
     this.$('notes-body').addEventListener('click', e => {
@@ -420,7 +426,7 @@ class UIController {
     if (view === 'dash') this.renderDash();
   }
 
-  alert(html, title, icon = 'info', buttons) { this.profile?.close(); this.modal.show({ title, html, icon, buttons }); }
+  alert(html, title, icon = 'info', buttons) { this.profile?.close(); this.teamCard?.close(); this.modal.show({ title, html, icon, buttons }); }
 
   /** Match / Notebook only exist in the navigation while the calendar has unlocked them. */
   syncLocks() {
@@ -697,7 +703,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const lg = this.state.league;
     const rows = lg.table();
     this.$('table-body').innerHTML = rows.map((r, i) => `
-      <tr class="${r.team.user ? 'me' : ''}${i === 0 && r.p ? ' lead' : ''}">
+      <tr class="${r.team.user ? 'me' : ''}${i === 0 && r.p ? ' lead' : ''}" data-team="${r.team.id}" tabindex="0">
         <td class="c pos-n">${i + 1}</td><td class="tm"><div class="tm-in">${emblemHTML(r.team, 'sm')}<span>${esc(L.team(r.team.name))}</span></div></td>
         <td class="c">${r.p}</td><td class="c">${r.w}</td><td class="c">${r.d}</td><td class="c">${r.l}</td>
         <td class="c">${r.gf}</td><td class="c">${r.ga}</td><td class="c">${r.gd > 0 ? '+' : ''}${r.gd}</td>
@@ -710,6 +716,23 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.$('md-next').disabled = this.tableMd >= lg.matchdays;
     this.$('md-results').innerHTML = lg.fixturesOf(this.tableMd).map(f => this.fixtureHTML(f)).join('');
     this.$('table-status').textContent = L.t('table.status', { n: playedMd });
+    this.renderLeaders();
+    this.teamCard.render();
+  }
+
+  /** v1.7: Top Scorers / Top Assists (AI kids + our academy). */
+  renderLeaders() {
+    const s = this.state, all = s.league.scorers(s.squad, s.seasonStats);
+    const fill = (id, key) => {
+      const top = League.leaders(all, key, 7);
+      this.$(id).innerHTML = `<thead><tr><th class="c">${L.t('table.pos')}</th><th>${L.t('table.player')}</th><th class="c"></th><th class="c">${L.t(key === 'goals' ? 'table.g' : 'table.a')}</th></tr></thead><tbody>`
+        + (top.length ? top.map((k, i) => `<tr class="${k.own ? 'me' : ''}${i === 0 ? ' lead' : ''}" data-team="${k.team.id}">
+            <td class="c pos-n">${i + 1}</td><td class="nm">${esc(L.name(k.name))}</td>
+            <td class="c">${emblemHTML(k.team, 'xs')}</td><td class="c pts">${k[key]}</td></tr>`).join('')
+          : `<tr class="empty"><td colspan="4">${L.t('table.none')}</td></tr>`) + '</tbody>';
+    };
+    fill('top-scorers', 'goals');
+    fill('top-assists', 'assists');
   }
 
   /* ---------- TEAM MANAGEMENT: roster (left) + tactics board (right) ---------- */
@@ -1017,6 +1040,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       })),
     };
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
+    s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
     s.phase = 'post';

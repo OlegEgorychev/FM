@@ -94,20 +94,39 @@ const emblemHTML = (team, size = 'sm') => team ? `<span class="emblem ${size}" t
 class League {
   static STRENGTHS = [3, 2, 1, 1, 0, 0, -1, -2, -3];   // spread across the 9 AI clubs
 
-  constructor({ teams, fixtures }) {
+  static SQUAD_SIZE = 14;
+  static LITE_POS = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'FWD'];
+  /* background share of goals / assists by position (weights, not %) */
+  static GOAL_W   = { GK: 0,   DEF: 0.6, MID: 2.2, FWD: 5 };
+  static ASSIST_W = { GK: 0.1, DEF: 1.1, MID: 3.6, FWD: 2.4 };
+
+  constructor({ teams, fixtures }, usedSurnames = new Set()) {
     this.teams = teams;
     this.fixtures = fixtures;
     for (const t of this.teams) { if (t.roster) t.roster = t.roster.map(p => new Player(p)); attachEmblem(t); }
+    // v1.7: every AI club carries a lightweight squad { id, name, pos, mp, goals, assists } (no attrs, no faces)
+    const used = new Set([...usedSurnames, ...this.teams.flatMap(t => (t.squad || []).map(k => k.name.split(' ').pop()))]);
+    for (const t of this.teams) if (!t.user && !Array.isArray(t.squad)) t.squad = League.liteSquad(t, used);
+  }
+
+  /** 14 kids per AI club. If a full match roster already exists (old save), its 11 names are kept. */
+  static liteSquad(team, used) {
+    return League.LITE_POS.map((pos, i) => {
+      const old = team.roster?.find(p => p.id === `t${team.id}_${i}`);
+      let name = old?.name;
+      if (!name) { let last, g = 0; do { last = pick(LAST); } while (used.has(last) && g++ < 200); used.add(last); name = `${pick(FIRST)} ${last}`; }
+      return { id: `t${team.id}_${i}`, name, pos: old?.position || pos, mp: 0, goals: 0, assists: 0 };
+    });
   }
 
   /** prevTeams: last season's clubs, so every badge survives the summer. */
-  static create(userName, prevTeams = []) {
+  static create(userName, prevTeams = [], usedSurnames = new Set()) {
     const strengths = shuffle(League.STRENGTHS);
     const rolled = EmblemGenerator.rollLeague(OPPONENTS.length + 1);
     const crests = [userName, ...OPPONENTS].map((n, i) => prevTeams.find(t => t.name === n)?.crest || rolled[i]);
     const teams = [{ id: 0, name: userName, user: true, crest: crests[0] }];
     OPPONENTS.forEach((name, i) => teams.push({ id: i + 1, name, strength: strengths[i], formation: pick(FORMATION_KEYS), roster: null, crest: crests[i + 1] }));
-    return new League({ teams, fixtures: League.roundRobin(teams.map(t => t.id)) });
+    return new League({ teams, fixtures: League.roundRobin(teams.map(t => t.id)) }, usedSurnames);
   }
 
   /** Circle method: one team fixed, the rest rotate. Second half mirrors the first with home/away swapped. */
@@ -137,12 +156,59 @@ class League {
   playedMatchdays() { return new Set(this.fixtures.filter(f => this.played(f)).map(f => f.md)).size; }
 
   /** AI roster is generated on first need and stored, so a club keeps the same kids all season. */
+  /** v1.7: the match roster is built from the club's lightweight squad, so names and ids match the league stats. */
   roster(team, usedSurnames) {
     if (!team.roster) {
-      team.roster = formationSlots(team.formation).map((s, i) =>
-        Player.generate(`t${team.id}_${i}`, LINE_POS[s.line], usedSurnames, team.strength, false, i + 1));
+      const free = [...team.squad];
+      team.roster = formationSlots(team.formation).map(s => {
+        const want = LINE_POS[s.line];
+        const k = Math.max(0, free.findIndex(x => x.pos === want));
+        const kid = free.splice(k, 1)[0];
+        const p = Player.generate(kid.id, want, usedSurnames, team.strength, false, team.squad.indexOf(kid) + 1);
+        p.name = kid.name;
+        return new Player(p);   // rebuild so the portrait hash matches the final name
+      });
     }
     return team.roster;
+  }
+
+  /* ---------- v1.7: LEAGUE STATS (matches, goals, assists) ---------- */
+  kid(id) { for (const t of this.teams) { const k = t.squad?.find(x => x.id === id); if (k) return k; } return null; }
+
+  /** Weighted random pick from a list of kids, never `not`. */
+  static weighted(list, wKey, not) {
+    const pool = list.filter(k => k !== not), w = pool.map(k => wKey[k.pos] + 0.05);
+    let r = Math.random() * w.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < pool.length; i++) if ((r -= w[i]) <= 0) return pool[i];
+    return pool[pool.length - 1];
+  }
+  /** Background result → stats: 11 of 14 kids play (GK always), each goal gets a scorer and usually an assist. */
+  distributeStats(team, goals) {
+    if (!team.squad) return;
+    const gk = team.squad.filter(k => k.pos === 'GK');
+    const out = shuffle(team.squad.filter(k => k.pos !== 'GK'));
+    const xi = [...gk.slice(0, 1), ...out.slice(0, 10)];
+    for (const k of xi) k.mp++;
+    for (let g = 0; g < goals; g++) {
+      const scorer = League.weighted(xi, League.GOAL_W);
+      scorer.goals++;
+      if (Math.random() < 0.72) League.weighted(xi, League.ASSIST_W, scorer).assists++;
+    }
+  }
+  /** User match: credit the opponent kids with what they did in the live engine. pairs: [[id, stats], ...] */
+  recordKids(pairs) {
+    for (const [id, st] of pairs) { const k = this.kid(id); if (k) { k.mp++; k.goals += st.goals || 0; k.assists += st.assists || 0; } }
+  }
+
+  /** All players of the league (AI kids + our academy) as { name, team, goals, assists, mp }. */
+  scorers(userSquad = [], userStats = {}) {
+    const me = this.teams.find(t => t.user);
+    const list = this.teams.filter(t => !t.user).flatMap(t => t.squad.map(k => ({ id: k.id, name: k.name, team: t, mp: k.mp, goals: k.goals, assists: k.assists })));
+    for (const p of userSquad) { const st = userStats[p.id] || {}; list.push({ id: p.id, name: p.name, team: me, mp: st.apps || 0, goals: st.goals || 0, assists: st.assists || 0, own: true }); }
+    return list;
+  }
+  static leaders(list, key, n = 7) {
+    return list.filter(x => x[key] > 0).sort((a, b) => b[key] - a[key] || a.mp - b.mp || a.name.localeCompare(b.name)).slice(0, n);
   }
 
   setUserResult(f, userGoals, oppGoals) {
@@ -158,6 +224,8 @@ class League {
     // base rates tuned so AI games score like the visual engine does (~2 goals per game)
     f.hg = League.poisson(clamp(1.1 + (rh - ra) * 0.035, 0.15, 3));
     f.ag = League.poisson(clamp(0.85 + (ra - rh) * 0.035, 0.1, 2.8));
+    this.distributeStats(this.team(f.home), f.hg);
+    this.distributeStats(this.team(f.away), f.ag);
   }
   /** Resolve every unplayed AI-vs-AI fixture of a matchday. Returns those fixtures. */
   simulateOthers(md) {

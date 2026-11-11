@@ -194,28 +194,39 @@
         <button class="tb-btn" data-close data-i18n-aria="ui.min">_</button><button class="tb-btn" data-close data-i18n-aria="ui.close">&times;</button></div>
       <div class="win-body">
         <div class="table-grid">
-          <div class="tbl-wrap sunken">
-            <table class="grid league">
-              <thead><tr>
-                <th class="c" data-i18n="table.pos"></th><th data-i18n="table.team"></th>
-                <th class="c" data-i18n="table.p"></th><th class="c" data-i18n="table.w"></th><th class="c" data-i18n="table.d"></th><th class="c" data-i18n="table.l"></th>
-                <th class="c" data-i18n="table.gf"></th><th class="c" data-i18n="table.ga"></th><th class="c" data-i18n="table.gd"></th><th class="c" data-i18n="table.pts"></th>
-                <th data-i18n="table.form"></th>
-              </tr></thead>
-              <tbody id="table-body"></tbody>
-            </table>
-          </div>
-          <div class="groupbox"><span class="gb-label" data-i18n="table.results"></span>
-            <div class="md-nav">
-              <button class="btn small" id="md-prev" aria-label="Previous">&#9664;</button>
-              <b id="md-label"></b>
-              <button class="btn small" id="md-next" aria-label="Next">&#9654;</button>
+          <div class="tbl-left">
+            <div class="tbl-wrap sunken">
+              <table class="grid league clickable">
+                <thead><tr>
+                  <th class="c" data-i18n="table.pos"></th><th data-i18n="table.team"></th>
+                  <th class="c" data-i18n="table.p"></th><th class="c" data-i18n="table.w"></th><th class="c" data-i18n="table.d"></th><th class="c" data-i18n="table.l"></th>
+                  <th class="c" data-i18n="table.gf"></th><th class="c" data-i18n="table.ga"></th><th class="c" data-i18n="table.gd"></th><th class="c" data-i18n="table.pts"></th>
+                  <th data-i18n="table.form"></th>
+                </tr></thead>
+                <tbody id="table-body"></tbody>
+              </table>
             </div>
-            <div class="fx-list" id="md-results"></div>
+            <div class="groupbox"><span class="gb-label" data-i18n="table.results"></span>
+              <div class="md-nav">
+                <button class="btn small" id="md-prev" aria-label="Previous">&#9664;</button>
+                <b id="md-label"></b>
+                <button class="btn small" id="md-next" aria-label="Next">&#9654;</button>
+              </div>
+              <div class="fx-list" id="md-results"></div>
+            </div>
+          </div>
+          <!-- v1.7: League leaders -->
+          <div class="tbl-right">
+            <div class="groupbox leaders"><span class="gb-label" data-i18n="table.scorers"></span>
+              <div class="tbl-wrap sunken"><table class="grid lead-tbl" id="top-scorers"></table></div>
+            </div>
+            <div class="groupbox leaders"><span class="gb-label" data-i18n="table.assists"></span>
+              <div class="tbl-wrap sunken"><table class="grid lead-tbl" id="top-assists"></table></div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="statusbar"><span id="table-status"></span><span data-i18n="table.sort"></span></div>
+      <div class="statusbar"><span id="table-status"></span><span data-i18n="table.clickHint"></span></div>
     </section>
 
     <!-- README.TXT (patch notes, Notepad style) -->
@@ -256,6 +267,17 @@
       <div class="win-body pinfo-body" id="pinfo-body"></div>
       <div class="row-btns pinfo-btns"><button class="btn go" id="pinfo-ok" type="button" data-i18n="ui.ok"></button></div>
       <div class="statusbar"><span id="pinfo-status"></span></div>
+    </section>
+  </div>
+
+  <!-- v1.7: Team Roster card (click a club in the League standings) -->
+  <div class="pinfo-layer" id="troster-layer" hidden>
+    <section class="win pinfo troster open" role="dialog" aria-modal="true" aria-labelledby="troster-title">
+      <div class="titlebar"><span class="t-ico">&#9776;</span><span class="t-txt" id="troster-title">TEAM_ROSTER.EXE</span><button class="tb-btn" id="troster-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="pinfo-tabs"><span class="pinfo-tab" data-i18n="tr.tab"></span></div>
+      <div class="win-body pinfo-body tr-body" id="troster-body"></div>
+      <div class="row-btns pinfo-btns"><button class="btn go" id="troster-ok" type="button" data-i18n="ui.ok"></button></div>
+      <div class="statusbar"><span id="troster-status"></span></div>
     </section>
   </div>
 

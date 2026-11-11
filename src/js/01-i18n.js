@@ -456,3 +456,22 @@ Object.assign(I18N.ru, {
   'pi.scout': 'Игрок соперника: отчёта скаута нет.', 'pi.oppNote': 'Знаем только то, что видим сегодня.',
   'pi.status.bar': 'Только цифры. Читай между строк, тренер.',
 });
+
+
+/* ---- v1.7: League stats (top scorers / assists) + TEAM_ROSTER.EXE ---- */
+Object.assign(I18N.en, {
+  'pi.assists': 'Assists', 'nav.table': 'League', 'table.standings': 'Standings', 'table.leaders': 'League leaders',
+  'table.scorers': 'Top Scorers', 'table.assists': 'Top Assists', 'table.player': 'Player', 'table.g': 'G', 'table.a': 'A',
+  'table.none': 'No one yet. The season is young.', 'table.clickHint': 'Click a club to open its roster',
+  'tr.tab': 'Roster', 'tr.place': 'League position', 'tr.placeN': '{n} of {t}', 'tr.record': 'W-D-L', 'tr.pts': 'Points', 'tr.gd': 'Goals',
+  'tr.player': 'Player', 'tr.pos': 'Pos', 'tr.mp': 'MP', 'tr.g': 'G', 'tr.a': 'A', 'tr.you': 'your academy',
+  'tr.status': 'Scouts only log matches, goals and assists.', 'tr.statusMe': 'Our kids. Full stats in the Profile Card.',
+});
+Object.assign(I18N.ru, {
+  'pi.assists': 'Голевые передачи', 'nav.table': 'Лига', 'table.standings': 'Турнирная таблица', 'table.leaders': 'Лидеры лиги',
+  'table.scorers': 'Бомбардиры', 'table.assists': 'Ассистенты', 'table.player': 'Игрок', 'table.g': 'Г', 'table.a': 'П',
+  'table.none': 'Пока никого. Сезон только начался.', 'table.clickHint': 'Щёлкни по клубу, чтобы открыть состав',
+  'tr.tab': 'Состав', 'tr.place': 'Место в лиге', 'tr.placeN': '{n} из {t}', 'tr.record': 'В-Н-П', 'tr.pts': 'Очки', 'tr.gd': 'Мячи',
+  'tr.player': 'Игрок', 'tr.pos': 'Поз', 'tr.mp': 'И', 'tr.g': 'Г', 'tr.a': 'П', 'tr.you': 'твоя академия',
+  'tr.status': 'Скауты записывают только матчи, голы и передачи.', 'tr.statusMe': 'Наши ребята. Полная статистика в карточке игрока.',
+});

@@ -48,7 +48,7 @@ class MatchEngine {
     return { name: team.name, formation: team.formation, user, score: 0, players: [...team.players], all: [...team.players],
       entries: slots.map((s, i) => ({ ...s, p: team.players[i] })) };
   }
-  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0 }; }
+  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0, assists: 0 }; }
 
   /* ---------- background play (v1.0) ----------
      Every minute, each player may also make an OFF-BALL pass or take on a man, resolved with the same
@@ -267,6 +267,7 @@ class MatchEngine {
     this.zone = 1;
     this.carrier = pick(this.inZone(side, 1));
     this.boxBonus = 0;
+    this.lastPass = null;
     this.setEv({ kind: 'kickoff' });
   }
   turnover(newCarrier, zone) {
@@ -274,6 +275,7 @@ class MatchEngine {
     this.carrier = newCarrier;
     this.zone = zone;
     this.boxBonus = 0;
+    this.lastPass = null;
   }
 
   /* ---------- decision (tags bend the AI) ---------- */
@@ -324,6 +326,7 @@ class MatchEngine {
 
     if (atk >= dfn) {
       this.st(c).passOk++;
+      this.lastPass = { p: c, side };   // v1.7: the last completed pass can become an assist
       this.carrier = recv; this.zone = tz;
       this.setEv({ kind: 'pass', a: c, b: recv, d: def });
       this.log('', this.isGK(c) ? 'gkPass' : forward ? 'passFwd' : 'passOk', vars, side);
@@ -379,14 +382,15 @@ class MatchEngine {
     const side = this.poss;
     const long = !freeKick && this.zone < 2;
     this.st(c).shots++;
-    this.pendingShot = { shooter: c, side, long, freeKick, bonus: freeKick ? 1 : this.boxBonus, phase: 1 };
+    const lp = this.lastPass, assist = !freeKick && lp && lp.side === side && lp.p !== c ? lp.p : null;
+    this.pendingShot = { shooter: c, side, long, freeKick, assist, bonus: freeKick ? 1 : this.boxBonus, phase: 1 };
     this.boxBonus = 0;
     this.setEv({ kind: 'aim', a: c, side });
     this.log('shot', freeKick ? 'fkAim' : long ? 'aimLong' : 'aim', { a: c }, side);
   }
 
   resolveShot() {
-    const { shooter, side, long, bonus } = this.pendingShot;
+    const { shooter, side, long, bonus, assist } = this.pendingShot;
     this.pendingShot = null;
     const opp = 1 - side;
     const blocker = pick(this.inZone(opp, 0));
@@ -406,6 +410,7 @@ class MatchEngine {
 
     if (atk > dfn) {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
+      if (assist) this.st(assist).assists++;
       this.sides[side].score++;
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
       this.hooks.onGoal?.(side);

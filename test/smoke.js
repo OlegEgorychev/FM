@@ -135,6 +135,33 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('emblems: 10 unique badges, not saved as SVG; calendar grid + mini table', cal.svgs === 10 && cal.crests && cal.saved && cal.today === 1
       && cal.played === 1 && cal.badges >= 2 && cal.mini >= 5 && cal.res === 10 && cal.table === 10 && cal.big >= 60, JSON.stringify(cal));
     await shot('5-calendar');
+    // v1.7: league stats + TEAM_ROSTER.EXE
+    await page.evaluate(() => YAM.ui.show('table'));
+    const ls = await page.evaluate(() => {
+      const lg = YAM.game.league, ai = lg.teams.filter(t => !t.user);
+      const fxGoals = lg.fixtures.filter(f => f.hg !== null).reduce((a, f) => a + f.hg + f.ag, 0);
+      const kidGoals = ai.reduce((a, t) => a + t.squad.reduce((b, k) => b + k.goals, 0), 0)
+        + Object.values(YAM.game.seasonStats).reduce((a, s) => a + (s.goals || 0), 0);
+      const kidAst = ai.reduce((a, t) => a + t.squad.reduce((b, k) => b + k.assists, 0), 0);
+      return { squads: ai.every(t => t.squad.length === 14), mp: ai.every(t => t.squad.filter(k => k.mp === 1).length === 11),
+        fxGoals, kidGoals, ast: kidAst <= kidGoals, scorers: document.querySelectorAll('#top-scorers tbody tr').length,
+        assists: document.querySelectorAll('#top-assists tbody tr').length, nav: document.querySelector('.tk[data-view="table"] .lbl').textContent };
+    });
+    check('league stats: 14-kid AI squads, goals add up, leaders tables', ls.squads && ls.mp && ls.fxGoals === ls.kidGoals && ls.ast
+      && ls.scorers >= 1 && ls.assists >= 1 && /League|Лига/.test(ls.nav), JSON.stringify(ls));
+    const aiRow = await page.evaluate(() => [...document.querySelectorAll('#table-body tr')].findIndex(tr => tr.dataset.team !== '0'));
+    await page.click(`#table-body tr:nth-child(${aiRow + 1})`);
+    const tr = await page.evaluate(() => {
+      const g = [...document.querySelectorAll('#troster-body .tr-table tbody tr .g')].map(x => +x.textContent);
+      return { open: !document.getElementById('troster-layer').hidden, title: document.getElementById('troster-title').textContent,
+        rows: g.length, sorted: g.every((v, i) => !i || g[i - 1] >= v), badge: !!document.querySelector('#troster-body .emblem.xl svg'),
+        place: /\d/.test(document.querySelector('#troster-body .tr-place')?.textContent || '') };
+    });
+    await shot('6-league');
+    await page.keyboard.press('Escape');
+    const closed = await page.evaluate(() => document.getElementById('troster-layer').hidden && YAM.ui.view === 'table');
+    check('team roster modal: click row, emblem, position, 14 rows sorted by goals, Esc closes', tr.open && /_ROSTER\.EXE$/.test(tr.title)
+      && tr.rows === 14 && tr.sorted && tr.badge && tr.place && closed, JSON.stringify({ ...tr, closed }));
     await page.click('#btn-lang'); await page.click('#btn-lang');
     check('frame loop cost < 2 ms', await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0) < 2), (await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0).toFixed(2))) + ' ms');
   } catch (e) {

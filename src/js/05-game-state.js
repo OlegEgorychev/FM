@@ -22,7 +22,7 @@ class GameState {
 
   newSeason(year) {
     this.season = year;
-    this.league = League.create(this.clubName, this.league?.teams);
+    this.league = League.create(this.clubName, this.league?.teams, new Set(this.squad.map(p => p.surname)));
     const start = `${year}-${SEASON.START_MONTH_DAY}`;
     const events = [];
     for (let md = 1; md <= this.league.matchdays; md++) {
@@ -175,7 +175,7 @@ class GameState {
       if (!d.v || d.v < 3 || this.player(this.lineup[0]).position !== 'GK') this.autoArrange();
       if (d.v >= 4 && d.league && d.calendar) {
         this.season = d.season;
-        this.league = new League(d.league);
+        this.league = new League(d.league, new Set(this.squad.map(p => p.surname)));
         this.calendar = d.calendar;
         this.phase = d.phase || 'calendar';
         this.lastReport = d.lastReport || null;
