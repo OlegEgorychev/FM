@@ -62,7 +62,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
 
     // calendar → matchday (random narrative events off here; they are tested at the end)
     await page.evaluate(() => { YAM.ui.events.enabled = false; });
-    await page.click('#btn-sim');
+    await page.evaluate(() => YAM.ui.autoSim());   // v2.5: END DAY is manual; debug auto-sim to the match
     await page.waitForFunction(() => YAM.game.phase === 'matchday', null, { timeout: 20000 });
     check('calendar stops on matchday', true, await page.evaluate(() => YAM.ui.cal.date));
     await shot('1-dashboard');
@@ -309,6 +309,41 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       && sp.q[0].matchDay && sp.q[0].due === plus14(sp.date), JSON.stringify(sp));
     await page.evaluate(d => { YAM.game.eventQueue[0].due = d; YAM.game.save(); }, sp.date);   // fast-forward the bomb: due today → next match day
 
+    // v2.5: END DAY loop, mandatory training plan, regimes, action points + call into office
+    await page.evaluate(() => { YAM.ui.events.enabled = false; YAM.ui.show('dash'); });
+    const dl0 = await page.evaluate(() => ({ date: YAM.game.calendar.date, ap: document.getElementById('hdr-ap').textContent, btn: document.getElementById('btn-sim').disabled, today: !!document.querySelector('#today-box .td-ap') }));
+    const endDay = async () => { await page.click('#btn-sim'); await page.waitForTimeout(40); };
+    const dayOf = d => new Date(d + 'T00:00:00Z').getUTCDay();
+    let guard = 0;
+    while (!(await page.evaluate(() => isTrainingDay(YAM.game.calendar.date))) && guard++ < 7) await endDay();
+    const dl1 = await page.evaluate(() => ({ date: YAM.game.calendar.date, btn: document.getElementById('btn-sim').disabled, need: !!document.querySelector('#today-box .td-req.need'), plans: document.querySelectorAll('#today-box .plan-btn').length }));
+    await page.evaluate(() => { for (const p of YAM.game.squad) { p.energy = 50; p.dyn.morale = 60; p.psych.discipline = 15; p.injuryDays = 0; p.awayDays = 0; } });
+    await page.click('#today-box .plan-btn[data-plan="cardio"]');
+    const dl2 = await page.evaluate(() => ({ btn: document.getElementById('btn-sim').disabled, plan: YAM.game.dayState().plan }));
+    await page.evaluate(() => { window.__R = Math.random; Math.random = () => 0.99; });
+    await endDay();
+    await page.evaluate(() => { Math.random = window.__R; });
+    const dl3 = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available); return { date: YAM.game.calendar.date, e: p.energy, m: p.dyn.morale, plan: YAM.game.dayState().plan, diary: YAM.game.diary.slice(-3).some(d => d.key === 'cal.trainingAll') }; });
+    const oneDay = (a, b) => (new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5 === 1;
+    check('END DAY: one day per click; Tue/Thu blocks until a plan is picked; cardio = +5 energy, −4 morale (+1 drift); plan resets next morning',
+      dl0.today && /1\/1/.test(dl0.ap) && !dl0.btn && [2, 4].includes(dayOf(dl1.date)) && dl1.btn && dl1.need && dl1.plans === 4 && !dl2.btn && dl2.plan === 'cardio'
+      && oneDay(dl1.date, dl3.date) && dl3.e === 55 && dl3.m === 57 && dl3.plan === null && dl3.diary, JSON.stringify({ dl0, dl1, dl2, dl3 }));
+    const kidO = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available && x.position !== 'GK'); p.dyn.sharpness = 30; p.dyn.morale = 60; YAM.ui.profile.open(p.id); return p.id; });
+    const of0 = await page.evaluate(() => ({ vis: !document.getElementById('pinfo-office').hidden, dis: document.getElementById('pinfo-office').disabled }));
+    await page.click('#pinfo-office');
+    const of1 = await page.evaluate(() => ({ ap: YAM.game.ap, open: !document.getElementById('talk-layer').hidden, n: document.querySelectorAll('#talk-choices .talk-btn').length, chip: document.getElementById('hdr-ap').className }));
+    await talk(0);   // praise — he is out of form → backfire
+    const of2 = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step }));
+    await talk(0);
+    const of3 = await page.evaluate(k => { YAM.ui.profile.open(k); return { m: YAM.game.player(k).dyn.morale, dis: document.getElementById('pinfo-office').disabled, closed: !YAM.game.pendingEvent }; }, kidO);
+    await page.keyboard.press('Escape');
+    await endDay();
+    const of4 = await page.evaluate(() => YAM.game.ap);
+    await page.evaluate(() => { YAM.ui.events.enabled = true; });
+    check('Call into office: costs 1 AP, praise backfires when out of form, button disabled until the next morning (AP refilled)',
+      of0.vis && !of0.dis && of1.ap === 0 && of1.open && of1.n === 3 && /spent/.test(of1.chip) && of2.step === 'praiseBad' && of3.m === 52 && of3.dis && of3.closed && of4 === 1,
+      JSON.stringify({ of0, of1, of2, of3, of4 }));
+
     // v2.4: Monday-first calendar grid + training days + The Truant
     await page.evaluate(() => { YAM.ui.calMonth = '2002-09'; YAM.ui.renderDash(); });
     const cg = await page.evaluate(() => {
@@ -329,7 +364,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       for (const p of s.squad) { p.energy = 80; p.dyn.sharpness = 50; p.psych.discipline = 15; }
       lazy.psych.discipline = 1;
       const R = Math.random; Math.random = () => 0.001;
-      const r = s.dayRoutine('2002-09-10');   // Tuesday
+      const r = s.dayRoutine('2002-09-10', true, 'cardio');   // Tuesday, v2.5 regime: cardio
       Math.random = R;
       const other = fit.find(p => p !== lazy);
       const out = { training: r.training, skipped: r.skipped.map(p => p.id), lazy: [lazy.energy, lazy.dyn.sharpness, lazy.skipped_training], other: [other.energy, other.dyn.sharpness, other.skipped_training] };
@@ -339,9 +374,9 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       out.id = lazy.id;
       return out;
     });
-    check('training day: discipline roll → skipper unchanged + skipped_training; attendees −10 condition +5 sharpness; rest day +10 / −2 and flag cleared',
-      trn.training && trn.skipped.length === 1 && trn.skipped[0] === trn.id && trn.lazy.join() === '80,50,true' && trn.other.join() === '70,55,false'
-      && !trn.rest.training && trn.rest.other.join() === '80,53' && trn.rest.flag === false, JSON.stringify(trn));
+    check('training day (cardio regime): discipline roll → skipper unchanged + skipped_training; attendees +5 condition +2 sharpness; rest day +10 / −2 and flag cleared',
+      trn.training && trn.skipped.length === 1 && trn.skipped[0] === trn.id && trn.lazy.join() === '80,50,true' && trn.other.join() === '85,52,false'
+      && !trn.rest.training && trn.rest.other.join() === '95,50' && trn.rest.flag === false, JSON.stringify(trn));
     await page.evaluate(() => { YAM.game.budget = 10; YAM.ui.renderBudget(); YAM.ui.events.fire('truant'); });
     const tu = await page.evaluate(() => ({ kid: YAM.game.pendingEvent?.cast.kid, n: document.querySelectorAll('#talk-choices .talk-btn').length, fineOff: document.querySelector('#talk-choices .talk-btn[data-i="0"]').disabled,
       face: !!document.querySelector('#talk-face svg rect') }));
@@ -370,7 +405,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await closeModal();
     const qPersist = await page.evaluate(() => YAM.game.eventQueue.length === 1 && YAM.game.eventQueue[0].id === 'scoutvisit');
     await page.evaluate(() => { Object.assign(EVENTS_CFG, { DAD_CHANCE: 0, KNOCK_CHANCE: 0, SCOUT_CHANCE: 0, POOL_CHANCE: 0, ULTI_CHANCE: 0, BUS_CHANCE: 0, TRUANT_CHANCE: 0, BOOTS_CHANCE: 1 }); YAM.game.eventLog = []; });
-    await page.click('#btn-sim');
+    await page.evaluate(() => YAM.ui.autoSim());   // v2.5: END DAY is manual; debug auto-sim to the match
     await page.waitForFunction(() => !document.getElementById('talk-layer').hidden, null, { timeout: 10000 });
     const paused = await page.evaluate(() => ({ running: YAM.ui.cal.running, date: YAM.ui.cal.date, btn: document.getElementById('btn-sim').disabled }));
     await page.waitForTimeout(900); await shot('9-talk');

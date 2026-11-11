@@ -118,20 +118,41 @@ class GameState {
   /* ----- energy ----- */
   /** Rest day: condition +10, match sharpness fades −2 (floor 20), morale drifts 1 point toward 60. */
   restDay() { this.dayRoutine(null, false); }
+  /** v2.5: today's coach state { date, ap, plan } — resets lazily every morning (whatever advanced the calendar). */
+  dayState() {
+    if (!this.today || this.today.date !== this.calendar.date) this.today = { date: this.calendar.date, ap: COACH.AP, plan: null };
+    return this.today;
+  }
+  get ap() { return this.dayState().ap; }
+  spendAP() { const d = this.dayState(); if (d.ap < 1) return false; d.ap--; this.save(); return true; }
+  setPlan(plan) { if (REGIMES[plan]) { this.dayState().plan = plan; this.save(); } }
+  /** v2.5: one random skill of a group +1 (capped by potential). Returns true if something improved. */
+  growSkill(p, g) {
+    let keys = g.keys || ATTR_GROUPS[g.group];
+    if (g.group === 'technical') keys = p.position === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
+    const k = pick(keys), cap = potentialCap(p);
+    if (!k || p[g.group][k] >= cap) return false;
+    p[g.group][k]++;
+    return true;
+  }
   /** v2.4: one non-match calendar day. Training day (Tue/Thu): fit kids roll vs discipline —
       attend → condition −10, sharpness +5; skip → no change + `skipped_training` (until the next day).
       Injured / kept-at-home kids rest. Returns { training, attended, skipped: [players] }. */
-  dayRoutine(date, training = !!date && isTrainingDay(date)) {
-    const skipped = [];
+  dayRoutine(date, training = !!date && isTrainingDay(date), plan = 'match') {
+    const skipped = [], improved = [], hurt = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
     for (const p of this.squad) {
       p.skipped_training = false;
       const trains = training && !(p.injuryDays > 0) && !(p.awayDays > 0);
-      if (trains && Math.random() < skipChance(p)) { p.skipped_training = true; skipped.push(p); }
-      else if (trains) {
+      const skip = skipChance(p) + (R.extraSkip && p.psych.discipline < R.lowDisc ? R.extraSkip : 0);   // v2.5: tactics bore the restless ones
+      if (trains && Math.random() < skip) { p.skipped_training = true; skipped.push(p); }
+      else if (trains) {   // v2.5: the coach's regime
         attended++;
-        p.energy = clamp(p.energy - TRAINING.DRAIN, 0, 100);
-        p.dyn.sharpness = clamp(p.dyn.sharpness + TRAINING.SHARP, 0, 100);
+        p.energy = clamp(p.energy + R.cond, 0, 100);
+        p.dyn.sharpness = clamp(p.dyn.sharpness + R.sharp, 0, 100);
+        if (R.morale) p.dyn.morale = clamp(p.dyn.morale + R.morale, 0, 100);
+        if (R.grow && Math.random() < R.grow.chance * (0.6 + p.psych.potential / 100) && this.growSkill(p, R.grow)) improved.push(p);
+        if (R.injury && Math.random() < R.injury) { p.injuryDays = Math.max(p.injuryDays, rnd(...R.injDays)); hurt.push(p); }
       } else {
         p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
         p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
@@ -139,7 +160,7 @@ class GameState {
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
     this.tickInjuries();
-    return { training, attended, skipped };
+    return { training, plan: training ? plan : null, attended, skipped, improved, hurt };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
   tickInjuries() {
@@ -244,7 +265,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, today: this.today, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -257,6 +278,7 @@ class GameState {
       this.clubName = d.clubName || CLUB_NAME;
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
+      this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
       this.eventQueue = Array.isArray(d.eventQueue) ? d.eventQueue.filter(q => q && q.id && q.due) : [];
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];

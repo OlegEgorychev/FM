@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v2.4</title>
+<title>Youth Academy Manager v2.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1249,6 +1249,36 @@ body.fx .crt-scan{ opacity: .9; }
 .budget.debt, dd.money.debt{ color: #ff6b5e !important; text-shadow: 0 0 6px rgba(255,60,40,.5); }
 .st-badge.home{ background: #2c3a4a; color: #cfe3ff; }
 .tag.flag[title*="scout"], .tag.flag[title*="Скаут"]{ background: #10243a; color: #9fd3ff; border-color: #2f5f8a; }
+
+/* v2.5: TODAY widget, training plans, action points */
+.today-card #today-box{ display: flex; flex-direction: column; gap: 6px; }
+.td-head{ display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 13px; }
+.td-head b{ text-transform: capitalize; }
+.td-kind{ font: bold 10px/1 var(--mono); letter-spacing: 1px; text-transform: uppercase; padding: 3px 5px; background: #2a3138; color: #c9d1d8; }
+.td-kind.k-training{ background: #4a3412; color: #ffcf8a; } .td-kind.k-match{ background: #1f3a5f; color: #cfe3ff; }
+.td-ap{ font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.td-ap b{ color: var(--text); font-family: var(--mono); }
+.ap-pips{ display: inline-flex; gap: 3px; } .ap-pips i{ width: 10px; height: 10px; background: #2a3138; border: 1px solid #000; transform: rotate(45deg); }
+.ap-pips i.on{ background: #ffcf5a; box-shadow: 0 0 6px rgba(255,190,60,.6); }
+.td-req{ font: bold 11px/1.2 var(--mono); letter-spacing: 1px; color: #8fd17f; text-transform: uppercase; }
+.td-req.need{ color: #ff9b5e; animation: tdBlink 1.2s steps(2) infinite; }
+@keyframes tdBlink{ 50%{ color: #ffd9a8; } }
+.td-note{ font-size: 12px; color: var(--muted); }
+.plan-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.plan-btn{ display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 5px 6px; text-align: left; cursor: pointer; border-radius: 0;
+  background: #1a2026; color: var(--text); border: 2px solid; border-color: #4a5660 #0a0d0f #0a0d0f #4a5660; }
+.plan-btn b{ font-size: 12px; } .plan-btn small{ font-size: 10px; color: var(--muted); line-height: 1.2; }
+.plan-btn:hover{ background: #222a32; }
+.plan-btn.on{ background: #3a2a10; border-color: #0a0d0f #ffcf5a #ffcf5a #0a0d0f; box-shadow: inset 0 0 0 1px #ffcf5a; }
+.plan-btn.on b{ color: #ffcf5a; }
+.ap-chip{ flex: none; height: 26px; display: inline-flex; align-items: center; padding: 0 8px; margin-right: 4px; font: bold 13px/1 var(--mono); color: #ffcf5a; background: #0d1210;
+  border: 2px solid; border-color: var(--shadow) var(--hi) var(--hi) var(--shadow); white-space: nowrap; }
+.ap-chip span{ color: #a8946a; font-weight: normal; margin-right: 4px; }
+.ap-chip.spent{ color: #6d7881; }
+.office-btn{ margin-right: auto; }
+.dash-left{ overflow-y: auto; }
+@media (max-width: 820px){ .ap-chip span{ display: none; } }
+#btn-sim:disabled{ background: repeating-linear-gradient(135deg, #4a3a1a 0 8px, #3a2e16 8px 16px); color: #ffcf8a; box-shadow: inset -1px -1px 0 #1a140a, inset 1px 1px 0 #7a6230; cursor: not-allowed; text-shadow: none; }
 /* =========================================================
    v2.1 — BOOT SCREEN (#loading-overlay) + MATCH SUMMARY
    Boot look follows the credits art: deep-space nebula, chrome/blood-red metal type, sparks, VHS glitches.
@@ -1415,6 +1445,9 @@ body.fx .crt-scan{ opacity: .9; }
           <aside class="dash-left">
             <div class="groupbox next-card"><span class="gb-label" data-i18n="dash.next"></span>
               <div id="next-event"></div>
+            </div>
+            <div class="groupbox today-card"><span class="gb-label" data-i18n="today.title"></span>
+              <div id="today-box"></div>
             </div>
             <button class="btn go big" id="btn-sim"></button>
             <p class="sim-hint" id="sim-hint"></p>
@@ -1641,7 +1674,7 @@ body.fx .crt-scan{ opacity: .9; }
       <div class="titlebar"><span class="t-ico">i</span><span class="t-txt" id="pinfo-title">PLAYER_INFO.EXE</span><button class="tb-btn" id="pinfo-x" data-i18n-aria="ui.close">&times;</button></div>
       <div class="pinfo-tabs"><span class="pinfo-tab" data-i18n="pi.tab"></span></div>
       <div class="win-body pinfo-body" id="pinfo-body"></div>
-      <div class="row-btns pinfo-btns"><button class="btn go" id="pinfo-ok" type="button" data-i18n="ui.ok"></button></div>
+      <div class="row-btns pinfo-btns"><button class="btn ff office-btn" id="pinfo-office" type="button" hidden></button><button class="btn go" id="pinfo-ok" type="button" data-i18n="ui.ok"></button></div>
       <div class="statusbar"><span id="pinfo-status"></span></div>
     </section>
   </div>
@@ -1711,6 +1744,7 @@ body.fx .crt-scan{ opacity: .9; }
     <button class="tk start" id="btn-startmenu" aria-haspopup="menu"><span class="logo">&#9673;</span><span data-i18n="ui.start">Start</span></button>
     <span class="app-title" id="app-title" title="Youth Academy Manager"></span>
     <span class="budget" id="hdr-budget" role="status" aria-live="polite"></span>
+    <span class="ap-chip" id="hdr-ap" role="status"></span>
     <span class="sep"></span>
     <div class="tasks">
       <button class="tk" data-view="dash">&#8962; <span class="lbl" data-i18n="nav.dash"></span></button>
@@ -1828,6 +1862,18 @@ const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAI
 /* v2.4 TRAINING DAYS — every Tuesday and Thursday (UTC weekday 2 and 4).
    Attend: condition −10, sharpness +5. Skip chance = (SKIP_FROM − discipline) × SKIP_STEP (discipline 1 → 27%, 9 → 3%, 10+ → 0). */
 const TRAINING = { WEEKDAYS: [2, 4], DRAIN: 10, SHARP: 5, SKIP_FROM: 10, SKIP_STEP: 0.03 };
+/* v2.5 TRAINING REGIMES — the coach picks one every training day (attendees only; skippers get nothing).
+   grow: per attendee, chance × (0.6 + potential/100) to gain +1 in a random skill of `group` (capped by potential). */
+const REGIMES = {
+  cardio:  { cond: 5,   sharp: 2, morale: -4, grow: { group: 'physical', keys: ['baseStamina', 'acceleration', 'speed'], chance: 0.06 } },
+  match:   { cond: -10, sharp: 8, injury: 0.03, injDays: [2, 5] },
+  tech:    { cond: -12, sharp: 3, grow: { group: 'technical', chance: 0.12 } },
+  tactics: { cond: -5,  sharp: 2, extraSkip: 0.35, lowDisc: 8, grow: { group: 'tactical', chance: 0.12 } },
+};
+const REGIME_KEYS = Object.keys(REGIMES);
+const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14), 8, 20);   // PA 50 → 13, PA 100 → 20
+/* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
+const COACH = { AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
@@ -2619,6 +2665,67 @@ Object.assign(I18N.ru, {
   'ev.truant.hangupOk.diary': '{k} бросил трубку. Дома что-то не так.',
   'dbg.ev.truant': 'Прогульщик',
 });
+
+
+/* ---- v2.5: daily loop (END DAY), training regimes, coach action points, call into office ---- */
+Object.assign(I18N.en, {
+  'dash.endDay': '&#9632; END DAY &#9656;', 'dash.endDayBlocked': '&#9888; Pick a training plan first',
+  'dash.hint.calendar': 'One day per click. Make today\'s decisions, then END DAY. Rest days give the squad +{n}% energy; on Tue/Thu you choose the training.',
+  'today.title': 'Today', 'today.planReq': 'TRAINING PLAN REQUIRED', 'today.planSet': 'Training plan set ✓',
+  'today.rest': 'Rest day: the squad recovers (+{n}% energy). Talk to a player, check the squad, then END DAY.',
+  'today.off': 'Pre-season. END DAY when you are ready.', 'today.phase.matchday': 'Match day! Go to the Match tab.',
+  'today.phase.post': 'Full time. Read the Notebook, then return to the Dashboard.', 'today.phase.seasonEnd': 'The season is over.',
+  'today.kind.training': 'Training', 'today.kind.rest': 'Rest', 'today.kind.match': 'Match', 'today.kind.off': 'Off',
+  'ap.left': 'Actions left:', 'ap.tip': 'Coach action points: 1 per day, refilled every morning.', 'hdr.ap': '<span>AP</span>{n}/{m}',
+  'plan.cardio': 'Cardio & Fitness', 'plan.cardio.d': '+energy, −morale (boring)',
+  'plan.match': 'Match Practice', 'plan.match.d': '++sharpness, −energy, small injury risk',
+  'plan.tech': 'Technical Drills', 'plan.tech.d': 'technique grows slowly, −−energy',
+  'plan.tactics': 'Tactics Room', 'plan.tactics.d': 'tactics grow, restless kids skip',
+  'cal.training': 'Training ({p}): {a} turned up. Skipped: {s}.', 'cal.trainingAll': 'Training ({p}): all {a} turned up.',
+  'tr.improved': 'Progress in training: {s}.', 'tr.hurt': 'Knocked in match practice: {s}.',
+  'office.btn': '[ CALL INTO OFFICE ] · AP {n}', 'office.btnTip': 'Costs 1 action point (1 per day).', 'office.btnNoAp': 'No action points left today. Come back tomorrow.',
+  'talk.roleOffice': '#{n} · {p} · coach\'s office',
+  'office.text': '{k} knocks and sits down on the edge of the chair. "You wanted to see me, coach?"',
+  'office.praise': 'Praise his recent form', 'office.crit': 'Criticize his behaviour', 'office.check': 'Just checking in',
+  'office.praiseGood': '{k} lights up. "Thanks, coach! I\'ll keep working, I promise."',
+  'office.praiseBad': '{k} frowns. "Good form? I\'ve been rubbish and I\'m knackered. Are you making fun of me?"',
+  'office.crit': '{k} stares at the floor. "...Yes, coach. Understood." His jaw is tight.',
+  'office.check': '{k} relaxes a bit. "I\'m alright, coach. Thanks for asking."',
+  'office.praiseGood.ok': 'Off you go', 'office.praiseBad.ok': 'That came out wrong...', 'office.crit.ok': 'Dismissed', 'office.check.ok': 'Good. See you at training',
+  'office.praiseGood.ok.diary': 'Praised {k} in the office. He walked out taller.', 'office.praiseBad.ok.diary': 'Praised {k}, but he took it as mockery.',
+  'office.crit.ok.diary': 'A hard talk with {k} in the office.', 'office.check.ok.diary': 'A quick chat with {k}.',
+  'dbg.autosim': 'Auto-sim to the next match', 'dbg.autosimD': 'The old non-stop calendar (Match Practice on training days).',
+  'dbg.ap': '+1 action point', 'dbg.apD': 'For testing the office talks.', 'dbg.doneAp': 'OK: {n} action point(s) today.', 'dbg.ev.office': 'Call into office (needs a kid)',
+});
+Object.assign(I18N.ru, {
+  'dash.endDay': '&#9632; ЗАВЕРШИТЬ ДЕНЬ &#9656;', 'dash.endDayBlocked': '&#9888; Сначала выбери план тренировки',
+  'dash.hint.calendar': 'Один день за щелчок. Прими решения на сегодня, затем «Завершить день». Дни отдыха дают составу +{n}% энергии; во вт/чт ты выбираешь тренировку.',
+  'today.title': 'Сегодня', 'today.planReq': 'НУЖЕН ПЛАН ТРЕНИРОВКИ', 'today.planSet': 'План тренировки выбран ✓',
+  'today.rest': 'День отдыха: состав восстанавливается (+{n}% энергии). Поговори с игроком, проверь состав, затем заверши день.',
+  'today.off': 'Межсезонье. Завершай день, когда будешь готов.', 'today.phase.matchday': 'День матча! Переходи на вкладку «Матч».',
+  'today.phase.post': 'Матч окончен. Прочитай Блокнот и вернись в Штаб.', 'today.phase.seasonEnd': 'Сезон завершён.',
+  'today.kind.training': 'Тренировка', 'today.kind.rest': 'Отдых', 'today.kind.match': 'Матч', 'today.kind.off': 'Выходной',
+  'ap.left': 'Осталось действий:', 'ap.tip': 'Очки действий тренера: 1 в день, восстанавливаются каждое утро.', 'hdr.ap': '<span>ОД</span>{n}/{m}',
+  'plan.cardio': 'Кардио и ОФП', 'plan.cardio.d': '+энергия, −мораль (скучно)',
+  'plan.match': 'Игровая практика', 'plan.match.d': '++тонус, −энергия, небольшой риск травмы',
+  'plan.tech': 'Техника', 'plan.tech.d': 'техника медленно растёт, −−энергия',
+  'plan.tactics': 'Тактический класс', 'plan.tactics.d': 'тактика растёт, непоседы прогуливают',
+  'cal.training': 'Тренировка ({p}): пришли {a}. Прогуляли: {s}.', 'cal.trainingAll': 'Тренировка ({p}): пришли все {a}.',
+  'tr.improved': 'Прогресс на тренировке: {s}.', 'tr.hurt': 'Ушиб на игровой практике: {s}.',
+  'office.btn': '[ ВЫЗВАТЬ В КАБИНЕТ ] · ОД {n}', 'office.btnTip': 'Стоит 1 очко действия (1 в день).', 'office.btnNoAp': 'Очков действий на сегодня нет. Приходи завтра.',
+  'talk.roleOffice': '№{n} · {p} · кабинет тренера',
+  'office.text': '{k} стучит и садится на краешек стула. «Вызывали, тренер?»',
+  'office.praise': 'Похвалить за игру', 'office.crit': 'Отругать за поведение', 'office.check': 'Просто узнать, как дела',
+  'office.praiseGood': '{k} расцветает. «Спасибо, тренер! Буду пахать дальше, обещаю».',
+  'office.praiseBad': '{k} хмурится. «За игру? Я играю ужасно и еле ноги таскаю. Вы издеваетесь?»',
+  'office.crit': '{k} смотрит в пол. «...Да, тренер. Понял». Желваки ходят.',
+  'office.check': '{k} немного расслабляется. «Нормально, тренер. Спасибо, что спросили».',
+  'office.praiseGood.ok': 'Свободен', 'office.praiseBad.ok': 'Неловко вышло...', 'office.crit.ok': 'Свободен', 'office.check.ok': 'Хорошо. До тренировки',
+  'office.praiseGood.ok.diary': 'Похвалили игрока в кабинете: {k} вышел окрылённым.', 'office.praiseBad.ok.diary': 'Похвала не зашла: {k} принял её за издёвку.',
+  'office.crit.ok.diary': 'Жёсткий разговор в кабинете. Игрок: {k}.', 'office.check.ok.diary': 'Короткий разговор. Игрок: {k}.',
+  'dbg.autosim': 'Авто-прокрутка до следующего матча', 'dbg.autosimD': 'Старый непрерывный календарь (игровая практика в дни тренировок).',
+  'dbg.ap': '+1 очко действия', 'dbg.apD': 'Для проверки разговоров в кабинете.', 'dbg.doneAp': 'OK: очков действий сегодня: {n}.', 'dbg.ev.office': 'Вызов в кабинет (нужен игрок)',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -3359,20 +3466,41 @@ class GameState {
   /* ----- energy ----- */
   /** Rest day: condition +10, match sharpness fades −2 (floor 20), morale drifts 1 point toward 60. */
   restDay() { this.dayRoutine(null, false); }
+  /** v2.5: today's coach state { date, ap, plan } — resets lazily every morning (whatever advanced the calendar). */
+  dayState() {
+    if (!this.today || this.today.date !== this.calendar.date) this.today = { date: this.calendar.date, ap: COACH.AP, plan: null };
+    return this.today;
+  }
+  get ap() { return this.dayState().ap; }
+  spendAP() { const d = this.dayState(); if (d.ap < 1) return false; d.ap--; this.save(); return true; }
+  setPlan(plan) { if (REGIMES[plan]) { this.dayState().plan = plan; this.save(); } }
+  /** v2.5: one random skill of a group +1 (capped by potential). Returns true if something improved. */
+  growSkill(p, g) {
+    let keys = g.keys || ATTR_GROUPS[g.group];
+    if (g.group === 'technical') keys = p.position === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
+    const k = pick(keys), cap = potentialCap(p);
+    if (!k || p[g.group][k] >= cap) return false;
+    p[g.group][k]++;
+    return true;
+  }
   /** v2.4: one non-match calendar day. Training day (Tue/Thu): fit kids roll vs discipline —
       attend → condition −10, sharpness +5; skip → no change + `skipped_training` (until the next day).
       Injured / kept-at-home kids rest. Returns { training, attended, skipped: [players] }. */
-  dayRoutine(date, training = !!date && isTrainingDay(date)) {
-    const skipped = [];
+  dayRoutine(date, training = !!date && isTrainingDay(date), plan = 'match') {
+    const skipped = [], improved = [], hurt = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
     for (const p of this.squad) {
       p.skipped_training = false;
       const trains = training && !(p.injuryDays > 0) && !(p.awayDays > 0);
-      if (trains && Math.random() < skipChance(p)) { p.skipped_training = true; skipped.push(p); }
-      else if (trains) {
+      const skip = skipChance(p) + (R.extraSkip && p.psych.discipline < R.lowDisc ? R.extraSkip : 0);   // v2.5: tactics bore the restless ones
+      if (trains && Math.random() < skip) { p.skipped_training = true; skipped.push(p); }
+      else if (trains) {   // v2.5: the coach's regime
         attended++;
-        p.energy = clamp(p.energy - TRAINING.DRAIN, 0, 100);
-        p.dyn.sharpness = clamp(p.dyn.sharpness + TRAINING.SHARP, 0, 100);
+        p.energy = clamp(p.energy + R.cond, 0, 100);
+        p.dyn.sharpness = clamp(p.dyn.sharpness + R.sharp, 0, 100);
+        if (R.morale) p.dyn.morale = clamp(p.dyn.morale + R.morale, 0, 100);
+        if (R.grow && Math.random() < R.grow.chance * (0.6 + p.psych.potential / 100) && this.growSkill(p, R.grow)) improved.push(p);
+        if (R.injury && Math.random() < R.injury) { p.injuryDays = Math.max(p.injuryDays, rnd(...R.injDays)); hurt.push(p); }
       } else {
         p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
         p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
@@ -3380,7 +3508,7 @@ class GameState {
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
     this.tickInjuries();
-    return { training, attended, skipped };
+    return { training, plan: training ? plan : null, attended, skipped, improved, hurt };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
   tickInjuries() {
@@ -3485,7 +3613,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, today: this.today, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -3498,6 +3626,7 @@ class GameState {
       this.clubName = d.clubName || CLUB_NAME;
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
+      this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
       this.eventQueue = Array.isArray(d.eventQueue) ? d.eventQueue.filter(q => q && q.id && q.due) : [];
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
@@ -4119,8 +4248,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.5', name: { en: 'The Daily Routine', ru: 'Распорядок дня' },
+    en: [
+      'Time no longer runs by itself: the big Dashboard button is now END DAY and moves the calendar exactly one day. Events, match days and the next morning follow.',
+      'New TODAY panel: the date, the kind of day and your action points. On Tuesdays and Thursdays it says TRAINING PLAN REQUIRED — you can\'t end the day until you pick one.',
+      'Four training plans: Cardio & Fitness (+energy, −morale), Match Practice (++sharpness, small injury risk), Technical Drills (technique grows slowly, very tiring) and Tactics Room (tactics grow, but restless kids skip). Growth is limited by each kid\'s hidden potential.',
+      'Coach action points: 1 per day (shown in the taskbar), refilled every morning. Spend it on [ CALL INTO OFFICE ] in a player\'s profile: praise him (careful — it backfires if he is out of form or exhausted), criticize him (+discipline, but he takes it hard) or just check in.',
+      'DEBUG.EXE: the old non-stop calendar is still there as "Auto-sim to the next match", plus +1 action point.',
+    ],
+    ru: [
+      'Время больше не идёт само: большая кнопка в Штабе теперь «Завершить день» и сдвигает календарь ровно на один день. Дальше — события, дни матчей и новое утро.',
+      'Новая панель «Сегодня»: дата, тип дня и очки действий. Во вторник и четверг там горит «НУЖЕН ПЛАН ТРЕНИРОВКИ» — завершить день, не выбрав план, нельзя.',
+      'Четыре плана тренировки: Кардио и ОФП (+энергия, −мораль), Игровая практика (++тонус, небольшой риск травмы), Техника (техника медленно растёт, очень утомляет) и Тактический класс (тактика растёт, но непоседы прогуливают). Рост ограничен скрытым потенциалом игрока.',
+      'Очки действий тренера: 1 в день (видно на панели задач), восстанавливаются каждое утро. Трать их на [ ВЫЗВАТЬ В КАБИНЕТ ] в карточке игрока: похвалить (осторожно — если он не в форме или выжат, похвала обернётся против тебя), отругать (+дисциплина, но он переживает) или просто спросить, как дела.',
+      'DEBUG.EXE: старый непрерывный календарь остался как «Авто-прокрутка до следующего матча», плюс +1 очко действия.',
+    ] },
   { v: '2.4', name: { en: 'Training Days', ru: 'Тренировки' },
     en: [
       'The calendar week now starts on Monday (Mon … Sun), with correct blank days at the start of every month.',
@@ -5048,6 +5192,7 @@ class ProfileCard {
     this.lastSig = '';
     document.getElementById('pinfo-x').addEventListener('click', () => this.close());
     document.getElementById('pinfo-ok').addEventListener('click', () => this.close());
+    document.getElementById('pinfo-office').addEventListener('click', () => this.ui.callIntoOffice(this.id));   // v2.5
     this.layer.addEventListener('mousedown', e => { if (e.target === this.layer) this.close(); });
     this.layer.addEventListener('contextmenu', e => { e.preventDefault(); if (e.target === this.layer) this.close(); });
     document.addEventListener('keydown', e => {
@@ -5090,7 +5235,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -5155,6 +5300,11 @@ class ProfileCard {
         <fieldset class="pi-note"><legend>${L.t('nb.coachNote')}</legend>${noteHtml}</fieldset>
       </div>`;
     document.getElementById('pinfo-status').textContent = L.t('pi.status.bar');
+    const ob = document.getElementById('pinfo-office');   // v2.5: [ CALL INTO OFFICE ] (1 action point)
+    ob.hidden = !own;
+    ob.disabled = !ui.canCallIn(p.id);
+    ob.innerHTML = L.t('office.btn', { n: s.ap });
+    ob.title = L.t(s.ap > 0 ? 'office.btnTip' : 'office.btnNoAp');
   }
 }
 /* =========================================================
@@ -5336,8 +5486,10 @@ class DebugConsole {
       ${btn('maxms', L.t('dbg.maxMs'), L.t('dbg.maxMsD'))}
       ${btn('force', L.t('dbg.force') + ` <b class="dbg-flag ${on ? 'on' : ''}">[${L.t(on ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.forceD'), on ? ' armed' : '')}
       <hr class="dbg-hr">
+      ${btn('autosim', L.t('dbg.autosim'), L.t('dbg.autosimD'))}
+      ${btn('ap', L.t('dbg.ap'), L.t('dbg.apD'))}
       ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[${money(this.ui.state.budget)}]</b>`, L.t('dbg.moneyD'))}
-      ${NARRATIVE_EVENTS.map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
+      ${NARRATIVE_EVENTS.filter(e => e.when !== 'manual').map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
       ${btn('events', L.t('dbg.events') + ` <b class="dbg-flag ${ev ? '' : 'on'}">[${L.t(ev ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.eventsD'))}
       <div class="dbg-queue"><b>EVENT_QUEUE</b> ${this.ui.state.eventQueue.length ? this.ui.state.eventQueue.map(q => `<code>${esc(q.id)} @ ${q.due}${q.matchDay ? ' (match day)' : ''}${q.from ? ' ← ' + esc(q.from) : ''}</code>`).join(' ') : '<i>empty</i>'}</div>
     </div>`;
@@ -5358,6 +5510,12 @@ class DebugConsole {
       s.cheats = { ...(s.cheats || {}), forceWin: !s.cheats?.forceWin };
       this.msg = L.t('dbg.doneForce', { s: L.t(s.cheats.forceWin ? 'dbg.forceOn' : 'dbg.forceOff') })
         + (s.cheats.forceWin && eng ? ' ' + L.t('dbg.forceLive') : '');
+    } else if (id === 'autosim') {   // v2.5: the old non-stop calendar (Match Practice on training days)
+      if (eng || ui.events.active || ui.cal.running || s.phase !== 'calendar') { this.msg = L.t('dbg.busy'); this.render(); return; }
+      this.close(); ui.autoSim(); return;
+    } else if (id === 'ap') {
+      s.dayState().ap++;
+      this.msg = L.t('dbg.doneAp', { n: s.ap });
     } else if (id === 'money') {
       s.addMoney(500);
       this.msg = L.t('dbg.doneMoney', { b: money(s.budget) });
@@ -5627,6 +5785,34 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v2.5 CALL INTO OFFICE — the coach's own action (1 AP), never random ---------- */
+  {
+    id: 'office', when: 'manual',
+    trigger: () => false,
+    cast: () => null,   // always fired with the kid the coach picked
+    execute(ctx) {
+      const { kid } = ctx.cast, face = kid.portraitSvg, name = L.name(kid.name), role = L.t('talk.roleOffice', { n: kid.number, p: L.pos(kid.position) });
+      const out = {
+        praiseGood: () => { kid.dyn.morale = clamp(kid.dyn.morale + COACH.PRAISE, 0, 100); },
+        praiseBad:  () => { kid.dyn.morale = clamp(kid.dyn.morale + COACH.PRAISE_BACKFIRE, 0, 100); },
+        crit:       () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + COACH.CRIT_DISC); kid.psych.composure = Math.max(1, kid.psych.composure + COACH.CRIT_COMP);
+                            kid.dyn.morale = clamp(kid.dyn.morale + COACH.CRIT_MORALE, 0, 100); },
+        check:      () => { kid.dyn.morale = clamp(kid.dyn.morale + COACH.CHECK_MORALE, 0, 100); },
+      };
+      if (out[ctx.step]) {   // the kid's reaction (decided when the coach spoke; saved as the step)
+        ctx.show({ face, name, role, text: L.t('office.' + ctx.step, { k: name }),
+          choices: [{ key: 'office.' + ctx.step + '.ok', tone: 'gray', who: kid.id, run: () => { out[ctx.step](); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
+      ctx.show({ face, name, role, text: L.t('office.text', { k: name }),
+        choices: [
+          { key: 'office.praise', tone: 'green', next: () => (kid.dyn.sharpness < COACH.PRAISE_LOW || kid.energy < COACH.PRAISE_LOW ? 'praiseBad' : 'praiseGood') },
+          { key: 'office.crit', tone: 'red', next: 'crit' },
+          { key: 'office.check', tone: 'gray', next: 'check' },
+        ] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',
@@ -5685,17 +5871,17 @@ class EventEngine {
   }
 
   /** After a NON-match day. Returns true when an event fired (the calendar must pause). */
-  roll(date) {
+  roll(date, { resume = true } = {}) {   // v2.5: resume=false in the END DAY loop (no auto-simulation afterwards)
     if (this.active) return false;
     const due = this.takeDue(date, false);
-    if (due && this.fire(due.id, date, { resume: true, cast: due.cast })) return true;
+    if (due && this.fire(due.id, date, { resume, cast: due.cast })) return true;
     if (!this.enabled) return false;
-    const s = this.state, last = s.eventLog[s.eventLog.length - 1];
+    const s = this.state, last = [...s.eventLog].reverse().find(e => e.id !== 'office');   // the coach's own talks don't count
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
     // v2.4: on a training day the training events are evaluated first (the routine has just run)
     const pool = (isTrainingDay(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
       .concat(shuffle(NARRATIVE_EVENTS.filter(e => (e.when || 'day') === 'day')));
-    for (const ev of pool) if (ev.trigger(s, date) && this.fire(ev.id, date, { resume: true })) return true;
+    for (const ev of pool) if (ev.trigger(s, date) && this.fire(ev.id, date, { resume })) return true;
     return false;
   }
   /** v2.2: on a MATCH day, before kick-off (called when the calendar stops on the matchday). */
@@ -5748,7 +5934,7 @@ class EventEngine {
       return;
     }
     const delta = choice.cost ? -choice.cost : choice.debt ? -choice.debt : choice.gain || 0;
-    s.eventLog.push({ id: pe.id, date: pe.date, season: s.season, choice: choice.key, who: choice.who });
+    s.eventLog.push({ id: pe.id, date: pe.date, season: s.season, choice: choice.key, who: choice.who });   // ('office' is skipped by the cooldown)
     if (s.eventLog.length > 60) s.eventLog.shift();
     s.addDiary({ date: pe.date, key: choice.key + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : '' }, cls: 'ev' });
     s.pendingEvent = null;
@@ -5758,6 +5944,7 @@ class EventEngine {
     this.ui.renderAll();
     if (pe.after === 'matchday') this.ui.afterMatchdayEvent();
     else if (pe.resume && s.phase === 'calendar') this.ui.runCalendar();
+    else this.ui.morning();   // v2.5: END DAY loop → the next morning (a match day arrives now)
   }
 }
 
@@ -5943,12 +6130,16 @@ class UIController {
     // Future event types plug in here, e.g.:
     // cal.registerType('training', { blocking: false, label: ev => '…', onArrive: ev => this.state.applyTraining(ev) });
     // cal.registerType('dialogue', { blocking: true,  label: ev => '…', onArrive: ev => this.openDialogue(ev) });
-    cal.onDay(date => {   // v2.4: Tue/Thu = training (the EventEngine rolls right after this, in runCalendar → onStep)
-      const r = this.state.dayRoutine(date);
+    cal.onDay(date => {   // v2.4/2.5: Tue/Thu = training with the coach's regime (auto-sim falls back to Match Practice)
+      const s = this.state, r = s.dayRoutine(date, isTrainingDay(date), s.dayState().plan || 'match');
       if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
+      const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
+      if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
+      if (r.hurt.length) s.addDiary({ date, key: 'tr.hurt', vars: { s: ids(r.hurt) }, cls: 'ev' });
+      const plan = { p: { plan: r.plan } };
       return r.skipped.length
-        ? { key: 'cal.training', vars: { a: r.attended, s: { list: r.skipped.map(p => ({ pid: p.id })) } }, cls: 'tr' }
-        : { key: 'cal.trainingAll', vars: { a: r.attended }, cls: 'tr' };
+        ? { key: 'cal.training', vars: { ...plan, a: r.attended, s: ids(r.skipped) }, cls: 'tr' }
+        : { key: 'cal.trainingAll', vars: { ...plan, a: r.attended }, cls: 'tr' };
     });
   }
 
@@ -5997,6 +6188,7 @@ class UIController {
 
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
+    if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
     if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
@@ -6050,6 +6242,10 @@ class UIController {
       if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.onLiveRosterClick(row.dataset.id); }
     });
     this.$('btn-sim').addEventListener('click', () => this.onDashAction());
+    this.$('today-box').addEventListener('click', e => {   // v2.5: training plan
+      const b = e.target.closest('[data-plan]');
+      if (b) { this.state.setPlan(b.dataset.plan); this.renderDash(); }
+    });
     // v1.6 calendar: month navigation + clickable day cells (info in the status bar)
     this.$('cal-prev').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), -1); this.renderCalendar(); });
     this.$('cal-next').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), 1); this.renderCalendar(); });
@@ -6424,13 +6620,14 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
     // main action button
     const btn = this.$('btn-sim');
-    btn.disabled = this.cal.running || this.live || this.events.active;
+    btn.disabled = this.cal.running || this.live || this.events.active || this.dayBlockers().length > 0;
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
-    else if (phase === 'calendar') btn.innerHTML = L.t('dash.sim');
+    else if (phase === 'calendar') btn.innerHTML = L.t(this.dayBlockers().length ? 'dash.endDayBlocked' : 'dash.endDay');
     else if (phase === 'matchday') btn.innerHTML = L.t('dash.goMatch');
     else if (phase === 'post') btn.innerHTML = L.t('dash.close');
     else btn.innerHTML = L.t('dash.newSeason', { y: s.season + 1, z: String(s.season + 2).slice(2) });
+    this.renderToday();   // v2.5
     this.$('sim-hint').innerHTML = phase === 'seasonEnd'
       ? L.t('dash.hint.seasonEnd', { pos: lg.position(0), pts: row.pts })
       : L.t('dash.hint.' + phase, { n: ENERGY.DAILY_REST });
@@ -6554,7 +6751,51 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return;
     }
     if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
-    this.runCalendar();
+    this.endDay();   // v2.5: one day per click
+  }
+
+  /* ---------- v2.5 DAILY LOOP: decide → END DAY → (evening event?) → next morning ---------- */
+  /** Mandatory tasks that block END DAY. */
+  dayBlockers() {
+    const s = this.state, out = [];
+    if (s.phase === 'calendar' && isTrainingDay(s.calendar.date) && !s.dayState().plan && this.dayInfo(s.calendar.date).kind === 'training') out.push('plan');
+    return out;
+  }
+  endDay() {
+    const s = this.state;
+    if (this.cal.running || s.phase !== 'calendar' || this.events.active || this.dayBlockers().length) { this.renderDash(); return; }
+    const r = this.cal.step();
+    if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }   // safety: today was already a match day
+    for (const info of r.infos) s.addDiary({ date: r.date, ...info });
+    this.calMonth = null;
+    s.save();
+    const fired = this.cal.nextEvent() && this.events.roll(r.date, { resume: false });   // the evening: something may happen
+    if (!fired) this.morning();
+    else this.renderAll();
+  }
+  /** New morning: AP and plan reset (lazily in dayState); a match day arrives straight away. */
+  morning() {
+    const s = this.state;
+    if (s.phase === 'calendar' && this.cal.blockingToday()) {
+      const r = this.cal.step();
+      if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }
+    }
+    if (s.phase === 'calendar' && !this.cal.nextEvent()) { s.phase = 'seasonEnd'; s.save(); }
+    this.renderAll();
+  }
+  /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
+  autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
+
+  /** v2.5: [ CALL INTO OFFICE ] — 1 action point, a short talk in the dialogue box. */
+  canCallIn(id) {
+    const s = this.state, p = s.player(id);
+    return !!p && s.ap > 0 && !this.events.active && !(this.engine && !this.engine.finished) && !this.cal.running;
+  }
+  callIntoOffice(id) {
+    if (!this.canCallIn(id) || !this.state.spendAP()) return;
+    this.profile.close();
+    this.events.fire('office', this.state.calendar.date, { cast: { kid: id } });
+    this.renderBudget();
   }
 
   /** Visible day-by-day simulation. v1.9: after every non-match day the EventEngine may fire an event,
@@ -6576,11 +6817,32 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.renderDash();
   }
 
+  /** v2.5: TODAY widget — date, action points, mandatory training plan (Tue/Thu). */
+  renderToday() {
+    const s = this.state, box = this.$('today-box');
+    if (!box) return;
+    const d = s.dayState(), info = this.dayInfo(s.calendar.date), live = s.phase === 'calendar';
+    const pips = Array.from({ length: COACH.AP }, (_, i) => `<i class="${i < d.ap ? 'on' : ''}"></i>`).join('');
+    let body = '';
+    if (live && info.kind === 'training') {
+      const need = !d.plan;
+      body = `<div class="td-req${need ? ' need' : ''}">${L.t(need ? 'today.planReq' : 'today.planSet')}</div><div class="plan-grid">`
+        + REGIME_KEYS.map(k => `<button type="button" class="plan-btn${d.plan === k ? ' on' : ''}" data-plan="${k}" aria-pressed="${d.plan === k}">
+            <b>${L.t('plan.' + k)}</b><small>${L.t('plan.' + k + '.d')}</small></button>`).join('') + '</div>';
+    } else if (live) body = `<div class="td-note">${L.t(info.kind === 'rest' ? 'today.rest' : 'today.off', { n: ENERGY.DAILY_REST })}</div>`;
+    else body = `<div class="td-note">${L.t('today.phase.' + s.phase)}</div>`;
+    box.innerHTML = `<div class="td-head"><b>${fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' })}</b>
+        <span class="td-kind k-${info.kind}">${L.t('today.kind.' + info.kind)}</span></div>
+      <div class="td-ap" title="${esc(L.t('ap.tip'))}">${L.t('ap.left')} <span class="ap-pips">${pips}</span> <b>${d.ap}/${COACH.AP}</b></div>${body}`;
+  }
+
   /** v1.9: club budget in the taskbar header (+ a short green/red flash when it changes). */
   renderBudget(delta = 0) {
     const el = this.$('hdr-budget');
     if (!el) return;
     el.innerHTML = L.t('hdr.budget', { b: money(this.state.budget) }); el.classList.toggle('debt', this.state.budget < 0);
+    const ap = this.$('hdr-ap');   // v2.5
+    if (ap) { const n = this.state.ap; ap.innerHTML = L.t('hdr.ap', { n, m: COACH.AP }); ap.classList.toggle('spent', n < 1); }
     if (delta) { el.classList.remove('up', 'down'); void el.offsetWidth; el.classList.add(delta > 0 ? 'up' : 'down'); }
   }
 

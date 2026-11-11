@@ -249,6 +249,34 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v2.5 CALL INTO OFFICE — the coach's own action (1 AP), never random ---------- */
+  {
+    id: 'office', when: 'manual',
+    trigger: () => false,
+    cast: () => null,   // always fired with the kid the coach picked
+    execute(ctx) {
+      const { kid } = ctx.cast, face = kid.portraitSvg, name = L.name(kid.name), role = L.t('talk.roleOffice', { n: kid.number, p: L.pos(kid.position) });
+      const out = {
+        praiseGood: () => { kid.dyn.morale = clamp(kid.dyn.morale + COACH.PRAISE, 0, 100); },
+        praiseBad:  () => { kid.dyn.morale = clamp(kid.dyn.morale + COACH.PRAISE_BACKFIRE, 0, 100); },
+        crit:       () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + COACH.CRIT_DISC); kid.psych.composure = Math.max(1, kid.psych.composure + COACH.CRIT_COMP);
+                            kid.dyn.morale = clamp(kid.dyn.morale + COACH.CRIT_MORALE, 0, 100); },
+        check:      () => { kid.dyn.morale = clamp(kid.dyn.morale + COACH.CHECK_MORALE, 0, 100); },
+      };
+      if (out[ctx.step]) {   // the kid's reaction (decided when the coach spoke; saved as the step)
+        ctx.show({ face, name, role, text: L.t('office.' + ctx.step, { k: name }),
+          choices: [{ key: 'office.' + ctx.step + '.ok', tone: 'gray', who: kid.id, run: () => { out[ctx.step](); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
+      ctx.show({ face, name, role, text: L.t('office.text', { k: name }),
+        choices: [
+          { key: 'office.praise', tone: 'green', next: () => (kid.dyn.sharpness < COACH.PRAISE_LOW || kid.energy < COACH.PRAISE_LOW ? 'praiseBad' : 'praiseGood') },
+          { key: 'office.crit', tone: 'red', next: 'crit' },
+          { key: 'office.check', tone: 'gray', next: 'check' },
+        ] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',
@@ -307,17 +335,17 @@ class EventEngine {
   }
 
   /** After a NON-match day. Returns true when an event fired (the calendar must pause). */
-  roll(date) {
+  roll(date, { resume = true } = {}) {   // v2.5: resume=false in the END DAY loop (no auto-simulation afterwards)
     if (this.active) return false;
     const due = this.takeDue(date, false);
-    if (due && this.fire(due.id, date, { resume: true, cast: due.cast })) return true;
+    if (due && this.fire(due.id, date, { resume, cast: due.cast })) return true;
     if (!this.enabled) return false;
-    const s = this.state, last = s.eventLog[s.eventLog.length - 1];
+    const s = this.state, last = [...s.eventLog].reverse().find(e => e.id !== 'office');   // the coach's own talks don't count
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
     // v2.4: on a training day the training events are evaluated first (the routine has just run)
     const pool = (isTrainingDay(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
       .concat(shuffle(NARRATIVE_EVENTS.filter(e => (e.when || 'day') === 'day')));
-    for (const ev of pool) if (ev.trigger(s, date) && this.fire(ev.id, date, { resume: true })) return true;
+    for (const ev of pool) if (ev.trigger(s, date) && this.fire(ev.id, date, { resume })) return true;
     return false;
   }
   /** v2.2: on a MATCH day, before kick-off (called when the calendar stops on the matchday). */
@@ -370,7 +398,7 @@ class EventEngine {
       return;
     }
     const delta = choice.cost ? -choice.cost : choice.debt ? -choice.debt : choice.gain || 0;
-    s.eventLog.push({ id: pe.id, date: pe.date, season: s.season, choice: choice.key, who: choice.who });
+    s.eventLog.push({ id: pe.id, date: pe.date, season: s.season, choice: choice.key, who: choice.who });   // ('office' is skipped by the cooldown)
     if (s.eventLog.length > 60) s.eventLog.shift();
     s.addDiary({ date: pe.date, key: choice.key + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : '' }, cls: 'ev' });
     s.pendingEvent = null;
@@ -380,6 +408,7 @@ class EventEngine {
     this.ui.renderAll();
     if (pe.after === 'matchday') this.ui.afterMatchdayEvent();
     else if (pe.resume && s.phase === 'calendar') this.ui.runCalendar();
+    else this.ui.morning();   // v2.5: END DAY loop → the next morning (a match day arrives now)
   }
 }
 

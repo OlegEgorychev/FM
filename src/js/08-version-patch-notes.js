@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.5', name: { en: 'The Daily Routine', ru: 'Распорядок дня' },
+    en: [
+      'Time no longer runs by itself: the big Dashboard button is now END DAY and moves the calendar exactly one day. Events, match days and the next morning follow.',
+      'New TODAY panel: the date, the kind of day and your action points. On Tuesdays and Thursdays it says TRAINING PLAN REQUIRED — you can\'t end the day until you pick one.',
+      'Four training plans: Cardio & Fitness (+energy, −morale), Match Practice (++sharpness, small injury risk), Technical Drills (technique grows slowly, very tiring) and Tactics Room (tactics grow, but restless kids skip). Growth is limited by each kid\'s hidden potential.',
+      'Coach action points: 1 per day (shown in the taskbar), refilled every morning. Spend it on [ CALL INTO OFFICE ] in a player\'s profile: praise him (careful — it backfires if he is out of form or exhausted), criticize him (+discipline, but he takes it hard) or just check in.',
+      'DEBUG.EXE: the old non-stop calendar is still there as "Auto-sim to the next match", plus +1 action point.',
+    ],
+    ru: [
+      'Время больше не идёт само: большая кнопка в Штабе теперь «Завершить день» и сдвигает календарь ровно на один день. Дальше — события, дни матчей и новое утро.',
+      'Новая панель «Сегодня»: дата, тип дня и очки действий. Во вторник и четверг там горит «НУЖЕН ПЛАН ТРЕНИРОВКИ» — завершить день, не выбрав план, нельзя.',
+      'Четыре плана тренировки: Кардио и ОФП (+энергия, −мораль), Игровая практика (++тонус, небольшой риск травмы), Техника (техника медленно растёт, очень утомляет) и Тактический класс (тактика растёт, но непоседы прогуливают). Рост ограничен скрытым потенциалом игрока.',
+      'Очки действий тренера: 1 в день (видно на панели задач), восстанавливаются каждое утро. Трать их на [ ВЫЗВАТЬ В КАБИНЕТ ] в карточке игрока: похвалить (осторожно — если он не в форме или выжат, похвала обернётся против тебя), отругать (+дисциплина, но он переживает) или просто спросить, как дела.',
+      'DEBUG.EXE: старый непрерывный календарь остался как «Авто-прокрутка до следующего матча», плюс +1 очко действия.',
+    ] },
   { v: '2.4', name: { en: 'Training Days', ru: 'Тренировки' },
     en: [
       'The calendar week now starts on Monday (Mon … Sun), with correct blank days at the start of every month.',

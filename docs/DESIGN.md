@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v2.4)
+# Youth Academy Manager — design notes (current: v2.5)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -117,3 +117,9 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Diary: `cal.training` (attended + skippers) / `cal.trainingAll`.
 - EventEngine: `roll(date)` on a training day evaluates `when: 'training'` events first (right after the routine, same onStep), then `day` events; same cooldown.
 - `truant` (training, someone skipped, 60%): cast = a skipper. A: −$20 (disabled under $20), discipline +2 (the brief's "+10" mapped to the 1–20 scale). B: 1-match ban, morale −10. C: `next: () => roll` → step `sorry` (discipline +2) or `hangup` (morale −10); the rolled step is saved, so a reload can't re-roll. Choice `next` may now be a function.
+
+## Daily routine: END DAY, training regimes, action points (v2.5)
+- `#btn-sim` in the calendar phase = END DAY → `UIController.endDay()`: blocked by `dayBlockers()` (training day without a plan) and open dialogues; `cal.step()` processes TODAY (daily hook = `dayRoutine(date, training, plan)`), advances one day, then `events.roll(date, { resume: false })` ("the evening"); if nothing fired → `morning()`: a match day arrives at once (`cal.step()` → onArrive). After an event choice without `resume`, `EventEngine.choose()` calls `ui.morning()`. `runCalendar()` survives only as `ui.autoSim()` (DEBUG.EXE "Auto-sim to the next match", smoke test) — plan defaults to Match Practice.
+- `state.today = { date, ap, plan }` via `dayState()` — lazily reset whenever the calendar date changes (any path). Saved.
+- `REGIMES` (00-utils-data.js), attendees only: cardio +5 cond / +2 sharp / −4 morale / 6% grow physical (stamina, accel, speed); match −10 / +8 / 3% injury 2–5 days; tech −12 / +3 / 12% grow technical (GK: goalkeeping, passing, first touch); tactics −5 / +2 / 12% grow tactical, discipline < 8 → +35% skip. Growth chance × (0.6 + PA/100), +1 to a random skill of the group, capped by `potentialCap(p)` = clamp(6 + PA·0.14, 8, 20). Diary: `cal.training(All)` with the plan name, `tr.improved` (names only, no numbers), `tr.hurt`.
+- `COACH.AP = 1` per day. Taskbar `#hdr-ap`, TODAY widget pips. `ProfileCard` → `#pinfo-office` "[ CALL INTO OFFICE ]" (own kids; disabled with 0 AP, during a live match, while a dialogue is open) → `ui.callIntoOffice(id)` spends 1 AP and fires the manual event `office` (excluded from the random cooldown). Choices roll the reaction step: praise → `praiseBad` if sharpness < 50 or energy < 50 (morale −8) else `praiseGood` (+12); criticize → discipline +2, composure −1, morale −8; check in → morale +4. Effects apply on the reaction's OK.

@@ -91,6 +91,18 @@ const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAI
 /* v2.4 TRAINING DAYS — every Tuesday and Thursday (UTC weekday 2 and 4).
    Attend: condition −10, sharpness +5. Skip chance = (SKIP_FROM − discipline) × SKIP_STEP (discipline 1 → 27%, 9 → 3%, 10+ → 0). */
 const TRAINING = { WEEKDAYS: [2, 4], DRAIN: 10, SHARP: 5, SKIP_FROM: 10, SKIP_STEP: 0.03 };
+/* v2.5 TRAINING REGIMES — the coach picks one every training day (attendees only; skippers get nothing).
+   grow: per attendee, chance × (0.6 + potential/100) to gain +1 in a random skill of `group` (capped by potential). */
+const REGIMES = {
+  cardio:  { cond: 5,   sharp: 2, morale: -4, grow: { group: 'physical', keys: ['baseStamina', 'acceleration', 'speed'], chance: 0.06 } },
+  match:   { cond: -10, sharp: 8, injury: 0.03, injDays: [2, 5] },
+  tech:    { cond: -12, sharp: 3, grow: { group: 'technical', chance: 0.12 } },
+  tactics: { cond: -5,  sharp: 2, extraSkip: 0.35, lowDisc: 8, grow: { group: 'tactical', chance: 0.12 } },
+};
+const REGIME_KEYS = Object.keys(REGIMES);
+const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14), 8, 20);   // PA 50 → 13, PA 100 → 20
+/* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
+const COACH = { AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };

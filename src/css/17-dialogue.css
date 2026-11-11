@@ -64,3 +64,33 @@
 .budget.debt, dd.money.debt{ color: #ff6b5e !important; text-shadow: 0 0 6px rgba(255,60,40,.5); }
 .st-badge.home{ background: #2c3a4a; color: #cfe3ff; }
 .tag.flag[title*="scout"], .tag.flag[title*="Скаут"]{ background: #10243a; color: #9fd3ff; border-color: #2f5f8a; }
+
+/* v2.5: TODAY widget, training plans, action points */
+.today-card #today-box{ display: flex; flex-direction: column; gap: 6px; }
+.td-head{ display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 13px; }
+.td-head b{ text-transform: capitalize; }
+.td-kind{ font: bold 10px/1 var(--mono); letter-spacing: 1px; text-transform: uppercase; padding: 3px 5px; background: #2a3138; color: #c9d1d8; }
+.td-kind.k-training{ background: #4a3412; color: #ffcf8a; } .td-kind.k-match{ background: #1f3a5f; color: #cfe3ff; }
+.td-ap{ font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.td-ap b{ color: var(--text); font-family: var(--mono); }
+.ap-pips{ display: inline-flex; gap: 3px; } .ap-pips i{ width: 10px; height: 10px; background: #2a3138; border: 1px solid #000; transform: rotate(45deg); }
+.ap-pips i.on{ background: #ffcf5a; box-shadow: 0 0 6px rgba(255,190,60,.6); }
+.td-req{ font: bold 11px/1.2 var(--mono); letter-spacing: 1px; color: #8fd17f; text-transform: uppercase; }
+.td-req.need{ color: #ff9b5e; animation: tdBlink 1.2s steps(2) infinite; }
+@keyframes tdBlink{ 50%{ color: #ffd9a8; } }
+.td-note{ font-size: 12px; color: var(--muted); }
+.plan-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.plan-btn{ display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 5px 6px; text-align: left; cursor: pointer; border-radius: 0;
+  background: #1a2026; color: var(--text); border: 2px solid; border-color: #4a5660 #0a0d0f #0a0d0f #4a5660; }
+.plan-btn b{ font-size: 12px; } .plan-btn small{ font-size: 10px; color: var(--muted); line-height: 1.2; }
+.plan-btn:hover{ background: #222a32; }
+.plan-btn.on{ background: #3a2a10; border-color: #0a0d0f #ffcf5a #ffcf5a #0a0d0f; box-shadow: inset 0 0 0 1px #ffcf5a; }
+.plan-btn.on b{ color: #ffcf5a; }
+.ap-chip{ flex: none; height: 26px; display: inline-flex; align-items: center; padding: 0 8px; margin-right: 4px; font: bold 13px/1 var(--mono); color: #ffcf5a; background: #0d1210;
+  border: 2px solid; border-color: var(--shadow) var(--hi) var(--hi) var(--shadow); white-space: nowrap; }
+.ap-chip span{ color: #a8946a; font-weight: normal; margin-right: 4px; }
+.ap-chip.spent{ color: #6d7881; }
+.office-btn{ margin-right: auto; }
+.dash-left{ overflow-y: auto; }
+@media (max-width: 820px){ .ap-chip span{ display: none; } }
+#btn-sim:disabled{ background: repeating-linear-gradient(135deg, #4a3a1a 0 8px, #3a2e16 8px 16px); color: #ffcf8a; box-shadow: inset -1px -1px 0 #1a140a, inset 1px 1px 0 #7a6230; cursor: not-allowed; text-shadow: none; }

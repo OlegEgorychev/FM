@@ -105,8 +105,10 @@ class DebugConsole {
       ${btn('maxms', L.t('dbg.maxMs'), L.t('dbg.maxMsD'))}
       ${btn('force', L.t('dbg.force') + ` <b class="dbg-flag ${on ? 'on' : ''}">[${L.t(on ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.forceD'), on ? ' armed' : '')}
       <hr class="dbg-hr">
+      ${btn('autosim', L.t('dbg.autosim'), L.t('dbg.autosimD'))}
+      ${btn('ap', L.t('dbg.ap'), L.t('dbg.apD'))}
       ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[${money(this.ui.state.budget)}]</b>`, L.t('dbg.moneyD'))}
-      ${NARRATIVE_EVENTS.map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
+      ${NARRATIVE_EVENTS.filter(e => e.when !== 'manual').map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
       ${btn('events', L.t('dbg.events') + ` <b class="dbg-flag ${ev ? '' : 'on'}">[${L.t(ev ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.eventsD'))}
       <div class="dbg-queue"><b>EVENT_QUEUE</b> ${this.ui.state.eventQueue.length ? this.ui.state.eventQueue.map(q => `<code>${esc(q.id)} @ ${q.due}${q.matchDay ? ' (match day)' : ''}${q.from ? ' ← ' + esc(q.from) : ''}</code>`).join(' ') : '<i>empty</i>'}</div>
     </div>`;
@@ -127,6 +129,12 @@ class DebugConsole {
       s.cheats = { ...(s.cheats || {}), forceWin: !s.cheats?.forceWin };
       this.msg = L.t('dbg.doneForce', { s: L.t(s.cheats.forceWin ? 'dbg.forceOn' : 'dbg.forceOff') })
         + (s.cheats.forceWin && eng ? ' ' + L.t('dbg.forceLive') : '');
+    } else if (id === 'autosim') {   // v2.5: the old non-stop calendar (Match Practice on training days)
+      if (eng || ui.events.active || ui.cal.running || s.phase !== 'calendar') { this.msg = L.t('dbg.busy'); this.render(); return; }
+      this.close(); ui.autoSim(); return;
+    } else if (id === 'ap') {
+      s.dayState().ap++;
+      this.msg = L.t('dbg.doneAp', { n: s.ap });
     } else if (id === 'money') {
       s.addMoney(500);
       this.msg = L.t('dbg.doneMoney', { b: money(s.budget) });

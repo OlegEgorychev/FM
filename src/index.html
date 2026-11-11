@@ -57,6 +57,9 @@
             <div class="groupbox next-card"><span class="gb-label" data-i18n="dash.next"></span>
               <div id="next-event"></div>
             </div>
+            <div class="groupbox today-card"><span class="gb-label" data-i18n="today.title"></span>
+              <div id="today-box"></div>
+            </div>
             <button class="btn go big" id="btn-sim"></button>
             <p class="sim-hint" id="sim-hint"></p>
             <div class="groupbox"><span class="gb-label" data-i18n="cal.legend"></span>
@@ -282,7 +285,7 @@
       <div class="titlebar"><span class="t-ico">i</span><span class="t-txt" id="pinfo-title">PLAYER_INFO.EXE</span><button class="tb-btn" id="pinfo-x" data-i18n-aria="ui.close">&times;</button></div>
       <div class="pinfo-tabs"><span class="pinfo-tab" data-i18n="pi.tab"></span></div>
       <div class="win-body pinfo-body" id="pinfo-body"></div>
-      <div class="row-btns pinfo-btns"><button class="btn go" id="pinfo-ok" type="button" data-i18n="ui.ok"></button></div>
+      <div class="row-btns pinfo-btns"><button class="btn ff office-btn" id="pinfo-office" type="button" hidden></button><button class="btn go" id="pinfo-ok" type="button" data-i18n="ui.ok"></button></div>
       <div class="statusbar"><span id="pinfo-status"></span></div>
     </section>
   </div>
@@ -352,6 +355,7 @@
     <button class="tk start" id="btn-startmenu" aria-haspopup="menu"><span class="logo">&#9673;</span><span data-i18n="ui.start">Start</span></button>
     <span class="app-title" id="app-title" title="Youth Academy Manager"></span>
     <span class="budget" id="hdr-budget" role="status" aria-live="polite"></span>
+    <span class="ap-chip" id="hdr-ap" role="status"></span>
     <span class="sep"></span>
     <div class="tasks">
       <button class="tk" data-view="dash">&#8962; <span class="lbl" data-i18n="nav.dash"></span></button>

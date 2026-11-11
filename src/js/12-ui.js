@@ -56,12 +56,16 @@ class UIController {
     // Future event types plug in here, e.g.:
     // cal.registerType('training', { blocking: false, label: ev => '…', onArrive: ev => this.state.applyTraining(ev) });
     // cal.registerType('dialogue', { blocking: true,  label: ev => '…', onArrive: ev => this.openDialogue(ev) });
-    cal.onDay(date => {   // v2.4: Tue/Thu = training (the EventEngine rolls right after this, in runCalendar → onStep)
-      const r = this.state.dayRoutine(date);
+    cal.onDay(date => {   // v2.4/2.5: Tue/Thu = training with the coach's regime (auto-sim falls back to Match Practice)
+      const s = this.state, r = s.dayRoutine(date, isTrainingDay(date), s.dayState().plan || 'match');
       if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
+      const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
+      if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
+      if (r.hurt.length) s.addDiary({ date, key: 'tr.hurt', vars: { s: ids(r.hurt) }, cls: 'ev' });
+      const plan = { p: { plan: r.plan } };
       return r.skipped.length
-        ? { key: 'cal.training', vars: { a: r.attended, s: { list: r.skipped.map(p => ({ pid: p.id })) } }, cls: 'tr' }
-        : { key: 'cal.trainingAll', vars: { a: r.attended }, cls: 'tr' };
+        ? { key: 'cal.training', vars: { ...plan, a: r.attended, s: ids(r.skipped) }, cls: 'tr' }
+        : { key: 'cal.trainingAll', vars: { ...plan, a: r.attended }, cls: 'tr' };
     });
   }
 
@@ -110,6 +114,7 @@ class UIController {
 
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
+    if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
     if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
@@ -163,6 +168,10 @@ class UIController {
       if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.onLiveRosterClick(row.dataset.id); }
     });
     this.$('btn-sim').addEventListener('click', () => this.onDashAction());
+    this.$('today-box').addEventListener('click', e => {   // v2.5: training plan
+      const b = e.target.closest('[data-plan]');
+      if (b) { this.state.setPlan(b.dataset.plan); this.renderDash(); }
+    });
     // v1.6 calendar: month navigation + clickable day cells (info in the status bar)
     this.$('cal-prev').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), -1); this.renderCalendar(); });
     this.$('cal-next').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), 1); this.renderCalendar(); });
@@ -537,13 +546,14 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
     // main action button
     const btn = this.$('btn-sim');
-    btn.disabled = this.cal.running || this.live || this.events.active;
+    btn.disabled = this.cal.running || this.live || this.events.active || this.dayBlockers().length > 0;
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
-    else if (phase === 'calendar') btn.innerHTML = L.t('dash.sim');
+    else if (phase === 'calendar') btn.innerHTML = L.t(this.dayBlockers().length ? 'dash.endDayBlocked' : 'dash.endDay');
     else if (phase === 'matchday') btn.innerHTML = L.t('dash.goMatch');
     else if (phase === 'post') btn.innerHTML = L.t('dash.close');
     else btn.innerHTML = L.t('dash.newSeason', { y: s.season + 1, z: String(s.season + 2).slice(2) });
+    this.renderToday();   // v2.5
     this.$('sim-hint').innerHTML = phase === 'seasonEnd'
       ? L.t('dash.hint.seasonEnd', { pos: lg.position(0), pts: row.pts })
       : L.t('dash.hint.' + phase, { n: ENERGY.DAILY_REST });
@@ -667,7 +677,51 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return;
     }
     if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
-    this.runCalendar();
+    this.endDay();   // v2.5: one day per click
+  }
+
+  /* ---------- v2.5 DAILY LOOP: decide → END DAY → (evening event?) → next morning ---------- */
+  /** Mandatory tasks that block END DAY. */
+  dayBlockers() {
+    const s = this.state, out = [];
+    if (s.phase === 'calendar' && isTrainingDay(s.calendar.date) && !s.dayState().plan && this.dayInfo(s.calendar.date).kind === 'training') out.push('plan');
+    return out;
+  }
+  endDay() {
+    const s = this.state;
+    if (this.cal.running || s.phase !== 'calendar' || this.events.active || this.dayBlockers().length) { this.renderDash(); return; }
+    const r = this.cal.step();
+    if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }   // safety: today was already a match day
+    for (const info of r.infos) s.addDiary({ date: r.date, ...info });
+    this.calMonth = null;
+    s.save();
+    const fired = this.cal.nextEvent() && this.events.roll(r.date, { resume: false });   // the evening: something may happen
+    if (!fired) this.morning();
+    else this.renderAll();
+  }
+  /** New morning: AP and plan reset (lazily in dayState); a match day arrives straight away. */
+  morning() {
+    const s = this.state;
+    if (s.phase === 'calendar' && this.cal.blockingToday()) {
+      const r = this.cal.step();
+      if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }
+    }
+    if (s.phase === 'calendar' && !this.cal.nextEvent()) { s.phase = 'seasonEnd'; s.save(); }
+    this.renderAll();
+  }
+  /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
+  autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
+
+  /** v2.5: [ CALL INTO OFFICE ] — 1 action point, a short talk in the dialogue box. */
+  canCallIn(id) {
+    const s = this.state, p = s.player(id);
+    return !!p && s.ap > 0 && !this.events.active && !(this.engine && !this.engine.finished) && !this.cal.running;
+  }
+  callIntoOffice(id) {
+    if (!this.canCallIn(id) || !this.state.spendAP()) return;
+    this.profile.close();
+    this.events.fire('office', this.state.calendar.date, { cast: { kid: id } });
+    this.renderBudget();
   }
 
   /** Visible day-by-day simulation. v1.9: after every non-match day the EventEngine may fire an event,
@@ -689,11 +743,32 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.renderDash();
   }
 
+  /** v2.5: TODAY widget — date, action points, mandatory training plan (Tue/Thu). */
+  renderToday() {
+    const s = this.state, box = this.$('today-box');
+    if (!box) return;
+    const d = s.dayState(), info = this.dayInfo(s.calendar.date), live = s.phase === 'calendar';
+    const pips = Array.from({ length: COACH.AP }, (_, i) => `<i class="${i < d.ap ? 'on' : ''}"></i>`).join('');
+    let body = '';
+    if (live && info.kind === 'training') {
+      const need = !d.plan;
+      body = `<div class="td-req${need ? ' need' : ''}">${L.t(need ? 'today.planReq' : 'today.planSet')}</div><div class="plan-grid">`
+        + REGIME_KEYS.map(k => `<button type="button" class="plan-btn${d.plan === k ? ' on' : ''}" data-plan="${k}" aria-pressed="${d.plan === k}">
+            <b>${L.t('plan.' + k)}</b><small>${L.t('plan.' + k + '.d')}</small></button>`).join('') + '</div>';
+    } else if (live) body = `<div class="td-note">${L.t(info.kind === 'rest' ? 'today.rest' : 'today.off', { n: ENERGY.DAILY_REST })}</div>`;
+    else body = `<div class="td-note">${L.t('today.phase.' + s.phase)}</div>`;
+    box.innerHTML = `<div class="td-head"><b>${fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' })}</b>
+        <span class="td-kind k-${info.kind}">${L.t('today.kind.' + info.kind)}</span></div>
+      <div class="td-ap" title="${esc(L.t('ap.tip'))}">${L.t('ap.left')} <span class="ap-pips">${pips}</span> <b>${d.ap}/${COACH.AP}</b></div>${body}`;
+  }
+
   /** v1.9: club budget in the taskbar header (+ a short green/red flash when it changes). */
   renderBudget(delta = 0) {
     const el = this.$('hdr-budget');
     if (!el) return;
     el.innerHTML = L.t('hdr.budget', { b: money(this.state.budget) }); el.classList.toggle('debt', this.state.budget < 0);
+    const ap = this.$('hdr-ap');   // v2.5
+    if (ap) { const n = this.state.ap; ap.innerHTML = L.t('hdr.ap', { n, m: COACH.AP }); ap.classList.toggle('spent', n < 1); }
     if (delta) { el.classList.remove('up', 'down'); void el.offsetWidth; el.classList.add(delta > 0 ? 'up' : 'down'); }
   }
 

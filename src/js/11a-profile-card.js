@@ -13,6 +13,7 @@ class ProfileCard {
     this.lastSig = '';
     document.getElementById('pinfo-x').addEventListener('click', () => this.close());
     document.getElementById('pinfo-ok').addEventListener('click', () => this.close());
+    document.getElementById('pinfo-office').addEventListener('click', () => this.ui.callIntoOffice(this.id));   // v2.5
     this.layer.addEventListener('mousedown', e => { if (e.target === this.layer) this.close(); });
     this.layer.addEventListener('contextmenu', e => { e.preventDefault(); if (e.target === this.layer) this.close(); });
     document.addEventListener('keydown', e => {
@@ -55,7 +56,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -120,5 +121,10 @@ class ProfileCard {
         <fieldset class="pi-note"><legend>${L.t('nb.coachNote')}</legend>${noteHtml}</fieldset>
       </div>`;
     document.getElementById('pinfo-status').textContent = L.t('pi.status.bar');
+    const ob = document.getElementById('pinfo-office');   // v2.5: [ CALL INTO OFFICE ] (1 action point)
+    ob.hidden = !own;
+    ob.disabled = !ui.canCallIn(p.id);
+    ob.innerHTML = L.t('office.btn', { n: s.ap });
+    ob.title = L.t(s.ap > 0 ? 'office.btnTip' : 'office.btnNoAp');
   }
 }
