@@ -104,6 +104,11 @@ const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14
 /* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
 const COACH = { AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
+/* v2.6 LOCKER ROOM — who turns up on training / match days.
+   Absent if: condition < MIN_COND, injured / suspended / kept at home, or skips: random·20 > discipline + DISC_GRACE.
+   (The brief's raw roll random·20 > discipline would leave ~half the squad at home: DISC_GRACE = 8 → discipline 10 ≈ 10%, 3 ≈ 45%, 12+ never.) */
+const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
+const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */

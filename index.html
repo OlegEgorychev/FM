@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v2.5</title>
+<title>Youth Academy Manager v2.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1381,6 +1381,64 @@ body.fx .crt-scan{ opacity: .9; }
 .ms-go{ width: 100%; padding: 12px; font: bold 15px/1 var(--mono) !important; letter-spacing: 1px; text-transform: uppercase; }
 @media (max-width: 640px){ .ms-score{ font-size: 38px; } .ms-stats{ grid-template-columns: repeat(2, 1fr); } }
 /* =========================================================
+   v2.6 — LOCKER ROOM (row of metal lockers; doors swing open one by one)
+   ========================================================= */
+.locker-layer{ position: absolute; inset: 0 0 38px 0; z-index: 80; display: grid; place-items: center; padding: 12px;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.2) 0 2px, transparent 2px 4px), rgba(4,6,8,.72);
+  -webkit-backdrop-filter: blur(3px) grayscale(.5); backdrop-filter: blur(3px) grayscale(.5); }
+.locker-layer[hidden]{ display: none; }
+.win.lockerwin{ position: relative; left: auto; top: auto; width: min(1180px, 100%); max-height: 100%; display: flex; flex-direction: column;
+  background: var(--face); color: #111; border-radius: 0; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
+  box-shadow: inset -1px -1px 0 var(--shadow), inset 1px 1px 0 #fff, 8px 10px 0 rgba(0,0,0,.45); }
+.win.lockerwin .titlebar{ border-radius: 0; margin: 2px 2px 0; background: linear-gradient(90deg, #2b3a2a, #5a6b48); }
+.lr-head{ display: flex; align-items: center; gap: 14px; padding: 8px 10px 4px; font-size: 13px; flex-wrap: wrap; }
+.lr-kind{ font: bold 11px/1 var(--mono); letter-spacing: 1px; text-transform: uppercase; padding: 4px 8px; color: #fff; background: #4a3412; }
+.lr-kind.k-match{ background: #1f3a5f; }
+.lr-count{ font: bold 18px/1 var(--mono); color: #1d4a1d; } .lr-count.low{ color: #b3261e; animation: tdBlink 1s steps(2) infinite; }
+.lr-ap{ margin-left: auto; color: #333; } .lr-ap b{ font-family: var(--mono); }
+
+.lr-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 4px 8px; padding: 12px; overflow: auto;
+  background: linear-gradient(#2a2f33, #1b1f22); border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow);
+  box-shadow: inset 0 0 40px rgba(0,0,0,.7); }
+.lk{ position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 6px 8px; min-height: 196px;
+  background: linear-gradient(90deg, #59636b 0 3px, #747f87 3px, #66717a 60%, #525c64); color: #eef1ec;
+  border: 2px solid; border-color: #9aa5ad #2b3237 #2b3237 #9aa5ad; perspective: 600px; }
+.lk::before{ content: ''; position: absolute; top: 34px; left: 50%; width: 46px; transform: translateX(-50%); height: 6px;   /* vents */
+  background: repeating-linear-gradient(90deg, #2b3237 0 4px, transparent 4px 7px); opacity: .6; }
+.lk-plate{ display: flex; justify-content: space-between; align-items: center; width: 100%; font: bold 12px/1 var(--mono); }
+.lk-no{ background: #e9e4d3; color: #111; padding: 2px 5px; border: 1px solid #000; }
+.lk-in{ margin-top: 16px; width: 88px; height: 88px; display: grid; place-items: center; background: #11161a; border: 2px solid #000;
+  box-shadow: inset 0 0 14px rgba(0,0,0,.9); }
+.lk-face{ width: 84px; height: 84px; } .lk-face svg{ width: 100%; height: 100%; display: block; }
+.lk-name{ font: bold 13px/1.1 var(--ui); text-align: center; text-shadow: 1px 1px 0 #000; }
+.lk .energy{ width: 100%; height: 14px; } .lk .energy span{ font-size: 10px; }
+/* empty locker: dark, a hook and a post-it */
+.lk.empty{ background: linear-gradient(90deg, #3a4046 0 3px, #464d53 3px, #3d4349); color: #9aa5ad; }
+.lk-in.dark{ background: radial-gradient(circle at 50% 10%, #1b2125, #07090a 70%); position: relative; }
+.lk-in.dark::before{ content: ''; position: absolute; top: 8px; left: 50%; width: 10px; height: 8px; transform: translateX(-50%);
+  border: 2px solid #6b747b; border-top: 0; border-radius: 0 0 6px 6px; }   /* coat hook */
+.lk-note{ width: 46px; height: 42px; display: grid; place-items: center; transform: rotate(-6deg);
+  font: bold 22px/1 var(--mono); color: #6b4a10; background: #f2d45c; box-shadow: 2px 3px 0 rgba(0,0,0,.5); }
+.lk-note.open{ width: 78px; height: auto; min-height: 42px; padding: 4px; font: bold 10px/1.15 var(--ui); text-align: center; color: #3a2a08; }
+.lk-miss{ font: bold 10px/1 var(--mono); letter-spacing: 1.5px; color: #ff8a7e; text-transform: uppercase; }
+.lk.empty.can{ cursor: pointer; }
+.lk.empty.can:hover, .lk.empty.can:focus-visible{ outline: 2px solid #ffcf5a; outline-offset: -2px; }
+.lk.empty.can:hover .lk-note{ transform: rotate(-2deg) scale(1.08); }
+.lk.empty.checked .lk-miss{ color: #9aa5ad; }
+/* reveal: the doors swing open one after another; empty ones flash red */
+.lk.rv::after{ content: ''; position: absolute; inset: -2px; transform-origin: left center; z-index: 2; pointer-events: none;
+  background: linear-gradient(90deg, #6e7981, #87929a 40%, #6e7981); border: 2px solid; border-color: #9aa5ad #2b3237 #2b3237 #9aa5ad;
+  animation: doorOpen .5s ease-in forwards; animation-delay: inherit; }
+@keyframes doorOpen{ 0%{ transform: rotateY(0); } 100%{ transform: rotateY(-100deg); opacity: 0; } }
+.lk.empty.rv{ animation: emptyFlash .9s steps(3) both; animation-delay: inherit; }
+@keyframes emptyFlash{ 0%, 40%{ box-shadow: none; } 60%{ box-shadow: 0 0 0 3px #b3261e, 0 0 18px rgba(255,60,40,.6); } 100%{ box-shadow: none; } }
+.lr-foot{ display: flex; align-items: center; gap: 12px; padding: 8px 10px; }
+.lr-hint{ flex: 1; font-size: 12px; color: #333; }
+#lr-proceed{ min-width: 260px; }
+.win.lockerwin .statusbar > span{ color: #333; font-size: 11px; }
+.st-badge.absent{ background: #3a3f44; color: #f2d45c; }
+@media (prefers-reduced-motion: reduce){ .lk.rv::after{ animation: none; display: none; } .lk.empty.rv{ animation: none; } }
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1713,6 +1771,17 @@ body.fx .crt-scan{ opacity: .9; }
     </section>
   </div>
 
+  <!-- v2.6: Locker room (who turned up today) -->
+  <div class="locker-layer" id="locker-room-view" hidden>
+    <section class="win lockerwin open" role="dialog" aria-modal="true" aria-labelledby="lr-title">
+      <div class="titlebar"><span class="t-ico">&#9636;</span><span class="t-txt" id="lr-title">LOCKER_ROOM.EXE</span><button class="tb-btn" id="lr-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="lr-head" id="lr-head"></div>
+      <div class="lr-grid" id="lr-grid"></div>
+      <div class="lr-foot"><span class="lr-hint" data-i18n="lr.hint"></span><button class="btn go big" id="lr-proceed" type="button"></button></div>
+      <div class="statusbar"><span id="lr-status"></span></div>
+    </section>
+  </div>
+
   <!-- v1.8: DEBUG.EXE (developer mode) -->
   <div class="pinfo-layer dbg-layer" id="debug-layer" hidden>
     <section class="win pinfo dbg open" role="dialog" aria-modal="true" aria-labelledby="debug-title">
@@ -1875,6 +1944,11 @@ const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14
 /* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
 const COACH = { AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
+/* v2.6 LOCKER ROOM — who turns up on training / match days.
+   Absent if: condition < MIN_COND, injured / suspended / kept at home, or skips: random·20 > discipline + DISC_GRACE.
+   (The brief's raw roll random·20 > discipline would leave ~half the squad at home: DISC_GRACE = 8 → discipline 10 ≈ 10%, 3 ≈ 45%, 12+ never.) */
+const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
+const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
@@ -2726,6 +2800,50 @@ Object.assign(I18N.ru, {
   'dbg.autosim': 'Авто-прокрутка до следующего матча', 'dbg.autosimD': 'Старый непрерывный календарь (игровая практика в дни тренировок).',
   'dbg.ap': '+1 очко действия', 'dbg.apD': 'Для проверки разговоров в кабинете.', 'dbg.doneAp': 'OK: очков действий сегодня: {n}.', 'dbg.ev.office': 'Вызов в кабинет (нужен игрок)',
 });
+
+
+/* ---- v2.6: locker room + roll call ---- */
+Object.assign(I18N.en, {
+  'dash.startDay': '&#9654; START DAY · locker room', 'dash.startMatchDay': '&#9654; Locker room &#9656;', 'modal.toLocker': '&#9636; To the locker room',
+  'today.lockerReq': 'WHO TURNED UP?', 'today.lockerNote': 'START DAY opens the locker room. Only the kids who came can train.',
+  'st.absent': 'Didn\'t turn up today', 'st.short.absent': 'absent today', 'team.err.unavail_absent': 'He didn\'t turn up at the locker room today.',
+  'lr.kindTraining': 'Training day', 'lr.kindMatch': 'Match day vs {o}', 'lr.arrived': 'Arrived: {n}/{t}',
+  'lr.missing': 'missing', 'lr.investigate': 'Roll call: find out why (1 action point)', 'lr.noAp': 'No action points left today.',
+  'lr.hint': 'Only the kids who came can train or be picked today. Click an empty locker to find out why (1 action point).',
+  'lr.toPlan': 'Proceed &#9656; training plan', 'lr.toMatch': 'Proceed &#9656; match prep',
+  'lr.status': 'Check who is here. Empty lockers can be investigated.', 'lr.statusShort': 'Fewer than 11 kids! The missing shirts stay empty.',
+  'lr.short.exhausted': 'exhausted, in bed', 'lr.short.injury': 'at the clinic', 'lr.short.suspended': 'suspended', 'lr.short.home': 'kept at home', 'lr.short.skipped': 'skipping',
+  'talk.rolePhoneCall': '#{n} · roll call · phone',
+  'lr.why.exhausted': 'His mom called. {k} is completely exhausted and staying in bed.',
+  'lr.why.injury': '{k} is at the clinic ({d} more day(s)).', 'lr.why.suspended': '{k} is suspended ({n} match(es) left). He stayed away.',
+  'lr.why.home': 'His dad picks up: "{k} stays at home." ({h} more day(s))', 'lr.why.skipped': 'No answer. {k} is skipping.',
+  'lr.fine': 'Fine him (+discipline)', 'lr.ignore': 'Ignore', 'lr.ok': 'Understood',
+  'lr.fine.diary': 'Fined {k} for skipping ({m}).', 'lr.ignore.diary': '{k} skipped; the coach let it go.', 'lr.ok.diary': 'Roll call: {k} — {r}.',
+  'lr.diary': 'Locker room: {n}/{t} turned up. Missing: {s}.', 'lr.diaryAll': 'Locker room: all {t} turned up.',
+  'lr.shortHanded': 'Not enough kids turned up: we start with {n} players!',
+});
+Object.assign(I18N.ru, {
+  'dash.startDay': '&#9654; НАЧАТЬ ДЕНЬ · раздевалка', 'dash.startMatchDay': '&#9654; В раздевалку &#9656;', 'modal.toLocker': '&#9636; В раздевалку',
+  'today.lockerReq': 'КТО ПРИШЁЛ?', 'today.lockerNote': '«Начать день» открывает раздевалку. Тренироваться могут только пришедшие.',
+  'st.absent': 'Сегодня не пришёл', 'st.short.absent': 'не пришёл', 'team.err.unavail_absent': 'Он сегодня не пришёл в раздевалку.',
+  'lr.kindTraining': 'День тренировки', 'lr.kindMatch': 'День матча · {o}', 'lr.arrived': 'Пришли: {n}/{t}',
+  'lr.missing': 'нет', 'lr.investigate': 'Перекличка: узнать причину (1 очко действия)', 'lr.noAp': 'Очков действий на сегодня нет.',
+  'lr.hint': 'Тренироваться и попасть в заявку сегодня могут только пришедшие. Щёлкни по пустому шкафчику, чтобы узнать причину (1 очко действия).',
+  'lr.toPlan': 'Дальше &#9656; план тренировки', 'lr.toMatch': 'Дальше &#9656; к матчу',
+  'lr.status': 'Посмотри, кто на месте. Пустые шкафчики можно проверить.', 'lr.statusShort': 'Меньше 11 человек! Пустые места так и останутся пустыми.',
+  'lr.short.exhausted': 'выжат, лежит дома', 'lr.short.injury': 'в клинике', 'lr.short.suspended': 'дисквалифицирован', 'lr.short.home': 'отец не пустил', 'lr.short.skipped': 'прогуливает',
+  'talk.rolePhoneCall': '№{n} · перекличка · телефон',
+  'lr.why.exhausted': 'Звонила мама. {k} совсем без сил и лежит в кровати.',
+  'lr.why.injury': '{k} в клинике (ещё {d} дн.).', 'lr.why.suspended': '{k} дисквалифицирован (ещё {n} матч(а)). Не пришёл.',
+  'lr.why.home': 'Трубку берёт отец: «{k} сидит дома». (ещё {h} дн.)', 'lr.why.skipped': 'Никто не отвечает. {k} прогуливает.',
+  'lr.fine': 'Оштрафовать (+дисциплина)', 'lr.ignore': 'Не обращать внимания', 'lr.ok': 'Понятно',
+  'lr.fine.diary': 'Штраф за прогул ({m}). Игрок: {k}.', 'lr.ignore.diary': '{k} прогулял; тренер не стал ничего делать.', 'lr.ok.diary': 'Перекличка: {k} — {r}.',
+  'lr.diary': 'Раздевалка: пришли {n}/{t}. Нет: {s}.', 'lr.diaryAll': 'Раздевалка: пришли все {t}.',
+  'lr.shortHanded': 'Пришло слишком мало ребят: на поле выходят только {n}!',
+});
+
+Object.assign(I18N.en, { 'today.phase.matchday': 'Match day! First the locker room: who turned up?' });
+Object.assign(I18N.ru, { 'today.phase.matchday': 'День матча! Сначала раздевалка: кто пришёл?' });
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -2975,7 +3093,8 @@ class Player {
       this.injuryDays = Math.max(0, Math.round(o.injuryDays || 0));                // v2.2: calendar days out
       this.suspensionMatches = Math.max(0, Math.round(o.suspensionMatches || 0));  // v2.2: matches banned
       this.awayDays = Math.max(0, Math.round(o.awayDays || 0));                    // v2.3: kept at home by a parent (days)
-      this.promiseBy = o.promiseBy || null;                                         // v2.3: who was promised his start ('dad' | 'pool')
+      this.promiseBy = o.promiseBy || null;
+      this.absentToday = o.absentToday || null;   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
@@ -3019,7 +3138,7 @@ class Player {
   hasFlag(f) { return !!this.flags?.includes(f); }
   /** v2.2: can he be picked for the XI / come on as a sub? (AI kids are always available) */
   get available() { return !this.unavailableReason; }
-  get unavailableReason() { return this.injuryDays > 0 ? 'inj' : this.suspensionMatches > 0 ? 'sus' : this.awayDays > 0 ? 'home' : this.hasFlag('Benched') ? 'deal' : null; }
+  get unavailableReason() { return this.injuryDays > 0 ? 'inj' : this.suspensionMatches > 0 ? 'sus' : this.awayDays > 0 ? 'home' : this.absentToday ? 'absent' : this.hasFlag('Benched') ? 'deal' : null; }
   /** Morale swing on every roll: ±2 at the extremes, amplified by passion (0.6×–1.5×). */
   get moodBonus() { return clamp((this.dyn.morale - 50) / 25 * (0.55 + this.psych.passion / 20), -2.5, 2.5); }
   /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */
@@ -3486,14 +3605,46 @@ class GameState {
   /** v2.4: one non-match calendar day. Training day (Tue/Thu): fit kids roll vs discipline —
       attend → condition −10, sharpness +5; skip → no change + `skipped_training` (until the next day).
       Injured / kept-at-home kids rest. Returns { training, attended, skipped: [players] }. */
+  /* ---------- v2.6 LOCKER ROOM: who turns up today ---------- */
+  /** Why a kid would NOT come today (null = he arrives). */
+  arrivalCheck(p) {
+    if (p.injuryDays > 0) return 'injury';
+    if (p.suspensionMatches > 0) return 'suspended';
+    if (p.awayDays > 0) return 'home';
+    if (p.energy < LOCKER.MIN_COND) return 'exhausted';
+    if (Math.random() * 20 > p.psych.discipline + LOCKER.DISC_GRACE) return 'skipped';
+    return null;
+  }
+  /** Rolls the arrivals once per day (training / match days). Absent kids are locked out until the next morning. */
+  runLocker(training = isTrainingDay(this.calendar.date)) {
+    const d = this.dayState();
+    if (d.locker) return d.locker;
+    const absent = {};
+    for (const p of this.squad) {
+      const r = this.arrivalCheck(p);
+      p.absentToday = r === 'exhausted' || r === 'skipped' ? r : null;   // injured / banned / home are locked by their own status
+      p.skipped_training = training && r === 'skipped';                   // feeds The Truant
+      if (r) absent[p.id] = r;
+    }
+    d.locker = { done: false, revealed: false, absent, checked: [] };
+    this.save();
+    return d.locker;
+  }
+  /** Every morning (and after a match): nobody is "absent" any more. */
+  clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
+
   dayRoutine(date, training = !!date && isTrainingDay(date), plan = 'match') {
     const skipped = [], improved = [], hurt = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
+    if (training) { const lk = this.runLocker(true); lk.done = true; }   // auto-sim: arrivals are rolled without the view
+    else this.clearDayStatus();
     for (const p of this.squad) {
-      p.skipped_training = false;
-      const trains = training && !(p.injuryDays > 0) && !(p.awayDays > 0);
-      const skip = skipChance(p) + (R.extraSkip && p.psych.discipline < R.lowDisc ? R.extraSkip : 0);   // v2.5: tactics bore the restless ones
-      if (trains && Math.random() < skip) { p.skipped_training = true; skipped.push(p); }
+      const present = training && p.available;   // v2.6: only kids who came to the locker room train
+      const walkOut = present && R.extraSkip && p.psych.discipline < R.lowDisc && Math.random() < R.extraSkip;   // v2.5: tactics bore the restless ones
+      if (walkOut) { p.skipped_training = true; }
+      if (p.skipped_training) skipped.push(p);
+      const trains = present && !walkOut;
+      if (training && p.skipped_training) { /* skipped: no tiredness, no sharpness (exhausted / injured kids rest) */ }
       else if (trains) {   // v2.5: the coach's regime
         attended++;
         p.energy = clamp(p.energy + R.cond, 0, 100);
@@ -3692,6 +3843,7 @@ class MatchEngine {
     this.energy = new Map(); this.drain = new Map();
     for (const s of this.sides) for (const e of s.entries) { this.energy.set(e.p.id, e.p.energy ?? 100); this.drain.set(e.p.id, MatchEngine.drainOf(e.p)); }
     this.everPlayed = new Set(home.players.map(p => p.id));
+    for (const id of opts.missing || []) { this.sentOff.add(id); this.everPlayed.delete(id); }   // v2.6: an empty shirt — we start short-handed
     this.subbedOff = new Set();
     this.subsUsed = 0;
     this.subs = [];
@@ -4248,8 +4400,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.6', name: { en: 'The Locker Room', ru: 'Раздевалка' },
+    en: [
+      'Training and match days now start in the LOCKER ROOM: the doors swing open one by one and you see who actually turned up.',
+      'A kid stays away if he is exhausted (energy under 25%), injured, suspended, kept at home — or simply skips (the lower his discipline, the more likely).',
+      'Only the kids who came can train, start or sit on the bench that day. Absent starters are replaced automatically; if fewer than 11 turn up, the empty shirts stay empty.',
+      'Roll call: click an empty locker to find out why (1 action point). A skipper can be fined (−$10, +discipline) or ignored.',
+      'Proceed takes you to the training plan (Tue/Thu) or to the match. The next morning everyone gets a fresh start.',
+    ],
+    ru: [
+      'Дни тренировок и матчей теперь начинаются в РАЗДЕВАЛКЕ: дверцы шкафчиков открываются одна за другой, и видно, кто на самом деле пришёл.',
+      'Игрок не приходит, если он выжат (энергия ниже 25%), травмирован, дисквалифицирован, отец держит его дома — или просто прогуливает (чем ниже дисциплина, тем вероятнее).',
+      'В этот день тренироваться, играть в основе и сидеть в запасе могут только пришедшие. Отсутствующих в основе заменяют автоматически; если пришло меньше 11, пустые места так и остаются пустыми.',
+      'Перекличка: щёлкни по пустому шкафчику, чтобы узнать причину (1 очко действия). Прогульщика можно оштрафовать (−$10, +дисциплина) или не трогать.',
+      '«Дальше» ведёт к плану тренировки (вт/чт) или к матчу. Следующим утром все начинают с чистого листа.',
+    ] },
   { v: '2.5', name: { en: 'The Daily Routine', ru: 'Распорядок дня' },
     en: [
       'Time no longer runs by itself: the big Dashboard button is now END DAY and moves the calendar exactly one day. Events, match days and the next morning follow.',
@@ -5409,7 +5576,8 @@ class DebugConsole {
     add('ENGINE', 'INJ', p => p.injuryDays || 0, null, 'v2.2 injury: calendar days left');
     add('ENGINE', 'SUS', p => p.suspensionMatches || 0, null, 'v2.2 suspension: matches left');
     add('ENGINE', 'HOME', p => p.awayDays || 0, null, 'v2.3 kept at home by a parent: days left');
-    add('ENGINE', 'SKIP%', p => Math.round(skipChance(p) * 100), null, 'v2.4 chance to skip a training day (from discipline)');
+    add('ENGINE', 'SKIP%', p => Math.round(arrivalSkipChance(p) * 100), null, 'v2.6 chance to skip the locker room (from discipline)');
+    add('ENGINE', 'ABS', p => p.absentToday || '—', null, 'v2.6 absent today');
     add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
     return c;
   })();
@@ -5813,6 +5981,28 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v2.6 ROLL CALL — the coach rings an absent kid (1 AP, from an empty locker) ---------- */
+  {
+    id: 'rollcall', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const { kid } = ctx.cast, name = L.name(kid.name), why = ctx.state.dayState().locker?.absent[kid.id] || 'skipped';
+      const base = { face: why === 'skipped' ? PortraitGenerator.silhouette('#444') : kid.portraitSvg, name, role: L.t('talk.rolePhoneCall', { n: kid.number }) };
+      if (why === 'skipped') {
+        ctx.show({ ...base, text: L.t('lr.why.skipped', { k: name }),
+          choices: [
+            { key: 'lr.fine', tone: 'red', cost: LOCKER.FINE, who: kid.id,
+              run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + LOCKER.FINE_DISC); return { k: { pid: kid.id } }; } },
+            { key: 'lr.ignore', tone: 'gray', who: kid.id, run: () => ({ k: { pid: kid.id } }) },
+          ] });
+        return;
+      }
+      ctx.show({ ...base, text: L.t('lr.why.' + why, { k: name, d: kid.injuryDays, n: kid.suspensionMatches, h: kid.awayDays }),
+        choices: [{ key: 'lr.ok', tone: 'gray', who: kid.id, run: () => ({ k: { pid: kid.id }, r: { why } }) }] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',
@@ -5876,7 +6066,7 @@ class EventEngine {
     const due = this.takeDue(date, false);
     if (due && this.fire(due.id, date, { resume, cast: due.cast })) return true;
     if (!this.enabled) return false;
-    const s = this.state, last = [...s.eventLog].reverse().find(e => e.id !== 'office');   // the coach's own talks don't count
+    const s = this.state, last = [...s.eventLog].reverse().find(e => this.find(e.id)?.when !== 'manual');   // the coach's own talks don't count
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
     // v2.4: on a training day the training events are evaluated first (the routine has just run)
     const pool = (isTrainingDay(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
@@ -5944,6 +6134,7 @@ class EventEngine {
     this.ui.renderAll();
     if (pe.after === 'matchday') this.ui.afterMatchdayEvent();
     else if (pe.resume && s.phase === 'calendar') this.ui.runCalendar();
+    else if (this.find(pe.id)?.when === 'manual') this.ui.afterManualEvent?.();   // v2.6: office / roll call: same day goes on
     else this.ui.morning();   // v2.5: END DAY loop → the next morning (a match day arrives now)
   }
 }
@@ -6073,6 +6264,111 @@ class MatchSummary {
   }
 }
 /* =========================================================
+   v2.6 — LOCKER ROOM ("LOCKER_ROOM.EXE", This Is the Police style roll call)
+   Training days: START DAY → here → Proceed → training plan → END DAY.
+   Match days: matchday dialog / Match tab → here → Proceed → Match screen.
+   Arrivals are rolled once per day (GameState.runLocker). Kids who don't turn up are locked out of the
+   XI, the bench and the training until the next morning. An empty locker can be investigated for 1 AP.
+   ========================================================= */
+class LockerRoom {
+  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?' };
+  constructor(ui) {
+    this.ui = ui;
+    this.layer = document.getElementById('locker-room-view');
+    this.grid = document.getElementById('lr-grid');
+    document.getElementById('lr-x').addEventListener('click', () => this.close());
+    document.getElementById('lr-proceed').addEventListener('click', () => this.proceed());
+    this.grid.addEventListener('click', e => {
+      const box = e.target.closest('.lk.empty');
+      if (box) this.investigate(box.dataset.pid);
+    });
+    document.addEventListener('keydown', e => {
+      if (!this.isOpen || e.key !== 'Escape' || !this.ui.events.view.layer.hidden) return;
+      e.preventDefault(); e.stopImmediatePropagation(); this.close();
+    }, true);
+  }
+  get isOpen() { return !this.layer.hidden; }
+  get state() { return this.ui.state; }
+
+  /** Opens the room; the first time today the arrivals are rolled and the doors open one by one. */
+  open() {
+    const s = this.state;
+    if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
+    if (this.ui.events.active) { this.ui.events.open(); return; }
+    this.ui.modal.close(); this.ui.profile.close();
+    const lk = s.runLocker(s.phase === 'calendar');
+    const reveal = !lk.revealed;
+    lk.revealed = true;
+    s.save();
+    this.render(reveal);
+    this.layer.hidden = false;
+    document.getElementById('lr-proceed').focus();
+  }
+  close() { this.layer.hidden = true; this.ui.renderDash(); }
+
+  render(reveal = false) {
+    const s = this.state, lk = s.dayState().locker;
+    if (!lk) return;
+    const match = s.phase === 'matchday', ctx = match ? s.matchContext() : null;
+    const squad = [...s.squad].sort((a, b) => a.number - b.number);
+    const present = squad.filter(p => !lk.absent[p.id]).length;
+    this.grid.innerHTML = squad.map((p, i) => {
+      const why = lk.absent[p.id], checked = lk.checked.includes(p.id), delay = reveal ? `style="animation-delay:${i * 70}ms"` : '';
+      const plate = `<div class="lk-plate"><span class="lk-no">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span></div>`;
+      if (!why) {
+        const e = Math.round(p.energy);
+        return `<div class="lk here${reveal ? ' rv' : ''}" ${delay} data-pid="${p.id}">${plate}
+          <div class="lk-in"><span class="portrait lk-face">${p.portraitSvg}</span></div>
+          <div class="lk-name">${esc(L.name(p.surname))}</div>
+          <div class="energy ${this.ui.energyClass(e)}"><i style="width:${e}%"></i><span>${e}%</span></div></div>`;
+      }
+      const note = checked ? `<div class="lk-note open">${esc(L.t('lr.short.' + why))}</div>`
+        : `<div class="lk-note">${LockerRoom.NOTE[why] && why !== 'skipped' && why !== 'exhausted' ? LockerRoom.NOTE[why] : '?'}</div>`;
+      const can = !checked && s.ap > 0;
+      return `<div class="lk empty${reveal ? ' rv' : ''}${checked ? ' checked' : ''}${can ? ' can' : ''}" ${delay} data-pid="${p.id}" role="button" tabindex="0"
+          title="${esc(checked ? L.t('lr.short.' + why) : can ? L.t('lr.investigate') : L.t('lr.noAp'))}">${plate}
+        <div class="lk-in dark">${note}</div>
+        <div class="lk-name">${esc(L.name(p.surname))}</div><div class="lk-miss">${L.t('lr.missing')}</div></div>`;
+    }).join('');
+    const d = s.dayState();
+    document.getElementById('lr-title').textContent = 'LOCKER_ROOM.EXE — ' + fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' });
+    document.getElementById('lr-head').innerHTML = `
+      <span class="lr-kind ${match ? 'k-match' : 'k-training'}">${match ? L.t('lr.kindMatch', { o: esc(L.team(ctx?.opp.name || '')) }) : L.t('lr.kindTraining')}</span>
+      <span class="lr-count${present < 11 ? ' low' : ''}">${L.t('lr.arrived', { n: present, t: squad.length })}</span>
+      <span class="lr-ap">${L.t('ap.left')} <b>${d.ap}/${COACH.AP}</b></span>`;
+    document.getElementById('lr-proceed').innerHTML = L.t(match ? 'lr.toMatch' : 'lr.toPlan');
+    document.getElementById('lr-status').textContent = L.t(present < 11 ? 'lr.statusShort' : 'lr.status');
+  }
+
+  /** Roll call: 1 AP, a short phone call about one empty locker. */
+  investigate(pid) {
+    const s = this.state, lk = s.dayState().locker;
+    if (!lk || !lk.absent[pid] || lk.checked.includes(pid) || this.ui.events.active) return;
+    if (!s.spendAP()) { document.getElementById('lr-status').textContent = L.t('lr.noAp'); return; }
+    lk.checked.push(pid);
+    s.save();
+    this.ui.renderBudget();
+    this.render();
+    this.ui.events.fire('rollcall', s.calendar.date, { cast: { kid: pid } });
+  }
+
+  /** Proceed: only the kids who came move on (absent starters are replaced), then plan / match. */
+  proceed() {
+    const s = this.state, lk = s.dayState().locker;
+    if (!lk || this.ui.events.active) return;
+    lk.done = true;
+    for (const c of s.ensureAvailableXI()) s.addDiary({ date: s.calendar.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
+    const miss = Object.keys(lk.absent).length;
+    s.addDiary({ date: s.calendar.date, key: miss ? 'lr.diary' : 'lr.diaryAll', vars: { n: s.squad.length - miss, t: s.squad.length,
+      s: { list: Object.keys(lk.absent).map(pid => ({ pid })) } }, cls: 'tr' });
+    s.save();
+    this.layer.hidden = true;
+    this.ui.prepareMatch();
+    this.ui.renderAll();
+    this.ui.show(s.phase === 'matchday' ? 'match' : 'dash');
+  }
+}
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -6102,6 +6398,7 @@ class UIController {
     this.teamCard = new TeamRosterCard(this);   // v1.7
     this.debug = new DebugConsole(this);         // v1.8
     this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
+    this.locker = new LockerRoom(this);          // v2.6: who turned up today
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
@@ -6156,6 +6453,7 @@ class UIController {
     this.renderSpeedBtns();
     this.renderBudget();
     if (this.debug?.isOpen) this.debug.render();   // v1.8
+    if (this.locker?.isOpen) this.locker.render();   // v2.6
     if (this.summary?.isOpen) this.summary.render();   // v2.1
   }
 
@@ -6189,6 +6487,7 @@ class UIController {
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
     if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
+    if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
     if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
@@ -6620,10 +6919,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
     // main action button
     const btn = this.$('btn-sim');
-    btn.disabled = this.cal.running || this.live || this.events.active || this.dayBlockers().length > 0;
+    const blk = this.dayBlockers()[0];
+    btn.disabled = this.cal.running || this.live || this.events.active || blk === 'plan';
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
-    else if (phase === 'calendar') btn.innerHTML = L.t(this.dayBlockers().length ? 'dash.endDayBlocked' : 'dash.endDay');
+    else if (phase === 'calendar') btn.innerHTML = L.t(blk === 'locker' ? 'dash.startDay' : blk === 'plan' ? 'dash.endDayBlocked' : 'dash.endDay');
+    else if (phase === 'matchday' && !s.dayState().locker?.done) btn.innerHTML = L.t('dash.startMatchDay');
     else if (phase === 'matchday') btn.innerHTML = L.t('dash.goMatch');
     else if (phase === 'post') btn.innerHTML = L.t('dash.close');
     else btn.innerHTML = L.t('dash.newSeason', { y: s.season + 1, z: String(s.season + 2).slice(2) });
@@ -6741,7 +7042,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** The one big button on the Dashboard changes with the phase of the matchday loop. */
   onDashAction() {
     const phase = this.state.phase;
-    if (phase === 'matchday') { this.show('match'); return; }
+    if (phase === 'matchday') { if (!this.state.dayState().locker?.done) this.locker.open(); else this.show('match'); return; }   // v2.6
     if (phase === 'post') { this.closeMatchday(); return; }
     if (phase === 'seasonEnd') {
       this.state.newSeason(this.state.season + 1);
@@ -6751,6 +7052,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return;
     }
     if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
+    if (this.dayBlockers()[0] === 'locker') { this.locker.open(); return; }   // v2.6: START DAY on a training day
     this.endDay();   // v2.5: one day per click
   }
 
@@ -6758,7 +7060,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** Mandatory tasks that block END DAY. */
   dayBlockers() {
     const s = this.state, out = [];
-    if (s.phase === 'calendar' && isTrainingDay(s.calendar.date) && !s.dayState().plan && this.dayInfo(s.calendar.date).kind === 'training') out.push('plan');
+    if (s.phase === 'calendar' && this.dayInfo(s.calendar.date).kind === 'training') {
+      if (!s.dayState().locker?.done) out.push('locker');   // v2.6: START DAY → locker room first
+      else if (!s.dayState().plan) out.push('plan');
+    }
     return out;
   }
   endDay() {
@@ -6776,6 +7081,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** New morning: AP and plan reset (lazily in dayState); a match day arrives straight away. */
   morning() {
     const s = this.state;
+    s.clearDayStatus();   // v2.6: yesterday's absences are forgotten
     if (s.phase === 'calendar' && this.cal.blockingToday()) {
       const r = this.cal.step();
       if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }
@@ -6783,6 +7089,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (s.phase === 'calendar' && !this.cal.nextEvent()) { s.phase = 'seasonEnd'; s.save(); }
     this.renderAll();
   }
+  /** v2.6: after a coach-initiated dialogue (office / roll call) the same day simply goes on. */
+  afterManualEvent() { this.renderAll(); this.profile.tick(); }
   /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
   autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
 
@@ -6824,7 +7132,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const d = s.dayState(), info = this.dayInfo(s.calendar.date), live = s.phase === 'calendar';
     const pips = Array.from({ length: COACH.AP }, (_, i) => `<i class="${i < d.ap ? 'on' : ''}"></i>`).join('');
     let body = '';
-    if (live && info.kind === 'training') {
+    if (live && info.kind === 'training' && !d.locker?.done) {   // v2.6: the locker room comes first
+      body = `<div class="td-req need">${L.t('today.lockerReq')}</div><div class="td-note">${L.t('today.lockerNote')}</div>`;
+    } else if (live && info.kind === 'training') {
       const need = !d.plan;
       body = `<div class="td-req${need ? ' need' : ''}">${L.t(need ? 'today.planReq' : 'today.planSet')}</div><div class="plan-grid">`
         + REGIME_KEYS.map(k => `<button type="button" class="plan-btn${d.plan === k ? ' on' : ''}" data-plan="${k}" aria-pressed="${d.plan === k}">
@@ -6878,7 +7188,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const r = p.unavailableReason;
     if (!r) return '';
     const n = r === 'inj' ? p.injuryDays : r === 'sus' ? p.suspensionMatches : r === 'home' ? p.awayDays : '';
-    return `<span class="st-badge ${r}" title="${esc(L.t('st.' + r, { n }))}">${{ inj: '\u271A', sus: '<i></i>', home: '\u2302', deal: '$' }[r]}${n}</span>`;
+    return `<span class="st-badge ${r}" title="${esc(L.t('st.' + r, { n }))}">${{ inj: '\u271A', sus: '<i></i>', home: '\u2302', deal: '$', absent: '?' }[r]}${n}</span>`;
   }
 
   /** v1.9: Promised_Start is checked at kick-off — kept quietly, or broken (morale crash + the parent wants money back). */
@@ -6921,7 +7231,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const s = this.state, ctx = s.matchContext(), ev = s.nextMatchEvent();
     if (!ctx || s.phase !== 'matchday') return;
     this.alert(L.t('dlg.matchday', { md: ev.md, o: esc(L.team(ctx.opp.name)), v: L.t('venue.' + ctx.venue) }), L.t('dlg.matchdayTitle'), 'match', [
-      { label: L.t('modal.toMatch'), primary: true, onClick: () => this.show('match') },
+      { label: L.t('modal.toLocker'), primary: true, onClick: () => this.locker.open() },   // v2.6: who turned up?
       { label: L.t('modal.toTeam'), onClick: () => this.show('team') },
       { label: L.t('modal.later') },
     ]);
@@ -6935,6 +7245,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const rep = s.lastReport;
     this.cal.completeEvent(ev.id);
     s.tickInjuries();   // v2.2: the match day counts as a day of healing too
+    s.clearDayStatus();   // v2.6
     this.cal.advanceDay();
     s.addDiary({ date: ev.date, key: 'cal.closed', vars: { md: ev.md, x: rep.gf, y: rep.ga, o: { team: rep.opponent }, pos: s.league.position(0) } });
     s.phase = this.cal.nextEvent() ? 'calendar' : 'seasonEnd';
@@ -7221,10 +7532,11 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   createEngine() {
     if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return null; }
     if (this.events.active) { this.events.open(); return null; }   // v2.2: answer the match-day dilemma first
+    if (!this.state.dayState().locker?.done) { this.locker.open(); return null; }   // v2.6: roll call before kick-off
     this.state.ensureShowcaseXI();                                  // v2.3: the scout's three start
     const fixes = this.state.ensureAvailableXI();                   // v2.2: nobody injured / suspended kicks off
     if (fixes.length) { this.renderTeam(); this.prepareMatch(); }
-    if (this.state.starters().some(p => !p.available)) { this.alert(L.t('xi.noFit'), L.t('team.err.title'), 'error'); return null; }
+    const missing = this.state.starters().filter(p => !p.available).map(p => p.id);   // v2.6: not enough kids turned up → short-handed
     const ctx = this.state.matchContext();
     this.state.notebookUnlocked = false;
     this.syncLocks();
@@ -7239,7 +7551,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing });
+    if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
     this.liveSel = null;
@@ -7311,7 +7624,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.league.setUserResult(ctx.fixture, a.score, b.score);
     const others = s.league.simulateOthers(ctx.md);
     this.appendLog({ minute: 90, type: 'flavor', key: 'match.others', vars: { r: { fixtures: others } }, side: -1, r: 0 });
-    const played = a.all;   // starters + substitutes
+    const played = a.all.filter(p => eng.everPlayed.has(p.id));   // starters + substitutes (v2.6: minus empty slots)
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())

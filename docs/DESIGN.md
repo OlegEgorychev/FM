@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v2.5)
+# Youth Academy Manager — design notes (current: v2.6)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -123,3 +123,11 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - `state.today = { date, ap, plan }` via `dayState()` — lazily reset whenever the calendar date changes (any path). Saved.
 - `REGIMES` (00-utils-data.js), attendees only: cardio +5 cond / +2 sharp / −4 morale / 6% grow physical (stamina, accel, speed); match −10 / +8 / 3% injury 2–5 days; tech −12 / +3 / 12% grow technical (GK: goalkeeping, passing, first touch); tactics −5 / +2 / 12% grow tactical, discipline < 8 → +35% skip. Growth chance × (0.6 + PA/100), +1 to a random skill of the group, capped by `potentialCap(p)` = clamp(6 + PA·0.14, 8, 20). Diary: `cal.training(All)` with the plan name, `tr.improved` (names only, no numbers), `tr.hurt`.
 - `COACH.AP = 1` per day. Taskbar `#hdr-ap`, TODAY widget pips. `ProfileCard` → `#pinfo-office` "[ CALL INTO OFFICE ]" (own kids; disabled with 0 AP, during a live match, while a dialogue is open) → `ui.callIntoOffice(id)` spends 1 AP and fires the manual event `office` (excluded from the random cooldown). Choices roll the reaction step: praise → `praiseBad` if sharpness < 50 or energy < 50 (morale −8) else `praiseGood` (+12); criticize → discipline +2, composure −1, morale −8; check in → morale +4. Effects apply on the reaction's OK.
+
+## Locker room (v2.6)
+- `LockerRoom` (11f-locker-room.js), DOM `#locker-room-view` (z 80, below the dialogue at 90), styles `19-locker-room.css`. Training day: main button = START DAY (blocker `locker`) → locker → Proceed → plan (blocker `plan`) → END DAY. Match day: the matchday dialog's primary button / Dashboard button / `createEngine()` open the locker first; Proceed → Match screen.
+- `GameState.runLocker()` once per day (stored in `today.locker = { done, revealed, absent: {id: reason}, checked: [] }`): `arrivalCheck()` → injury / suspended / home / exhausted (energy < 25) / skipped (`random·20 > discipline + LOCKER.DISC_GRACE`, grace 8: the brief's raw roll would empty half the squad). `player.absentToday` ('exhausted' | 'skipped') makes him unavailable (`unavailableReason` 'absent', "?" badge); skipped on a training day also sets `skipped_training` (The Truant). Auto-sim rolls arrivals inside `dayRoutine`.
+- `clearDayStatus()` every morning (`morning()`), on rest days and after a match (`closeMatchday`).
+- Training regime only for present kids; skippers unchanged; exhausted / injured / banned kids rest (+10). Tactics' extra skip is now a walk-out among those present.
+- Roll call: clicking an empty locker spends 1 AP and fires the manual event `rollcall` (reason text; skipped → fine −$10 & discipline +2, or ignore). Manual events (office, rollcall) return to the same day (`ui.afterManualEvent()`), not to `morning()`.
+- Proceed: `ensureAvailableXI()` (diary `xi.auto`), diary `lr.diary`. If fewer than 11 fit kids remain, `createEngine()` passes `missing` → `MatchEngine` marks them sent off from minute 0 (not counted as played) and logs `lr.shortHanded`.

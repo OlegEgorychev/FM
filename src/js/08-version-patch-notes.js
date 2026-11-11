@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.6', name: { en: 'The Locker Room', ru: 'Раздевалка' },
+    en: [
+      'Training and match days now start in the LOCKER ROOM: the doors swing open one by one and you see who actually turned up.',
+      'A kid stays away if he is exhausted (energy under 25%), injured, suspended, kept at home — or simply skips (the lower his discipline, the more likely).',
+      'Only the kids who came can train, start or sit on the bench that day. Absent starters are replaced automatically; if fewer than 11 turn up, the empty shirts stay empty.',
+      'Roll call: click an empty locker to find out why (1 action point). A skipper can be fined (−$10, +discipline) or ignored.',
+      'Proceed takes you to the training plan (Tue/Thu) or to the match. The next morning everyone gets a fresh start.',
+    ],
+    ru: [
+      'Дни тренировок и матчей теперь начинаются в РАЗДЕВАЛКЕ: дверцы шкафчиков открываются одна за другой, и видно, кто на самом деле пришёл.',
+      'Игрок не приходит, если он выжат (энергия ниже 25%), травмирован, дисквалифицирован, отец держит его дома — или просто прогуливает (чем ниже дисциплина, тем вероятнее).',
+      'В этот день тренироваться, играть в основе и сидеть в запасе могут только пришедшие. Отсутствующих в основе заменяют автоматически; если пришло меньше 11, пустые места так и остаются пустыми.',
+      'Перекличка: щёлкни по пустому шкафчику, чтобы узнать причину (1 очко действия). Прогульщика можно оштрафовать (−$10, +дисциплина) или не трогать.',
+      '«Дальше» ведёт к плану тренировки (вт/чт) или к матчу. Следующим утром все начинают с чистого листа.',
+    ] },
   { v: '2.5', name: { en: 'The Daily Routine', ru: 'Распорядок дня' },
     en: [
       'Time no longer runs by itself: the big Dashboard button is now END DAY and moves the calendar exactly one day. Events, match days and the next morning follow.',

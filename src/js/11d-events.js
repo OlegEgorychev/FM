@@ -277,6 +277,28 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v2.6 ROLL CALL — the coach rings an absent kid (1 AP, from an empty locker) ---------- */
+  {
+    id: 'rollcall', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const { kid } = ctx.cast, name = L.name(kid.name), why = ctx.state.dayState().locker?.absent[kid.id] || 'skipped';
+      const base = { face: why === 'skipped' ? PortraitGenerator.silhouette('#444') : kid.portraitSvg, name, role: L.t('talk.rolePhoneCall', { n: kid.number }) };
+      if (why === 'skipped') {
+        ctx.show({ ...base, text: L.t('lr.why.skipped', { k: name }),
+          choices: [
+            { key: 'lr.fine', tone: 'red', cost: LOCKER.FINE, who: kid.id,
+              run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + LOCKER.FINE_DISC); return { k: { pid: kid.id } }; } },
+            { key: 'lr.ignore', tone: 'gray', who: kid.id, run: () => ({ k: { pid: kid.id } }) },
+          ] });
+        return;
+      }
+      ctx.show({ ...base, text: L.t('lr.why.' + why, { k: name, d: kid.injuryDays, n: kid.suspensionMatches, h: kid.awayDays }),
+        choices: [{ key: 'lr.ok', tone: 'gray', who: kid.id, run: () => ({ k: { pid: kid.id }, r: { why } }) }] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',
@@ -340,7 +362,7 @@ class EventEngine {
     const due = this.takeDue(date, false);
     if (due && this.fire(due.id, date, { resume, cast: due.cast })) return true;
     if (!this.enabled) return false;
-    const s = this.state, last = [...s.eventLog].reverse().find(e => e.id !== 'office');   // the coach's own talks don't count
+    const s = this.state, last = [...s.eventLog].reverse().find(e => this.find(e.id)?.when !== 'manual');   // the coach's own talks don't count
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
     // v2.4: on a training day the training events are evaluated first (the routine has just run)
     const pool = (isTrainingDay(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
@@ -408,6 +430,7 @@ class EventEngine {
     this.ui.renderAll();
     if (pe.after === 'matchday') this.ui.afterMatchdayEvent();
     else if (pe.resume && s.phase === 'calendar') this.ui.runCalendar();
+    else if (this.find(pe.id)?.when === 'manual') this.ui.afterManualEvent?.();   // v2.6: office / roll call: same day goes on
     else this.ui.morning();   // v2.5: END DAY loop → the next morning (a match day arrives now)
   }
 }

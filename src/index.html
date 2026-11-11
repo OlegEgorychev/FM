@@ -324,6 +324,17 @@
     </section>
   </div>
 
+  <!-- v2.6: Locker room (who turned up today) -->
+  <div class="locker-layer" id="locker-room-view" hidden>
+    <section class="win lockerwin open" role="dialog" aria-modal="true" aria-labelledby="lr-title">
+      <div class="titlebar"><span class="t-ico">&#9636;</span><span class="t-txt" id="lr-title">LOCKER_ROOM.EXE</span><button class="tb-btn" id="lr-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="lr-head" id="lr-head"></div>
+      <div class="lr-grid" id="lr-grid"></div>
+      <div class="lr-foot"><span class="lr-hint" data-i18n="lr.hint"></span><button class="btn go big" id="lr-proceed" type="button"></button></div>
+      <div class="statusbar"><span id="lr-status"></span></div>
+    </section>
+  </div>
+
   <!-- v1.8: DEBUG.EXE (developer mode) -->
   <div class="pinfo-layer dbg-layer" id="debug-layer" hidden>
     <section class="win pinfo dbg open" role="dialog" aria-modal="true" aria-labelledby="debug-title">

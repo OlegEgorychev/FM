@@ -138,14 +138,46 @@ class GameState {
   /** v2.4: one non-match calendar day. Training day (Tue/Thu): fit kids roll vs discipline —
       attend → condition −10, sharpness +5; skip → no change + `skipped_training` (until the next day).
       Injured / kept-at-home kids rest. Returns { training, attended, skipped: [players] }. */
+  /* ---------- v2.6 LOCKER ROOM: who turns up today ---------- */
+  /** Why a kid would NOT come today (null = he arrives). */
+  arrivalCheck(p) {
+    if (p.injuryDays > 0) return 'injury';
+    if (p.suspensionMatches > 0) return 'suspended';
+    if (p.awayDays > 0) return 'home';
+    if (p.energy < LOCKER.MIN_COND) return 'exhausted';
+    if (Math.random() * 20 > p.psych.discipline + LOCKER.DISC_GRACE) return 'skipped';
+    return null;
+  }
+  /** Rolls the arrivals once per day (training / match days). Absent kids are locked out until the next morning. */
+  runLocker(training = isTrainingDay(this.calendar.date)) {
+    const d = this.dayState();
+    if (d.locker) return d.locker;
+    const absent = {};
+    for (const p of this.squad) {
+      const r = this.arrivalCheck(p);
+      p.absentToday = r === 'exhausted' || r === 'skipped' ? r : null;   // injured / banned / home are locked by their own status
+      p.skipped_training = training && r === 'skipped';                   // feeds The Truant
+      if (r) absent[p.id] = r;
+    }
+    d.locker = { done: false, revealed: false, absent, checked: [] };
+    this.save();
+    return d.locker;
+  }
+  /** Every morning (and after a match): nobody is "absent" any more. */
+  clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
+
   dayRoutine(date, training = !!date && isTrainingDay(date), plan = 'match') {
     const skipped = [], improved = [], hurt = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
+    if (training) { const lk = this.runLocker(true); lk.done = true; }   // auto-sim: arrivals are rolled without the view
+    else this.clearDayStatus();
     for (const p of this.squad) {
-      p.skipped_training = false;
-      const trains = training && !(p.injuryDays > 0) && !(p.awayDays > 0);
-      const skip = skipChance(p) + (R.extraSkip && p.psych.discipline < R.lowDisc ? R.extraSkip : 0);   // v2.5: tactics bore the restless ones
-      if (trains && Math.random() < skip) { p.skipped_training = true; skipped.push(p); }
+      const present = training && p.available;   // v2.6: only kids who came to the locker room train
+      const walkOut = present && R.extraSkip && p.psych.discipline < R.lowDisc && Math.random() < R.extraSkip;   // v2.5: tactics bore the restless ones
+      if (walkOut) { p.skipped_training = true; }
+      if (p.skipped_training) skipped.push(p);
+      const trains = present && !walkOut;
+      if (training && p.skipped_training) { /* skipped: no tiredness, no sharpness (exhausted / injured kids rest) */ }
       else if (trains) {   // v2.5: the coach's regime
         attended++;
         p.energy = clamp(p.energy + R.cond, 0, 100);

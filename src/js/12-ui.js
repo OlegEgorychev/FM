@@ -28,6 +28,7 @@ class UIController {
     this.teamCard = new TeamRosterCard(this);   // v1.7
     this.debug = new DebugConsole(this);         // v1.8
     this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
+    this.locker = new LockerRoom(this);          // v2.6: who turned up today
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
@@ -82,6 +83,7 @@ class UIController {
     this.renderSpeedBtns();
     this.renderBudget();
     if (this.debug?.isOpen) this.debug.render();   // v1.8
+    if (this.locker?.isOpen) this.locker.render();   // v2.6
     if (this.summary?.isOpen) this.summary.render();   // v2.1
   }
 
@@ -115,6 +117,7 @@ class UIController {
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
     if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
+    if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
     if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
@@ -546,10 +549,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
     // main action button
     const btn = this.$('btn-sim');
-    btn.disabled = this.cal.running || this.live || this.events.active || this.dayBlockers().length > 0;
+    const blk = this.dayBlockers()[0];
+    btn.disabled = this.cal.running || this.live || this.events.active || blk === 'plan';
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
-    else if (phase === 'calendar') btn.innerHTML = L.t(this.dayBlockers().length ? 'dash.endDayBlocked' : 'dash.endDay');
+    else if (phase === 'calendar') btn.innerHTML = L.t(blk === 'locker' ? 'dash.startDay' : blk === 'plan' ? 'dash.endDayBlocked' : 'dash.endDay');
+    else if (phase === 'matchday' && !s.dayState().locker?.done) btn.innerHTML = L.t('dash.startMatchDay');
     else if (phase === 'matchday') btn.innerHTML = L.t('dash.goMatch');
     else if (phase === 'post') btn.innerHTML = L.t('dash.close');
     else btn.innerHTML = L.t('dash.newSeason', { y: s.season + 1, z: String(s.season + 2).slice(2) });
@@ -667,7 +672,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** The one big button on the Dashboard changes with the phase of the matchday loop. */
   onDashAction() {
     const phase = this.state.phase;
-    if (phase === 'matchday') { this.show('match'); return; }
+    if (phase === 'matchday') { if (!this.state.dayState().locker?.done) this.locker.open(); else this.show('match'); return; }   // v2.6
     if (phase === 'post') { this.closeMatchday(); return; }
     if (phase === 'seasonEnd') {
       this.state.newSeason(this.state.season + 1);
@@ -677,6 +682,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return;
     }
     if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
+    if (this.dayBlockers()[0] === 'locker') { this.locker.open(); return; }   // v2.6: START DAY on a training day
     this.endDay();   // v2.5: one day per click
   }
 
@@ -684,7 +690,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** Mandatory tasks that block END DAY. */
   dayBlockers() {
     const s = this.state, out = [];
-    if (s.phase === 'calendar' && isTrainingDay(s.calendar.date) && !s.dayState().plan && this.dayInfo(s.calendar.date).kind === 'training') out.push('plan');
+    if (s.phase === 'calendar' && this.dayInfo(s.calendar.date).kind === 'training') {
+      if (!s.dayState().locker?.done) out.push('locker');   // v2.6: START DAY → locker room first
+      else if (!s.dayState().plan) out.push('plan');
+    }
     return out;
   }
   endDay() {
@@ -702,6 +711,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** New morning: AP and plan reset (lazily in dayState); a match day arrives straight away. */
   morning() {
     const s = this.state;
+    s.clearDayStatus();   // v2.6: yesterday's absences are forgotten
     if (s.phase === 'calendar' && this.cal.blockingToday()) {
       const r = this.cal.step();
       if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }
@@ -709,6 +719,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (s.phase === 'calendar' && !this.cal.nextEvent()) { s.phase = 'seasonEnd'; s.save(); }
     this.renderAll();
   }
+  /** v2.6: after a coach-initiated dialogue (office / roll call) the same day simply goes on. */
+  afterManualEvent() { this.renderAll(); this.profile.tick(); }
   /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
   autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
 
@@ -750,7 +762,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const d = s.dayState(), info = this.dayInfo(s.calendar.date), live = s.phase === 'calendar';
     const pips = Array.from({ length: COACH.AP }, (_, i) => `<i class="${i < d.ap ? 'on' : ''}"></i>`).join('');
     let body = '';
-    if (live && info.kind === 'training') {
+    if (live && info.kind === 'training' && !d.locker?.done) {   // v2.6: the locker room comes first
+      body = `<div class="td-req need">${L.t('today.lockerReq')}</div><div class="td-note">${L.t('today.lockerNote')}</div>`;
+    } else if (live && info.kind === 'training') {
       const need = !d.plan;
       body = `<div class="td-req${need ? ' need' : ''}">${L.t(need ? 'today.planReq' : 'today.planSet')}</div><div class="plan-grid">`
         + REGIME_KEYS.map(k => `<button type="button" class="plan-btn${d.plan === k ? ' on' : ''}" data-plan="${k}" aria-pressed="${d.plan === k}">
@@ -804,7 +818,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const r = p.unavailableReason;
     if (!r) return '';
     const n = r === 'inj' ? p.injuryDays : r === 'sus' ? p.suspensionMatches : r === 'home' ? p.awayDays : '';
-    return `<span class="st-badge ${r}" title="${esc(L.t('st.' + r, { n }))}">${{ inj: '\u271A', sus: '<i></i>', home: '\u2302', deal: '$' }[r]}${n}</span>`;
+    return `<span class="st-badge ${r}" title="${esc(L.t('st.' + r, { n }))}">${{ inj: '\u271A', sus: '<i></i>', home: '\u2302', deal: '$', absent: '?' }[r]}${n}</span>`;
   }
 
   /** v1.9: Promised_Start is checked at kick-off — kept quietly, or broken (morale crash + the parent wants money back). */
@@ -847,7 +861,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const s = this.state, ctx = s.matchContext(), ev = s.nextMatchEvent();
     if (!ctx || s.phase !== 'matchday') return;
     this.alert(L.t('dlg.matchday', { md: ev.md, o: esc(L.team(ctx.opp.name)), v: L.t('venue.' + ctx.venue) }), L.t('dlg.matchdayTitle'), 'match', [
-      { label: L.t('modal.toMatch'), primary: true, onClick: () => this.show('match') },
+      { label: L.t('modal.toLocker'), primary: true, onClick: () => this.locker.open() },   // v2.6: who turned up?
       { label: L.t('modal.toTeam'), onClick: () => this.show('team') },
       { label: L.t('modal.later') },
     ]);
@@ -861,6 +875,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const rep = s.lastReport;
     this.cal.completeEvent(ev.id);
     s.tickInjuries();   // v2.2: the match day counts as a day of healing too
+    s.clearDayStatus();   // v2.6
     this.cal.advanceDay();
     s.addDiary({ date: ev.date, key: 'cal.closed', vars: { md: ev.md, x: rep.gf, y: rep.ga, o: { team: rep.opponent }, pos: s.league.position(0) } });
     s.phase = this.cal.nextEvent() ? 'calendar' : 'seasonEnd';
@@ -1147,10 +1162,11 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   createEngine() {
     if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return null; }
     if (this.events.active) { this.events.open(); return null; }   // v2.2: answer the match-day dilemma first
+    if (!this.state.dayState().locker?.done) { this.locker.open(); return null; }   // v2.6: roll call before kick-off
     this.state.ensureShowcaseXI();                                  // v2.3: the scout's three start
     const fixes = this.state.ensureAvailableXI();                   // v2.2: nobody injured / suspended kicks off
     if (fixes.length) { this.renderTeam(); this.prepareMatch(); }
-    if (this.state.starters().some(p => !p.available)) { this.alert(L.t('xi.noFit'), L.t('team.err.title'), 'error'); return null; }
+    const missing = this.state.starters().filter(p => !p.available).map(p => p.id);   // v2.6: not enough kids turned up → short-handed
     const ctx = this.state.matchContext();
     this.state.notebookUnlocked = false;
     this.syncLocks();
@@ -1165,7 +1181,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing });
+    if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
     this.liveSel = null;
@@ -1237,7 +1254,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.league.setUserResult(ctx.fixture, a.score, b.score);
     const others = s.league.simulateOthers(ctx.md);
     this.appendLog({ minute: 90, type: 'flavor', key: 'match.others', vars: { r: { fixtures: others } }, side: -1, r: 0 });
-    const played = a.all;   // starters + substitutes
+    const played = a.all.filter(p => eng.everPlayed.has(p.id));   // starters + substitutes (v2.6: minus empty slots)
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())

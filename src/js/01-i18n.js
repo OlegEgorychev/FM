@@ -793,3 +793,47 @@ Object.assign(I18N.ru, {
   'dbg.autosim': 'Авто-прокрутка до следующего матча', 'dbg.autosimD': 'Старый непрерывный календарь (игровая практика в дни тренировок).',
   'dbg.ap': '+1 очко действия', 'dbg.apD': 'Для проверки разговоров в кабинете.', 'dbg.doneAp': 'OK: очков действий сегодня: {n}.', 'dbg.ev.office': 'Вызов в кабинет (нужен игрок)',
 });
+
+
+/* ---- v2.6: locker room + roll call ---- */
+Object.assign(I18N.en, {
+  'dash.startDay': '&#9654; START DAY · locker room', 'dash.startMatchDay': '&#9654; Locker room &#9656;', 'modal.toLocker': '&#9636; To the locker room',
+  'today.lockerReq': 'WHO TURNED UP?', 'today.lockerNote': 'START DAY opens the locker room. Only the kids who came can train.',
+  'st.absent': 'Didn\'t turn up today', 'st.short.absent': 'absent today', 'team.err.unavail_absent': 'He didn\'t turn up at the locker room today.',
+  'lr.kindTraining': 'Training day', 'lr.kindMatch': 'Match day vs {o}', 'lr.arrived': 'Arrived: {n}/{t}',
+  'lr.missing': 'missing', 'lr.investigate': 'Roll call: find out why (1 action point)', 'lr.noAp': 'No action points left today.',
+  'lr.hint': 'Only the kids who came can train or be picked today. Click an empty locker to find out why (1 action point).',
+  'lr.toPlan': 'Proceed &#9656; training plan', 'lr.toMatch': 'Proceed &#9656; match prep',
+  'lr.status': 'Check who is here. Empty lockers can be investigated.', 'lr.statusShort': 'Fewer than 11 kids! The missing shirts stay empty.',
+  'lr.short.exhausted': 'exhausted, in bed', 'lr.short.injury': 'at the clinic', 'lr.short.suspended': 'suspended', 'lr.short.home': 'kept at home', 'lr.short.skipped': 'skipping',
+  'talk.rolePhoneCall': '#{n} · roll call · phone',
+  'lr.why.exhausted': 'His mom called. {k} is completely exhausted and staying in bed.',
+  'lr.why.injury': '{k} is at the clinic ({d} more day(s)).', 'lr.why.suspended': '{k} is suspended ({n} match(es) left). He stayed away.',
+  'lr.why.home': 'His dad picks up: "{k} stays at home." ({h} more day(s))', 'lr.why.skipped': 'No answer. {k} is skipping.',
+  'lr.fine': 'Fine him (+discipline)', 'lr.ignore': 'Ignore', 'lr.ok': 'Understood',
+  'lr.fine.diary': 'Fined {k} for skipping ({m}).', 'lr.ignore.diary': '{k} skipped; the coach let it go.', 'lr.ok.diary': 'Roll call: {k} — {r}.',
+  'lr.diary': 'Locker room: {n}/{t} turned up. Missing: {s}.', 'lr.diaryAll': 'Locker room: all {t} turned up.',
+  'lr.shortHanded': 'Not enough kids turned up: we start with {n} players!',
+});
+Object.assign(I18N.ru, {
+  'dash.startDay': '&#9654; НАЧАТЬ ДЕНЬ · раздевалка', 'dash.startMatchDay': '&#9654; В раздевалку &#9656;', 'modal.toLocker': '&#9636; В раздевалку',
+  'today.lockerReq': 'КТО ПРИШЁЛ?', 'today.lockerNote': '«Начать день» открывает раздевалку. Тренироваться могут только пришедшие.',
+  'st.absent': 'Сегодня не пришёл', 'st.short.absent': 'не пришёл', 'team.err.unavail_absent': 'Он сегодня не пришёл в раздевалку.',
+  'lr.kindTraining': 'День тренировки', 'lr.kindMatch': 'День матча · {o}', 'lr.arrived': 'Пришли: {n}/{t}',
+  'lr.missing': 'нет', 'lr.investigate': 'Перекличка: узнать причину (1 очко действия)', 'lr.noAp': 'Очков действий на сегодня нет.',
+  'lr.hint': 'Тренироваться и попасть в заявку сегодня могут только пришедшие. Щёлкни по пустому шкафчику, чтобы узнать причину (1 очко действия).',
+  'lr.toPlan': 'Дальше &#9656; план тренировки', 'lr.toMatch': 'Дальше &#9656; к матчу',
+  'lr.status': 'Посмотри, кто на месте. Пустые шкафчики можно проверить.', 'lr.statusShort': 'Меньше 11 человек! Пустые места так и останутся пустыми.',
+  'lr.short.exhausted': 'выжат, лежит дома', 'lr.short.injury': 'в клинике', 'lr.short.suspended': 'дисквалифицирован', 'lr.short.home': 'отец не пустил', 'lr.short.skipped': 'прогуливает',
+  'talk.rolePhoneCall': '№{n} · перекличка · телефон',
+  'lr.why.exhausted': 'Звонила мама. {k} совсем без сил и лежит в кровати.',
+  'lr.why.injury': '{k} в клинике (ещё {d} дн.).', 'lr.why.suspended': '{k} дисквалифицирован (ещё {n} матч(а)). Не пришёл.',
+  'lr.why.home': 'Трубку берёт отец: «{k} сидит дома». (ещё {h} дн.)', 'lr.why.skipped': 'Никто не отвечает. {k} прогуливает.',
+  'lr.fine': 'Оштрафовать (+дисциплина)', 'lr.ignore': 'Не обращать внимания', 'lr.ok': 'Понятно',
+  'lr.fine.diary': 'Штраф за прогул ({m}). Игрок: {k}.', 'lr.ignore.diary': '{k} прогулял; тренер не стал ничего делать.', 'lr.ok.diary': 'Перекличка: {k} — {r}.',
+  'lr.diary': 'Раздевалка: пришли {n}/{t}. Нет: {s}.', 'lr.diaryAll': 'Раздевалка: пришли все {t}.',
+  'lr.shortHanded': 'Пришло слишком мало ребят: на поле выходят только {n}!',
+});
+
+Object.assign(I18N.en, { 'today.phase.matchday': 'Match day! First the locker room: who turned up?' });
+Object.assign(I18N.ru, { 'today.phase.matchday': 'День матча! Сначала раздевалка: кто пришёл?' });

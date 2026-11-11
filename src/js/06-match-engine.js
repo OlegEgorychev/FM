@@ -22,6 +22,7 @@ class MatchEngine {
     this.energy = new Map(); this.drain = new Map();
     for (const s of this.sides) for (const e of s.entries) { this.energy.set(e.p.id, e.p.energy ?? 100); this.drain.set(e.p.id, MatchEngine.drainOf(e.p)); }
     this.everPlayed = new Set(home.players.map(p => p.id));
+    for (const id of opts.missing || []) { this.sentOff.add(id); this.everPlayed.delete(id); }   // v2.6: an empty shirt — we start short-handed
     this.subbedOff = new Set();
     this.subsUsed = 0;
     this.subs = [];

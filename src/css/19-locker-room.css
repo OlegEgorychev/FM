@@ -1,0 +1,58 @@
+/* =========================================================
+   v2.6 — LOCKER ROOM (row of metal lockers; doors swing open one by one)
+   ========================================================= */
+.locker-layer{ position: absolute; inset: 0 0 38px 0; z-index: 80; display: grid; place-items: center; padding: 12px;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.2) 0 2px, transparent 2px 4px), rgba(4,6,8,.72);
+  -webkit-backdrop-filter: blur(3px) grayscale(.5); backdrop-filter: blur(3px) grayscale(.5); }
+.locker-layer[hidden]{ display: none; }
+.win.lockerwin{ position: relative; left: auto; top: auto; width: min(1180px, 100%); max-height: 100%; display: flex; flex-direction: column;
+  background: var(--face); color: #111; border-radius: 0; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
+  box-shadow: inset -1px -1px 0 var(--shadow), inset 1px 1px 0 #fff, 8px 10px 0 rgba(0,0,0,.45); }
+.win.lockerwin .titlebar{ border-radius: 0; margin: 2px 2px 0; background: linear-gradient(90deg, #2b3a2a, #5a6b48); }
+.lr-head{ display: flex; align-items: center; gap: 14px; padding: 8px 10px 4px; font-size: 13px; flex-wrap: wrap; }
+.lr-kind{ font: bold 11px/1 var(--mono); letter-spacing: 1px; text-transform: uppercase; padding: 4px 8px; color: #fff; background: #4a3412; }
+.lr-kind.k-match{ background: #1f3a5f; }
+.lr-count{ font: bold 18px/1 var(--mono); color: #1d4a1d; } .lr-count.low{ color: #b3261e; animation: tdBlink 1s steps(2) infinite; }
+.lr-ap{ margin-left: auto; color: #333; } .lr-ap b{ font-family: var(--mono); }
+
+.lr-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 4px 8px; padding: 12px; overflow: auto;
+  background: linear-gradient(#2a2f33, #1b1f22); border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow);
+  box-shadow: inset 0 0 40px rgba(0,0,0,.7); }
+.lk{ position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 6px 8px; min-height: 196px;
+  background: linear-gradient(90deg, #59636b 0 3px, #747f87 3px, #66717a 60%, #525c64); color: #eef1ec;
+  border: 2px solid; border-color: #9aa5ad #2b3237 #2b3237 #9aa5ad; perspective: 600px; }
+.lk::before{ content: ''; position: absolute; top: 34px; left: 50%; width: 46px; transform: translateX(-50%); height: 6px;   /* vents */
+  background: repeating-linear-gradient(90deg, #2b3237 0 4px, transparent 4px 7px); opacity: .6; }
+.lk-plate{ display: flex; justify-content: space-between; align-items: center; width: 100%; font: bold 12px/1 var(--mono); }
+.lk-no{ background: #e9e4d3; color: #111; padding: 2px 5px; border: 1px solid #000; }
+.lk-in{ margin-top: 16px; width: 88px; height: 88px; display: grid; place-items: center; background: #11161a; border: 2px solid #000;
+  box-shadow: inset 0 0 14px rgba(0,0,0,.9); }
+.lk-face{ width: 84px; height: 84px; } .lk-face svg{ width: 100%; height: 100%; display: block; }
+.lk-name{ font: bold 13px/1.1 var(--ui); text-align: center; text-shadow: 1px 1px 0 #000; }
+.lk .energy{ width: 100%; height: 14px; } .lk .energy span{ font-size: 10px; }
+/* empty locker: dark, a hook and a post-it */
+.lk.empty{ background: linear-gradient(90deg, #3a4046 0 3px, #464d53 3px, #3d4349); color: #9aa5ad; }
+.lk-in.dark{ background: radial-gradient(circle at 50% 10%, #1b2125, #07090a 70%); position: relative; }
+.lk-in.dark::before{ content: ''; position: absolute; top: 8px; left: 50%; width: 10px; height: 8px; transform: translateX(-50%);
+  border: 2px solid #6b747b; border-top: 0; border-radius: 0 0 6px 6px; }   /* coat hook */
+.lk-note{ width: 46px; height: 42px; display: grid; place-items: center; transform: rotate(-6deg);
+  font: bold 22px/1 var(--mono); color: #6b4a10; background: #f2d45c; box-shadow: 2px 3px 0 rgba(0,0,0,.5); }
+.lk-note.open{ width: 78px; height: auto; min-height: 42px; padding: 4px; font: bold 10px/1.15 var(--ui); text-align: center; color: #3a2a08; }
+.lk-miss{ font: bold 10px/1 var(--mono); letter-spacing: 1.5px; color: #ff8a7e; text-transform: uppercase; }
+.lk.empty.can{ cursor: pointer; }
+.lk.empty.can:hover, .lk.empty.can:focus-visible{ outline: 2px solid #ffcf5a; outline-offset: -2px; }
+.lk.empty.can:hover .lk-note{ transform: rotate(-2deg) scale(1.08); }
+.lk.empty.checked .lk-miss{ color: #9aa5ad; }
+/* reveal: the doors swing open one after another; empty ones flash red */
+.lk.rv::after{ content: ''; position: absolute; inset: -2px; transform-origin: left center; z-index: 2; pointer-events: none;
+  background: linear-gradient(90deg, #6e7981, #87929a 40%, #6e7981); border: 2px solid; border-color: #9aa5ad #2b3237 #2b3237 #9aa5ad;
+  animation: doorOpen .5s ease-in forwards; animation-delay: inherit; }
+@keyframes doorOpen{ 0%{ transform: rotateY(0); } 100%{ transform: rotateY(-100deg); opacity: 0; } }
+.lk.empty.rv{ animation: emptyFlash .9s steps(3) both; animation-delay: inherit; }
+@keyframes emptyFlash{ 0%, 40%{ box-shadow: none; } 60%{ box-shadow: 0 0 0 3px #b3261e, 0 0 18px rgba(255,60,40,.6); } 100%{ box-shadow: none; } }
+.lr-foot{ display: flex; align-items: center; gap: 12px; padding: 8px 10px; }
+.lr-hint{ flex: 1; font-size: 12px; color: #333; }
+#lr-proceed{ min-width: 260px; }
+.win.lockerwin .statusbar > span{ color: #333; font-size: 11px; }
+.st-badge.absent{ background: #3a3f44; color: #f2d45c; }
+@media (prefers-reduced-motion: reduce){ .lk.rv::after{ animation: none; display: none; } .lk.empty.rv{ animation: none; } }

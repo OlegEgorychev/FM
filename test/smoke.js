@@ -61,12 +61,13 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.evaluate(() => { for (const k of [1, 2, 5]) { YAM.MatchEngine.SPEED[k] = 6; YAM.MatchEngine.HIGHLIGHT[k] = 12; } });
 
     // calendar → matchday (random narrative events off here; they are tested at the end)
-    await page.evaluate(() => { YAM.ui.events.enabled = false; });
+    await page.evaluate(() => { YAM.ui.events.enabled = false; YAM.game.squad.forEach(p => { p.psych.discipline = 20; }); });   // v2.6: everyone turns up (deterministic)
     await page.evaluate(() => YAM.ui.autoSim());   // v2.5: END DAY is manual; debug auto-sim to the match
     await page.waitForFunction(() => YAM.game.phase === 'matchday', null, { timeout: 20000 });
     check('calendar stops on matchday', true, await page.evaluate(() => YAM.ui.cal.date));
     await shot('1-dashboard');
     await closeModal();
+    await page.evaluate(() => YAM.ui.locker.open()); await page.click('#lr-proceed');   // v2.6: roll call before kick-off
     await page.click('.tk[data-view=match]');
 
     // layout: three columns, no scrolling
@@ -86,7 +87,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const sub = await page.evaluate(() => {
       const e = YAM.ui.engine;
       const out = e.sides[0].entries.find(x => x.line === 'MID').p;
-      const inn = YAM.game.squad.find(p => !e.sides[0].players.includes(p) && p.position === 'MID');
+      const inn = YAM.game.squad.find(p => !e.sides[0].players.includes(p) && p.position === 'MID' && p.available)
+        || YAM.game.squad.find(p => !e.sides[0].players.includes(p) && p.position !== 'GK' && p.available);
       return { out: out.id, in: inn.id };
     });
     // v1.5: profile card during the match (right-click a pitch token, [i] in the roster) must not touch the swap
@@ -316,18 +318,57 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const dayOf = d => new Date(d + 'T00:00:00Z').getUTCDay();
     let guard = 0;
     while (!(await page.evaluate(() => isTrainingDay(YAM.game.calendar.date))) && guard++ < 7) await endDay();
-    const dl1 = await page.evaluate(() => ({ date: YAM.game.calendar.date, btn: document.getElementById('btn-sim').disabled, need: !!document.querySelector('#today-box .td-req.need'), plans: document.querySelectorAll('#today-box .plan-btn').length }));
-    await page.evaluate(() => { for (const p of YAM.game.squad) { p.energy = 50; p.dyn.morale = 60; p.psych.discipline = 15; p.injuryDays = 0; p.awayDays = 0; } });
+    // v2.6: training day → START DAY → locker room (forced absences) → roll call → Proceed → plan → END DAY
+    const lr0 = await page.evaluate(() => {
+      const s = YAM.game, fit = s.squad.filter(p => p.available && p.position !== 'GK' && !(p.suspensionMatches > 0));
+      for (const p of s.squad) { p.energy = 50; p.dyn.morale = 60; p.psych.discipline = 15; p.injuryDays = 0; p.awayDays = 0; }
+      const [tired, lazy, hurt, keep] = [fit[0], fit[1], fit[2], fit[3]];
+      tired.energy = 10; lazy.psych.discipline = 1; hurt.injuryDays = 5;
+      if (!s.isStarter(lazy.id)) { const i = s.lineup.findIndex((id, k) => k > 0 && ![tired.id, hurt.id].includes(id)); s.lineup[i] = lazy.id; }
+      s.save(); YAM.ui.renderAll();
+      return { pre: s.squad.filter(p => p.suspensionMatches > 0).length, date: s.calendar.date, tired: tired.id, lazy: lazy.id, hurt: hurt.id, keep: keep.id, lazyStarter: s.isStarter(lazy.id),
+        btn: document.getElementById('btn-sim').disabled, label: document.getElementById('btn-sim').textContent, need: !!document.querySelector('#today-box .td-req.need'),
+        plans: document.querySelectorAll('#today-box .plan-btn').length };
+    });
+    await page.evaluate(() => { window.__R = Math.random; Math.random = () => 0.99; });
+    await page.click('#btn-sim');   // START DAY → locker room
+    await page.evaluate(() => { Math.random = window.__R; });
+    await page.waitForTimeout(250);
+    const lr1 = await page.evaluate(ids => {
+      const g = document.getElementById('lr-grid'), lk = YAM.game.dayState().locker;
+      return { open: !document.getElementById('locker-room-view').hidden, cells: g.querySelectorAll('.lk').length, empty: [...g.querySelectorAll('.lk.empty')].map(x => x.dataset.pid).sort(),
+        faces: g.querySelectorAll('.lk.here .lk-face svg').length, why: [lk.absent[ids.tired], lk.absent[ids.lazy], lk.absent[ids.hurt]], skipFlag: YAM.game.player(ids.lazy).skipped_training };
+    }, lr0);
+    await shot('10-locker');
+    await page.click(`#lr-grid .lk.empty[data-pid="${lr0.lazy}"]`);   // roll call: 1 AP
+    const lr2 = await page.evaluate(() => ({ ap: YAM.game.ap, talk: !document.getElementById('talk-layer').hidden, n: document.querySelectorAll('#talk-choices .talk-btn').length, b: YAM.game.budget }));
+    const disc0 = await page.evaluate(id => YAM.game.player(id).psych.discipline, lr0.lazy);
+    await talk(0);   // fine him
+    const lr3 = await page.evaluate(([id, t]) => ({ b: YAM.game.budget, disc: YAM.game.player(id).psych.discipline, still: !document.getElementById('locker-room-view').hidden,
+      noAp: !document.querySelector(`#lr-grid .lk.empty[data-pid="${t}"]`).classList.contains('can'), note: !!document.querySelector(`#lr-grid .lk.empty[data-pid="${id}"] .lk-note.open`) }), [lr0.lazy, lr0.tired]);
+    await page.click('#lr-proceed');
+    const lr4 = await page.evaluate(id => ({ open: !document.getElementById('locker-room-view').hidden, lazyStarter: YAM.game.isStarter(id), btn: document.getElementById('btn-sim').disabled,
+      swap: YAM.game.swapPlayers(YAM.game.lineup[1], id),
+      need: !!document.querySelector('#today-box .td-req.need'), plans: document.querySelectorAll('#today-box .plan-btn').length }), lr0.lazy);
+    check('locker room: START DAY opens it, absences = exhausted / skipped / injured (empty lockers), absent kids locked out, roll call = 1 AP + fine, Proceed → plan',
+      !lr0.btn && lr0.need && lr0.plans === 0 && lr0.lazyStarter && lr1.open && lr1.cells === 16 && lr1.empty.length === 3 + lr0.pre && lr1.faces === 13 - lr0.pre
+      && lr1.why.join() === 'exhausted,skipped,injury' && lr1.skipFlag && lr4.swap === 'unavail_absent' && lr2.ap === 0 && lr2.talk && lr2.n === 2
+      && lr3.b === lr2.b - 10 && lr3.disc === disc0 + 2 && lr3.still && lr3.noAp && lr3.note && !lr4.open && !lr4.lazyStarter && lr4.btn && lr4.need && lr4.plans === 4,
+      JSON.stringify({ lr0, lr1, lr2, lr3, lr4 }));
+    const dl1 = { date: lr0.date };
     await page.click('#today-box .plan-btn[data-plan="cardio"]');
     const dl2 = await page.evaluate(() => ({ btn: document.getElementById('btn-sim').disabled, plan: YAM.game.dayState().plan }));
     await page.evaluate(() => { window.__R = Math.random; Math.random = () => 0.99; });
     await endDay();
     await page.evaluate(() => { Math.random = window.__R; });
-    const dl3 = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available); return { date: YAM.game.calendar.date, e: p.energy, m: p.dyn.morale, plan: YAM.game.dayState().plan, diary: YAM.game.diary.slice(-3).some(d => d.key === 'cal.trainingAll') }; });
+    const dl3 = await page.evaluate(ids => { const p = YAM.game.player(ids.keep), L2 = YAM.game.player(ids.lazy), T = YAM.game.player(ids.tired);
+      return { date: YAM.game.calendar.date, e: p.energy, m: p.dyn.morale, plan: YAM.game.dayState().plan, diary: YAM.game.diary.slice(-4).some(d => d.key === 'cal.training'),
+        lazyE: L2.energy, tiredE: T.energy, cleared: !L2.absentToday && !T.absentToday && L2.available }; }, lr0);
     const oneDay = (a, b) => (new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5 === 1;
-    check('END DAY: one day per click; Tue/Thu blocks until a plan is picked; cardio = +5 energy, −4 morale (+1 drift); plan resets next morning',
-      dl0.today && /1\/1/.test(dl0.ap) && !dl0.btn && [2, 4].includes(dayOf(dl1.date)) && dl1.btn && dl1.need && dl1.plans === 4 && !dl2.btn && dl2.plan === 'cardio'
-      && oneDay(dl1.date, dl3.date) && dl3.e === 55 && dl3.m === 57 && dl3.plan === null && dl3.diary, JSON.stringify({ dl0, dl1, dl2, dl3 }));
+    check('END DAY after the locker: cardio for those present (+5 energy, −4 morale +1 drift), skipper unchanged, exhausted kid rested, absences cleared next morning',
+      dl0.today && /1\/1/.test(dl0.ap) && !dl0.btn && [2, 4].includes(dayOf(dl1.date)) && !dl2.btn && dl2.plan === 'cardio'
+      && oneDay(dl1.date, dl3.date) && dl3.e === 55 && dl3.m === 57 && dl3.plan === null && dl3.diary && dl3.lazyE === 50 && dl3.tiredE === 20 && dl3.cleared, JSON.stringify({ dl0, dl1, dl2, dl3 }));
+    await page.evaluate(id => { YAM.game.player(id).injuryDays = 0; }, lr0.hurt);
     const kidO = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available && x.position !== 'GK'); p.dyn.sharpness = 30; p.dyn.morale = 60; YAM.ui.profile.open(p.id); return p.id; });
     const of0 = await page.evaluate(() => ({ vis: !document.getElementById('pinfo-office').hidden, dis: document.getElementById('pinfo-office').disabled }));
     await page.click('#pinfo-office');
@@ -363,7 +404,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const s = YAM.game, fit = s.squad.filter(p => p.available), lazy = fit[3];
       for (const p of s.squad) { p.energy = 80; p.dyn.sharpness = 50; p.psych.discipline = 15; }
       lazy.psych.discipline = 1;
-      const R = Math.random; Math.random = () => 0.001;
+      const R = Math.random; Math.random = () => 0.99;   // v2.6: arrival skip = random·20 > discipline + 8
       const r = s.dayRoutine('2002-09-10', true, 'cardio');   // Tuesday, v2.5 regime: cardio
       Math.random = R;
       const other = fit.find(p => p !== lazy);
@@ -387,7 +428,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const tu2 = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step, n: document.querySelectorAll('#talk-choices .talk-btn').length }));
     await talk(0);
     const tu3 = await page.evaluate(k => ({ disc: YAM.game.player(k).psych.discipline, closed: !YAM.game.pendingEvent }), tu.kid);
-    await page.evaluate(() => { YAM.game.budget = 300; YAM.ui.events.fire('truant'); });
+    await page.evaluate(k => { YAM.game.budget = 300; YAM.game.player(k).skipped_training = true; YAM.ui.events.fire('truant'); }, tu.kid);   // the evening event led to a new morning
     await talk(1);   // suspend for the next match
     const tu4 = await page.evaluate(k => ({ sus: YAM.game.player(k).suspensionMatches, starter: YAM.game.isStarter(k) }), tu.kid);
     await page.evaluate(k => { YAM.game.player(k).suspensionMatches = 0; YAM.game.player(k).skipped_training = false; }, tu.kid);
@@ -454,6 +495,11 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       return out;
     });
     check('Quick Sim: instant and visual drivers give identical results (3 seeds)', same.every(Boolean), JSON.stringify(same));
+    await page.evaluate(() => { YAM.game.squad.forEach(p => { p.psych.discipline = 20; if (p.energy < 30) p.energy = 60; }); YAM.ui.locker.open(); });
+    const lrMatch = await page.evaluate(() => ({ open: !document.getElementById('locker-room-view').hidden, kind: !!document.querySelector('#lr-head .k-match'),
+      btn: document.getElementById('lr-proceed').textContent }));
+    await page.click('#lr-proceed');
+    check('match day: locker room before the match (Proceed → match prep)', lrMatch.open && lrMatch.kind && (await page.evaluate(() => YAM.ui.view === 'match')), JSON.stringify(lrMatch));
     await page.click('.tk[data-view=match]');
     const qs0 = await page.evaluate(() => ({ btn: !document.getElementById('btn-instant').disabled, apps: Object.values(YAM.game.seasonStats).reduce((a, s) => a + s.apps, 0),
       energy: YAM.game.starters().map(p => p.energy) }));
