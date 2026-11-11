@@ -309,6 +309,57 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       && sp.q[0].matchDay && sp.q[0].due === plus14(sp.date), JSON.stringify(sp));
     await page.evaluate(d => { YAM.game.eventQueue[0].due = d; YAM.game.save(); }, sp.date);   // fast-forward the bomb: due today → next match day
 
+    // v2.4: Monday-first calendar grid + training days + The Truant
+    await page.evaluate(() => { YAM.ui.calMonth = '2002-09'; YAM.ui.renderDash(); });
+    const cg = await page.evaluate(() => {
+      const grid = () => [...document.querySelectorAll('#cal-grid > div')];
+      const wd = [...document.querySelectorAll('#cal-grid .cal-wd')].map(x => x.textContent);
+      const lead = () => grid().filter(x => !x.classList.contains('cal-wd')).findIndex(x => !x.classList.contains('out'));
+      const trOk = () => [...document.querySelectorAll('#cal-grid .cal-day.training')].every(x => [2, 4].includes(new Date(x.dataset.date + 'T00:00:00Z').getUTCDay()));
+      const sep = { lead: lead(), tr: document.querySelectorAll('#cal-grid .cal-day.training').length, ok: trOk(), cone: !!document.querySelector('#cal-grid .cal-day.training .cd-cone') };
+      YAM.ui.calMonth = '2002-10'; YAM.ui.renderDash();
+      const oct = { lead: lead(), ok: trOk(), cols: (grid().length) % 7 };
+      YAM.ui.calMonth = null; YAM.ui.renderDash();
+      return { mon: wd[0] === fmtDate('2002-09-02', { weekday: 'short' }), sun: wd[6] === fmtDate('2002-09-08', { weekday: 'short' }), sep, oct };
+    });
+    check('calendar: Monday-first header, Sep 2002 lead 6 (1st = Sunday), Oct 2002 lead 1 (1st = Tuesday), training cells only Tue/Thu',
+      cg.mon && cg.sun && cg.sep.lead === 6 && cg.oct.lead === 1 && cg.sep.ok && cg.oct.ok && cg.sep.tr >= 6 && cg.sep.cone && cg.oct.cols === 0, JSON.stringify(cg));
+    const trn = await page.evaluate(() => {
+      const s = YAM.game, fit = s.squad.filter(p => p.available), lazy = fit[3];
+      for (const p of s.squad) { p.energy = 80; p.dyn.sharpness = 50; p.psych.discipline = 15; }
+      lazy.psych.discipline = 1;
+      const R = Math.random; Math.random = () => 0.001;
+      const r = s.dayRoutine('2002-09-10');   // Tuesday
+      Math.random = R;
+      const other = fit.find(p => p !== lazy);
+      const out = { training: r.training, skipped: r.skipped.map(p => p.id), lazy: [lazy.energy, lazy.dyn.sharpness, lazy.skipped_training], other: [other.energy, other.dyn.sharpness, other.skipped_training] };
+      const r2 = s.dayRoutine('2002-09-11');  // Wednesday = rest
+      out.rest = { training: r2.training, other: [other.energy, other.dyn.sharpness], flag: lazy.skipped_training };
+      lazy.skipped_training = true;   // keep him as today's truant for the event test
+      out.id = lazy.id;
+      return out;
+    });
+    check('training day: discipline roll → skipper unchanged + skipped_training; attendees −10 condition +5 sharpness; rest day +10 / −2 and flag cleared',
+      trn.training && trn.skipped.length === 1 && trn.skipped[0] === trn.id && trn.lazy.join() === '80,50,true' && trn.other.join() === '70,55,false'
+      && !trn.rest.training && trn.rest.other.join() === '80,53' && trn.rest.flag === false, JSON.stringify(trn));
+    await page.evaluate(() => { YAM.game.budget = 10; YAM.ui.renderBudget(); YAM.ui.events.fire('truant'); });
+    const tu = await page.evaluate(() => ({ kid: YAM.game.pendingEvent?.cast.kid, n: document.querySelectorAll('#talk-choices .talk-btn').length, fineOff: document.querySelector('#talk-choices .talk-btn[data-i="0"]').disabled,
+      face: !!document.querySelector('#talk-face svg rect') }));
+    const d0 = await page.evaluate(k => YAM.game.player(k).psych.discipline, tu.kid);
+    await page.evaluate(() => { window.__R = Math.random; Math.random = () => 0.1; });
+    await talk(2);   // call him → rolled step "sorry"
+    await page.evaluate(() => { Math.random = window.__R; });
+    const tu2 = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step, n: document.querySelectorAll('#talk-choices .talk-btn').length }));
+    await talk(0);
+    const tu3 = await page.evaluate(k => ({ disc: YAM.game.player(k).psych.discipline, closed: !YAM.game.pendingEvent }), tu.kid);
+    await page.evaluate(() => { YAM.game.budget = 300; YAM.ui.events.fire('truant'); });
+    await talk(1);   // suspend for the next match
+    const tu4 = await page.evaluate(k => ({ sus: YAM.game.player(k).suspensionMatches, starter: YAM.game.isStarter(k) }), tu.kid);
+    await page.evaluate(k => { YAM.game.player(k).suspensionMatches = 0; YAM.game.player(k).skipped_training = false; }, tu.kid);
+    check('The Truant: skipper\'s portrait, fine disabled under $20, "call him" rolls a saved step (sorry → +2 discipline), suspend = 1 match',
+      trn.id === tu.kid && tu.n === 3 && tu.fineOff && tu.face && tu2.step === 'sorry' && tu2.n === 1 && tu3.disc === Math.min(20, d0 + 2) && tu3.closed && tu4.sus === 1 && !tu4.starter,
+      JSON.stringify({ tu, tu2, tu3, tu4 }));
+
     // a dilemma survives a reload, then the calendar pauses on a random event and resumes after the choice
     await page.evaluate(() => YAM.ui.events.fire('boots'));
     await page.reload();
@@ -318,7 +369,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const re2 = await page.evaluate(k => ({ b: YAM.game.budget, mor: YAM.game.player(k).dyn.morale }), re.kid);
     await closeModal();
     const qPersist = await page.evaluate(() => YAM.game.eventQueue.length === 1 && YAM.game.eventQueue[0].id === 'scoutvisit');
-    await page.evaluate(() => { Object.assign(EVENTS_CFG, { DAD_CHANCE: 0, KNOCK_CHANCE: 0, SCOUT_CHANCE: 0, POOL_CHANCE: 0, ULTI_CHANCE: 0, BUS_CHANCE: 0, BOOTS_CHANCE: 1 }); YAM.game.eventLog = []; });
+    await page.evaluate(() => { Object.assign(EVENTS_CFG, { DAD_CHANCE: 0, KNOCK_CHANCE: 0, SCOUT_CHANCE: 0, POOL_CHANCE: 0, ULTI_CHANCE: 0, BUS_CHANCE: 0, TRUANT_CHANCE: 0, BOOTS_CHANCE: 1 }); YAM.game.eventLog = []; });
     await page.click('#btn-sim');
     await page.waitForFunction(() => !document.getElementById('talk-layer').hidden, null, { timeout: 10000 });
     const paused = await page.evaluate(() => ({ running: YAM.ui.cal.running, date: YAM.ui.cal.date, btn: document.getElementById('btn-sim').disabled }));

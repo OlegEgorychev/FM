@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v2.3)
+# Youth Academy Manager — design notes (current: v2.4)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -110,3 +110,10 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Queue items may carry `cast` (`ctx.schedule(id, { …, cast })`); `fire(id, date, { cast })` reuses it if every kid is still in the squad, else falls back to `event.cast()`.
 - `scout` (day, 5%, after MD1, once per season): +$500 kit money → `scoutvisit` 14 days later on a match day. `scoutvisit` (scheduled): top 3 FIT kids by overall. A: flag `Showcase` (◉ chip) + morale +10, `ensureShowcaseXI()` puts them in the XI; `swapPlayers` → `showcase` error, `MatchEngine.substitute` → `showcase` (can't be subbed off). After the match: −15 extra energy, 25% (×2 if exhausted) injury 3–8 days, diary `scout.done/hurt`. B: forced −$500 (`debt`), budget < 0 → team morale −20. Future hook: the scout can come back to poach a kid.
 - `pool` (day, 5%, after MD1, once per season): cast = winner's son + loser's son. A: +$200 → `poolloss` 14 days later (day event) with the loser's son carried in the queue. B: winner's son morale −5. `poolloss`: A: `Promised_Start` with `player.promiseBy = 'pool'` (broken at kick-off → morale −30 + kept at home 10 days, no refund). B: `player.awayDays = 10` (⌂ badge, unavailable like an injury, −1 per calendar day) + morale −15.
+
+## Training days + Monday-first calendar (v2.4)
+- Calendar grid: Monday-first (`lead = (getUTCDay() + 6) % 7`, headers from 2002-09-02 = Monday, weekend headers tinted). `dayInfo()` kinds: match / training / rest / off.
+- `TRAINING` (00-utils-data.js): Tue + Thu (`isTrainingDay(iso)`). `GameState.dayRoutine(date)` is the daily hook (`restDay()` = rest-only wrapper). Every day first clears `skipped_training`. Training: fit kids (not injured / kept at home) roll `skipChance(p) = max(0, (10 − discipline) × 3%)` → skip (no change, `skipped_training = true`) or attend (condition −10, sharpness +5). Rest days (and unfit kids on training days): condition +10 (`ENERGY.DAILY_REST`, was 4), sharpness −2 (was −1). Weekly net for a regular: +20 condition, +2 sharpness (+12 for a full match).
+- Diary: `cal.training` (attended + skippers) / `cal.trainingAll`.
+- EventEngine: `roll(date)` on a training day evaluates `when: 'training'` events first (right after the routine, same onStep), then `day` events; same cooldown.
+- `truant` (training, someone skipped, 60%): cast = a skipper. A: −$20 (disabled under $20), discipline +2 (the brief's "+10" mapped to the 1–20 scale). B: 1-match ban, morale −10. C: `next: () => roll` → step `sorry` (discipline +2) or `hangup` (morale −10); the rolled step is saved, so a reload can't re-roll. Choice `next` may now be a function.

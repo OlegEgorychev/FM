@@ -28,6 +28,7 @@ class DebugConsole {
     add('ENGINE', 'INJ', p => p.injuryDays || 0, null, 'v2.2 injury: calendar days left');
     add('ENGINE', 'SUS', p => p.suspensionMatches || 0, null, 'v2.2 suspension: matches left');
     add('ENGINE', 'HOME', p => p.awayDays || 0, null, 'v2.3 kept at home by a parent: days left');
+    add('ENGINE', 'SKIP%', p => Math.round(skipChance(p) * 100), null, 'v2.4 chance to skip a training day (from discipline)');
     add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
     return c;
   })();

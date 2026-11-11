@@ -695,3 +695,40 @@ Object.assign(I18N.ru, {
   'ev.promise.brokenPool': 'Обещание нарушено: {k} не вышел в старте. Отец держит его дома {d} дн.',
   'dbg.ev.scout': 'Скаут', 'dbg.ev.scoutvisit': 'Скаут на трибуне', 'dbg.ev.pool': 'Папин тотализатор', 'dbg.ev.poolloss': 'Проигравший папа',
 });
+
+
+/* ---- v2.4: Monday-first calendar, training days, The Truant ---- */
+Object.assign(I18N.en, {
+  'cal.lg.training': 'Training (Tue/Thu)', 'cal.trShort': 'TR',
+  'cal.info.training': 'Training day: −{d}% energy, +{s} sharpness for those who turn up. Low-discipline kids may skip.',
+  'cal.info.rest': 'Rest day, squad +{n}% energy.',
+  'cal.training': 'Training: {a} turned up. Skipped: {s}.', 'cal.trainingAll': 'Training: all {a} turned up. Good session.',
+  'talk.roleTruant': 'Training register · empty line', 'talk.rolePhone': 'On the phone',
+  'ev.truant.text': '{k} didn\'t show up for training today. No call, no warning.',
+  'ev.truant.a': 'Fine him (+discipline)', 'ev.truant.b': 'Suspend him for the next match', 'ev.truant.c': 'Call him and ask what\'s wrong',
+  'ev.truant.a.diary': 'Fined {k} for skipping training ({m}). He got the message.',
+  'ev.truant.b.diary': '{k} is suspended for the next match for skipping training.',
+  'ev.truant.sorry': '{k} goes quiet, then: "Sorry, coach. Mum was ill, I had to look after my sister. It won\'t happen again."',
+  'ev.truant.hangup': '{k} mumbles something, then: "Leave me alone!" Click. He hung up.',
+  'ev.truant.sorryOk': 'Glad you told me. See you Thursday.', 'ev.truant.hangupOk': 'Put the phone down',
+  'ev.truant.sorryOk.diary': '{k} apologised for skipping training. He seems more focused now.',
+  'ev.truant.hangupOk.diary': '{k} hung up on the coach. Something is wrong at home.',
+  'dbg.ev.truant': 'The Truant',
+});
+Object.assign(I18N.ru, {
+  'cal.lg.training': 'Тренировка (вт/чт)', 'cal.trShort': 'ТР',
+  'cal.info.training': 'Тренировка: −{d}% энергии и +{s} тонуса тем, кто пришёл. Недисциплинированные могут прогулять.',
+  'cal.info.rest': 'День отдыха, состав +{n}% энергии.',
+  'cal.training': 'Тренировка: пришли {a}. Прогуляли: {s}.', 'cal.trainingAll': 'Тренировка: пришли все {a}. Хорошее занятие.',
+  'talk.roleTruant': 'Журнал тренировок · пустая строка', 'talk.rolePhone': 'По телефону',
+  'ev.truant.text': '{k} не пришёл сегодня на тренировку. Ни звонка, ни предупреждения.',
+  'ev.truant.a': 'Оштрафовать (+дисциплина)', 'ev.truant.b': 'Отстранить на следующий матч', 'ev.truant.c': 'Позвонить и спросить, что случилось',
+  'ev.truant.a.diary': 'Штраф за прогул тренировки ({m}). Игрок: {k}. Урок усвоен.',
+  'ev.truant.b.diary': '{k} отстранён на следующий матч за прогул тренировки.',
+  'ev.truant.sorry': '{k} молчит, потом: «Простите, тренер. Мама заболела, я сидел с сестрой. Больше не повторится».',
+  'ev.truant.hangup': '{k} что-то бормочет, потом: «Отстаньте от меня!» Щелчок. Бросил трубку.',
+  'ev.truant.sorryOk': 'Хорошо, что сказал. Жду в четверг.', 'ev.truant.hangupOk': 'Положить трубку',
+  'ev.truant.sorryOk.diary': '{k} извинился за прогул. Кажется, стал собраннее.',
+  'ev.truant.hangupOk.diary': '{k} бросил трубку. Дома что-то не так.',
+  'dbg.ev.truant': 'Прогульщик',
+});

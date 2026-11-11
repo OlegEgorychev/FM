@@ -56,9 +56,12 @@ class UIController {
     // Future event types plug in here, e.g.:
     // cal.registerType('training', { blocking: false, label: ev => '…', onArrive: ev => this.state.applyTraining(ev) });
     // cal.registerType('dialogue', { blocking: true,  label: ev => '…', onArrive: ev => this.openDialogue(ev) });
-    cal.onDay(() => {
-      this.state.restDay();
-      return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
+    cal.onDay(date => {   // v2.4: Tue/Thu = training (the EventEngine rolls right after this, in runCalendar → onStep)
+      const r = this.state.dayRoutine(date);
+      if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
+      return r.skipped.length
+        ? { key: 'cal.training', vars: { a: r.attended, s: { list: r.skipped.map(p => ({ pid: p.id })) } }, cls: 'tr' }
+        : { key: 'cal.trainingAll', vars: { a: r.attended }, cls: 'tr' };
     });
   }
 
@@ -518,7 +521,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     } else {
       this.$('next-event').innerHTML = `<div class="ne-row">${emblemHTML(lg.team(0), 'lg')}</div><div class="ev-title">${L.t('dash.none')}</div>`;
     }
-    this.$('cal-legend').innerHTML = ['match', 'W', 'D', 'L', 'rest', 'today']
+    this.$('cal-legend').innerHTML = ['match', 'W', 'D', 'L', 'training', 'rest', 'today']
       .map(k => `<li><i class="sw sw-${k}"></i>${L.t('cal.lg.' + k)}</li>`).join('');
 
     // club panel
@@ -578,16 +581,17 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     }
     const start = s.calendar.events[0] && isoAdd(s.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
     const end = s.calendar.events[s.calendar.events.length - 1]?.date;
-    return { kind: start && iso >= start && iso <= end ? 'rest' : 'off' };
+    if (!(start && iso >= start && iso <= end)) return { kind: 'off' };
+    return { kind: isTrainingDay(iso) ? 'training' : 'rest' };   // v2.4
   }
 
   renderCalendar() {
     const ym = this.viewMonth(), today = this.cal.date;
-    const first = ym + '-01', lead = new Date(first + 'T00:00:00Z').getUTCDay();
+    const first = ym + '-01', lead = (new Date(first + 'T00:00:00Z').getUTCDay() + 6) % 7;   // v2.4: Monday-first week
     const days = daysBetween(first, this.shiftMonth(ym, 1) + '-01');
     this.$('cal-month').textContent = fmtDate(first, { month: 'long', year: 'numeric' });
     this.$('cal-today').textContent = fmtDate(today, { weekday: 'long', day: 'numeric', month: 'long' });
-    const wd = Array.from({ length: 7 }, (_, i) => `<div class="cal-wd">${fmtDate(isoAdd('2002-09-01', i), { weekday: 'short' })}</div>`).join('');
+    const wd = Array.from({ length: 7 }, (_, i) => `<div class="cal-wd${i >= 5 ? ' we' : ''}">${fmtDate(isoAdd('2002-09-02', i), { weekday: 'short' })}</div>`).join('');   // 2002-09-02 = Monday
     let cells = '';
     for (let i = 0; i < 42; i++) {
       const n = i - lead + 1;
@@ -601,6 +605,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         body = `<div class="cd-ev">${emblemHTML(d.opp, 'xs')}<span class="cd-tag ${d.res ? 't-' + d.res.r : 't-match'}">${tag}</span></div>
           <div class="cd-opp">${esc(L.team(d.opp.name))}</div>`;
       } else if (d.kind === 'rest') body = '<div class="cd-rest"></div>';
+      else if (d.kind === 'training') body = `<div class="cd-cone" aria-hidden="true"></div><div class="cd-tr">${L.t('cal.trShort')}</div>`;
       cells += `<div class="${cls}" data-date="${iso}" role="gridcell" tabindex="-1" title="${esc(this.dayText(iso, d))}"><span class="cd-n">${n}</span>${body}</div>`;
     }
     this.$('cal-grid').innerHTML = wd + cells;
@@ -613,7 +618,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const when = fmtDate(iso, { weekday: 'short', day: 'numeric', month: 'short' });
     if (d.kind === 'match') return `${when}: ` + L.t(d.res ? 'cal.info.played' : 'cal.info.match',
       { md: d.ev.md, o: L.team(d.opp.name), v: L.t('venue.' + d.venue), x: d.res?.gf, y: d.res?.ga });
-    return `${when}: ` + L.t(d.kind === 'rest' ? 'cal.info.rest' : 'cal.info.off', { n: ENERGY.DAILY_REST });
+    return `${when}: ` + L.t({ rest: 'cal.info.rest', training: 'cal.info.training' }[d.kind] || 'cal.info.off', { n: ENERGY.DAILY_REST, d: TRAINING.DRAIN, s: TRAINING.SHARP });
   }
 
   pickDay(iso) {

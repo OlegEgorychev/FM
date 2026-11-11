@@ -77,7 +77,9 @@ const EVENTS_CFG = { COOLDOWN: 6, BOOTS_CHANCE: 0.05, DAD_CHANCE: 0.05, BOOTS_CO
   DEBT_MORALE: -20,
   POOL_CHANCE: 0.05, POOL_GIFT: 200, POOL_DAYS: 14, POOL_REFUSE_MORALE: -5, HOME_DAYS: 10, HOME_MORALE: -15, POOL_BROKEN_MORALE: -30,
   ULTI_CHANCE: 0.05, ULTI_DISCIPLINE: 8, ULTI_FINE: 20, ULTI_FINE_MORALE: -10, ULTI_SUSPEND: 2, ULTI_SORRY_DISC: -2, ULTI_SORRY_MORALE: 5,
-  RED_BAN: 1, KNOCK_TO_INJURY: 0.35, KNOCK_DAYS: [4, 12] };
+  RED_BAN: 1, KNOCK_TO_INJURY: 0.35, KNOCK_DAYS: [4, 12],
+  // v2.4 The Truant (training days, someone skipped)
+  TRUANT_CHANCE: 0.6, TRUANT_FINE: 20, TRUANT_FINE_DISC: 2, TRUANT_BAN_MORALE: -10, TRUANT_SORRY_DISC: 2, TRUANT_HANGUP_MORALE: -10 };
 /* Story flags on academy kids (separate from the one-per-kid ROLE tag). Shown as chips, never as numbers. */
 const FLAGS = { Promised_Start: { en: ['PROMISED START', 'A parent paid for this kid to start the next match.'],
   ru: ['ОБЕЩАН СТАРТ', 'Родитель заплатил, чтобы этот игрок вышел в старте в следующем матче.'] },
@@ -85,10 +87,15 @@ const FLAGS = { Promised_Start: { en: ['PROMISED START', 'A parent paid for this
     ru: ['СМОТРИТ СКАУТ', 'Скаут большого клуба приехал на него: выходит в старте и играет все 90 минут.'] },
   Benched: { en: ['BENCHED (DEAL)', 'You promised a businessman he sits out this match.'],
     ru: ['В ЗАПАСЕ (СДЕЛКА)', 'Ты пообещал бизнесмену, что он пропустит этот матч.'] } };
-const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -1, FLOOR: 20 };
+const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -2, FLOOR: 20 };   // v2.4: rest −2/day, training +5
+/* v2.4 TRAINING DAYS — every Tuesday and Thursday (UTC weekday 2 and 4).
+   Attend: condition −10, sharpness +5. Skip chance = (SKIP_FROM − discipline) × SKIP_STEP (discipline 1 → 27%, 9 → 3%, 10+ → 0). */
+const TRAINING = { WEEKDAYS: [2, 4], DRAIN: 10, SHARP: 5, SKIP_FROM: 10, SKIP_STEP: 0.03 };
+const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
+const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
-const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 4,
+const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 10,   // v2.4: rest days +10 (training days cost 10)
   EXHAUSTED: 30, EXHAUSTED_MULT: 0.8,   // live: under 30% during the match → stats ×0.8 (v1.1)
   HT_REST: 4 };                         // half-time rest for everyone on the pitch   // bench +6 on matchday, +4 every rest day
 const OUT_OF_POSITION = 0.85;   // stat multiplier for a player outside his natural line

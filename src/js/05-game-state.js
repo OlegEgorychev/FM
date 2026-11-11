@@ -116,14 +116,30 @@ class GameState {
   removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
 
   /* ----- energy ----- */
-  /** Rest day: condition +4, match sharpness fades −1 (floor 20), morale drifts 1 point toward 60. */
-  restDay() {
+  /** Rest day: condition +10, match sharpness fades −2 (floor 20), morale drifts 1 point toward 60. */
+  restDay() { this.dayRoutine(null, false); }
+  /** v2.4: one non-match calendar day. Training day (Tue/Thu): fit kids roll vs discipline —
+      attend → condition −10, sharpness +5; skip → no change + `skipped_training` (until the next day).
+      Injured / kept-at-home kids rest. Returns { training, attended, skipped: [players] }. */
+  dayRoutine(date, training = !!date && isTrainingDay(date)) {
+    const skipped = [];
+    let attended = 0;
     for (const p of this.squad) {
-      p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
-      p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
+      p.skipped_training = false;
+      const trains = training && !(p.injuryDays > 0) && !(p.awayDays > 0);
+      if (trains && Math.random() < skipChance(p)) { p.skipped_training = true; skipped.push(p); }
+      else if (trains) {
+        attended++;
+        p.energy = clamp(p.energy - TRAINING.DRAIN, 0, 100);
+        p.dyn.sharpness = clamp(p.dyn.sharpness + TRAINING.SHARP, 0, 100);
+      } else {
+        p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
+        p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
+      }
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
     this.tickInjuries();
+    return { training, attended, skipped };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
   tickInjuries() {

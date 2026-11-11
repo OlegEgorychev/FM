@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v2.3</title>
+<title>Youth Academy Manager v2.4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1061,6 +1061,17 @@ body.fx .crt-scan{ opacity: .9; }
   .cd-tag{ font-size: 12px; padding: 0 2px; }
   .cd-ev .emblem{ display: none; }
 }
+
+/* v2.4: Monday-first week, weekend headers, training days (Tue/Thu) */
+.cal-wd.we{ color: #6b2a24; }
+.cal-day.training{ background: linear-gradient(160deg, #2b2a1c, #23271f); }
+.cal-day.training.past{ opacity: .7; }
+.cd-cone{ position: absolute; right: 5px; bottom: 6px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 10px solid #e8812a; filter: drop-shadow(1px 1px 0 #000); }
+.cd-cone::after{ content: ''; position: absolute; left: -3px; top: 4px; width: 6px; height: 2px; background: #f5f0e0; }
+.cd-tr{ position: absolute; left: 5px; bottom: 4px; font: 10px/1 var(--mono); color: #c9a25a; letter-spacing: .5px; text-transform: uppercase; }
+.sw-training{ background: #e8812a; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.tk-line.tr{ color: #d9c08a; }
 /* =========================================================
    v1.7 — LEAGUE split view (standings | leaders) + TEAM_ROSTER.EXE
    ========================================================= */
@@ -1803,7 +1814,9 @@ const EVENTS_CFG = { COOLDOWN: 6, BOOTS_CHANCE: 0.05, DAD_CHANCE: 0.05, BOOTS_CO
   DEBT_MORALE: -20,
   POOL_CHANCE: 0.05, POOL_GIFT: 200, POOL_DAYS: 14, POOL_REFUSE_MORALE: -5, HOME_DAYS: 10, HOME_MORALE: -15, POOL_BROKEN_MORALE: -30,
   ULTI_CHANCE: 0.05, ULTI_DISCIPLINE: 8, ULTI_FINE: 20, ULTI_FINE_MORALE: -10, ULTI_SUSPEND: 2, ULTI_SORRY_DISC: -2, ULTI_SORRY_MORALE: 5,
-  RED_BAN: 1, KNOCK_TO_INJURY: 0.35, KNOCK_DAYS: [4, 12] };
+  RED_BAN: 1, KNOCK_TO_INJURY: 0.35, KNOCK_DAYS: [4, 12],
+  // v2.4 The Truant (training days, someone skipped)
+  TRUANT_CHANCE: 0.6, TRUANT_FINE: 20, TRUANT_FINE_DISC: 2, TRUANT_BAN_MORALE: -10, TRUANT_SORRY_DISC: 2, TRUANT_HANGUP_MORALE: -10 };
 /* Story flags on academy kids (separate from the one-per-kid ROLE tag). Shown as chips, never as numbers. */
 const FLAGS = { Promised_Start: { en: ['PROMISED START', 'A parent paid for this kid to start the next match.'],
   ru: ['ОБЕЩАН СТАРТ', 'Родитель заплатил, чтобы этот игрок вышел в старте в следующем матче.'] },
@@ -1811,10 +1824,15 @@ const FLAGS = { Promised_Start: { en: ['PROMISED START', 'A parent paid for this
     ru: ['СМОТРИТ СКАУТ', 'Скаут большого клуба приехал на него: выходит в старте и играет все 90 минут.'] },
   Benched: { en: ['BENCHED (DEAL)', 'You promised a businessman he sits out this match.'],
     ru: ['В ЗАПАСЕ (СДЕЛКА)', 'Ты пообещал бизнесмену, что он пропустит этот матч.'] } };
-const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -1, FLOOR: 20 };
+const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -2, FLOOR: 20 };   // v2.4: rest −2/day, training +5
+/* v2.4 TRAINING DAYS — every Tuesday and Thursday (UTC weekday 2 and 4).
+   Attend: condition −10, sharpness +5. Skip chance = (SKIP_FROM − discipline) × SKIP_STEP (discipline 1 → 27%, 9 → 3%, 10+ → 0). */
+const TRAINING = { WEEKDAYS: [2, 4], DRAIN: 10, SHARP: 5, SKIP_FROM: 10, SKIP_STEP: 0.03 };
+const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
+const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
-const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 4,
+const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 10,   // v2.4: rest days +10 (training days cost 10)
   EXHAUSTED: 30, EXHAUSTED_MULT: 0.8,   // live: under 30% during the match → stats ×0.8 (v1.1)
   HT_REST: 4 };                         // half-time rest for everyone on the pitch   // bench +6 on matchday, +4 every rest day
 const OUT_OF_POSITION = 0.85;   // stat multiplier for a player outside his natural line
@@ -2564,6 +2582,43 @@ Object.assign(I18N.ru, {
   'ev.promise.brokenPool': 'Обещание нарушено: {k} не вышел в старте. Отец держит его дома {d} дн.',
   'dbg.ev.scout': 'Скаут', 'dbg.ev.scoutvisit': 'Скаут на трибуне', 'dbg.ev.pool': 'Папин тотализатор', 'dbg.ev.poolloss': 'Проигравший папа',
 });
+
+
+/* ---- v2.4: Monday-first calendar, training days, The Truant ---- */
+Object.assign(I18N.en, {
+  'cal.lg.training': 'Training (Tue/Thu)', 'cal.trShort': 'TR',
+  'cal.info.training': 'Training day: −{d}% energy, +{s} sharpness for those who turn up. Low-discipline kids may skip.',
+  'cal.info.rest': 'Rest day, squad +{n}% energy.',
+  'cal.training': 'Training: {a} turned up. Skipped: {s}.', 'cal.trainingAll': 'Training: all {a} turned up. Good session.',
+  'talk.roleTruant': 'Training register · empty line', 'talk.rolePhone': 'On the phone',
+  'ev.truant.text': '{k} didn\'t show up for training today. No call, no warning.',
+  'ev.truant.a': 'Fine him (+discipline)', 'ev.truant.b': 'Suspend him for the next match', 'ev.truant.c': 'Call him and ask what\'s wrong',
+  'ev.truant.a.diary': 'Fined {k} for skipping training ({m}). He got the message.',
+  'ev.truant.b.diary': '{k} is suspended for the next match for skipping training.',
+  'ev.truant.sorry': '{k} goes quiet, then: "Sorry, coach. Mum was ill, I had to look after my sister. It won\'t happen again."',
+  'ev.truant.hangup': '{k} mumbles something, then: "Leave me alone!" Click. He hung up.',
+  'ev.truant.sorryOk': 'Glad you told me. See you Thursday.', 'ev.truant.hangupOk': 'Put the phone down',
+  'ev.truant.sorryOk.diary': '{k} apologised for skipping training. He seems more focused now.',
+  'ev.truant.hangupOk.diary': '{k} hung up on the coach. Something is wrong at home.',
+  'dbg.ev.truant': 'The Truant',
+});
+Object.assign(I18N.ru, {
+  'cal.lg.training': 'Тренировка (вт/чт)', 'cal.trShort': 'ТР',
+  'cal.info.training': 'Тренировка: −{d}% энергии и +{s} тонуса тем, кто пришёл. Недисциплинированные могут прогулять.',
+  'cal.info.rest': 'День отдыха, состав +{n}% энергии.',
+  'cal.training': 'Тренировка: пришли {a}. Прогуляли: {s}.', 'cal.trainingAll': 'Тренировка: пришли все {a}. Хорошее занятие.',
+  'talk.roleTruant': 'Журнал тренировок · пустая строка', 'talk.rolePhone': 'По телефону',
+  'ev.truant.text': '{k} не пришёл сегодня на тренировку. Ни звонка, ни предупреждения.',
+  'ev.truant.a': 'Оштрафовать (+дисциплина)', 'ev.truant.b': 'Отстранить на следующий матч', 'ev.truant.c': 'Позвонить и спросить, что случилось',
+  'ev.truant.a.diary': 'Штраф за прогул тренировки ({m}). Игрок: {k}. Урок усвоен.',
+  'ev.truant.b.diary': '{k} отстранён на следующий матч за прогул тренировки.',
+  'ev.truant.sorry': '{k} молчит, потом: «Простите, тренер. Мама заболела, я сидел с сестрой. Больше не повторится».',
+  'ev.truant.hangup': '{k} что-то бормочет, потом: «Отстаньте от меня!» Щелчок. Бросил трубку.',
+  'ev.truant.sorryOk': 'Хорошо, что сказал. Жду в четверг.', 'ev.truant.hangupOk': 'Положить трубку',
+  'ev.truant.sorryOk.diary': '{k} извинился за прогул. Кажется, стал собраннее.',
+  'ev.truant.hangupOk.diary': '{k} бросил трубку. Дома что-то не так.',
+  'dbg.ev.truant': 'Прогульщик',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -3302,14 +3357,30 @@ class GameState {
   removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
 
   /* ----- energy ----- */
-  /** Rest day: condition +4, match sharpness fades −1 (floor 20), morale drifts 1 point toward 60. */
-  restDay() {
+  /** Rest day: condition +10, match sharpness fades −2 (floor 20), morale drifts 1 point toward 60. */
+  restDay() { this.dayRoutine(null, false); }
+  /** v2.4: one non-match calendar day. Training day (Tue/Thu): fit kids roll vs discipline —
+      attend → condition −10, sharpness +5; skip → no change + `skipped_training` (until the next day).
+      Injured / kept-at-home kids rest. Returns { training, attended, skipped: [players] }. */
+  dayRoutine(date, training = !!date && isTrainingDay(date)) {
+    const skipped = [];
+    let attended = 0;
     for (const p of this.squad) {
-      p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
-      p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
+      p.skipped_training = false;
+      const trains = training && !(p.injuryDays > 0) && !(p.awayDays > 0);
+      if (trains && Math.random() < skipChance(p)) { p.skipped_training = true; skipped.push(p); }
+      else if (trains) {
+        attended++;
+        p.energy = clamp(p.energy - TRAINING.DRAIN, 0, 100);
+        p.dyn.sharpness = clamp(p.dyn.sharpness + TRAINING.SHARP, 0, 100);
+      } else {
+        p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
+        p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
+      }
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
     this.tickInjuries();
+    return { training, attended, skipped };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
   tickInjuries() {
@@ -4048,8 +4119,21 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.4', name: { en: 'Training Days', ru: 'Тренировки' },
+    en: [
+      'The calendar week now starts on Monday (Mon … Sun), with correct blank days at the start of every month.',
+      'Every Tuesday and Thursday is a training day (orange cone on the calendar). Kids who turn up lose 10% energy but gain match sharpness; on the other free days they rest and recover more (+10%).',
+      'Kids with poor discipline sometimes skip training: no tiredness, but no sharpness either. The diary lists who skipped.',
+      'New event "The Truant" right after training: fine him, suspend him for a match, or call and ask what is wrong (he may open up… or hang up on you).',
+    ],
+    ru: [
+      'Неделя в календаре теперь начинается с понедельника (Пн … Вс), пустые дни в начале каждого месяца считаются правильно.',
+      'Каждый вторник и четверг — тренировка (оранжевая фишка в календаре). Кто пришёл, теряет 10% энергии, но набирает игровой тонус; в остальные свободные дни ребята отдыхают и восстанавливаются сильнее (+10%).',
+      'Недисциплинированные иногда прогуливают: не устают, но и тонус не растёт. В дневнике видно, кто прогулял.',
+      'Новое событие «Прогульщик» сразу после тренировки: оштрафовать, отстранить на матч или позвонить и спросить, что случилось (может раскрыться… а может бросить трубку).',
+    ] },
   { v: '2.3', name: { en: 'Scouts & the Dads\' Pool', ru: 'Скаут и папин тотализатор' },
     en: [
       'The shady businessman is gone: this is a kids\' league.',
@@ -5175,6 +5259,7 @@ class DebugConsole {
     add('ENGINE', 'INJ', p => p.injuryDays || 0, null, 'v2.2 injury: calendar days left');
     add('ENGINE', 'SUS', p => p.suspensionMatches || 0, null, 'v2.2 suspension: matches left');
     add('ENGINE', 'HOME', p => p.awayDays || 0, null, 'v2.3 kept at home by a parent: days left');
+    add('ENGINE', 'SKIP%', p => Math.round(skipChance(p) * 100), null, 'v2.4 chance to skip a training day (from discipline)');
     add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
     return c;
   })();
@@ -5506,6 +5591,42 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v2.4 THE TRUANT — rolled right after the training-day routine ---------- */
+  {
+    id: 'truant', when: 'training',
+    trigger: (s) => s.squad.some(p => p.skipped_training) && Math.random() < EVENTS_CFG.TRUANT_CHANCE,
+    cast(s) {
+      const sk = s.squad.filter(p => p.skipped_training);
+      return sk.length ? { kid: pick(sk).id } : null;
+    },
+    execute(ctx) {
+      const { kid } = ctx.cast, face = kid.portraitSvg, name = L.name(kid.name), role = L.t('talk.roleSnitch', { n: kid.number, p: L.pos(kid.position) });
+      const sorry = ctx.step === 'sorry';
+      if (sorry || ctx.step === 'hangup') {   // result of "call him": decided once, saved as the step (a reload can't re-roll it)
+        ctx.show({ face, name, role: L.t('talk.rolePhone'), text: L.t('ev.truant.' + ctx.step, { k: name }),
+          choices: [{ key: 'ev.truant.' + ctx.step + 'Ok', tone: 'gray', who: kid.id,
+            run: () => {
+              if (sorry) kid.psych.discipline = Math.min(20, kid.psych.discipline + EVENTS_CFG.TRUANT_SORRY_DISC);
+              else kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.TRUANT_HANGUP_MORALE, 0, 100);
+              return { k: { pid: kid.id } };
+            } }] });
+        return;
+      }
+      ctx.show({ face, name, role: L.t('talk.roleTruant'), text: L.t('ev.truant.text', { k: name }),
+        choices: [
+          { key: 'ev.truant.a', tone: 'red', cost: EVENTS_CFG.TRUANT_FINE, who: kid.id,
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + EVENTS_CFG.TRUANT_FINE_DISC); return { k: { pid: kid.id } }; } },
+          { key: 'ev.truant.b', tone: 'gray', who: kid.id,
+            run: () => {
+              kid.suspensionMatches = Math.max(kid.suspensionMatches, 1);
+              kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.TRUANT_BAN_MORALE, 0, 100);
+              return { k: { pid: kid.id } };
+            } },
+          { key: 'ev.truant.c', tone: 'green', next: () => (Math.random() < 0.5 ? 'sorry' : 'hangup') },
+        ] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',
@@ -5571,8 +5692,10 @@ class EventEngine {
     if (!this.enabled) return false;
     const s = this.state, last = s.eventLog[s.eventLog.length - 1];
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
-    for (const ev of shuffle(NARRATIVE_EVENTS.filter(e => (e.when || 'day') === 'day')))
-      if (ev.trigger(s, date) && this.fire(ev.id, date, { resume: true })) return true;
+    // v2.4: on a training day the training events are evaluated first (the routine has just run)
+    const pool = (isTrainingDay(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
+      .concat(shuffle(NARRATIVE_EVENTS.filter(e => (e.when || 'day') === 'day')));
+    for (const ev of pool) if (ev.trigger(s, date) && this.fire(ev.id, date, { resume: true })) return true;
     return false;
   }
   /** v2.2: on a MATCH day, before kick-off (called when the calendar stops on the matchday). */
@@ -5619,7 +5742,7 @@ class EventEngine {
     if (choice.debt) s.addMoney(-choice.debt, true);   // v2.2: forced payment, may go below $0
     const vars = choice.run?.() || {};
     if (choice.next) {                                 // v2.2 multi-step dialogue: same event, next step
-      pe.step = choice.next;
+      pe.step = typeof choice.next === 'function' ? choice.next() : choice.next;   // v2.4: a step can be rolled
       s.save();
       this.open();
       return;
@@ -5820,9 +5943,12 @@ class UIController {
     // Future event types plug in here, e.g.:
     // cal.registerType('training', { blocking: false, label: ev => '…', onArrive: ev => this.state.applyTraining(ev) });
     // cal.registerType('dialogue', { blocking: true,  label: ev => '…', onArrive: ev => this.openDialogue(ev) });
-    cal.onDay(() => {
-      this.state.restDay();
-      return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
+    cal.onDay(date => {   // v2.4: Tue/Thu = training (the EventEngine rolls right after this, in runCalendar → onStep)
+      const r = this.state.dayRoutine(date);
+      if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
+      return r.skipped.length
+        ? { key: 'cal.training', vars: { a: r.attended, s: { list: r.skipped.map(p => ({ pid: p.id })) } }, cls: 'tr' }
+        : { key: 'cal.trainingAll', vars: { a: r.attended }, cls: 'tr' };
     });
   }
 
@@ -6282,7 +6408,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     } else {
       this.$('next-event').innerHTML = `<div class="ne-row">${emblemHTML(lg.team(0), 'lg')}</div><div class="ev-title">${L.t('dash.none')}</div>`;
     }
-    this.$('cal-legend').innerHTML = ['match', 'W', 'D', 'L', 'rest', 'today']
+    this.$('cal-legend').innerHTML = ['match', 'W', 'D', 'L', 'training', 'rest', 'today']
       .map(k => `<li><i class="sw sw-${k}"></i>${L.t('cal.lg.' + k)}</li>`).join('');
 
     // club panel
@@ -6342,16 +6468,17 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     }
     const start = s.calendar.events[0] && isoAdd(s.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
     const end = s.calendar.events[s.calendar.events.length - 1]?.date;
-    return { kind: start && iso >= start && iso <= end ? 'rest' : 'off' };
+    if (!(start && iso >= start && iso <= end)) return { kind: 'off' };
+    return { kind: isTrainingDay(iso) ? 'training' : 'rest' };   // v2.4
   }
 
   renderCalendar() {
     const ym = this.viewMonth(), today = this.cal.date;
-    const first = ym + '-01', lead = new Date(first + 'T00:00:00Z').getUTCDay();
+    const first = ym + '-01', lead = (new Date(first + 'T00:00:00Z').getUTCDay() + 6) % 7;   // v2.4: Monday-first week
     const days = daysBetween(first, this.shiftMonth(ym, 1) + '-01');
     this.$('cal-month').textContent = fmtDate(first, { month: 'long', year: 'numeric' });
     this.$('cal-today').textContent = fmtDate(today, { weekday: 'long', day: 'numeric', month: 'long' });
-    const wd = Array.from({ length: 7 }, (_, i) => `<div class="cal-wd">${fmtDate(isoAdd('2002-09-01', i), { weekday: 'short' })}</div>`).join('');
+    const wd = Array.from({ length: 7 }, (_, i) => `<div class="cal-wd${i >= 5 ? ' we' : ''}">${fmtDate(isoAdd('2002-09-02', i), { weekday: 'short' })}</div>`).join('');   // 2002-09-02 = Monday
     let cells = '';
     for (let i = 0; i < 42; i++) {
       const n = i - lead + 1;
@@ -6365,6 +6492,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         body = `<div class="cd-ev">${emblemHTML(d.opp, 'xs')}<span class="cd-tag ${d.res ? 't-' + d.res.r : 't-match'}">${tag}</span></div>
           <div class="cd-opp">${esc(L.team(d.opp.name))}</div>`;
       } else if (d.kind === 'rest') body = '<div class="cd-rest"></div>';
+      else if (d.kind === 'training') body = `<div class="cd-cone" aria-hidden="true"></div><div class="cd-tr">${L.t('cal.trShort')}</div>`;
       cells += `<div class="${cls}" data-date="${iso}" role="gridcell" tabindex="-1" title="${esc(this.dayText(iso, d))}"><span class="cd-n">${n}</span>${body}</div>`;
     }
     this.$('cal-grid').innerHTML = wd + cells;
@@ -6377,7 +6505,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const when = fmtDate(iso, { weekday: 'short', day: 'numeric', month: 'short' });
     if (d.kind === 'match') return `${when}: ` + L.t(d.res ? 'cal.info.played' : 'cal.info.match',
       { md: d.ev.md, o: L.team(d.opp.name), v: L.t('venue.' + d.venue), x: d.res?.gf, y: d.res?.ga });
-    return `${when}: ` + L.t(d.kind === 'rest' ? 'cal.info.rest' : 'cal.info.off', { n: ENERGY.DAILY_REST });
+    return `${when}: ` + L.t({ rest: 'cal.info.rest', training: 'cal.info.training' }[d.kind] || 'cal.info.off', { n: ENERGY.DAILY_REST, d: TRAINING.DRAIN, s: TRAINING.SHARP });
   }
 
   pickDay(iso) {

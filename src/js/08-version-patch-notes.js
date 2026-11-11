@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.4', name: { en: 'Training Days', ru: 'Тренировки' },
+    en: [
+      'The calendar week now starts on Monday (Mon … Sun), with correct blank days at the start of every month.',
+      'Every Tuesday and Thursday is a training day (orange cone on the calendar). Kids who turn up lose 10% energy but gain match sharpness; on the other free days they rest and recover more (+10%).',
+      'Kids with poor discipline sometimes skip training: no tiredness, but no sharpness either. The diary lists who skipped.',
+      'New event "The Truant" right after training: fine him, suspend him for a match, or call and ask what is wrong (he may open up… or hang up on you).',
+    ],
+    ru: [
+      'Неделя в календаре теперь начинается с понедельника (Пн … Вс), пустые дни в начале каждого месяца считаются правильно.',
+      'Каждый вторник и четверг — тренировка (оранжевая фишка в календаре). Кто пришёл, теряет 10% энергии, но набирает игровой тонус; в остальные свободные дни ребята отдыхают и восстанавливаются сильнее (+10%).',
+      'Недисциплинированные иногда прогуливают: не устают, но и тонус не растёт. В дневнике видно, кто прогулял.',
+      'Новое событие «Прогульщик» сразу после тренировки: оштрафовать, отстранить на матч или позвонить и спросить, что случилось (может раскрыться… а может бросить трубку).',
+    ] },
   { v: '2.3', name: { en: 'Scouts & the Dads\' Pool', ru: 'Скаут и папин тотализатор' },
     en: [
       'The shady businessman is gone: this is a kids\' league.',

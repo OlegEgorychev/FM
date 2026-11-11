@@ -213,6 +213,42 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v2.4 THE TRUANT — rolled right after the training-day routine ---------- */
+  {
+    id: 'truant', when: 'training',
+    trigger: (s) => s.squad.some(p => p.skipped_training) && Math.random() < EVENTS_CFG.TRUANT_CHANCE,
+    cast(s) {
+      const sk = s.squad.filter(p => p.skipped_training);
+      return sk.length ? { kid: pick(sk).id } : null;
+    },
+    execute(ctx) {
+      const { kid } = ctx.cast, face = kid.portraitSvg, name = L.name(kid.name), role = L.t('talk.roleSnitch', { n: kid.number, p: L.pos(kid.position) });
+      const sorry = ctx.step === 'sorry';
+      if (sorry || ctx.step === 'hangup') {   // result of "call him": decided once, saved as the step (a reload can't re-roll it)
+        ctx.show({ face, name, role: L.t('talk.rolePhone'), text: L.t('ev.truant.' + ctx.step, { k: name }),
+          choices: [{ key: 'ev.truant.' + ctx.step + 'Ok', tone: 'gray', who: kid.id,
+            run: () => {
+              if (sorry) kid.psych.discipline = Math.min(20, kid.psych.discipline + EVENTS_CFG.TRUANT_SORRY_DISC);
+              else kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.TRUANT_HANGUP_MORALE, 0, 100);
+              return { k: { pid: kid.id } };
+            } }] });
+        return;
+      }
+      ctx.show({ face, name, role: L.t('talk.roleTruant'), text: L.t('ev.truant.text', { k: name }),
+        choices: [
+          { key: 'ev.truant.a', tone: 'red', cost: EVENTS_CFG.TRUANT_FINE, who: kid.id,
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + EVENTS_CFG.TRUANT_FINE_DISC); return { k: { pid: kid.id } }; } },
+          { key: 'ev.truant.b', tone: 'gray', who: kid.id,
+            run: () => {
+              kid.suspensionMatches = Math.max(kid.suspensionMatches, 1);
+              kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.TRUANT_BAN_MORALE, 0, 100);
+              return { k: { pid: kid.id } };
+            } },
+          { key: 'ev.truant.c', tone: 'green', next: () => (Math.random() < 0.5 ? 'sorry' : 'hangup') },
+        ] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',
@@ -278,8 +314,10 @@ class EventEngine {
     if (!this.enabled) return false;
     const s = this.state, last = s.eventLog[s.eventLog.length - 1];
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
-    for (const ev of shuffle(NARRATIVE_EVENTS.filter(e => (e.when || 'day') === 'day')))
-      if (ev.trigger(s, date) && this.fire(ev.id, date, { resume: true })) return true;
+    // v2.4: on a training day the training events are evaluated first (the routine has just run)
+    const pool = (isTrainingDay(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
+      .concat(shuffle(NARRATIVE_EVENTS.filter(e => (e.when || 'day') === 'day')));
+    for (const ev of pool) if (ev.trigger(s, date) && this.fire(ev.id, date, { resume: true })) return true;
     return false;
   }
   /** v2.2: on a MATCH day, before kick-off (called when the calendar stops on the matchday). */
@@ -326,7 +364,7 @@ class EventEngine {
     if (choice.debt) s.addMoney(-choice.debt, true);   // v2.2: forced payment, may go below $0
     const vars = choice.run?.() || {};
     if (choice.next) {                                 // v2.2 multi-step dialogue: same event, next step
-      pe.step = choice.next;
+      pe.step = typeof choice.next === 'function' ? choice.next() : choice.next;   // v2.4: a step can be rolled
       s.save();
       this.open();
       return;
