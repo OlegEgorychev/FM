@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.8', name: { en: 'Attribute Overhaul + DEBUG.EXE', ru: 'Новые атрибуты + DEBUG.EXE' },
+    en: [
+      'Every kid now has a full football profile: biometrics (age 13–15, height, weight, strong foot, weak foot), physical, technical and tactical skills, personality (passion, discipline, composure) and a hidden potential. You still never see the numbers: watch the matches and read the Notebook.',
+      'The Profile Card shows only what a coach can see: portrait, age, height, weight, strong foot, position, energy, role and stats.',
+      'New match maths: a pass is the passer\'s passing + vision against the defender\'s positioning + tackling; the receiver\'s first touch and crossing into the box matter too. Dribbles, tackles, shots and saves use their own skill mixes.',
+      'Match sharpness: kids who play stay sharp, kids on the bench get rusty. Below 50% sharpness technical skills drop. Morale rises with wins and goals, falls with defeats and red cards, and nudges every duel. Stamina decides how fast a kid tires.',
+      'For testing: a small [DEBUG.EXE] button in the tray opens a Registry-Editor-style window with the full squad database (every raw value, sortable) and GOD MODE cheats: restore energy, max morale & sharpness, force a win in the next match.',
+    ],
+    ru: [
+      'У каждого игрока теперь полный футбольный профиль: биометрия (возраст 13–15, рост, вес, ведущая нога, слабая нога), физические, технические и тактические навыки, характер (страсть, дисциплина, хладнокровие) и скрытый потенциал. Цифр ты по-прежнему не видишь: смотри матчи и читай Блокнот.',
+      'Карточка игрока показывает только то, что видит тренер: портрет, возраст, рост, вес, ведущую ногу, позицию, энергию, роль и статистику.',
+      'Новая математика матча: пас — это точность паса + видение поля против выбора позиции + отбора защитника; важны и первое касание принимающего, и навес в штрафную. У дриблинга, отбора, ударов и сейвов свои сочетания навыков.',
+      'Игровой тонус: кто играет, тот в форме, кто сидит в запасе, тот теряет тонус. Ниже 50% технические навыки падают. Мораль растёт от побед и голов, падает от поражений и удалений и влияет на каждую схватку. Выносливость решает, как быстро игрок устаёт.',
+      'Для тестов: маленькая кнопка [DEBUG.EXE] в трее открывает окно в стиле «Редактора реестра» с полной базой состава (все сырые значения, сортировка) и читами РЕЖИМА БОГА: восстановить энергию, максимум морали и тонуса, гарантированная победа в следующем матче.',
+    ] },
   { v: '1.7', name: { en: 'League Statistics', ru: 'Статистика лиги' },
     en: [
       'The "League Table" tab is now simply "League", split in two: standings and results on the left, League Leaders on the right.',

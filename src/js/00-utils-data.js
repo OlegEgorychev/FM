@@ -20,13 +20,52 @@ const NATURAL_LINE = { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'ATT' };   // play
 const LINE_POS = { GK: 'GK', DEF: 'DEF', MID: 'MID', ATT: 'FWD' };
 const LINE_IDX = { DEF: 0, MID: 1, ATT: 2 };
 const ZONE_LINE = ['DEF', 'MID', 'ATT'];   // zone index (relative to team in possession) -> line that plays there
-const ATTRS = ['Speed', 'Pass', 'Dribble', 'Shoot', 'Tackle', 'Save'];
-const PROFILES = { // [min, max] per hidden attribute, 1-20
-  GK:  { Speed: [6, 12],  Pass: [5, 11],  Dribble: [3, 8],   Shoot: [2, 6],   Tackle: [4, 9],   Save: [10, 18] },
-  DEF: { Speed: [7, 14],  Pass: [7, 13],  Dribble: [5, 10],  Shoot: [4, 9],   Tackle: [10, 18], Save: [1, 4] },
-  MID: { Speed: [8, 15],  Pass: [10, 18], Dribble: [8, 15],  Shoot: [7, 13],  Tackle: [7, 14],  Save: [1, 4] },
-  FWD: { Speed: [10, 18], Pass: [7, 13],  Dribble: [10, 17], Shoot: [11, 18], Tackle: [3, 8],   Save: [1, 3] },
+/** Seeded PRNG (FNV-1a hash → mulberry32): the same string always rolls the same numbers. Used to migrate old saves. */
+const seeded = str => {
+  let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  return () => { h = (h + 0x6D2B79F5) >>> 0; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 };
+const rndR = (r, a, b) => a + Math.floor(r() * (b - a + 1));
+
+/* =========================================================
+   v1.8 PLAYER ATTRIBUTES — classic RPG / manager framework. ALL HIDDEN from the normal UI
+   (only DEBUG.EXE shows raw numbers). Skills 1–20, potential 1–100, dynamic states 0–100.
+   ========================================================= */
+const ATTR_GROUPS = {
+  physical:  ['acceleration', 'speed', 'agility', 'strength', 'baseStamina'],
+  technical: ['firstTouch', 'dribbling', 'passing', 'crossing', 'shooting', 'tackling', 'goalkeeping'],
+  tactical:  ['positioning', 'vision', 'decisions'],
+  psych:     ['passion', 'discipline', 'composure'],          // + psych.potential (1–100)
+};
+const SKILL_KEYS = ['physical', 'technical', 'tactical'];     // groups that scale with club strength
+/* [min, max] per position (13–15 year olds). Psych is rolled the same for everybody. */
+const PROFILES = {
+  GK:  { acceleration: [5, 11],  speed: [5, 11],  agility: [9, 16],  strength: [7, 13],  baseStamina: [7, 13],
+         firstTouch: [5, 11],  dribbling: [3, 8],   passing: [5, 11],  crossing: [2, 7],   shooting: [2, 6],   tackling: [4, 9],  goalkeeping: [10, 18],
+         positioning: [9, 16], vision: [4, 10],  decisions: [7, 14] },
+  DEF: { acceleration: [7, 13],  speed: [7, 14],  agility: [6, 12],  strength: [10, 17], baseStamina: [9, 16],
+         firstTouch: [6, 12],  dribbling: [5, 10],  passing: [7, 13],  crossing: [5, 11],  shooting: [4, 9],   tackling: [10, 18], goalkeeping: [1, 4],
+         positioning: [10, 17], vision: [5, 11], decisions: [7, 14] },
+  MID: { acceleration: [8, 14],  speed: [8, 15],  agility: [9, 15],  strength: [7, 13],  baseStamina: [11, 17],
+         firstTouch: [9, 16],  dribbling: [8, 15],  passing: [10, 18], crossing: [7, 14],  shooting: [7, 13],  tackling: [7, 14], goalkeeping: [1, 4],
+         positioning: [8, 14], vision: [10, 17], decisions: [9, 16] },
+  FWD: { acceleration: [11, 18], speed: [10, 18], agility: [10, 16], strength: [7, 14],  baseStamina: [8, 14],
+         firstTouch: [9, 16],  dribbling: [10, 17], passing: [7, 13],  crossing: [6, 12],  shooting: [11, 18], tackling: [3, 8],  goalkeeping: [1, 3],
+         positioning: [9, 15], vision: [7, 13],  decisions: [7, 13] },
+};
+/* Engine composites: which raw skills feed each match roll (weights). TECH = hit by low sharpness (−2 each). */
+const COMPOSITE = {
+  Pass:    { passing: 1, vision: 1 },                         // passer
+  Mark:    { positioning: 1, tackling: 2 },                   // defender reading a pass / blocking a shot
+  Dribble: { dribbling: 1, agility: 1, firstTouch: 1 },
+  Speed:   { acceleration: 1, speed: 1 },
+  Tackle:  { tackling: 2, strength: 1, positioning: 1 },      // defender in a 1v1 duel
+  Shoot:   { shooting: 2, composure: 1 },
+  Save:    { goalkeeping: 2, agility: 1, positioning: 1 },
+};
+const TECH = new Set(ATTR_GROUPS.technical);
+const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -1, FLOOR: 20 };
+const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
 const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 4,
   EXHAUSTED: 30, EXHAUSTED_MULT: 0.8,   // live: under 30% during the match → stats ×0.8 (v1.1)

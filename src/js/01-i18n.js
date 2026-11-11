@@ -475,3 +475,32 @@ Object.assign(I18N.ru, {
   'tr.player': 'Игрок', 'tr.pos': 'Поз', 'tr.mp': 'И', 'tr.g': 'Г', 'tr.a': 'П', 'tr.you': 'твоя академия',
   'tr.status': 'Скауты записывают только матчи, голы и передачи.', 'tr.statusMe': 'Наши ребята. Полная статистика в карточке игрока.',
 });
+
+
+/* ---- v1.8: biometrics on the Profile Card + DEBUG.EXE (developer tools) ---- */
+Object.assign(I18N.en, {
+  'pi.height': 'Height', 'pi.weight': 'Weight', 'pi.foot': 'Foot', 'pi.cm': '{n} cm', 'pi.kg': '{n} kg', 'pi.footL': 'Left', 'pi.footR': 'Right',
+  'dbg.btn': '[DEBUG.EXE]', 'dbg.title': 'DEBUG.EXE — Academy Registry Editor', 'dbg.tabDb': 'DATABASE', 'dbg.tabGod': 'GOD MODE',
+  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — raw values, click a column to sort. Skills 1–20, PA 1–100, states 0–100. Composites = what the match engine rolls (incl. sharpness penalty).',
+  'dbg.avg': 'Squad average', 'dbg.rows': '{n} players · {c} columns',
+  'dbg.energy': 'Restore All Energy to 100%', 'dbg.energyD': 'Sets condition = 100 for the whole squad (and on the pitch, if a match is running).',
+  'dbg.maxMs': 'Max Morale & Sharpness', 'dbg.maxMsD': 'Morale = 100 and sharpness = 100 for every kid.',
+  'dbg.force': 'Force Win Next Match', 'dbg.forceD': 'Arms a one-shot flag: next kick-off the engine gives us +8 on every roll and the opponent −5. Clears at full time.',
+  'dbg.forceOn': 'ARMED', 'dbg.forceOff': 'off', 'dbg.forceLive': 'A match is already running: the flag will apply from the NEXT kick-off.',
+  'dbg.doneEnergy': 'OK: condition restored for {n} players.', 'dbg.doneMs': 'OK: morale & sharpness maxed for {n} players.',
+  'dbg.doneForce': 'OK: Force Win {s}.', 'dbg.godHint': 'Cheats for testing only. They are saved with the academy.',
+  'dbg.forceLog': '[DEBUG] Force Win is active for this match.',
+});
+Object.assign(I18N.ru, {
+  'pi.height': 'Рост', 'pi.weight': 'Вес', 'pi.foot': 'Нога', 'pi.cm': '{n} см', 'pi.kg': '{n} кг', 'pi.footL': 'Левая', 'pi.footR': 'Правая',
+  'dbg.btn': '[DEBUG.EXE]', 'dbg.title': 'DEBUG.EXE — редактор реестра академии', 'dbg.tabDb': 'БАЗА ДАННЫХ', 'dbg.tabGod': 'РЕЖИМ БОГА',
+  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — сырые значения, щёлкни по столбцу для сортировки. Навыки 1–20, PA 1–100, состояния 0–100. Композиты = то, что бросает движок матча (с учётом штрафа за форму).',
+  'dbg.avg': 'Среднее по составу', 'dbg.rows': 'Игроков: {n} · столбцов: {c}',
+  'dbg.energy': 'Восстановить всю энергию до 100%', 'dbg.energyD': 'Кондиция = 100 у всего состава (и на поле, если идёт матч).',
+  'dbg.maxMs': 'Макс. мораль и игровой тонус', 'dbg.maxMsD': 'Мораль = 100 и тонус = 100 у каждого игрока.',
+  'dbg.force': 'Гарантированная победа в след. матче', 'dbg.forceD': 'Одноразовый флаг: со следующего начала матча движок даёт нам +8 к каждому броску, сопернику −5. Сбрасывается после финального свистка.',
+  'dbg.forceOn': 'ВКЛЮЧЕНО', 'dbg.forceOff': 'выкл.', 'dbg.forceLive': 'Матч уже идёт: флаг сработает со СЛЕДУЮЩЕГО начала матча.',
+  'dbg.doneEnergy': 'OK: кондиция восстановлена у {n} игроков.', 'dbg.doneMs': 'OK: мораль и тонус на максимуме у {n} игроков.',
+  'dbg.doneForce': 'OK: гарантированная победа — {s}.', 'dbg.godHint': 'Читы только для тестов. Они сохраняются вместе с академией.',
+  'dbg.forceLog': '[DEBUG] В этом матче включена гарантированная победа.',
+});

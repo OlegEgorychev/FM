@@ -1,0 +1,125 @@
+/* =========================================================
+   v1.8 — DEBUG.EXE (developer mode, Win98 "Registry Editor" look)
+   Tab DATABASE: every hidden + visible attribute of every academy kid as raw numbers (sortable).
+   Tab GOD MODE: test cheats (energy, morale & sharpness, one-shot Force Win).
+   This is the ONLY place where the hidden 1–20 skills are ever rendered.
+   ========================================================= */
+class DebugConsole {
+  /** Column spec: g = group header, h = short header, v = value getter, s = scale for heat colours. */
+  static COLS = (() => {
+    const c = [];
+    const add = (g, h, v, s = null, t = '') => c.push({ g, h, v, s, t });
+    add('ID', '#', p => p.number); add('ID', 'NAME', p => p.name); add('ID', 'POS', p => p.position);
+    add('BIO', 'AGE', p => p.bio.age); add('BIO', 'HT', p => p.bio.height, null, 'height, cm'); add('BIO', 'WT', p => p.bio.weight, null, 'weight, kg');
+    add('BIO', 'FT', p => p.bio.strongFoot, null, 'strong foot'); add('BIO', 'WF', p => p.bio.weakFoot, 5, 'weak foot 1-5');
+    const short = { acceleration: 'ACC', speed: 'SPD', agility: 'AGI', strength: 'STR', baseStamina: 'STA',
+      firstTouch: 'FTC', dribbling: 'DRI', passing: 'PAS', crossing: 'CRO', shooting: 'SHO', tackling: 'TCK', goalkeeping: 'GKP',
+      positioning: 'POS', vision: 'VIS', decisions: 'DEC', passion: 'PSN', discipline: 'DSC', composure: 'CMP' };
+    for (const g of ['physical', 'technical', 'tactical', 'psych'])
+      for (const k of ATTR_GROUPS[g]) add(g.toUpperCase(), short[k], p => p[g][k], 20, k);
+    add('PSYCH', 'PA', p => p.psych.potential, 100, 'potential ability 1-100');
+    add('DYNAMIC', 'CON', p => Math.round(p.dyn.condition), 100, 'condition (energy)');
+    add('DYNAMIC', 'SHP', p => Math.round(p.dyn.sharpness), 100, 'sharpness (match tone); < 50 → technical −2');
+    add('DYNAMIC', 'MOR', p => Math.round(p.dyn.morale), 100, 'morale');
+    for (const k of Object.keys(COMPOSITE)) add('ENGINE', { Pass: 'PAS*', Mark: 'MRK*', Dribble: 'DRB*', Speed: 'PAC*', Tackle: 'TKL*', Shoot: 'SHT*', Save: 'SAV*' }[k], p => +p.rating(k).toFixed(1), 20, 'composite ' + k + ' = ' + Object.keys(COMPOSITE[k]).join('+'));
+    add('ENGINE', 'MOOD', p => +p.moodBonus.toFixed(1), null, 'morale × passion roll bonus');
+    add('ENGINE', 'ROLE', p => (p.tags || [])[0] || '—');
+    return c;
+  })();
+
+  constructor(ui) {
+    this.ui = ui;
+    this.tab = 'db';
+    this.sort = { i: 2, dir: 1 };
+    this.msg = '';
+    this.layer = document.getElementById('debug-layer');
+    this.body = document.getElementById('debug-body');
+    document.getElementById('btn-debug').addEventListener('click', () => this.open());
+    document.getElementById('debug-x').addEventListener('click', () => this.close());
+    document.getElementById('debug-ok').addEventListener('click', () => this.close());
+    this.layer.addEventListener('mousedown', e => { if (e.target === this.layer) this.close(); });
+    this.layer.querySelectorAll('[data-dtab]').forEach(b => b.addEventListener('click', () => { this.tab = b.dataset.dtab; this.msg = ''; this.render(); }));
+    this.body.addEventListener('click', e => {
+      const th = e.target.closest('th[data-col]');
+      if (th) { const i = +th.dataset.col; this.sort = { i, dir: this.sort.i === i ? -this.sort.dir : 1 }; this.render(); return; }
+      const b = e.target.closest('[data-cheat]');
+      if (b) this.cheat(b.dataset.cheat);
+    });
+    document.addEventListener('keydown', e => {
+      if (!this.isOpen || e.key !== 'Escape') return;
+      e.preventDefault(); e.stopImmediatePropagation(); this.close();
+    }, true);
+  }
+  get isOpen() { return !this.layer.hidden; }
+  open() { if (this.ui.modal.isOpen) return; this.ui.profile.close(); this.msg = ''; this.render(); this.layer.hidden = false; document.getElementById('debug-ok').focus(); }
+  close() { this.layer.hidden = true; }
+
+  heat(v, s) {
+    if (s == null || typeof v !== 'number') return '';
+    const r = v / s;
+    return r >= 0.75 ? 'hi' : r >= 0.55 ? 'gd' : r <= 0.3 ? 'lo' : '';
+  }
+
+  render() {
+    if (!this.layer) return;
+    this.layer.querySelectorAll('[data-dtab]').forEach(b => b.classList.toggle('on', b.dataset.dtab === this.tab));
+    this.body.innerHTML = this.tab === 'db' ? this.dbHTML() : this.godHTML();
+    document.getElementById('debug-status').textContent = this.msg
+      || (this.tab === 'db' ? L.t('dbg.rows', { n: this.ui.state.squad.length, c: DebugConsole.COLS.length }) : L.t('dbg.godHint'));
+  }
+
+  dbHTML() {
+    const C = DebugConsole.COLS, { i, dir } = this.sort;
+    const squad = [...this.ui.state.squad].sort((a, b) => {
+      if (i === 2) return dir * ((POS_ORDER[a.position] - POS_ORDER[b.position]) || a.number - b.number);
+      const x = C[i].v(a), y = C[i].v(b);
+      return dir * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y)));
+    });
+    const groups = [];
+    C.forEach(c => { const last = groups[groups.length - 1]; if (last && last.g === c.g) last.n++; else groups.push({ g: c.g, n: 1 }); });
+    const head1 = groups.map(g => `<th colspan="${g.n}" class="grp g-${g.g.toLowerCase()}">${g.g}</th>`).join('');
+    const head2 = C.map((c, k) => `<th data-col="${k}" title="${esc(c.t || c.h)}" class="${k === i ? (dir > 0 ? 'asc' : 'desc') : ''}">${c.h}</th>`).join('');
+    const rows = squad.map(p => `<tr>${C.map(c => { const v = c.v(p); return `<td class="${this.heat(v, c.s)}">${esc(v)}</td>`; }).join('')}</tr>`).join('');
+    const avg = C.map((c, k) => {
+      if (k === 0) return `<td colspan="3">${L.t('dbg.avg')}</td>`;
+      if (k < 3) return '';
+      const vals = squad.map(c.v).filter(v => typeof v === 'number');
+      return vals.length && c.s ? `<td>${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}</td>` : '<td></td>';
+    }).join('');
+    return `<p class="dbg-hint">${esc(L.t('dbg.dbHint'))}</p>
+      <div class="dbg-scroll"><table class="dbg-table"><thead><tr>${head1}</tr><tr>${head2}</tr></thead>
+      <tbody>${rows}</tbody><tfoot><tr>${avg}</tr></tfoot></table></div>`;
+  }
+
+  godHTML() {
+    const on = !!this.ui.state.cheats?.forceWin;
+    const btn = (id, label, desc, extra = '') => `<div class="dbg-cheat"><button class="btn${extra}" type="button" data-cheat="${id}">${label}</button><span>${desc}</span></div>`;
+    return `<div class="dbg-god">
+      ${btn('energy', L.t('dbg.energy'), L.t('dbg.energyD'))}
+      ${btn('maxms', L.t('dbg.maxMs'), L.t('dbg.maxMsD'))}
+      ${btn('force', L.t('dbg.force') + ` <b class="dbg-flag ${on ? 'on' : ''}">[${L.t(on ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.forceD'), on ? ' armed' : '')}
+    </div>`;
+  }
+
+  cheat(id) {
+    const ui = this.ui, s = ui.state, eng = ui.engine && !ui.engine.finished ? ui.engine : null;
+    if (id === 'energy') {
+      for (const p of s.squad) {
+        p.dyn.condition = 100;
+        if (eng?.energy.has(p.id)) { eng.energy.set(p.id, 100); eng.tired.delete(p.id); }
+      }
+      this.msg = L.t('dbg.doneEnergy', { n: s.squad.length });
+    } else if (id === 'maxms') {
+      for (const p of s.squad) { p.dyn.morale = 100; p.dyn.sharpness = 100; }
+      this.msg = L.t('dbg.doneMs', { n: s.squad.length });
+    } else if (id === 'force') {
+      s.cheats = { ...(s.cheats || {}), forceWin: !s.cheats?.forceWin };
+      this.msg = L.t('dbg.doneForce', { s: L.t(s.cheats.forceWin ? 'dbg.forceOn' : 'dbg.forceOff') })
+        + (s.cheats.forceWin && eng ? ' ' + L.t('dbg.forceLive') : '');
+    }
+    s.save();
+    ui.renderAll();
+    if (eng) ui.renderLive(eng);
+    this.render();
+  }
+}

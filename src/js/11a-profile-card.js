@@ -103,6 +103,9 @@ class ProfileCard {
           <dt>${L.t('pi.name')}</dt><dd><b>${esc(L.name(p.name))}</b></dd>
           <dt>${L.t('pi.number')}</dt><dd>#${p.number ?? '—'}</dd>
           <dt>${L.t('pi.age')}</dt><dd>${p.age}</dd>
+          <dt>${L.t('pi.height')}</dt><dd>${L.t('pi.cm', { n: p.bio.height })}</dd>
+          <dt>${L.t('pi.weight')}</dt><dd>${L.t('pi.kg', { n: p.bio.weight })}</dd>
+          <dt>${L.t('pi.foot')}</dt><dd>${L.t(p.bio.strongFoot === 'L' ? 'pi.footL' : 'pi.footR')}</dd>
           <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.position}">${L.pos(p.position)}</span></dd>
           <dt>${L.t('pi.status')}</dt><dd>${where}</dd>
         </dl>

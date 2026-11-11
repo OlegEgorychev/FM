@@ -20,13 +20,14 @@ class MatchEngine {
     this.tired = new Set(home.players.filter(p => (p.energy ?? 100) < ENERGY.TIRED).map(p => p.id));
     // LIVE energy (v1.1): every player drains 30–40% over 90 minutes; subs come on with their own energy
     this.energy = new Map(); this.drain = new Map();
-    for (const s of this.sides) for (const e of s.entries) { this.energy.set(e.p.id, e.p.energy ?? 100); this.drain.set(e.p.id, rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90); }
+    for (const s of this.sides) for (const e of s.entries) { this.energy.set(e.p.id, e.p.energy ?? 100); this.drain.set(e.p.id, MatchEngine.drainOf(e.p)); }
     this.everPlayed = new Set(home.players.map(p => p.id));
     this.subbedOff = new Set();
     this.subsUsed = 0;
     this.subs = [];
     this.paused = false;
     this.mentality = opts.mentality || 'balanced';
+    this.forceWin = !!opts.forceWin;   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
     this.speed = opts.speed || 1;
     this.sentOff = new Set();
     this.timer = null;
@@ -48,6 +49,8 @@ class MatchEngine {
     return { name: team.name, formation: team.formation, user, score: 0, players: [...team.players], all: [...team.players],
       entries: slots.map((s, i) => ({ ...s, p: team.players[i] })) };
   }
+  /** v1.8: per-minute drain, base 30–40% / 90' scaled by baseStamina (20 → ×0.85, 10 → ×1.0, 1 → ×1.135). */
+  static drainOf(p) { return rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90 * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015); }
   static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0, assists: 0 }; }
 
   /* ---------- background play (v1.0) ----------
@@ -76,7 +79,7 @@ class MatchEngine {
         if (Math.random() < MatchEngine.AMBIENT.pass[e.line]) {
           const def = pick(this.lineMates(opp, MatchEngine.OPP_LINE[e.line]));
           const atk = this.eff(p, 'Pass') + R() + this.mod(side, 'atk') + this.sup(side, z) * 0.5;
-          const dfn = this.eff(def, 'Tackle') * 0.35 + 5.2 + R() + this.mod(opp, 'def');
+          const dfn = this.eff(def, 'Mark') * 0.35 + 5.2 + R() + this.mod(opp, 'def');
           if (atk >= dfn) this.st(p).passOk++;
           else { this.st(p).passFail++; this.st(def).intercepts++; }
         }
@@ -104,23 +107,29 @@ class MatchEngine {
   scoreVars() { return { h: this.team(0), x: this.sides[0].score, y: this.sides[1].score, a: this.team(1) }; }
   setEv(ev) { this.ev = ev; this.seq++; this.evLog.push({ seq: this.seq, ev }); if (this.evLog.length > 12) this.evLog.shift(); }
 
-  /* ---------- the maths: tags, fatigue, position, shouts, numerical superiority ---------- */
+  /* ---------- the maths: tags, fatigue, position, shouts, numerical superiority ----------
+     v1.8: `attr` is a COMPOSITE key (00-utils-data.js) built from the raw 1–20 skills:
+     Pass = passing+vision · Mark = positioning+2·tackling · Dribble = dribbling+agility+firstTouch · Speed = acceleration+speed
+     Tackle = 2·tackling+strength+positioning · Shoot = 2·shooting+composure · Save = 2·goalkeeping+agility+positioning.
+     Global modifiers: sharpness < 50% → technical skills −2 (inside Player.skill), condition = live energy (×0.5 / ×0.8),
+     morale × passion → ±2.5 flat on every roll. */
   eff(p, attr) {
-    let v = p.attrs[attr];
+    let v = p.rating ? p.rating(attr) : 10;
     if (this.tired.has(p.id)) v *= 0.5;
     const en = this.energy?.get(p.id);
     if (en !== undefined && en < ENERGY.EXHAUSTED) v *= ENERGY.EXHAUSTED_MULT;
     if (NATURAL_LINE[p.position] !== this.lineOf.get(p.id)) v *= OUT_OF_POSITION;
     const t = p.tags || [];
-    if (t.includes('Aggressive') && attr === 'Tackle') v *= 1.5;
+    if (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) v *= 1.5;
     if (t.includes('Playmaker') && attr === 'Pass') v *= 1.5;
     if (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) v *= 1.5;
-    return v;
+    return v + (p.moodBonus ?? 0);
   }
   mod(side, role) {
-    if (side !== 0 || this.mentality === 'balanced') return 0;
+    const cheat = this.forceWin ? (side === 0 ? 8 : -5) : 0;
+    if (side !== 0 || this.mentality === 'balanced') return cheat;
     const pushing = this.mentality === 'attack';
-    return (role === 'atk') === pushing ? 3 : -3;
+    return cheat + ((role === 'atk') === pushing ? 3 : -3);
   }
   counts(side) {
     const c = { DEF: 0, MID: 0, ATT: 0 };
@@ -239,7 +248,7 @@ class MatchEngine {
     if (!this.stats.has(inP.id)) this.stats.set(inP.id, MatchEngine.blankStats());
     this.lineOf.set(inP.id, line);
     this.energy.set(inP.id, inP.energy ?? 100);
-    this.drain.set(inP.id, rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90);
+    this.drain.set(inP.id, MatchEngine.drainOf(inP));
     if ((inP.energy ?? 100) < ENERGY.TIRED) this.tired.add(inP.id);
     this.everPlayed.add(inP.id);
     this.subbedOff.add(outId);
@@ -287,6 +296,10 @@ class MatchEngine {
       { pass: 60, dribble: 32, shoot: 8 },
       this.lineOf.get(c.id) === 'ATT' ? { pass: 28, dribble: 22, shoot: 50 } : { pass: 38, dribble: 27, shoot: 35 },
     ][this.zone] };
+    // v1.8: decisions — rash kids try hopeful long shots, smart ones keep the ball moving
+    const dec = c.tactical?.decisions ?? 10;
+    if (dec <= 7 && this.zone === 1) w.shoot += 6;
+    if (dec >= 15) { w.pass *= 1.15; if (this.zone === 1) w.shoot *= 0.6; }
     const t = c.tags || [];
     if (t.includes('Playmaker')) { w.pass *= 2; w.dribble *= 0.4; }
     if (t.includes('Selfish')) {
@@ -320,8 +333,12 @@ class MatchEngine {
     const def = pick(this.inZone(opp, 2 - tz));
     const forward = tz > z;
 
-    const atk = this.eff(c, 'Pass') + Math.random() * 10 + 3 - (forward ? 2 : 0) + (this.isGK(c) ? 2 : 0) + this.mod(side, 'atk') + this.sup(side, tz);
-    const dfn = this.eff(def, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def');
+    // v1.8: passer (passing+vision) vs reader (positioning+tackling); the receiver's first touch adds ±1.5;
+    // a forward ball into the final third leans on crossing.
+    const touch = ((recv.skill?.('firstTouch') ?? 10) - 10) * 0.15;
+    const cross = forward && tz === 2 ? ((c.skill?.('crossing') ?? 10) - 10) * 0.1 : 0;
+    const atk = this.eff(c, 'Pass') + Math.random() * 10 + 3 - (forward ? 2 : 0) + (this.isGK(c) ? 2 : 0) + touch + cross + this.mod(side, 'atk') + this.sup(side, tz);
+    const dfn = this.eff(def, 'Mark') + Math.random() * 10 + this.mod(opp, 'def');
     const vars = { a: c, b: recv, d: def };
 
     if (atk >= dfn) {
@@ -397,7 +414,7 @@ class MatchEngine {
     const keeper = this.keeper(opp);
 
     if (Math.random() < 0.2 &&
-        this.eff(blocker, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
+        this.eff(blocker, 'Mark') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
       this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
       this.turnover(blocker, 0);

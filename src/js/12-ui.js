@@ -26,6 +26,7 @@ class UIController {
     this.modal = new Modal();
     this.profile = new ProfileCard(this);
     this.teamCard = new TeamRosterCard(this);   // v1.7
+    this.debug = new DebugConsole(this);         // v1.8
     this.setupCalendar();
     this.bind();
     this.applyStatic();
@@ -68,6 +69,7 @@ class UIController {
     this.syncLocks();
     this.renderShouts();
     this.renderSpeedBtns();
+    if (this.debug?.isOpen) this.debug.render();   // v1.8
   }
 
   /* ---------- language ---------- */
@@ -960,7 +962,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin });
+    if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.liveSel = null;
     this.radar.setup(this.engine.sides);
     this.engine.start();
@@ -1043,6 +1046,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
+    s.applyMatchDynamics(eng, result);
+    if (s.cheats?.forceWin) s.cheats.forceWin = false;   // v1.8: one-shot debug cheat
+    this.debug?.render();
     s.phase = 'post';
     s.notebookUnlocked = true;
     s.save();

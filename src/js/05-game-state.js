@@ -34,6 +34,7 @@ class GameState {
     this.notebookUnlocked = false;
     this.diary = [{ date: start, key: 'cal.welcome', vars: { y: year, z: String(year + 1).slice(2) } }];
     this.seasonStats = {};   // playerId → cumulative stats this season (+ apps)
+    this.cheats = this.cheats || { forceWin: false };   // v1.8 DEBUG.EXE
     this.coachNotes = {};    // v1.5: playerId → last Notebook note the coach actually saw { md, keys, role }
     for (const p of this.squad) p.energy = 100;   // summer break
     this.save();
@@ -109,7 +110,27 @@ class GameState {
   removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
 
   /* ----- energy ----- */
-  restDay() { for (const p of this.squad) p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100); }
+  /** Rest day: condition +4, match sharpness fades −1 (floor 20), morale drifts 1 point toward 60. */
+  restDay() {
+    for (const p of this.squad) {
+      p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
+      p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
+      p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
+    }
+  }
+  /** v1.8: after a match — sharpness from minutes (full game +12, sub +6, unused −2); morale from the result,
+      goals and red cards, amplified by passion (0.6×–1.4×). */
+  applyMatchDynamics(eng, result) {
+    const subIn = new Set(eng.subs.map(x => x.in));
+    for (const p of this.squad) {
+      const played = eng.everPlayed.has(p.id), st = eng.stats.get(p.id);
+      const sh = !played ? SHARPNESS.UNUSED : subIn.has(p.id) || eng.subbedOff.has(p.id) ? SHARPNESS.SUB : SHARPNESS.PLAYED;
+      p.dyn.sharpness = clamp(p.dyn.sharpness + sh, 0, 100);
+      let m = MORALE[result] + (st ? st.goals * MORALE.GOAL + st.red * MORALE.RED : 0);
+      if (!played) m -= 2;
+      p.dyn.morale = clamp(Math.round(p.dyn.morale + m * (0.6 + p.psych.passion / 25)), 0, 100);
+    }
+  }
   /** v1.1: players who played keep their LIVE end-of-match energy; unused subs rest. */
   applyLiveFatigue(eng) {
     for (const p of this.squad) {
@@ -149,7 +170,7 @@ class GameState {
       localStorage.setItem(GameState.KEY, JSON.stringify({
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
-        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes,
+        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -183,6 +204,7 @@ class GameState {
         this.diary = Array.isArray(d.diary) ? d.diary : [];
         this.seasonStats = d.seasonStats && typeof d.seasonStats === 'object' ? d.seasonStats : {};
         this.coachNotes = d.coachNotes && typeof d.coachNotes === 'object' ? d.coachNotes : {};
+        this.cheats = { forceWin: !!d.cheats?.forceWin };
         if (this.lastReport && !d.coachNotes) this.recordCoachNotes(this.lastReport);   // pre-v1.5 save
         // a match interrupted by a page reload is simply replayed
       } else {

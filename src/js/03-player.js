@@ -54,25 +54,91 @@ const PortraitGenerator = (() => {
 })();
 
 /* =========================================================
-   PLAYER
+   PLAYER (v1.8: nested attribute structure)
+   bio       — age 13–15, height (cm), weight (kg), strongFoot L/R, weakFoot 1–5   (position stays on p.position)
+   physical  — acceleration, speed, agility, strength, baseStamina          (1–20, HIDDEN)
+   technical — firstTouch, dribbling, passing, crossing, shooting, tackling, goalkeeping (1–20, HIDDEN)
+   tactical  — positioning, vision, decisions                               (1–20, HIDDEN)
+   psych     — passion, discipline, composure (1–20) + potential (PA 1–100)  (HIDDEN)
+   dyn       — condition (= energy), sharpness (match tone), morale         (0–100)
    ========================================================= */
+const AttrGen = {
+  /** Fresh roll. r = rng (Math.random or seeded), mod = club strength shift for skill groups. */
+  roll(position, r = Math.random, mod = 0, age = null) {
+    const P = PROFILES[position] || PROFILES.MID, out = {};
+    for (const g of SKILL_KEYS) { out[g] = {}; for (const k of ATTR_GROUPS[g]) { const [lo, hi] = P[k]; out[g][k] = clamp(rndR(r, lo, hi) + mod, 1, 20); } }
+    out.psych = { passion: rndR(r, 4, 18), discipline: rndR(r, 3, 18), composure: rndR(r, 3, 17),
+      potential: clamp(Math.round(30 + (r() + r() + r()) / 3 * 65 + mod * 2), 1, 100) };   // bell-ish 30–95
+    out.bio = AttrGen.bio(position, r, age, out.physical);
+    return out;
+  },
+  bio(position, r, age, phys) {
+    age = Number.isInteger(age) && age >= 13 && age <= 16 ? age : rndR(r, 13, 15);
+    const height = Math.round(150 + (age - 13) * 6 + (position === 'GK' ? 5 : 0) + (r() - 0.5) * 20);
+    const weight = Math.round(height * 0.45 - 22 + (phys ? (phys.strength - 10) * 0.6 : 0) + (r() - 0.5) * 8);
+    const strongFoot = r() < 0.76 ? 'R' : 'L';
+    const wf = r(); const weakFoot = wf < 0.30 ? 1 : wf < 0.68 ? 2 : wf < 0.88 ? 3 : wf < 0.97 ? 4 : 5;
+    return { age, height, weight, strongFoot, weakFoot };
+  },
+  /** Saves made before v1.8 only have the 6 old attrs (Speed/Pass/Dribble/Shoot/Tackle/Save): derive stable values. */
+  fromLegacy(position, a, seed, age) {
+    const r = seeded(seed), j = v => clamp(Math.round(v + (r() - 0.5) * 4), 1, 20);
+    const avg = (...x) => x.reduce((s, v) => s + v, 0) / x.length;
+    const fresh = AttrGen.roll(position, r, 0, age);   // psych, bio, stamina come from the seed
+    fresh.physical = { acceleration: j(a.Speed), speed: j(a.Speed), agility: j(avg(a.Speed, a.Dribble)),
+      strength: j(avg(a.Tackle, 10)), baseStamina: fresh.physical.baseStamina };
+    fresh.technical = { firstTouch: j(a.Dribble), dribbling: j(a.Dribble), passing: j(a.Pass), crossing: j(a.Pass - 1),
+      shooting: j(a.Shoot), tackling: j(a.Tackle), goalkeeping: j(a.Save) };
+    fresh.tactical = { positioning: j(position === 'GK' ? a.Save - 2 : a.Tackle), vision: j(a.Pass), decisions: j(avg(a.Pass, a.Tackle)) };
+    return fresh;
+  },
+  validGroup(o, g) { return o && typeof o === 'object' && ATTR_GROUPS[g].every(k => Number.isFinite(o[k])); },
+};
+
 class Player {
-  constructor({ id, name, position, attrs, tags, energy, number, face, age }) {
+  constructor(o) {
+    const { id, name, position, tags, number, face } = o;
     this.id = id;
     this.name = name;
     this.position = position;
     this.number = number;
-    this.attrs = attrs;              // HIDDEN — never rendered
-    if (tags) {                      // only the academy squad carries tags + energy
-      this.tags = tags;
-      this.energy = energy ?? 100;
-    }
+    if (tags) this.tags = tags;      // only the academy squad carries tags
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
-    // v1.5: age 14–16 (saves made before v1.5 get a stable age from the name hash)
-    this.age = Number.isInteger(age) && age >= 14 && age <= 16 ? age : 14 + PortraitGenerator.hashFace(id + name + '#age')[1];
+    // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
+    const fresh = SKILL_KEYS.every(g => AttrGen.validGroup(o[g], g)) && AttrGen.validGroup(o.psych, 'psych') ? null
+      : o.attrs ? AttrGen.fromLegacy(position, o.attrs, id + name + '#v18', o.age)
+      : AttrGen.roll(position, seeded(id + name + '#v18'), 0, o.age);
+    const src = fresh || o;
+    for (const g of [...SKILL_KEYS, 'psych']) this[g] = { ...src[g] };
+    this.psych.potential = clamp(Math.round(src.psych.potential ?? 50), 1, 100);
+    const b = o.bio && Number.isInteger(o.bio.age) ? o.bio : (fresh?.bio || AttrGen.bio(position, seeded(id + name + '#bio'), o.age, this.physical));
+    this.bio = { ...b };
+    const d = o.dyn || {};
+    const r = seeded(id + name + '#dyn');
+    this.dyn = { condition: clamp(Math.round(d.condition ?? o.energy ?? 100), 0, 100),
+      sharpness: clamp(Math.round(d.sharpness ?? rndR(r, 55, 75)), 0, 100),
+      morale: clamp(Math.round(d.morale ?? rndR(r, 55, 75)), 0, 100) };
     this.portraitSvg = PortraitGenerator.svg(this.face, position === 'GK' ? 'gk' : tags ? 'home' : 'away');
   }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
+  get age() { return this.bio.age; }
+  /** `energy` is the old name of dyn.condition — kept so every v1.1–v1.7 system keeps working. */
+  get energy() { return this.dyn.condition; }
+  set energy(v) { this.dyn.condition = v; }
+  get sharp() { return this.dyn.sharpness >= SHARPNESS.RUSTY; }
+  /** Raw skill with the sharpness rule applied: technical skills −2 when match tone < 50%. */
+  skill(k) {
+    const v = this.physical[k] ?? this.technical[k] ?? this.tactical[k] ?? this.psych[k] ?? 10;
+    return TECH.has(k) && !this.sharp ? Math.max(1, v - SHARPNESS.RUSTY_PEN) : v;
+  }
+  /** Weighted engine composite (1–20 scale), e.g. rating('Pass') = (passing + vision) / 2. */
+  rating(key) {
+    const w = COMPOSITE[key]; let sum = 0, n = 0;
+    for (const k in w) { sum += this.skill(k) * w[k]; n += w[k]; }
+    return sum / n;
+  }
+  /** Morale swing on every roll: ±2 at the extremes, amplified by passion (0.6×–1.5×). */
+  get moodBonus() { return clamp((this.dyn.morale - 50) / 25 * (0.55 + this.psych.passion / 20), -2.5, 2.5); }
   /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */
   toJSON() { const { portraitSvg, ...o } = this; return o; }
 
@@ -80,8 +146,8 @@ class Player {
     let last; let guard = 0;
     do { last = pick(LAST); } while (usedSurnames.has(last) && guard++ < 200);
     usedSurnames.add(last);
-    const attrs = {};
-    for (const a of ATTRS) { const [lo, hi] = PROFILES[position][a]; attrs[a] = clamp(rnd(lo, hi) + mod, 1, 20); }
-    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(), age: rnd(14, 16) });
+    const a = AttrGen.roll(position, Math.random, mod);
+    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(),
+      ...a, dyn: { condition: 100, sharpness: rnd(55, 75), morale: rnd(55, 75) } });
   }
 }

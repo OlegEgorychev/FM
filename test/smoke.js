@@ -111,7 +111,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     });
     await shot('5-profile');
     await page.keyboard.press('Escape');
-    check('profile card: notebook right-click, season stats + note + 96px face', pc3.open && pc3.apps === 1 && pc3.age >= 14 && pc3.age <= 16 && pc3.txt && pc3.note && pc3.svg >= 90, JSON.stringify(pc3));
+    check('profile card: notebook right-click, season stats + note + 96px face', pc3.open && pc3.apps === 1 && pc3.age >= 13 && pc3.age <= 16 && pc3.txt && pc3.note && pc3.svg >= 90, JSON.stringify(pc3));
     await page.click('#notes-body [data-tag]');
     await shot('4-notebook');
     await page.click('#btn-back');
@@ -162,6 +162,44 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const closed = await page.evaluate(() => document.getElementById('troster-layer').hidden && YAM.ui.view === 'table');
     check('team roster modal: click row, emblem, position, 14 rows sorted by goals, Esc closes', tr.open && /_ROSTER\.EXE$/.test(tr.title)
       && tr.rows === 14 && tr.sorted && tr.badge && tr.place && closed, JSON.stringify({ ...tr, closed }));
+    // v1.8: attribute structure + DEBUG.EXE (database + god mode); hidden attrs never on the Profile Card
+    const at = await page.evaluate(() => {
+      const sq = YAM.game.squad, G = { physical: 5, technical: 7, tactical: 3, psych: 4 };
+      const okRange = (v, a, b) => Number.isFinite(v) && v >= a && v <= b;
+      return { groups: sq.every(p => Object.entries(G).every(([g, n]) => Object.keys(p[g]).length === n)),
+        skills: sq.every(p => ['physical', 'technical', 'tactical'].every(g => Object.values(p[g]).every(v => okRange(v, 1, 20)))),
+        pa: sq.every(p => okRange(p.psych.potential, 1, 100)), bio: sq.every(p => okRange(p.bio.age, 13, 16) && 'LR'.includes(p.bio.strongFoot) && okRange(p.bio.weakFoot, 1, 5) && p.bio.height > 130),
+        dyn: sq.every(p => ['condition', 'sharpness', 'morale'].every(k => okRange(p.dyn[k], 0, 100)) && p.energy === p.dyn.condition),
+        saved: /"technical":\{/.test(localStorage.getItem('yam_save_v1') || '') && !/"attrs"/.test(localStorage.getItem('yam_save_v1') || '') };
+    });
+    check('v1.8 attributes: nested groups, ranges, condition = energy, saved', Object.values(at).every(Boolean), JSON.stringify(at));
+    await page.click('#btn-debug');
+    const db = await page.evaluate(() => ({ open: !document.getElementById('debug-layer').hidden,
+      rows: document.querySelectorAll('#debug-body .dbg-table tbody tr').length, cols: document.querySelectorAll('#debug-body .dbg-table thead tr:nth-child(2) th').length,
+      n: YAM.game.squad.length }));
+    await shot('7-debug-db');
+    await page.click('#debug-layer [data-dtab="god"]');
+    await page.evaluate(() => { for (const p of YAM.game.squad) { p.energy = 31; p.dyn.morale = 20; p.dyn.sharpness = 10; } });
+    await page.click('[data-cheat="energy"]'); await page.click('[data-cheat="maxms"]'); await page.click('[data-cheat="force"]');
+    await shot('8-debug-god');
+    const gm = await page.evaluate(() => ({ e: YAM.game.squad.every(p => p.energy === 100), m: YAM.game.squad.every(p => p.dyn.morale === 100 && p.dyn.sharpness === 100),
+      f: YAM.game.cheats.forceWin === true, armed: !!document.querySelector('[data-cheat="force"].armed') }));
+    await page.keyboard.press('Escape');
+    const dbClosed = await page.evaluate(() => document.getElementById('debug-layer').hidden);
+    check('DEBUG.EXE: database lists every kid + all columns, god mode cheats work, Esc closes', db.open && db.rows === db.n && db.cols >= 35 && Object.values(gm).every(Boolean) && dbClosed, JSON.stringify({ db, gm }));
+    // Force Win: a headless engine run with the flag must beat a far stronger side
+    const fw = await page.evaluate(() => {
+      const home = YAM.ui.homeTeam(), ctx = YAM.game.matchContext();
+      let wins = 0;
+      for (let i = 0; i < 10; i++) {
+        const e = new YAM.MatchEngine(home, ctx.team, { onLog() {}, onUpdate() {}, onEnd() {}, onHalfTime: x => { x.paused = false; } }, { forceWin: true });
+        e.started = true; e.kickoff(0); e.stop = () => {}; e.updateSpeed = () => {};
+        while (!e.finished) { e.paused = false; e.tick(); }
+        if (e.sides[0].score > e.sides[1].score) wins++;
+      }
+      return wins;
+    });
+    check('force win flag: user wins >= 9/10 engine runs', fw >= 9, fw + '/10');
     await page.click('#btn-lang'); await page.click('#btn-lang');
     check('frame loop cost < 2 ms', await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0) < 2), (await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0).toFixed(2))) + ' ms');
   } catch (e) {

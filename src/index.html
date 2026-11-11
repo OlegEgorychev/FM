@@ -281,6 +281,17 @@
     </section>
   </div>
 
+  <!-- v1.8: DEBUG.EXE (developer mode) -->
+  <div class="pinfo-layer dbg-layer" id="debug-layer" hidden>
+    <section class="win pinfo dbg open" role="dialog" aria-modal="true" aria-labelledby="debug-title">
+      <div class="titlebar"><span class="t-ico">&#9881;</span><span class="t-txt" id="debug-title" data-i18n="dbg.title">DEBUG.EXE</span><button class="tb-btn" id="debug-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="pinfo-tabs dbg-tabs"><button type="button" class="pinfo-tab" data-dtab="db" data-i18n="dbg.tabDb"></button><button type="button" class="pinfo-tab" data-dtab="god" data-i18n="dbg.tabGod"></button></div>
+      <div class="win-body dbg-body" id="debug-body"></div>
+      <div class="row-btns pinfo-btns"><button class="btn go" id="debug-ok" type="button" data-i18n="ui.ok"></button></div>
+      <div class="statusbar"><span id="debug-status"></span></div>
+    </section>
+  </div>
+
   <div id="startmenu" role="menu">
     <div class="side">ACADEMY 98</div>
     <ul>
@@ -310,6 +321,7 @@
       <button class="tk dyn" data-view="notes" id="tk-notes" hidden>&#9998; <span class="lbl" data-i18n="nav.notebook"></span></button>
     </div>
     <div class="tray">
+      <button class="dbg-btn" id="btn-debug" type="button" data-i18n="dbg.btn">[DEBUG.EXE]</button>
       <button class="ver" id="btn-ver" data-i18n-aria="nav.readmeLong"></button>
       <button class="lang" id="btn-lang">RU</button>
       <span class="clk-label" id="tray-date"></span>

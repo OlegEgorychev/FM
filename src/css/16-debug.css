@@ -1,0 +1,52 @@
+/* =========================================================
+   v1.8 — DEBUG.EXE (Win98 Registry Editor / Task Manager look)
+   ========================================================= */
+.dbg-btn{ height: 20px; padding: 0 5px; font: 11px/1 var(--mono); letter-spacing: .3px; color: #6f8a6a; cursor: pointer;
+  background: transparent; border: 1px dotted transparent; opacity: .55; }
+.dbg-btn:hover, .dbg-btn:focus-visible{ opacity: 1; color: #9fe58f; border-color: #3f5a3a; outline: none; }
+
+.dbg-layer{ z-index: 76; }
+.win.pinfo.dbg{ width: min(1220px, 100%); height: min(640px, 100%); display: flex; flex-direction: column; }
+.win.pinfo.dbg .titlebar{ background: linear-gradient(90deg, #5a0a0a, #a5523a); }
+.dbg-tabs{ gap: 2px; }
+.dbg-tabs .pinfo-tab{ font: bold 11px/1 var(--mono); letter-spacing: .5px; padding: 5px 14px; cursor: pointer; color: #333;
+  border-color: #fff var(--dark) transparent #fff; background: #bdb8a8; top: 2px; }
+.dbg-tabs .pinfo-tab.on{ background: var(--face); color: #111; top: 1px; padding-bottom: 6px; z-index: 1; }
+.dbg-body{ flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; margin: 0 8px; padding: 8px;
+  border: 1px solid; border-color: #fff var(--dark) var(--dark) #fff; box-shadow: inset -1px -1px 0 var(--shadow); overflow: hidden; }
+.dbg-hint{ margin: 0; font-size: 11px; color: #333; }
+
+/* dense data grid in a sunken white "list view" */
+.dbg-scroll{ flex: 1; min-height: 0; overflow: auto; background: #fff;
+  border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); box-shadow: inset 1px 1px 0 var(--dark); }
+.dbg-table{ border-collapse: collapse; font: 11px/1.2 var(--mono); color: #111; white-space: nowrap; }
+.dbg-table th, .dbg-table td{ padding: 2px 4px; text-align: right; border-right: 1px solid #e3e0d6; border-bottom: 1px solid #ecebe6; }
+.dbg-table td:nth-child(2), .dbg-table td:nth-child(3), .dbg-table td:last-child{ text-align: left; }
+.dbg-table td:nth-child(2){ font-weight: bold; }
+.dbg-table thead th{ position: sticky; background: var(--face); color: #111; font-weight: normal;
+  border: 1px solid; border-color: #fff var(--dark) var(--dark) #fff; }
+.dbg-table thead tr:first-child th{ top: 0; height: 17px; font-weight: bold; text-align: center; letter-spacing: 1px; font-size: 10px; }
+.dbg-table thead tr:nth-child(2) th{ top: 17px; cursor: pointer; user-select: none; }
+.dbg-table thead tr:nth-child(2) th:hover{ background: #dcd8cb; }
+.dbg-table thead th.asc::after{ content: ' \25B2'; font-size: 8px; }
+.dbg-table thead th.desc::after{ content: ' \25BC'; font-size: 8px; }
+.dbg-table th.g-physical{ background: #c9d6c2; } .dbg-table th.g-technical{ background: #c2cdd9; }
+.dbg-table th.g-tactical{ background: #d9d2c2; }  .dbg-table th.g-psych{ background: #d6c2d4; }
+.dbg-table th.g-dynamic{ background: #d9c9b8; }   .dbg-table th.g-engine{ background: #0a246a; color: #fff; }
+.dbg-table tbody tr:nth-child(even){ background: #f6f5f0; }
+.dbg-table tbody tr:hover{ background: #0a246a; color: #fff; }
+.dbg-table tbody tr:hover td{ color: #fff; }
+.dbg-table td.hi{ color: #0d6b0d; font-weight: bold; }
+.dbg-table td.gd{ color: #3a6b2a; }
+.dbg-table td.lo{ color: #b3261e; }
+.dbg-table tfoot td{ position: sticky; bottom: 0; background: #e9e4d3; font-weight: bold; border-top: 2px solid var(--dark); }
+
+/* GOD MODE */
+.dbg-god{ display: flex; flex-direction: column; gap: 10px; padding: 6px 4px; }
+.dbg-cheat{ display: grid; grid-template-columns: 320px 1fr; gap: 12px; align-items: center; font-size: 12px; color: #222; }
+.dbg-cheat .btn{ justify-content: flex-start; text-align: left; min-height: 30px; font-family: var(--mono); font-size: 12px; }
+.dbg-cheat .btn.armed{ background: #e6c9c3; }
+.dbg-flag{ color: #555; margin-left: 4px; } .dbg-flag.on{ color: #b3261e; }
+.win.pinfo.dbg .statusbar > span{ font-family: var(--mono); }
+
+@media (max-width: 760px){ .dbg-cheat{ grid-template-columns: 1fr; gap: 4px; } }

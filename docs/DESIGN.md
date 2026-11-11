@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v1.5)
+# Youth Academy Manager — design notes (current: v1.8)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -12,7 +12,7 @@ Main nav: Dashboard | Team Management | League Table. Match and Notebook appear 
 Loop: Dashboard (calendar) → matchday modal → Team Management → Match (half-time pause, subs) → full-time modal → Notebook (roles) → Return to Dashboard → next matchday. 18 matchdays → season end → new season.
 
 ## Systems (00-utils-data.js, 05-game-state.js)
-- Hidden attributes 1–20: Speed, Pass, Dribble, Shoot, Tackle, Save — never displayed.
+- Hidden attributes: see "Attribute system (v1.8)" below — never displayed outside DEBUG.EXE.
 - Roles (one per player, set in Notebook): Aggressive (Tackle ×1.5; lost visible duel → foul + yellow, 2nd = red), Playmaker (Pass ×1.5, passes more), Selfish (Dribble/Shoot ×1.5, rarely passes).
 - Energy: in-match live drain 30–40% over 90'; under 30% → ×0.8; starting/subbed on under 50% → ×0.5; half-time +4; after match players keep real energy, unused subs +6; rest day +4. Squad 16 (11 + bench GK, DEF, MID, MID, FWD).
 - Formations (10): slot lines DEF/MID/ATT decide who contests each third; `presence()` → line superiority ±4 (normalised: 4-4-2 vs 4-4-2 = 0); out of natural line ×0.85.
@@ -65,3 +65,16 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - User match: opponent kids are credited from live engine stats (`League.recordKids`); our kids use `seasonStats` (now with `assists`).
 - UI: League tab = standings + results (left), Top Scorers / Top Assists top-7 (right, `renderLeaders`). Clicking a club opens `TeamRosterCard` (`11b-team-roster.js`, reuses the `.pinfo` chrome): badge, position, W-D-L, MP/G/A sorted by goals.
 - Old saves: missing `squad` is generated on load, keeping the names of an already generated match roster.
+
+## Attribute system (v1.8)
+- `Player` (03-player.js) carries nested groups: `bio` {age 13–15, height, weight, strongFoot L/R, weakFoot 1–5} (position stays `p.position`), `physical` {acceleration, speed, agility, strength, baseStamina}, `technical` {firstTouch, dribbling, passing, crossing, shooting, tackling, goalkeeping*}, `tactical` {positioning, vision, decisions}, `psych` {passion, discipline, composure, potential 1–100}, `dyn` {condition, sharpness, morale 0–100}. *`goalkeeping` was added on top of the brief so keepers have their own skill.
+- `p.energy` is a getter/setter for `dyn.condition`; `p.age` reads `bio.age`. Old `attrs` are gone; `AttrGen.fromLegacy()` derives stable values from pre-v1.8 saves (seeded by id+name). Ranges per position: `PROFILES` in 00-utils-data.js; AI clubs add `team.strength` to every skill.
+- Engine composites (`COMPOSITE`, `p.rating(key)`): Pass = passing+vision · Mark = positioning+2·tackling (reads passes, blocks shots) · Dribble = dribbling+agility+firstTouch · Speed = acceleration+speed · Tackle = 2·tackling+strength+positioning · Shoot = 2·shooting+composure · Save = 2·goalkeeping+agility+positioning.
+- Global modifiers: sharpness < 50 → every technical skill −2 (`p.skill()`); condition = live energy (×0.5 / ×0.8 as before); `moodBonus` = (morale−50)/25 × (0.55+passion/20), capped ±2.5, added to every roll. Pass also gets receiver firstTouch ±1.5 and crossing ±1 for balls into the final third. Decisions ≤7 → extra long shots from midfield, ≥15 → more passing. Drain × (1.15 − baseStamina·0.015).
+- Dynamics: rest day −1 sharpness (floor 20), morale drifts 1 toward 60. After a match (`applyMatchDynamics`): sharpness full game +12, sub +6, unused −2; morale W +8 / D +1 / L −6, +5 per goal, −10 red, unused −2, × (0.6 + passion/25). Discipline is stored but not yet used.
+- Balance check (600 sims, 6 random squads): win% 34 vs 36 in v1.7, pass % 68 vs 70, goals similar.
+
+## DEBUG.EXE (v1.8)
+- `DebugConsole` (11c-debug.js), DOM `#debug-layer`, styles `16-debug.css`, tray button `#btn-debug`.
+- DATABASE: every academy kid × 39 columns (ID, BIO, PHYSICAL, TECHNICAL, TACTICAL, PSYCH, DYNAMIC, ENGINE composites + mood + role), sortable, heat colours, averages row.
+- GOD MODE: restore condition 100 (also live engine), morale & sharpness 100, Force Win toggle (`state.cheats.forceWin`, saved; engine `mod()` +8 for us / −5 for them; cleared at full time). The only UI allowed to show hidden attributes.

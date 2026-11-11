@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.7</title>
+<title>Youth Academy Manager v1.8</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1113,6 +1113,58 @@ body.fx .crt-scan{ opacity: .9; }
   .emblem.xl{ width: 64px; height: 64px; }
 }
 /* =========================================================
+   v1.8 — DEBUG.EXE (Win98 Registry Editor / Task Manager look)
+   ========================================================= */
+.dbg-btn{ height: 20px; padding: 0 5px; font: 11px/1 var(--mono); letter-spacing: .3px; color: #6f8a6a; cursor: pointer;
+  background: transparent; border: 1px dotted transparent; opacity: .55; }
+.dbg-btn:hover, .dbg-btn:focus-visible{ opacity: 1; color: #9fe58f; border-color: #3f5a3a; outline: none; }
+
+.dbg-layer{ z-index: 76; }
+.win.pinfo.dbg{ width: min(1220px, 100%); height: min(640px, 100%); display: flex; flex-direction: column; }
+.win.pinfo.dbg .titlebar{ background: linear-gradient(90deg, #5a0a0a, #a5523a); }
+.dbg-tabs{ gap: 2px; }
+.dbg-tabs .pinfo-tab{ font: bold 11px/1 var(--mono); letter-spacing: .5px; padding: 5px 14px; cursor: pointer; color: #333;
+  border-color: #fff var(--dark) transparent #fff; background: #bdb8a8; top: 2px; }
+.dbg-tabs .pinfo-tab.on{ background: var(--face); color: #111; top: 1px; padding-bottom: 6px; z-index: 1; }
+.dbg-body{ flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; margin: 0 8px; padding: 8px;
+  border: 1px solid; border-color: #fff var(--dark) var(--dark) #fff; box-shadow: inset -1px -1px 0 var(--shadow); overflow: hidden; }
+.dbg-hint{ margin: 0; font-size: 11px; color: #333; }
+
+/* dense data grid in a sunken white "list view" */
+.dbg-scroll{ flex: 1; min-height: 0; overflow: auto; background: #fff;
+  border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); box-shadow: inset 1px 1px 0 var(--dark); }
+.dbg-table{ border-collapse: collapse; font: 11px/1.2 var(--mono); color: #111; white-space: nowrap; }
+.dbg-table th, .dbg-table td{ padding: 2px 4px; text-align: right; border-right: 1px solid #e3e0d6; border-bottom: 1px solid #ecebe6; }
+.dbg-table td:nth-child(2), .dbg-table td:nth-child(3), .dbg-table td:last-child{ text-align: left; }
+.dbg-table td:nth-child(2){ font-weight: bold; }
+.dbg-table thead th{ position: sticky; background: var(--face); color: #111; font-weight: normal;
+  border: 1px solid; border-color: #fff var(--dark) var(--dark) #fff; }
+.dbg-table thead tr:first-child th{ top: 0; height: 17px; font-weight: bold; text-align: center; letter-spacing: 1px; font-size: 10px; }
+.dbg-table thead tr:nth-child(2) th{ top: 17px; cursor: pointer; user-select: none; }
+.dbg-table thead tr:nth-child(2) th:hover{ background: #dcd8cb; }
+.dbg-table thead th.asc::after{ content: ' \25B2'; font-size: 8px; }
+.dbg-table thead th.desc::after{ content: ' \25BC'; font-size: 8px; }
+.dbg-table th.g-physical{ background: #c9d6c2; } .dbg-table th.g-technical{ background: #c2cdd9; }
+.dbg-table th.g-tactical{ background: #d9d2c2; }  .dbg-table th.g-psych{ background: #d6c2d4; }
+.dbg-table th.g-dynamic{ background: #d9c9b8; }   .dbg-table th.g-engine{ background: #0a246a; color: #fff; }
+.dbg-table tbody tr:nth-child(even){ background: #f6f5f0; }
+.dbg-table tbody tr:hover{ background: #0a246a; color: #fff; }
+.dbg-table tbody tr:hover td{ color: #fff; }
+.dbg-table td.hi{ color: #0d6b0d; font-weight: bold; }
+.dbg-table td.gd{ color: #3a6b2a; }
+.dbg-table td.lo{ color: #b3261e; }
+.dbg-table tfoot td{ position: sticky; bottom: 0; background: #e9e4d3; font-weight: bold; border-top: 2px solid var(--dark); }
+
+/* GOD MODE */
+.dbg-god{ display: flex; flex-direction: column; gap: 10px; padding: 6px 4px; }
+.dbg-cheat{ display: grid; grid-template-columns: 320px 1fr; gap: 12px; align-items: center; font-size: 12px; color: #222; }
+.dbg-cheat .btn{ justify-content: flex-start; text-align: left; min-height: 30px; font-family: var(--mono); font-size: 12px; }
+.dbg-cheat .btn.armed{ background: #e6c9c3; }
+.dbg-flag{ color: #555; margin-left: 4px; } .dbg-flag.on{ color: #b3261e; }
+.win.pinfo.dbg .statusbar > span{ font-family: var(--mono); }
+
+@media (max-width: 760px){ .dbg-cheat{ grid-template-columns: 1fr; gap: 4px; } }
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1402,6 +1454,17 @@ body.fx .crt-scan{ opacity: .9; }
     </section>
   </div>
 
+  <!-- v1.8: DEBUG.EXE (developer mode) -->
+  <div class="pinfo-layer dbg-layer" id="debug-layer" hidden>
+    <section class="win pinfo dbg open" role="dialog" aria-modal="true" aria-labelledby="debug-title">
+      <div class="titlebar"><span class="t-ico">&#9881;</span><span class="t-txt" id="debug-title" data-i18n="dbg.title">DEBUG.EXE</span><button class="tb-btn" id="debug-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="pinfo-tabs dbg-tabs"><button type="button" class="pinfo-tab" data-dtab="db" data-i18n="dbg.tabDb"></button><button type="button" class="pinfo-tab" data-dtab="god" data-i18n="dbg.tabGod"></button></div>
+      <div class="win-body dbg-body" id="debug-body"></div>
+      <div class="row-btns pinfo-btns"><button class="btn go" id="debug-ok" type="button" data-i18n="ui.ok"></button></div>
+      <div class="statusbar"><span id="debug-status"></span></div>
+    </section>
+  </div>
+
   <div id="startmenu" role="menu">
     <div class="side">ACADEMY 98</div>
     <ul>
@@ -1431,6 +1494,7 @@ body.fx .crt-scan{ opacity: .9; }
       <button class="tk dyn" data-view="notes" id="tk-notes" hidden>&#9998; <span class="lbl" data-i18n="nav.notebook"></span></button>
     </div>
     <div class="tray">
+      <button class="dbg-btn" id="btn-debug" type="button" data-i18n="dbg.btn">[DEBUG.EXE]</button>
       <button class="ver" id="btn-ver" data-i18n-aria="nav.readmeLong"></button>
       <button class="lang" id="btn-lang">RU</button>
       <span class="clk-label" id="tray-date"></span>
@@ -1466,13 +1530,52 @@ const NATURAL_LINE = { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'ATT' };   // play
 const LINE_POS = { GK: 'GK', DEF: 'DEF', MID: 'MID', ATT: 'FWD' };
 const LINE_IDX = { DEF: 0, MID: 1, ATT: 2 };
 const ZONE_LINE = ['DEF', 'MID', 'ATT'];   // zone index (relative to team in possession) -> line that plays there
-const ATTRS = ['Speed', 'Pass', 'Dribble', 'Shoot', 'Tackle', 'Save'];
-const PROFILES = { // [min, max] per hidden attribute, 1-20
-  GK:  { Speed: [6, 12],  Pass: [5, 11],  Dribble: [3, 8],   Shoot: [2, 6],   Tackle: [4, 9],   Save: [10, 18] },
-  DEF: { Speed: [7, 14],  Pass: [7, 13],  Dribble: [5, 10],  Shoot: [4, 9],   Tackle: [10, 18], Save: [1, 4] },
-  MID: { Speed: [8, 15],  Pass: [10, 18], Dribble: [8, 15],  Shoot: [7, 13],  Tackle: [7, 14],  Save: [1, 4] },
-  FWD: { Speed: [10, 18], Pass: [7, 13],  Dribble: [10, 17], Shoot: [11, 18], Tackle: [3, 8],   Save: [1, 3] },
+/** Seeded PRNG (FNV-1a hash → mulberry32): the same string always rolls the same numbers. Used to migrate old saves. */
+const seeded = str => {
+  let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  return () => { h = (h + 0x6D2B79F5) >>> 0; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 };
+const rndR = (r, a, b) => a + Math.floor(r() * (b - a + 1));
+
+/* =========================================================
+   v1.8 PLAYER ATTRIBUTES — classic RPG / manager framework. ALL HIDDEN from the normal UI
+   (only DEBUG.EXE shows raw numbers). Skills 1–20, potential 1–100, dynamic states 0–100.
+   ========================================================= */
+const ATTR_GROUPS = {
+  physical:  ['acceleration', 'speed', 'agility', 'strength', 'baseStamina'],
+  technical: ['firstTouch', 'dribbling', 'passing', 'crossing', 'shooting', 'tackling', 'goalkeeping'],
+  tactical:  ['positioning', 'vision', 'decisions'],
+  psych:     ['passion', 'discipline', 'composure'],          // + psych.potential (1–100)
+};
+const SKILL_KEYS = ['physical', 'technical', 'tactical'];     // groups that scale with club strength
+/* [min, max] per position (13–15 year olds). Psych is rolled the same for everybody. */
+const PROFILES = {
+  GK:  { acceleration: [5, 11],  speed: [5, 11],  agility: [9, 16],  strength: [7, 13],  baseStamina: [7, 13],
+         firstTouch: [5, 11],  dribbling: [3, 8],   passing: [5, 11],  crossing: [2, 7],   shooting: [2, 6],   tackling: [4, 9],  goalkeeping: [10, 18],
+         positioning: [9, 16], vision: [4, 10],  decisions: [7, 14] },
+  DEF: { acceleration: [7, 13],  speed: [7, 14],  agility: [6, 12],  strength: [10, 17], baseStamina: [9, 16],
+         firstTouch: [6, 12],  dribbling: [5, 10],  passing: [7, 13],  crossing: [5, 11],  shooting: [4, 9],   tackling: [10, 18], goalkeeping: [1, 4],
+         positioning: [10, 17], vision: [5, 11], decisions: [7, 14] },
+  MID: { acceleration: [8, 14],  speed: [8, 15],  agility: [9, 15],  strength: [7, 13],  baseStamina: [11, 17],
+         firstTouch: [9, 16],  dribbling: [8, 15],  passing: [10, 18], crossing: [7, 14],  shooting: [7, 13],  tackling: [7, 14], goalkeeping: [1, 4],
+         positioning: [8, 14], vision: [10, 17], decisions: [9, 16] },
+  FWD: { acceleration: [11, 18], speed: [10, 18], agility: [10, 16], strength: [7, 14],  baseStamina: [8, 14],
+         firstTouch: [9, 16],  dribbling: [10, 17], passing: [7, 13],  crossing: [6, 12],  shooting: [11, 18], tackling: [3, 8],  goalkeeping: [1, 3],
+         positioning: [9, 15], vision: [7, 13],  decisions: [7, 13] },
+};
+/* Engine composites: which raw skills feed each match roll (weights). TECH = hit by low sharpness (−2 each). */
+const COMPOSITE = {
+  Pass:    { passing: 1, vision: 1 },                         // passer
+  Mark:    { positioning: 1, tackling: 2 },                   // defender reading a pass / blocking a shot
+  Dribble: { dribbling: 1, agility: 1, firstTouch: 1 },
+  Speed:   { acceleration: 1, speed: 1 },
+  Tackle:  { tackling: 2, strength: 1, positioning: 1 },      // defender in a 1v1 duel
+  Shoot:   { shooting: 2, composure: 1 },
+  Save:    { goalkeeping: 2, agility: 1, positioning: 1 },
+};
+const TECH = new Set(ATTR_GROUPS.technical);
+const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -1, FLOOR: 20 };
+const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
 const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 4,
   EXHAUSTED: 30, EXHAUSTED_MULT: 0.8,   // live: under 30% during the match → stats ×0.8 (v1.1)
@@ -2004,6 +2107,35 @@ Object.assign(I18N.ru, {
   'tr.player': 'Игрок', 'tr.pos': 'Поз', 'tr.mp': 'И', 'tr.g': 'Г', 'tr.a': 'П', 'tr.you': 'твоя академия',
   'tr.status': 'Скауты записывают только матчи, голы и передачи.', 'tr.statusMe': 'Наши ребята. Полная статистика в карточке игрока.',
 });
+
+
+/* ---- v1.8: biometrics on the Profile Card + DEBUG.EXE (developer tools) ---- */
+Object.assign(I18N.en, {
+  'pi.height': 'Height', 'pi.weight': 'Weight', 'pi.foot': 'Foot', 'pi.cm': '{n} cm', 'pi.kg': '{n} kg', 'pi.footL': 'Left', 'pi.footR': 'Right',
+  'dbg.btn': '[DEBUG.EXE]', 'dbg.title': 'DEBUG.EXE — Academy Registry Editor', 'dbg.tabDb': 'DATABASE', 'dbg.tabGod': 'GOD MODE',
+  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — raw values, click a column to sort. Skills 1–20, PA 1–100, states 0–100. Composites = what the match engine rolls (incl. sharpness penalty).',
+  'dbg.avg': 'Squad average', 'dbg.rows': '{n} players · {c} columns',
+  'dbg.energy': 'Restore All Energy to 100%', 'dbg.energyD': 'Sets condition = 100 for the whole squad (and on the pitch, if a match is running).',
+  'dbg.maxMs': 'Max Morale & Sharpness', 'dbg.maxMsD': 'Morale = 100 and sharpness = 100 for every kid.',
+  'dbg.force': 'Force Win Next Match', 'dbg.forceD': 'Arms a one-shot flag: next kick-off the engine gives us +8 on every roll and the opponent −5. Clears at full time.',
+  'dbg.forceOn': 'ARMED', 'dbg.forceOff': 'off', 'dbg.forceLive': 'A match is already running: the flag will apply from the NEXT kick-off.',
+  'dbg.doneEnergy': 'OK: condition restored for {n} players.', 'dbg.doneMs': 'OK: morale & sharpness maxed for {n} players.',
+  'dbg.doneForce': 'OK: Force Win {s}.', 'dbg.godHint': 'Cheats for testing only. They are saved with the academy.',
+  'dbg.forceLog': '[DEBUG] Force Win is active for this match.',
+});
+Object.assign(I18N.ru, {
+  'pi.height': 'Рост', 'pi.weight': 'Вес', 'pi.foot': 'Нога', 'pi.cm': '{n} см', 'pi.kg': '{n} кг', 'pi.footL': 'Левая', 'pi.footR': 'Правая',
+  'dbg.btn': '[DEBUG.EXE]', 'dbg.title': 'DEBUG.EXE — редактор реестра академии', 'dbg.tabDb': 'БАЗА ДАННЫХ', 'dbg.tabGod': 'РЕЖИМ БОГА',
+  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — сырые значения, щёлкни по столбцу для сортировки. Навыки 1–20, PA 1–100, состояния 0–100. Композиты = то, что бросает движок матча (с учётом штрафа за форму).',
+  'dbg.avg': 'Среднее по составу', 'dbg.rows': 'Игроков: {n} · столбцов: {c}',
+  'dbg.energy': 'Восстановить всю энергию до 100%', 'dbg.energyD': 'Кондиция = 100 у всего состава (и на поле, если идёт матч).',
+  'dbg.maxMs': 'Макс. мораль и игровой тонус', 'dbg.maxMsD': 'Мораль = 100 и тонус = 100 у каждого игрока.',
+  'dbg.force': 'Гарантированная победа в след. матче', 'dbg.forceD': 'Одноразовый флаг: со следующего начала матча движок даёт нам +8 к каждому броску, сопернику −5. Сбрасывается после финального свистка.',
+  'dbg.forceOn': 'ВКЛЮЧЕНО', 'dbg.forceOff': 'выкл.', 'dbg.forceLive': 'Матч уже идёт: флаг сработает со СЛЕДУЮЩЕГО начала матча.',
+  'dbg.doneEnergy': 'OK: кондиция восстановлена у {n} игроков.', 'dbg.doneMs': 'OK: мораль и тонус на максимуме у {n} игроков.',
+  'dbg.doneForce': 'OK: гарантированная победа — {s}.', 'dbg.godHint': 'Читы только для тестов. Они сохраняются вместе с академией.',
+  'dbg.forceLog': '[DEBUG] В этом матче включена гарантированная победа.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -2082,25 +2214,91 @@ const PortraitGenerator = (() => {
 })();
 
 /* =========================================================
-   PLAYER
+   PLAYER (v1.8: nested attribute structure)
+   bio       — age 13–15, height (cm), weight (kg), strongFoot L/R, weakFoot 1–5   (position stays on p.position)
+   physical  — acceleration, speed, agility, strength, baseStamina          (1–20, HIDDEN)
+   technical — firstTouch, dribbling, passing, crossing, shooting, tackling, goalkeeping (1–20, HIDDEN)
+   tactical  — positioning, vision, decisions                               (1–20, HIDDEN)
+   psych     — passion, discipline, composure (1–20) + potential (PA 1–100)  (HIDDEN)
+   dyn       — condition (= energy), sharpness (match tone), morale         (0–100)
    ========================================================= */
+const AttrGen = {
+  /** Fresh roll. r = rng (Math.random or seeded), mod = club strength shift for skill groups. */
+  roll(position, r = Math.random, mod = 0, age = null) {
+    const P = PROFILES[position] || PROFILES.MID, out = {};
+    for (const g of SKILL_KEYS) { out[g] = {}; for (const k of ATTR_GROUPS[g]) { const [lo, hi] = P[k]; out[g][k] = clamp(rndR(r, lo, hi) + mod, 1, 20); } }
+    out.psych = { passion: rndR(r, 4, 18), discipline: rndR(r, 3, 18), composure: rndR(r, 3, 17),
+      potential: clamp(Math.round(30 + (r() + r() + r()) / 3 * 65 + mod * 2), 1, 100) };   // bell-ish 30–95
+    out.bio = AttrGen.bio(position, r, age, out.physical);
+    return out;
+  },
+  bio(position, r, age, phys) {
+    age = Number.isInteger(age) && age >= 13 && age <= 16 ? age : rndR(r, 13, 15);
+    const height = Math.round(150 + (age - 13) * 6 + (position === 'GK' ? 5 : 0) + (r() - 0.5) * 20);
+    const weight = Math.round(height * 0.45 - 22 + (phys ? (phys.strength - 10) * 0.6 : 0) + (r() - 0.5) * 8);
+    const strongFoot = r() < 0.76 ? 'R' : 'L';
+    const wf = r(); const weakFoot = wf < 0.30 ? 1 : wf < 0.68 ? 2 : wf < 0.88 ? 3 : wf < 0.97 ? 4 : 5;
+    return { age, height, weight, strongFoot, weakFoot };
+  },
+  /** Saves made before v1.8 only have the 6 old attrs (Speed/Pass/Dribble/Shoot/Tackle/Save): derive stable values. */
+  fromLegacy(position, a, seed, age) {
+    const r = seeded(seed), j = v => clamp(Math.round(v + (r() - 0.5) * 4), 1, 20);
+    const avg = (...x) => x.reduce((s, v) => s + v, 0) / x.length;
+    const fresh = AttrGen.roll(position, r, 0, age);   // psych, bio, stamina come from the seed
+    fresh.physical = { acceleration: j(a.Speed), speed: j(a.Speed), agility: j(avg(a.Speed, a.Dribble)),
+      strength: j(avg(a.Tackle, 10)), baseStamina: fresh.physical.baseStamina };
+    fresh.technical = { firstTouch: j(a.Dribble), dribbling: j(a.Dribble), passing: j(a.Pass), crossing: j(a.Pass - 1),
+      shooting: j(a.Shoot), tackling: j(a.Tackle), goalkeeping: j(a.Save) };
+    fresh.tactical = { positioning: j(position === 'GK' ? a.Save - 2 : a.Tackle), vision: j(a.Pass), decisions: j(avg(a.Pass, a.Tackle)) };
+    return fresh;
+  },
+  validGroup(o, g) { return o && typeof o === 'object' && ATTR_GROUPS[g].every(k => Number.isFinite(o[k])); },
+};
+
 class Player {
-  constructor({ id, name, position, attrs, tags, energy, number, face, age }) {
+  constructor(o) {
+    const { id, name, position, tags, number, face } = o;
     this.id = id;
     this.name = name;
     this.position = position;
     this.number = number;
-    this.attrs = attrs;              // HIDDEN — never rendered
-    if (tags) {                      // only the academy squad carries tags + energy
-      this.tags = tags;
-      this.energy = energy ?? 100;
-    }
+    if (tags) this.tags = tags;      // only the academy squad carries tags
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
-    // v1.5: age 14–16 (saves made before v1.5 get a stable age from the name hash)
-    this.age = Number.isInteger(age) && age >= 14 && age <= 16 ? age : 14 + PortraitGenerator.hashFace(id + name + '#age')[1];
+    // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
+    const fresh = SKILL_KEYS.every(g => AttrGen.validGroup(o[g], g)) && AttrGen.validGroup(o.psych, 'psych') ? null
+      : o.attrs ? AttrGen.fromLegacy(position, o.attrs, id + name + '#v18', o.age)
+      : AttrGen.roll(position, seeded(id + name + '#v18'), 0, o.age);
+    const src = fresh || o;
+    for (const g of [...SKILL_KEYS, 'psych']) this[g] = { ...src[g] };
+    this.psych.potential = clamp(Math.round(src.psych.potential ?? 50), 1, 100);
+    const b = o.bio && Number.isInteger(o.bio.age) ? o.bio : (fresh?.bio || AttrGen.bio(position, seeded(id + name + '#bio'), o.age, this.physical));
+    this.bio = { ...b };
+    const d = o.dyn || {};
+    const r = seeded(id + name + '#dyn');
+    this.dyn = { condition: clamp(Math.round(d.condition ?? o.energy ?? 100), 0, 100),
+      sharpness: clamp(Math.round(d.sharpness ?? rndR(r, 55, 75)), 0, 100),
+      morale: clamp(Math.round(d.morale ?? rndR(r, 55, 75)), 0, 100) };
     this.portraitSvg = PortraitGenerator.svg(this.face, position === 'GK' ? 'gk' : tags ? 'home' : 'away');
   }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
+  get age() { return this.bio.age; }
+  /** `energy` is the old name of dyn.condition — kept so every v1.1–v1.7 system keeps working. */
+  get energy() { return this.dyn.condition; }
+  set energy(v) { this.dyn.condition = v; }
+  get sharp() { return this.dyn.sharpness >= SHARPNESS.RUSTY; }
+  /** Raw skill with the sharpness rule applied: technical skills −2 when match tone < 50%. */
+  skill(k) {
+    const v = this.physical[k] ?? this.technical[k] ?? this.tactical[k] ?? this.psych[k] ?? 10;
+    return TECH.has(k) && !this.sharp ? Math.max(1, v - SHARPNESS.RUSTY_PEN) : v;
+  }
+  /** Weighted engine composite (1–20 scale), e.g. rating('Pass') = (passing + vision) / 2. */
+  rating(key) {
+    const w = COMPOSITE[key]; let sum = 0, n = 0;
+    for (const k in w) { sum += this.skill(k) * w[k]; n += w[k]; }
+    return sum / n;
+  }
+  /** Morale swing on every roll: ±2 at the extremes, amplified by passion (0.6×–1.5×). */
+  get moodBonus() { return clamp((this.dyn.morale - 50) / 25 * (0.55 + this.psych.passion / 20), -2.5, 2.5); }
   /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */
   toJSON() { const { portraitSvg, ...o } = this; return o; }
 
@@ -2108,9 +2306,9 @@ class Player {
     let last; let guard = 0;
     do { last = pick(LAST); } while (usedSurnames.has(last) && guard++ < 200);
     usedSurnames.add(last);
-    const attrs = {};
-    for (const a of ATTRS) { const [lo, hi] = PROFILES[position][a]; attrs[a] = clamp(rnd(lo, hi) + mod, 1, 20); }
-    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, attrs, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(), age: rnd(14, 16) });
+    const a = AttrGen.roll(position, Math.random, mod);
+    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(),
+      ...a, dyn: { condition: 100, sharpness: rnd(55, 75), morale: rnd(55, 75) } });
   }
 }
 /* =========================================================
@@ -2461,6 +2659,7 @@ class GameState {
     this.notebookUnlocked = false;
     this.diary = [{ date: start, key: 'cal.welcome', vars: { y: year, z: String(year + 1).slice(2) } }];
     this.seasonStats = {};   // playerId → cumulative stats this season (+ apps)
+    this.cheats = this.cheats || { forceWin: false };   // v1.8 DEBUG.EXE
     this.coachNotes = {};    // v1.5: playerId → last Notebook note the coach actually saw { md, keys, role }
     for (const p of this.squad) p.energy = 100;   // summer break
     this.save();
@@ -2536,7 +2735,27 @@ class GameState {
   removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
 
   /* ----- energy ----- */
-  restDay() { for (const p of this.squad) p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100); }
+  /** Rest day: condition +4, match sharpness fades −1 (floor 20), morale drifts 1 point toward 60. */
+  restDay() {
+    for (const p of this.squad) {
+      p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
+      p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
+      p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
+    }
+  }
+  /** v1.8: after a match — sharpness from minutes (full game +12, sub +6, unused −2); morale from the result,
+      goals and red cards, amplified by passion (0.6×–1.4×). */
+  applyMatchDynamics(eng, result) {
+    const subIn = new Set(eng.subs.map(x => x.in));
+    for (const p of this.squad) {
+      const played = eng.everPlayed.has(p.id), st = eng.stats.get(p.id);
+      const sh = !played ? SHARPNESS.UNUSED : subIn.has(p.id) || eng.subbedOff.has(p.id) ? SHARPNESS.SUB : SHARPNESS.PLAYED;
+      p.dyn.sharpness = clamp(p.dyn.sharpness + sh, 0, 100);
+      let m = MORALE[result] + (st ? st.goals * MORALE.GOAL + st.red * MORALE.RED : 0);
+      if (!played) m -= 2;
+      p.dyn.morale = clamp(Math.round(p.dyn.morale + m * (0.6 + p.psych.passion / 25)), 0, 100);
+    }
+  }
   /** v1.1: players who played keep their LIVE end-of-match energy; unused subs rest. */
   applyLiveFatigue(eng) {
     for (const p of this.squad) {
@@ -2576,7 +2795,7 @@ class GameState {
       localStorage.setItem(GameState.KEY, JSON.stringify({
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
-        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes,
+        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -2610,6 +2829,7 @@ class GameState {
         this.diary = Array.isArray(d.diary) ? d.diary : [];
         this.seasonStats = d.seasonStats && typeof d.seasonStats === 'object' ? d.seasonStats : {};
         this.coachNotes = d.coachNotes && typeof d.coachNotes === 'object' ? d.coachNotes : {};
+        this.cheats = { forceWin: !!d.cheats?.forceWin };
         if (this.lastReport && !d.coachNotes) this.recordCoachNotes(this.lastReport);   // pre-v1.5 save
         // a match interrupted by a page reload is simply replayed
       } else {
@@ -2647,13 +2867,14 @@ class MatchEngine {
     this.tired = new Set(home.players.filter(p => (p.energy ?? 100) < ENERGY.TIRED).map(p => p.id));
     // LIVE energy (v1.1): every player drains 30–40% over 90 minutes; subs come on with their own energy
     this.energy = new Map(); this.drain = new Map();
-    for (const s of this.sides) for (const e of s.entries) { this.energy.set(e.p.id, e.p.energy ?? 100); this.drain.set(e.p.id, rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90); }
+    for (const s of this.sides) for (const e of s.entries) { this.energy.set(e.p.id, e.p.energy ?? 100); this.drain.set(e.p.id, MatchEngine.drainOf(e.p)); }
     this.everPlayed = new Set(home.players.map(p => p.id));
     this.subbedOff = new Set();
     this.subsUsed = 0;
     this.subs = [];
     this.paused = false;
     this.mentality = opts.mentality || 'balanced';
+    this.forceWin = !!opts.forceWin;   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
     this.speed = opts.speed || 1;
     this.sentOff = new Set();
     this.timer = null;
@@ -2675,6 +2896,8 @@ class MatchEngine {
     return { name: team.name, formation: team.formation, user, score: 0, players: [...team.players], all: [...team.players],
       entries: slots.map((s, i) => ({ ...s, p: team.players[i] })) };
   }
+  /** v1.8: per-minute drain, base 30–40% / 90' scaled by baseStamina (20 → ×0.85, 10 → ×1.0, 1 → ×1.135). */
+  static drainOf(p) { return rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90 * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015); }
   static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0, assists: 0 }; }
 
   /* ---------- background play (v1.0) ----------
@@ -2703,7 +2926,7 @@ class MatchEngine {
         if (Math.random() < MatchEngine.AMBIENT.pass[e.line]) {
           const def = pick(this.lineMates(opp, MatchEngine.OPP_LINE[e.line]));
           const atk = this.eff(p, 'Pass') + R() + this.mod(side, 'atk') + this.sup(side, z) * 0.5;
-          const dfn = this.eff(def, 'Tackle') * 0.35 + 5.2 + R() + this.mod(opp, 'def');
+          const dfn = this.eff(def, 'Mark') * 0.35 + 5.2 + R() + this.mod(opp, 'def');
           if (atk >= dfn) this.st(p).passOk++;
           else { this.st(p).passFail++; this.st(def).intercepts++; }
         }
@@ -2731,23 +2954,29 @@ class MatchEngine {
   scoreVars() { return { h: this.team(0), x: this.sides[0].score, y: this.sides[1].score, a: this.team(1) }; }
   setEv(ev) { this.ev = ev; this.seq++; this.evLog.push({ seq: this.seq, ev }); if (this.evLog.length > 12) this.evLog.shift(); }
 
-  /* ---------- the maths: tags, fatigue, position, shouts, numerical superiority ---------- */
+  /* ---------- the maths: tags, fatigue, position, shouts, numerical superiority ----------
+     v1.8: `attr` is a COMPOSITE key (00-utils-data.js) built from the raw 1–20 skills:
+     Pass = passing+vision · Mark = positioning+2·tackling · Dribble = dribbling+agility+firstTouch · Speed = acceleration+speed
+     Tackle = 2·tackling+strength+positioning · Shoot = 2·shooting+composure · Save = 2·goalkeeping+agility+positioning.
+     Global modifiers: sharpness < 50% → technical skills −2 (inside Player.skill), condition = live energy (×0.5 / ×0.8),
+     morale × passion → ±2.5 flat on every roll. */
   eff(p, attr) {
-    let v = p.attrs[attr];
+    let v = p.rating ? p.rating(attr) : 10;
     if (this.tired.has(p.id)) v *= 0.5;
     const en = this.energy?.get(p.id);
     if (en !== undefined && en < ENERGY.EXHAUSTED) v *= ENERGY.EXHAUSTED_MULT;
     if (NATURAL_LINE[p.position] !== this.lineOf.get(p.id)) v *= OUT_OF_POSITION;
     const t = p.tags || [];
-    if (t.includes('Aggressive') && attr === 'Tackle') v *= 1.5;
+    if (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) v *= 1.5;
     if (t.includes('Playmaker') && attr === 'Pass') v *= 1.5;
     if (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) v *= 1.5;
-    return v;
+    return v + (p.moodBonus ?? 0);
   }
   mod(side, role) {
-    if (side !== 0 || this.mentality === 'balanced') return 0;
+    const cheat = this.forceWin ? (side === 0 ? 8 : -5) : 0;
+    if (side !== 0 || this.mentality === 'balanced') return cheat;
     const pushing = this.mentality === 'attack';
-    return (role === 'atk') === pushing ? 3 : -3;
+    return cheat + ((role === 'atk') === pushing ? 3 : -3);
   }
   counts(side) {
     const c = { DEF: 0, MID: 0, ATT: 0 };
@@ -2866,7 +3095,7 @@ class MatchEngine {
     if (!this.stats.has(inP.id)) this.stats.set(inP.id, MatchEngine.blankStats());
     this.lineOf.set(inP.id, line);
     this.energy.set(inP.id, inP.energy ?? 100);
-    this.drain.set(inP.id, rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90);
+    this.drain.set(inP.id, MatchEngine.drainOf(inP));
     if ((inP.energy ?? 100) < ENERGY.TIRED) this.tired.add(inP.id);
     this.everPlayed.add(inP.id);
     this.subbedOff.add(outId);
@@ -2914,6 +3143,10 @@ class MatchEngine {
       { pass: 60, dribble: 32, shoot: 8 },
       this.lineOf.get(c.id) === 'ATT' ? { pass: 28, dribble: 22, shoot: 50 } : { pass: 38, dribble: 27, shoot: 35 },
     ][this.zone] };
+    // v1.8: decisions — rash kids try hopeful long shots, smart ones keep the ball moving
+    const dec = c.tactical?.decisions ?? 10;
+    if (dec <= 7 && this.zone === 1) w.shoot += 6;
+    if (dec >= 15) { w.pass *= 1.15; if (this.zone === 1) w.shoot *= 0.6; }
     const t = c.tags || [];
     if (t.includes('Playmaker')) { w.pass *= 2; w.dribble *= 0.4; }
     if (t.includes('Selfish')) {
@@ -2947,8 +3180,12 @@ class MatchEngine {
     const def = pick(this.inZone(opp, 2 - tz));
     const forward = tz > z;
 
-    const atk = this.eff(c, 'Pass') + Math.random() * 10 + 3 - (forward ? 2 : 0) + (this.isGK(c) ? 2 : 0) + this.mod(side, 'atk') + this.sup(side, tz);
-    const dfn = this.eff(def, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def');
+    // v1.8: passer (passing+vision) vs reader (positioning+tackling); the receiver's first touch adds ±1.5;
+    // a forward ball into the final third leans on crossing.
+    const touch = ((recv.skill?.('firstTouch') ?? 10) - 10) * 0.15;
+    const cross = forward && tz === 2 ? ((c.skill?.('crossing') ?? 10) - 10) * 0.1 : 0;
+    const atk = this.eff(c, 'Pass') + Math.random() * 10 + 3 - (forward ? 2 : 0) + (this.isGK(c) ? 2 : 0) + touch + cross + this.mod(side, 'atk') + this.sup(side, tz);
+    const dfn = this.eff(def, 'Mark') + Math.random() * 10 + this.mod(opp, 'def');
     const vars = { a: c, b: recv, d: def };
 
     if (atk >= dfn) {
@@ -3024,7 +3261,7 @@ class MatchEngine {
     const keeper = this.keeper(opp);
 
     if (Math.random() < 0.2 &&
-        this.eff(blocker, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
+        this.eff(blocker, 'Mark') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
       this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
       this.turnover(blocker, 0);
@@ -3142,8 +3379,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.8', name: { en: 'Attribute Overhaul + DEBUG.EXE', ru: 'Новые атрибуты + DEBUG.EXE' },
+    en: [
+      'Every kid now has a full football profile: biometrics (age 13–15, height, weight, strong foot, weak foot), physical, technical and tactical skills, personality (passion, discipline, composure) and a hidden potential. You still never see the numbers: watch the matches and read the Notebook.',
+      'The Profile Card shows only what a coach can see: portrait, age, height, weight, strong foot, position, energy, role and stats.',
+      'New match maths: a pass is the passer\'s passing + vision against the defender\'s positioning + tackling; the receiver\'s first touch and crossing into the box matter too. Dribbles, tackles, shots and saves use their own skill mixes.',
+      'Match sharpness: kids who play stay sharp, kids on the bench get rusty. Below 50% sharpness technical skills drop. Morale rises with wins and goals, falls with defeats and red cards, and nudges every duel. Stamina decides how fast a kid tires.',
+      'For testing: a small [DEBUG.EXE] button in the tray opens a Registry-Editor-style window with the full squad database (every raw value, sortable) and GOD MODE cheats: restore energy, max morale & sharpness, force a win in the next match.',
+    ],
+    ru: [
+      'У каждого игрока теперь полный футбольный профиль: биометрия (возраст 13–15, рост, вес, ведущая нога, слабая нога), физические, технические и тактические навыки, характер (страсть, дисциплина, хладнокровие) и скрытый потенциал. Цифр ты по-прежнему не видишь: смотри матчи и читай Блокнот.',
+      'Карточка игрока показывает только то, что видит тренер: портрет, возраст, рост, вес, ведущую ногу, позицию, энергию, роль и статистику.',
+      'Новая математика матча: пас — это точность паса + видение поля против выбора позиции + отбора защитника; важны и первое касание принимающего, и навес в штрафную. У дриблинга, отбора, ударов и сейвов свои сочетания навыков.',
+      'Игровой тонус: кто играет, тот в форме, кто сидит в запасе, тот теряет тонус. Ниже 50% технические навыки падают. Мораль растёт от побед и голов, падает от поражений и удалений и влияет на каждую схватку. Выносливость решает, как быстро игрок устаёт.',
+      'Для тестов: маленькая кнопка [DEBUG.EXE] в трее открывает окно в стиле «Редактора реестра» с полной базой состава (все сырые значения, сортировка) и читами РЕЖИМА БОГА: восстановить энергию, максимум морали и тонуса, гарантированная победа в следующем матче.',
+    ] },
   { v: '1.7', name: { en: 'League Statistics', ru: 'Статистика лиги' },
     en: [
       'The "League Table" tab is now simply "League", split in two: standings and results on the left, League Leaders on the right.',
@@ -4060,6 +4312,9 @@ class ProfileCard {
           <dt>${L.t('pi.name')}</dt><dd><b>${esc(L.name(p.name))}</b></dd>
           <dt>${L.t('pi.number')}</dt><dd>#${p.number ?? '—'}</dd>
           <dt>${L.t('pi.age')}</dt><dd>${p.age}</dd>
+          <dt>${L.t('pi.height')}</dt><dd>${L.t('pi.cm', { n: p.bio.height })}</dd>
+          <dt>${L.t('pi.weight')}</dt><dd>${L.t('pi.kg', { n: p.bio.weight })}</dd>
+          <dt>${L.t('pi.foot')}</dt><dd>${L.t(p.bio.strongFoot === 'L' ? 'pi.footL' : 'pi.footR')}</dd>
           <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.position}">${L.pos(p.position)}</span></dd>
           <dt>${L.t('pi.status')}</dt><dd>${where}</dd>
         </dl>
@@ -4148,6 +4403,131 @@ class TeamRosterCard {
   }
 }
 /* =========================================================
+   v1.8 — DEBUG.EXE (developer mode, Win98 "Registry Editor" look)
+   Tab DATABASE: every hidden + visible attribute of every academy kid as raw numbers (sortable).
+   Tab GOD MODE: test cheats (energy, morale & sharpness, one-shot Force Win).
+   This is the ONLY place where the hidden 1–20 skills are ever rendered.
+   ========================================================= */
+class DebugConsole {
+  /** Column spec: g = group header, h = short header, v = value getter, s = scale for heat colours. */
+  static COLS = (() => {
+    const c = [];
+    const add = (g, h, v, s = null, t = '') => c.push({ g, h, v, s, t });
+    add('ID', '#', p => p.number); add('ID', 'NAME', p => p.name); add('ID', 'POS', p => p.position);
+    add('BIO', 'AGE', p => p.bio.age); add('BIO', 'HT', p => p.bio.height, null, 'height, cm'); add('BIO', 'WT', p => p.bio.weight, null, 'weight, kg');
+    add('BIO', 'FT', p => p.bio.strongFoot, null, 'strong foot'); add('BIO', 'WF', p => p.bio.weakFoot, 5, 'weak foot 1-5');
+    const short = { acceleration: 'ACC', speed: 'SPD', agility: 'AGI', strength: 'STR', baseStamina: 'STA',
+      firstTouch: 'FTC', dribbling: 'DRI', passing: 'PAS', crossing: 'CRO', shooting: 'SHO', tackling: 'TCK', goalkeeping: 'GKP',
+      positioning: 'POS', vision: 'VIS', decisions: 'DEC', passion: 'PSN', discipline: 'DSC', composure: 'CMP' };
+    for (const g of ['physical', 'technical', 'tactical', 'psych'])
+      for (const k of ATTR_GROUPS[g]) add(g.toUpperCase(), short[k], p => p[g][k], 20, k);
+    add('PSYCH', 'PA', p => p.psych.potential, 100, 'potential ability 1-100');
+    add('DYNAMIC', 'CON', p => Math.round(p.dyn.condition), 100, 'condition (energy)');
+    add('DYNAMIC', 'SHP', p => Math.round(p.dyn.sharpness), 100, 'sharpness (match tone); < 50 → technical −2');
+    add('DYNAMIC', 'MOR', p => Math.round(p.dyn.morale), 100, 'morale');
+    for (const k of Object.keys(COMPOSITE)) add('ENGINE', { Pass: 'PAS*', Mark: 'MRK*', Dribble: 'DRB*', Speed: 'PAC*', Tackle: 'TKL*', Shoot: 'SHT*', Save: 'SAV*' }[k], p => +p.rating(k).toFixed(1), 20, 'composite ' + k + ' = ' + Object.keys(COMPOSITE[k]).join('+'));
+    add('ENGINE', 'MOOD', p => +p.moodBonus.toFixed(1), null, 'morale × passion roll bonus');
+    add('ENGINE', 'ROLE', p => (p.tags || [])[0] || '—');
+    return c;
+  })();
+
+  constructor(ui) {
+    this.ui = ui;
+    this.tab = 'db';
+    this.sort = { i: 2, dir: 1 };
+    this.msg = '';
+    this.layer = document.getElementById('debug-layer');
+    this.body = document.getElementById('debug-body');
+    document.getElementById('btn-debug').addEventListener('click', () => this.open());
+    document.getElementById('debug-x').addEventListener('click', () => this.close());
+    document.getElementById('debug-ok').addEventListener('click', () => this.close());
+    this.layer.addEventListener('mousedown', e => { if (e.target === this.layer) this.close(); });
+    this.layer.querySelectorAll('[data-dtab]').forEach(b => b.addEventListener('click', () => { this.tab = b.dataset.dtab; this.msg = ''; this.render(); }));
+    this.body.addEventListener('click', e => {
+      const th = e.target.closest('th[data-col]');
+      if (th) { const i = +th.dataset.col; this.sort = { i, dir: this.sort.i === i ? -this.sort.dir : 1 }; this.render(); return; }
+      const b = e.target.closest('[data-cheat]');
+      if (b) this.cheat(b.dataset.cheat);
+    });
+    document.addEventListener('keydown', e => {
+      if (!this.isOpen || e.key !== 'Escape') return;
+      e.preventDefault(); e.stopImmediatePropagation(); this.close();
+    }, true);
+  }
+  get isOpen() { return !this.layer.hidden; }
+  open() { if (this.ui.modal.isOpen) return; this.ui.profile.close(); this.msg = ''; this.render(); this.layer.hidden = false; document.getElementById('debug-ok').focus(); }
+  close() { this.layer.hidden = true; }
+
+  heat(v, s) {
+    if (s == null || typeof v !== 'number') return '';
+    const r = v / s;
+    return r >= 0.75 ? 'hi' : r >= 0.55 ? 'gd' : r <= 0.3 ? 'lo' : '';
+  }
+
+  render() {
+    if (!this.layer) return;
+    this.layer.querySelectorAll('[data-dtab]').forEach(b => b.classList.toggle('on', b.dataset.dtab === this.tab));
+    this.body.innerHTML = this.tab === 'db' ? this.dbHTML() : this.godHTML();
+    document.getElementById('debug-status').textContent = this.msg
+      || (this.tab === 'db' ? L.t('dbg.rows', { n: this.ui.state.squad.length, c: DebugConsole.COLS.length }) : L.t('dbg.godHint'));
+  }
+
+  dbHTML() {
+    const C = DebugConsole.COLS, { i, dir } = this.sort;
+    const squad = [...this.ui.state.squad].sort((a, b) => {
+      if (i === 2) return dir * ((POS_ORDER[a.position] - POS_ORDER[b.position]) || a.number - b.number);
+      const x = C[i].v(a), y = C[i].v(b);
+      return dir * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y)));
+    });
+    const groups = [];
+    C.forEach(c => { const last = groups[groups.length - 1]; if (last && last.g === c.g) last.n++; else groups.push({ g: c.g, n: 1 }); });
+    const head1 = groups.map(g => `<th colspan="${g.n}" class="grp g-${g.g.toLowerCase()}">${g.g}</th>`).join('');
+    const head2 = C.map((c, k) => `<th data-col="${k}" title="${esc(c.t || c.h)}" class="${k === i ? (dir > 0 ? 'asc' : 'desc') : ''}">${c.h}</th>`).join('');
+    const rows = squad.map(p => `<tr>${C.map(c => { const v = c.v(p); return `<td class="${this.heat(v, c.s)}">${esc(v)}</td>`; }).join('')}</tr>`).join('');
+    const avg = C.map((c, k) => {
+      if (k === 0) return `<td colspan="3">${L.t('dbg.avg')}</td>`;
+      if (k < 3) return '';
+      const vals = squad.map(c.v).filter(v => typeof v === 'number');
+      return vals.length && c.s ? `<td>${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}</td>` : '<td></td>';
+    }).join('');
+    return `<p class="dbg-hint">${esc(L.t('dbg.dbHint'))}</p>
+      <div class="dbg-scroll"><table class="dbg-table"><thead><tr>${head1}</tr><tr>${head2}</tr></thead>
+      <tbody>${rows}</tbody><tfoot><tr>${avg}</tr></tfoot></table></div>`;
+  }
+
+  godHTML() {
+    const on = !!this.ui.state.cheats?.forceWin;
+    const btn = (id, label, desc, extra = '') => `<div class="dbg-cheat"><button class="btn${extra}" type="button" data-cheat="${id}">${label}</button><span>${desc}</span></div>`;
+    return `<div class="dbg-god">
+      ${btn('energy', L.t('dbg.energy'), L.t('dbg.energyD'))}
+      ${btn('maxms', L.t('dbg.maxMs'), L.t('dbg.maxMsD'))}
+      ${btn('force', L.t('dbg.force') + ` <b class="dbg-flag ${on ? 'on' : ''}">[${L.t(on ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.forceD'), on ? ' armed' : '')}
+    </div>`;
+  }
+
+  cheat(id) {
+    const ui = this.ui, s = ui.state, eng = ui.engine && !ui.engine.finished ? ui.engine : null;
+    if (id === 'energy') {
+      for (const p of s.squad) {
+        p.dyn.condition = 100;
+        if (eng?.energy.has(p.id)) { eng.energy.set(p.id, 100); eng.tired.delete(p.id); }
+      }
+      this.msg = L.t('dbg.doneEnergy', { n: s.squad.length });
+    } else if (id === 'maxms') {
+      for (const p of s.squad) { p.dyn.morale = 100; p.dyn.sharpness = 100; }
+      this.msg = L.t('dbg.doneMs', { n: s.squad.length });
+    } else if (id === 'force') {
+      s.cheats = { ...(s.cheats || {}), forceWin: !s.cheats?.forceWin };
+      this.msg = L.t('dbg.doneForce', { s: L.t(s.cheats.forceWin ? 'dbg.forceOn' : 'dbg.forceOff') })
+        + (s.cheats.forceWin && eng ? ' ' + L.t('dbg.forceLive') : '');
+    }
+    s.save();
+    ui.renderAll();
+    if (eng) ui.renderLive(eng);
+    this.render();
+  }
+}
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -4175,6 +4555,7 @@ class UIController {
     this.modal = new Modal();
     this.profile = new ProfileCard(this);
     this.teamCard = new TeamRosterCard(this);   // v1.7
+    this.debug = new DebugConsole(this);         // v1.8
     this.setupCalendar();
     this.bind();
     this.applyStatic();
@@ -4217,6 +4598,7 @@ class UIController {
     this.syncLocks();
     this.renderShouts();
     this.renderSpeedBtns();
+    if (this.debug?.isOpen) this.debug.render();   // v1.8
   }
 
   /* ---------- language ---------- */
@@ -5109,7 +5491,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin });
+    if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.liveSel = null;
     this.radar.setup(this.engine.sides);
     this.engine.start();
@@ -5192,6 +5575,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
+    s.applyMatchDynamics(eng, result);
+    if (s.cheats?.forceWin) s.cheats.forceWin = false;   // v1.8: one-shot debug cheat
+    this.debug?.render();
     s.phase = 'post';
     s.notebookUnlocked = true;
     s.save();
