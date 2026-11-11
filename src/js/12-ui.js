@@ -28,6 +28,7 @@ class UIController {
     this.teamCard = new TeamRosterCard(this);   // v1.7
     this.debug = new DebugConsole(this);         // v1.8
     this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
+    this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
     this.bind();
@@ -74,6 +75,7 @@ class UIController {
     this.renderSpeedBtns();
     this.renderBudget();
     if (this.debug?.isOpen) this.debug.render();   // v1.8
+    if (this.summary?.isOpen) this.summary.render();   // v2.1
   }
 
   /* ---------- language ---------- */
@@ -1101,6 +1103,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const played = a.all;   // starters + substitutes
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
+      // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
+      events: eng.matchEvents.map(e => ({ ...e })), ht: eng.htScore || null, instant: !!eng.instant,
+      totals: [eng.teamTotals(0), eng.teamTotals(1)].map(t => ({ shots: t.shots, onTarget: t.onTarget, passOk: t.passOk, passFail: t.passFail, yellow: t.yellow, red: t.red })),
+      poss: Math.round(eng.possTicks[0] / ((eng.possTicks[0] + eng.possTicks[1]) || 1) * 100),
       players: shuffle(played).slice(0, 3).map(p => ({
         id: p.id, stats: { ...eng.st(p) },
         tired: eng.tired.has(p.id), oop: NATURAL_LINE[p.position] !== eng.lineOf.get(p.id), role: (p.tags || [])[0] || null,
@@ -1118,18 +1124,15 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.save();
     this.tableMd = ctx.md;
     this.renderAll();
-    if (eng.instant) {   // v2.0 Quick Sim: no full-time dialog, straight to the Coach's Notebook
+    this.$('tk-notes').classList.add('alert');
+    if (eng.instant) {   // v2.0 Quick Sim
       this.renderLive(eng);
       this.appendLog({ minute: 90, type: 'coach', key: 'match.instantDone', vars: {}, side: -1, r: 0 });
-      this.show('notes');
+      this.summary.open(s.lastReport);
       return;
     }
-    this.$('tk-notes').classList.add('alert');
-    this.alert(L.t('modal.ft', { h: esc(L.team(s.clubName)), x: a.score, y: b.score, a: esc(L.team(ctx.opp.name)) }), L.t('modal.ftTitle'),
-      result === 'W' ? 'ok' : result === 'D' ? 'info' : 'warn', [
-        { label: L.t('modal.toNotes'), primary: true, onClick: () => this.show('notes') },
-        { label: L.t('modal.stay') },
-      ]);
+    // v2.1: full time → MATCH SUMMARY scoreboard first (a short beat so the final whistle lands on the pitch)
+    setTimeout(() => { if (s.phase === 'post' && s.lastReport) this.summary.open(s.lastReport); }, 700);
   }
 
   /* ---------- NOTEBOOK ---------- */

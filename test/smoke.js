@@ -10,7 +10,8 @@ const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');
 
-const FILE = 'file://' + path.resolve(__dirname, '..', 'index.html');
+const BASE = 'file://' + path.resolve(__dirname, '..', 'index.html');
+const FILE = BASE + '?noboot';   // v2.1: the boot screen is tested once, separately
 const SHOTS = process.argv.includes('--shots');
 const results = [];
 const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info }); };
@@ -27,6 +28,23 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
   const closeModal = async () => { if (await modalOpen()) await page.keyboard.press('Escape'); };
 
   try {
+    // v2.1: boot screen — visible at once, phases change, bar 5–8 s, then fades out and is removed
+    const bp = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+    bp.on('pageerror', e => errors.push('boot: ' + e.message));
+    await bp.goto(BASE);
+    const b1 = await bp.evaluate(() => ({ vis: !!document.getElementById('loading-overlay'), z: getComputedStyle(document.getElementById('loading-overlay')).zIndex,
+      dur: BootScreen.duration, phase: document.querySelector('.boot-phase').textContent, logo: !!document.querySelector('.boot-logo svg') }));
+    await bp.waitForTimeout(1600);
+    const b2 = await bp.evaluate(() => ({ phase: document.querySelector('.boot-phase').textContent, w: parseFloat(document.querySelector('.boot-fill').style.width) }));
+    if (SHOTS) { fs.mkdirSync(path.join(__dirname, 'shots'), { recursive: true }); await bp.screenshot({ path: path.join(__dirname, 'shots', '0-boot-a.png') }); }
+    await bp.waitForTimeout(Math.max(0, b1.dur * 0.55 - 1600));
+    if (SHOTS) await bp.screenshot({ path: path.join(__dirname, 'shots', '0-boot-b.png') });
+    await bp.waitForFunction(() => !document.getElementById('loading-overlay'), null, { timeout: 10000 });
+    const b3 = await bp.evaluate(() => ({ el: Math.round(BootScreen.elapsed), ui: !!(window.YAM && YAM.ui) }));
+    await bp.close();
+    check('boot screen: z 9999, logo, phases cycle, 5–8 s bar, then removed', b1.vis && b1.z === '9999' && b1.logo && b1.dur >= 5000 && b1.dur <= 8000
+      && b2.phase !== b1.phase && b2.w > 0 && b2.w < 100 && b3.el >= 5000 && b3.el < 8600 && b3.ui, JSON.stringify({ b1, b2, b3 }));
+
     await page.goto(FILE);
     await page.evaluate(() => localStorage.clear());
     await page.reload();
@@ -87,7 +105,20 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.waitForFunction(() => YAM.game.phase === 'post', null, { timeout: 120000 });
     const fin = await page.evaluate(() => ({ score: YAM.ui.engine.sides.map(s => s.score).join('-'), md: YAM.game.league.fixturesOf(1).every(f => f.hg !== null) }));
     check('full-time + all 5 fixtures resolved', fin.md, fin.score);
+    // v2.1: Match Summary before the Notebook — goals in the timeline match the score
+    await page.waitForFunction(() => !document.getElementById('msum-layer').hidden, null, { timeout: 5000 });
+    const ms = await page.evaluate(() => {
+      const e = YAM.ui.engine, ev = e.matchEvents, rep = YAM.game.lastReport;
+      const g = side => ev.filter(x => x.type === 'goal' && x.isHomeTeam === (side === 0)).length;
+      return { goals: [g(0), g(1)].join('-'), score: e.sides.map(s => s.score).join('-'), saved: rep.events.length === ev.length,
+        homeRows: document.querySelectorAll('#msum-body .ms-col.home .ms-ev.goal').length, awayRows: document.querySelectorAll('#msum-body .ms-col.away .ms-ev.goal').length,
+        cards: ev.filter(x => x.type === 'yellow').length === e.teamTotals(0).yellow + e.teamTotals(1).yellow,
+        board: document.querySelector('#msum-body .ms-score').textContent.replace(/\s/g, ''), fields: ev.every(x => 'minute' in x && 'type' in x && 'playerName' in x && 'isHomeTeam' in x) };
+    });
     await shot('3-fulltime');
+    check('match summary: opens at full time, goals/cards = engine, timeline 2 columns', ms.goals === ms.score && ms.saved && ms.cards && ms.fields
+      && `${ms.homeRows}-${ms.awayRows}` === ms.score && ms.board === ms.score, JSON.stringify(ms));
+    await page.click('#msum-go');
 
     // notebook
     await closeModal();
@@ -280,6 +311,10 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       energy: YAM.game.starters().map(p => p.energy) }));
     await page.click('#btn-instant');
     await page.waitForFunction(() => YAM.game.phase === 'post', null, { timeout: 5000 });
+    const qsum = await page.evaluate(() => ({ open: !document.getElementById('msum-layer').hidden, quick: /QUICK|БЫСТР/.test(document.getElementById('msum-body').textContent),
+      goals: document.querySelectorAll('#msum-body .ms-ev.goal').length, total: YAM.game.lastReport.gf + YAM.game.lastReport.ga }));
+    await page.click('#msum-go');
+    check('Quick Sim → Match Summary first (same event list), then Notebook', qsum.open && qsum.quick && qsum.goals === qsum.total, JSON.stringify(qsum));
     const qs = await page.evaluate(e0 => ({ ms: YAM.ui.lastSimMs, view: YAM.ui.view, cards: document.querySelectorAll('#notes-body .card').length,
       md2: YAM.game.league.fixturesOf(2).every(f => f.hg !== null), modal: !document.getElementById('modal-layer').hidden,
       apps: Object.values(YAM.game.seasonStats).reduce((a, s) => a + s.apps, 0), tired: YAM.game.lastReport && YAM.game.starters().some((p, i) => p.energy < e0[i]),

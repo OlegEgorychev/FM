@@ -564,3 +564,28 @@ Object.assign(I18N.ru, {
   'match.instant': '[ &#9197; МГНОВЕННЫЙ МАТЧ ]', 'match.instantRest': '[ &#9197; ДОИГРАТЬ МГНОВЕННО ]',
   'match.instantDone': 'Быстрая симуляция: матч доигран мгновенно тем же движком. Отчёт в Блокноте.',
 });
+
+
+/* ---- v2.1: boot screen + match summary + knocks ---- */
+Object.assign(I18N.en, {
+  'boot.skip': 'click or press any key to skip', 'boot.ready': 'READY. Good luck, coach.',
+  'boot.phases': ['Loading database...', 'Generating procedural faces...', 'Bribing referees...', 'Initializing Match Engine...', 'Painting club crests...',
+    'Drying muddy kits...', 'Hiding attributes from the coach...', 'Counting the club budget ($)...', 'Calibrating CRT scanlines...', 'Inflating match balls...',
+    'Teaching kids the offside rule...', 'Brewing the coach\'s tea...'],
+  'ms.go': '[ Proceed to Coach\'s Notebook ]', 'ms.md': 'Matchday {n}', 'ms.ht': 'HT', 'ms.none': 'No key events', 'ms.quick': 'QUICK SIM',
+  'ms.poss': 'Possession', 'ms.shots': 'Shots (on target)', 'ms.pass': 'Pass accuracy', 'ms.cards': 'Cards Y/R',
+  'ms.status': 'Full time. Details for every kid are in the Coach\'s Notebook.',
+  'ms.type.goal': 'Goal', 'ms.type.yellow': 'Yellow card', 'ms.type.red': 'Red card', 'ms.type.injury': 'Injury (knock)',
+  'eng.injury': '{a} goes down after a hard tackle... he plays on, but limping (−{n}% energy).',
+});
+Object.assign(I18N.ru, {
+  'boot.skip': 'щёлкни или нажми любую клавишу, чтобы пропустить', 'boot.ready': 'ГОТОВО. Удачи, тренер.',
+  'boot.phases': ['Загрузка базы данных...', 'Генерация процедурных лиц...', 'Подкуп судей...', 'Инициализация матчевого движка...', 'Раскраска клубных гербов...',
+    'Сушка грязной формы...', 'Прячем атрибуты от тренера...', 'Пересчёт бюджета клуба ($)...', 'Калибровка развёртки ЭЛТ...', 'Накачка мячей...',
+    'Объясняем детям офсайд...', 'Завариваем тренеру чай...'],
+  'ms.go': '[ Перейти в Блокнот тренера ]', 'ms.md': 'Тур {n}', 'ms.ht': 'Перерыв', 'ms.none': 'Без ключевых событий', 'ms.quick': 'БЫСТРАЯ СИМУЛЯЦИЯ',
+  'ms.poss': 'Владение', 'ms.shots': 'Удары (в створ)', 'ms.pass': 'Точность пасов', 'ms.cards': 'Карточки Ж/К',
+  'ms.status': 'Финальный свисток. Подробности по каждому игроку — в Блокноте тренера.',
+  'ms.type.goal': 'Гол', 'ms.type.yellow': 'Жёлтая карточка', 'ms.type.red': 'Красная карточка', 'ms.type.injury': 'Травма (ушиб)',
+  'eng.injury': '{a} падает после жёсткого подката... играет дальше, но хромает (−{n}% энергии).',
+});

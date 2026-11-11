@@ -10,6 +10,22 @@
 {{CSS}}</style>
 </head>
 <body>
+<!-- v2.1: boot / loading screen — static markup so it shows before any script runs -->
+<div id="loading-overlay" role="progressbar" aria-label="Loading">
+  <div class="boot-nebula"></div>
+  <div class="boot-art" aria-hidden="true"></div>
+  <div class="boot-credits" aria-hidden="true"><span class="bc-by">CREATED BY</span><span class="bc-name">EGORYCHEV<br>OLEG</span></div>
+  <div class="boot-title"><div class="boot-logo"></div><div class="boot-ver"></div></div>
+  <div class="boot-sparks" aria-hidden="true"></div>
+  <div class="boot-bottom">
+    <div class="boot-bar"><i class="boot-fill"></i></div>
+    <pre class="boot-ascii">[                        ]   0%</pre>
+    <div class="boot-phase">&gt; BOOTING...</div>
+  </div>
+  <div class="boot-skip"></div>
+  <div class="boot-vhs" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="boot-scan" aria-hidden="true"></div>
+</div>
 <div id="screen">
   <!-- Scene backdrops (cross-faded per tab) -->
   <div class="scene active" id="scene-office" aria-hidden="true"></div>
@@ -292,6 +308,16 @@
       </div>
       <p class="talk-text" id="talk-text"></p>
       <div class="talk-choices" id="talk-choices"></div>
+    </section>
+  </div>
+
+  <!-- v2.1: Match Summary (full time, before the Coach's Notebook) -->
+  <div class="pinfo-layer" id="msum-layer" hidden>
+    <section class="win pinfo msum open" role="dialog" aria-modal="true" aria-labelledby="msum-title">
+      <div class="titlebar"><span class="t-ico">&#9917;</span><span class="t-txt" id="msum-title">MATCH_SUMMARY.EXE</span><button class="tb-btn" id="msum-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="win-body msum-body" id="msum-body"></div>
+      <div class="row-btns pinfo-btns"><button class="btn go ms-go" id="msum-go" type="button" data-i18n="ms.go"></button></div>
+      <div class="statusbar"><span id="msum-status"></span></div>
     </section>
   </div>
 

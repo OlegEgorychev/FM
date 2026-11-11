@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v2.0</title>
+<title>Youth Academy Manager v2.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1225,6 +1225,107 @@ body.fx .crt-scan{ opacity: .9; }
 @media (max-width: 820px){ .budget{ font-size: 12px; padding: 0 6px; } .budget span{ display: none; } }
 .tk-line.ev{ color: #ffd98a; }
 /* =========================================================
+   v2.1 — BOOT SCREEN (#loading-overlay) + MATCH SUMMARY
+   Boot look follows the credits art: deep-space nebula, chrome/blood-red metal type, sparks, VHS glitches.
+   ========================================================= */
+#loading-overlay{ position: fixed; inset: 0; z-index: 9999; overflow: hidden; cursor: progress; color: #d9dce3;
+  background: #07060b; font-family: var(--mono, monospace); transition: opacity .8s ease, filter .8s ease; }
+#loading-overlay.fade{ opacity: 0; filter: brightness(2.2) blur(2px); pointer-events: none; }
+.boot-nebula{ position: absolute; inset: -10%;
+  background: radial-gradient(ellipse 40% 30% at 30% 30%, rgba(160,30,70,.35), transparent 70%),
+              radial-gradient(ellipse 45% 35% at 70% 40%, rgba(70,40,150,.35), transparent 70%),
+              radial-gradient(ellipse 50% 40% at 50% 75%, rgba(40,20,70,.5), transparent 70%),
+              radial-gradient(1px 1px at 12% 20%, #fff, transparent), radial-gradient(1px 1px at 82% 14%, #fff, transparent),
+              radial-gradient(1px 1px at 64% 82%, #cfd, transparent), radial-gradient(1px 1px at 33% 67%, #fff, transparent),
+              #07060b;
+  animation: bootDrift 14s ease-in-out infinite alternate; }
+@keyframes bootDrift{ to{ transform: translate(-2%, 1%) scale(1.04); } }
+
+/* scene A: credits art (fallback = CSS chrome text) */
+.boot-art{ position: absolute; inset: 0; background: url("assets/boot-credits.webp") center / cover no-repeat; opacity: 0;
+  transition: opacity 1s ease, transform 7s ease-out; transform: scale(1.06); }
+#loading-overlay.has-art .boot-art{ opacity: 1; transform: scale(1); }
+#loading-overlay.has-art .boot-credits{ display: none; }
+.boot-credits{ position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh;
+  transition: opacity .9s ease; text-align: center; }
+.bc-by{ font: bold clamp(18px, 4vw, 52px)/1 var(--mono, monospace); letter-spacing: .3em; color: #b9b2b4; text-shadow: 3px 3px 0 #120d10; }
+.bc-name{ font: 900 clamp(40px, 10vw, 150px)/.95 Impact, 'Arial Black', var(--ui, sans-serif); letter-spacing: .02em;
+  background: linear-gradient(#f5f7fb 0%, #9ea7b4 44%, #eef1f5 50%, #b5232a 53%, #4a0a0f 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  -webkit-text-stroke: 2px #2a2228; filter: drop-shadow(4px 5px 0 #0b0a0d) drop-shadow(0 0 24px rgba(255,90,40,.25)); }
+#loading-overlay.scene-b .boot-credits{ opacity: 0; }
+#loading-overlay.has-art.scene-b .boot-art{ opacity: .14; filter: blur(7px) saturate(1.3); transform: scale(1.12); transition: opacity 1s ease, filter 1s ease, transform 6s ease-out; }
+
+/* scene B: pixel game logo */
+.boot-title{ position: absolute; left: 50%; top: 44%; width: min(900px, 88vw); transform: translate(-50%, -50%) scale(.94);
+  display: flex; flex-direction: column; align-items: center; gap: 1.6vh; opacity: 0; transition: opacity .9s ease .2s, transform 1.4s ease .2s; }
+#loading-overlay.scene-b .boot-title{ opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.boot-logo{ width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2.2vh; }
+.pixel-text{ display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 0 18px rgba(200,40,40,.28)); }
+.pixel-text.l2{ width: 62%; }
+.boot-ver{ font-size: clamp(11px, 1.4vw, 16px); letter-spacing: .35em; color: #8f8796; text-shadow: 0 0 6px rgba(160,40,60,.6); }
+.boot-sparks{ position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1s ease .4s; }
+#loading-overlay.scene-b .boot-sparks{ opacity: 1; }
+.boot-sparks i{ position: absolute; width: 2px; height: 2px; background: #ffb347; box-shadow: 0 0 6px 1px #ff6a1a; border-radius: 1px;
+  animation: spark linear infinite; }
+@keyframes spark{ 0%{ transform: translate(0, 0); opacity: 0; } 10%{ opacity: 1; } 100%{ transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+
+/* progress bar (Win98 installer blocks, in chrome-red) */
+.boot-bottom{ position: absolute; left: 50%; bottom: 9vh; width: min(560px, 84vw); transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 8px; }
+.boot-bar{ height: 22px; padding: 3px; background: #0b0a0e; border: 2px solid; border-color: #2c2830 #8a8290 #8a8290 #2c2830; box-shadow: 0 0 0 1px #000; }
+.boot-fill{ display: block; height: 100%; width: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 1px, #000 1px 3px, transparent 3px 13px),
+              linear-gradient(#f2f4f8 0%, #a7aeba 45%, #c12a2f 55%, #5a0c12 100%); }
+.boot-ascii{ margin: 0; font: 13px/1 var(--mono, monospace); color: #ffb347; text-align: center; letter-spacing: 1px; white-space: pre; text-shadow: 0 0 6px rgba(255,140,40,.5); }
+.boot-phase{ min-height: 1.2em; font-size: 13px; color: #c9cfd8; text-align: center; letter-spacing: .5px; }
+.boot-phase::after{ content: '_'; animation: bootBlink 1s steps(1) infinite; }
+@keyframes bootBlink{ 50%{ opacity: 0; } }
+.boot-skip{ position: absolute; right: 16px; bottom: 12px; font-size: 11px; color: #5d5866; letter-spacing: 1px; }
+
+/* CRT + VHS */
+.boot-scan{ position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.32) 0 2px, transparent 2px 4px),
+              radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.75) 100%); }
+.boot-vhs i{ position: absolute; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(200,220,255,.35) 20%, transparent 40%, rgba(255,255,255,.25) 70%, transparent);
+  animation: vhs 4.5s linear infinite; opacity: .6; }
+.boot-vhs i:nth-child(2){ animation-duration: 6.3s; animation-delay: -2s; height: 1px; }
+.boot-vhs i:nth-child(3){ animation-duration: 3.1s; animation-delay: -1s; }
+@keyframes vhs{ 0%{ top: 102%; } 100%{ top: -3%; } }
+@media (prefers-reduced-motion: reduce){
+  .boot-nebula, .boot-vhs i, .boot-sparks i, .boot-phase::after{ animation: none; }
+  .boot-sparks{ display: none; }
+}
+
+/* =========================================================
+   MATCH SUMMARY ("MATCH_SUMMARY.EXE")
+   ========================================================= */
+.win.pinfo.msum{ width: min(720px, 100%); }
+.win.pinfo.msum .titlebar{ background: linear-gradient(90deg, #1a1a1a, #6b1d1d); }
+.msum-body{ display: flex; flex-direction: column; gap: 10px; margin: 8px; padding: 0; }
+.ms-board{ display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 14px 16px;
+  background: #0b0f0d; color: var(--text); border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); box-shadow: inset 0 0 30px rgba(0,0,0,.8); }
+.ms-team{ display: flex; align-items: center; gap: 10px; min-width: 0; font: bold 15px/1.15 var(--ui); text-transform: uppercase; letter-spacing: .5px; }
+.ms-team.away{ flex-direction: row-reverse; text-align: right; }
+.ms-team span:last-child{ min-width: 0; overflow-wrap: anywhere; }
+.ms-score{ font: bold 54px/1 var(--mono); color: #ffcf5a; letter-spacing: 4px; text-shadow: 0 0 14px rgba(255,190,60,.45); white-space: nowrap; }
+.ms-sub{ grid-column: 1 / -1; display: flex; justify-content: center; gap: 18px; font: 12px/1 var(--mono); color: var(--muted); }
+.ms-res{ padding: 2px 8px; color: #111; font-weight: bold; } .ms-res.W{ background: #7fd36b; } .ms-res.D{ background: #d9c56a; } .ms-res.L{ background: #e0705f; }
+.ms-timeline{ position: relative; display: grid; grid-template-columns: 1fr 1fr; max-height: 300px; overflow: auto; min-height: 120px;
+  background: #11171b; color: var(--text); border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); }
+.ms-timeline::before{ content: ''; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px dashed #34404a; }
+.ms-col{ display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; min-width: 0; }
+.ms-col.home{ align-items: flex-end; text-align: right; }
+.ms-col h4{ margin: 0 0 4px; font: bold 11px/1 var(--mono); letter-spacing: 1.5px; color: var(--amber); text-transform: uppercase; }
+.ms-ev{ font: 14px/1.5 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ms-ev .m{ color: var(--muted); } .ms-ev small{ color: var(--muted); font-size: 11px; }
+.ms-ev.goal{ color: #eef1ec; font-weight: bold; } .ms-ev.red{ color: #f08a7e; } .ms-ev.injury{ color: #9fd3ff; }
+.ms-ev.ht{ color: var(--muted); font-size: 11px; letter-spacing: 1px; }
+.ms-none{ color: var(--muted); font-style: italic; font-size: 12px; }
+.ms-stats{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font: 12px/1.3 var(--ui); color: #222; text-align: center; }
+.ms-stats b{ display: block; font: bold 15px/1.2 var(--mono); color: #111; }
+.ms-go{ width: 100%; padding: 12px; font: bold 15px/1 var(--mono) !important; letter-spacing: 1px; text-transform: uppercase; }
+@media (max-width: 640px){ .ms-score{ font-size: 38px; } .ms-stats{ grid-template-columns: repeat(2, 1fr); } }
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1243,6 +1344,22 @@ body.fx .crt-scan{ opacity: .9; }
 </style>
 </head>
 <body>
+<!-- v2.1: boot / loading screen — static markup so it shows before any script runs -->
+<div id="loading-overlay" role="progressbar" aria-label="Loading">
+  <div class="boot-nebula"></div>
+  <div class="boot-art" aria-hidden="true"></div>
+  <div class="boot-credits" aria-hidden="true"><span class="bc-by">CREATED BY</span><span class="bc-name">EGORYCHEV<br>OLEG</span></div>
+  <div class="boot-title"><div class="boot-logo"></div><div class="boot-ver"></div></div>
+  <div class="boot-sparks" aria-hidden="true"></div>
+  <div class="boot-bottom">
+    <div class="boot-bar"><i class="boot-fill"></i></div>
+    <pre class="boot-ascii">[                        ]   0%</pre>
+    <div class="boot-phase">&gt; BOOTING...</div>
+  </div>
+  <div class="boot-skip"></div>
+  <div class="boot-vhs" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="boot-scan" aria-hidden="true"></div>
+</div>
 <div id="screen">
   <!-- Scene backdrops (cross-faded per tab) -->
   <div class="scene active" id="scene-office" aria-hidden="true"></div>
@@ -1525,6 +1642,16 @@ body.fx .crt-scan{ opacity: .9; }
       </div>
       <p class="talk-text" id="talk-text"></p>
       <div class="talk-choices" id="talk-choices"></div>
+    </section>
+  </div>
+
+  <!-- v2.1: Match Summary (full time, before the Coach's Notebook) -->
+  <div class="pinfo-layer" id="msum-layer" hidden>
+    <section class="win pinfo msum open" role="dialog" aria-modal="true" aria-labelledby="msum-title">
+      <div class="titlebar"><span class="t-ico">&#9917;</span><span class="t-txt" id="msum-title">MATCH_SUMMARY.EXE</span><button class="tb-btn" id="msum-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="win-body msum-body" id="msum-body"></div>
+      <div class="row-btns pinfo-btns"><button class="btn go ms-go" id="msum-go" type="button" data-i18n="ms.go"></button></div>
+      <div class="statusbar"><span id="msum-status"></span></div>
     </section>
   </div>
 
@@ -2278,6 +2405,31 @@ Object.assign(I18N.ru, {
   'match.instant': '[ &#9197; МГНОВЕННЫЙ МАТЧ ]', 'match.instantRest': '[ &#9197; ДОИГРАТЬ МГНОВЕННО ]',
   'match.instantDone': 'Быстрая симуляция: матч доигран мгновенно тем же движком. Отчёт в Блокноте.',
 });
+
+
+/* ---- v2.1: boot screen + match summary + knocks ---- */
+Object.assign(I18N.en, {
+  'boot.skip': 'click or press any key to skip', 'boot.ready': 'READY. Good luck, coach.',
+  'boot.phases': ['Loading database...', 'Generating procedural faces...', 'Bribing referees...', 'Initializing Match Engine...', 'Painting club crests...',
+    'Drying muddy kits...', 'Hiding attributes from the coach...', 'Counting the club budget ($)...', 'Calibrating CRT scanlines...', 'Inflating match balls...',
+    'Teaching kids the offside rule...', 'Brewing the coach\'s tea...'],
+  'ms.go': '[ Proceed to Coach\'s Notebook ]', 'ms.md': 'Matchday {n}', 'ms.ht': 'HT', 'ms.none': 'No key events', 'ms.quick': 'QUICK SIM',
+  'ms.poss': 'Possession', 'ms.shots': 'Shots (on target)', 'ms.pass': 'Pass accuracy', 'ms.cards': 'Cards Y/R',
+  'ms.status': 'Full time. Details for every kid are in the Coach\'s Notebook.',
+  'ms.type.goal': 'Goal', 'ms.type.yellow': 'Yellow card', 'ms.type.red': 'Red card', 'ms.type.injury': 'Injury (knock)',
+  'eng.injury': '{a} goes down after a hard tackle... he plays on, but limping (−{n}% energy).',
+});
+Object.assign(I18N.ru, {
+  'boot.skip': 'щёлкни или нажми любую клавишу, чтобы пропустить', 'boot.ready': 'ГОТОВО. Удачи, тренер.',
+  'boot.phases': ['Загрузка базы данных...', 'Генерация процедурных лиц...', 'Подкуп судей...', 'Инициализация матчевого движка...', 'Раскраска клубных гербов...',
+    'Сушка грязной формы...', 'Прячем атрибуты от тренера...', 'Пересчёт бюджета клуба ($)...', 'Калибровка развёртки ЭЛТ...', 'Накачка мячей...',
+    'Объясняем детям офсайд...', 'Завариваем тренеру чай...'],
+  'ms.go': '[ Перейти в Блокнот тренера ]', 'ms.md': 'Тур {n}', 'ms.ht': 'Перерыв', 'ms.none': 'Без ключевых событий', 'ms.quick': 'БЫСТРАЯ СИМУЛЯЦИЯ',
+  'ms.poss': 'Владение', 'ms.shots': 'Удары (в створ)', 'ms.pass': 'Точность пасов', 'ms.cards': 'Карточки Ж/К',
+  'ms.status': 'Финальный свисток. Подробности по каждому игроку — в Блокноте тренера.',
+  'ms.type.goal': 'Гол', 'ms.type.yellow': 'Жёлтая карточка', 'ms.type.red': 'Красная карточка', 'ms.type.injury': 'Травма (ушиб)',
+  'eng.injury': '{a} падает после жёсткого подката... играет дальше, но хромает (−{n}% энергии).',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -2300,6 +2452,113 @@ class Lang {
 }
 const L = new Lang();
 
+/* =========================================================
+   v2.1 — BOOT / LOADING SCREEN (atmospheric startup)
+   Static markup (#loading-overlay) is the FIRST thing in <body>, so it is visible before any script runs.
+   Two scenes over one progress bar: credits art (assets/boot-credits.webp, CSS chrome text as fallback)
+   → pixel game logo with sparks. The bar fills in 5–8 s (random), a fake loading phase changes every second,
+   then the overlay fades out. Click / any key skips it; `?noboot` in the URL disables it (tests).
+   ========================================================= */
+const PixelFont = (() => {
+  // 5x7 bitmap glyphs, one string per row ('#' = pixel)
+  const G = {
+    A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'], B: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
+    C: ['.####', '#....', '#....', '#....', '#....', '#....', '.####'], D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+    E: ['#####', '#....', '#....', '####.', '#....', '#....', '#####'], F: ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+    G: ['.####', '#....', '#....', '#.###', '#...#', '#...#', '.###.'], H: ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+    I: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '#####'], J: ['..###', '...#.', '...#.', '...#.', '#..#.', '#..#.', '.##..'],
+    K: ['#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#'], L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+    M: ['#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#'], N: ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#', '#...#'],
+    O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'], P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+    Q: ['.###.', '#...#', '#...#', '#...#', '#.#.#', '#..#.', '.##.#'], R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+    S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'], T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+    U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'], V: ['#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
+    W: ['#...#', '#...#', '#...#', '#.#.#', '#.#.#', '##.##', '#...#'], X: ['#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#'],
+    Y: ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'], Z: ['#####', '....#', '...#.', '..#..', '.#...', '#....', '#####'],
+    0: ['.###.', '#...#', '#..##', '#.#.#', '##..#', '#...#', '.###.'], 1: ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+    2: ['.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#####'], 3: ['####.', '....#', '....#', '.###.', '....#', '....#', '####.'],
+    4: ['...#.', '..##.', '.#.#.', '#..#.', '#####', '...#.', '...#.'], 5: ['#####', '#....', '####.', '....#', '....#', '#...#', '.###.'],
+    6: ['.###.', '#....', '#....', '####.', '#...#', '#...#', '.###.'], 7: ['#####', '....#', '...#.', '..#..', '.#...', '.#...', '.#...'],
+    8: ['.###.', '#...#', '#...#', '.###.', '#...#', '#...#', '.###.'], 9: ['.###.', '#...#', '#...#', '.####', '....#', '....#', '.###.'],
+    '.': ['.....', '.....', '.....', '.....', '.....', '.##..', '.##..'], '-': ['.....', '.....', '.....', '.###.', '.....', '.....', '.....'],
+    ' ': ['.....', '.....', '.....', '.....', '.....', '.....', '.....'],
+  };
+  let uid = 0;
+  /** Chrome-and-blood pixel text (silver top → red bottom, dark 3D extrude), as one SVG. */
+  return {
+    svg(text, { cls = '' } = {}) {
+      const chars = [...text.toUpperCase()].map(c => G[c] || G[' ']);
+      const w = chars.length * 6 - 1, id = 'pf' + (++uid);
+      let d = '';
+      chars.forEach((g, i) => g.forEach((row, y) => [...row].forEach((c, x) => { if (c === '#') d += `M${i * 6 + x} ${y}h1v1h-1z`; })));
+      return `<svg class="pixel-text ${cls}" viewBox="-0.5 -0.5 ${w + 1.6} 8.6" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-label="${esc(text)}" role="img">`
+        + `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f6fa"/><stop offset=".42" stop-color="#9aa3b0"/>`
+        + `<stop offset=".5" stop-color="#e9edf2"/><stop offset=".56" stop-color="#b8242a"/><stop offset="1" stop-color="#4e0b10"/></linearGradient></defs>`
+        + `<path d="${d}" fill="#08090c" transform="translate(.9 .9)"/><path d="${d}" fill="#2a1a20" transform="translate(.45 .45)"/>`
+        + `<path d="${d}" fill="url(#${id})"/></svg>`;
+    },
+  };
+})();
+
+const BootScreen = {
+  MIN_MS: 5000, MAX_MS: 8000, PHASE_MS: 1000,
+  el: null, done: false,
+  start() {
+    this.el = document.getElementById('loading-overlay');
+    if (!this.el) return;
+    if (/[?&]noboot\b/.test(location.search)) { this.el.remove(); this.done = true; return; }
+    this.duration = rnd(this.MIN_MS, this.MAX_MS);
+    this.t0 = performance.now();
+    this.$ = s => this.el.querySelector(s);
+    this.$('.boot-logo').innerHTML = PixelFont.svg('Youth Academy', { cls: 'l1' }) + PixelFont.svg('Manager', { cls: 'l2' });
+    this.$('.boot-ver').textContent = `v${APP_VERSION}  ·  ACADEMY 98`;
+    this.$('.boot-skip').textContent = L.t('boot.skip');
+    const art = new Image();   // credits art: if the asset is missing, the CSS chrome fallback stays visible
+    art.onload = () => this.el.classList.add('has-art');
+    art.src = 'assets/boot-credits.webp';
+    this.sparks();
+    this.phases = shuffle(I18N[L.code]['boot.phases'] || I18N.en['boot.phases']);
+    this.phase(0);
+    this.skip = () => this.finish();
+    addEventListener('keydown', this.skip, true);
+    this.el.addEventListener('click', this.skip);
+    this.raf = requestAnimationFrame(() => this.frame());
+  },
+  phase(i) {
+    const list = [...this.phases.slice(0, Math.ceil(this.duration / this.PHASE_MS) - 1), L.t('boot.ready')];
+    this.$('.boot-phase').textContent = '> ' + list[Math.min(i, list.length - 1)];
+    this.phaseIdx = i;
+  },
+  frame() {
+    if (this.done) return;
+    const t = Math.min(1, (performance.now() - this.t0) / this.duration);
+    const k = t < 1 ? Math.floor(t * 40) / 40 : 1;   // the bar moves in chunky steps, like an old installer
+    this.$('.boot-fill').style.width = (k * 100) + '%';
+    const cells = 24, on = Math.round(k * cells);
+    this.$('.boot-ascii').textContent = `[${'|'.repeat(on)}${' '.repeat(cells - on)}] ${String(Math.round(k * 100)).padStart(3)}%`;
+    const p = Math.floor((performance.now() - this.t0) / this.PHASE_MS);
+    if (p !== this.phaseIdx) this.phase(p);
+    this.el.classList.toggle('scene-b', t > 0.42);   // credits → game logo
+    if (t >= 1) { this.phase(99); setTimeout(() => this.finish(), 350); return; }
+    this.raf = requestAnimationFrame(() => this.frame());
+  },
+  sparks() {
+    const box = this.$('.boot-sparks');
+    box.innerHTML = Array.from({ length: 26 }, () => {
+      const x = rnd(8, 92), y = rnd(30, 70), dx = rnd(-60, 60), dy = rnd(-90, -20), d = (Math.random() * 2.2 + 1.2).toFixed(2), dl = (Math.random() * 3).toFixed(2);
+      return `<i style="left:${x}%;top:${y}%;--dx:${dx}px;--dy:${dy}px;animation-duration:${d}s;animation-delay:-${dl}s"></i>`;
+    }).join('');
+  },
+  finish() {
+    if (this.done) return;
+    this.done = true;
+    cancelAnimationFrame(this.raf);
+    removeEventListener('keydown', this.skip, true);
+    this.elapsed = performance.now() - this.t0;
+    this.el.classList.add('fade');
+    setTimeout(() => { this.el.remove(); document.dispatchEvent(new Event('yam:booted')); }, 800);
+  },
+};
 /* =========================================================
    PORTRAIT GENERATOR (v1.4) — procedural 32x32 pixel-art "paper doll".
    A face is 7 trait indices; layers are plain [x, y, w, h] rect lists.
@@ -3065,6 +3324,8 @@ class MatchEngine {
     this.htLogged = false;
     this.possTicks = [0, 0];
     this.ev = { kind: 'kickoff' };
+    this.matchEvents = [];   // v2.1: key events for the Match Summary { minute, type, playerName, playerId, isHomeTeam, side, assist? }
+    this.injured = new Set();
     this.evLog = [];   // recent {seq, ev} so the view never misses an event that was overwritten in the same tick
     this.seq = 0;
   }
@@ -3120,6 +3381,21 @@ class MatchEngine {
     }
   }
   st(p) { return this.stats.get(p.id); }
+  /** v2.1: key event for the Match Summary (goal / yellow / red / injury). Same in visual and instant mode. */
+  addEvent(type, p, side, extra = {}) {
+    this.matchEvents.push({ minute: Math.max(1, this.minute), type, playerName: p.name, playerId: p.id, isHomeTeam: side === 0, side, ...extra });
+  }
+  /** v2.1: a hard tackle can leave a knock — the victim plays on with −25% energy (once per match). Strength protects. */
+  static INJURY = { CHANCE: 0.03, ENERGY: 25 };
+  maybeInjure(p, side) {
+    if (this.injured.has(p.id) || this.sentOff.has(p.id)) return;
+    const str = p.physical?.strength ?? 10;
+    if (Math.random() >= MatchEngine.INJURY.CHANCE * (1.4 - str * 0.04)) return;
+    this.injured.add(p.id);
+    this.energy.set(p.id, Math.max(0, this.energy.get(p.id) - MatchEngine.INJURY.ENERGY));
+    this.addEvent('injury', p, side);
+    this.log('turn', 'eng.injury', { a: p, n: MatchEngine.INJURY.ENERGY }, side);
+  }
   active(side) { return this.sides[side].players.filter(p => !this.sentOff.has(p.id)); }
   inZone(side, zone) {
     const line = ZONE_LINE[zone];
@@ -3261,6 +3537,7 @@ class MatchEngine {
       if (!this.sentOff.has(p.id)) this.energy.set(p.id, Math.min(100, this.energy.get(p.id) + ENERGY.HT_REST));
     }
     this.log('flavor', 'ht.rest', { n: ENERGY.HT_REST }, -1);
+    this.htScore = this.sides.map(x => x.score);   // v2.1: for the summary timeline
     this.setEv({ kind: 'halftime' });
     if (this.instant) return;   // instant sim: same +4% rest, no pause
     this.pause();
@@ -3421,6 +3698,7 @@ class MatchEngine {
       this.st(c).dribbleFail++;
       this.st(def).tackles++;
       this.log('turn', 'drFail', vars, side);
+      this.maybeInjure(c, side);
       this.turnover(def, 2 - z);
       this.setEv({ kind: 'tackle', a: c, d: def });
     }
@@ -3431,10 +3709,12 @@ class MatchEngine {
     const defSide = 1 - attSide;
     const s = this.st(def);
     s.yellow++;
+    this.addEvent('yellow', def, defSide);
     this.setEv({ kind: 'foul', a: victim, d: def });
     this.log('foul', 'foul', { a: victim, d: def }, defSide);
     if (s.yellow >= 2) {
       s.red = 1;
+      this.addEvent('red', def, defSide);
       this.sentOff.add(def.id);
       this.hold = 1;
       this.log('red', 'red', { d: def, n: this.active(defSide).length }, defSide);
@@ -3476,6 +3756,7 @@ class MatchEngine {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
+      this.addEvent('goal', shooter, side, assist ? { assist: assist.name } : {});
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
       if (!this.instant) this.hooks.onGoal?.(side);
       this.kickoff(opp);
@@ -3579,8 +3860,21 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.1', name: { en: 'Boot Screen & Match Summary', ru: 'Загрузочный экран и итоги матча' },
+    en: [
+      'New atmospheric boot screen: the "Created by" credits, then the chrome pixel logo with sparks, a classic installer progress bar and funny loading messages (5–8 seconds; click or press any key to skip).',
+      'Match Summary: at full time a scoreboard window opens before the Coach\'s Notebook — big final score with club badges, a two-column timeline of goals (with assists), cards and knocks, plus possession, shots, pass accuracy and cards.',
+      'Works the same after a watched match and after a Quick Sim: both read the same event list recorded by the match engine.',
+      'Knocks: a hard tackle can now leave a kid limping (−25% energy for the rest of the match). Strong kids get hurt less.',
+    ],
+    ru: [
+      'Новый атмосферный загрузочный экран: титр «Created by», затем хромированный пиксельный логотип с искрами, классическая полоса установки и забавные сообщения о загрузке (5–8 секунд; щелчок или любая клавиша — пропустить).',
+      'Итоги матча: после финального свистка перед Блокнотом тренера открывается табло — крупный счёт с гербами клубов, хроника в две колонки (голы с ассистентами, карточки, травмы), а также владение, удары, точность пасов и карточки.',
+      'Одинаково работает после просмотренного матча и после быстрой симуляции: оба режима берут один и тот же список событий из матчевого движка.',
+      'Травмы-ушибы: после жёсткого подката игрок может захромать (−25% энергии до конца матча). Сильные ребята травмируются реже.',
+    ] },
   { v: '2.0', name: { en: 'Quick Sim', ru: 'Быстрая симуляция' },
     en: [
       'New [ INSTANT SIM MATCH ] button under Start Match: skip the 2D match and get the final result in a few milliseconds.',
@@ -4954,6 +5248,75 @@ class DialogueView {
   close() { this.finishTyping(); this.layer.hidden = true; this.choices = null; }
 }
 /* =========================================================
+   v2.1 — MATCH SUMMARY ("MATCH_SUMMARY.EXE")
+   Opens at full time (visual and Quick Sim) BEFORE the Coach's Notebook.
+   Built only from state.lastReport (events come from MatchEngine.matchEvents), so it can be re-opened after a reload.
+   Our club is always on the left (like the live scoreboard); the venue is shown underneath.
+   ========================================================= */
+class MatchSummary {
+  static ICON = { goal: '⚽', yellow: '🟨', red: '🟥', injury: '✚' };
+  constructor(ui) {
+    this.ui = ui;
+    this.layer = document.getElementById('msum-layer');
+    this.body = document.getElementById('msum-body');
+    document.getElementById('msum-x').addEventListener('click', () => this.close());
+    document.getElementById('msum-go').addEventListener('click', () => { this.close(); this.ui.show('notes'); });
+    document.addEventListener('keydown', e => {
+      if (!this.isOpen || e.key !== 'Escape') return;
+      e.preventDefault(); e.stopImmediatePropagation(); this.close();
+    }, true);
+  }
+  get isOpen() { return !this.layer.hidden; }
+  /** "Liam Smith" → "L. Smith" (in the current language). */
+  static short(name) { const n = L.name(name).split(' '); return n.length > 1 ? `${n[0][0]}. ${n.slice(1).join(' ')}` : n[0]; }
+
+  open(rep) {
+    if (!rep) return;
+    this.rep = rep;
+    this.ui.modal.close(); this.ui.profile.close();
+    this.render();
+    this.layer.hidden = false;
+    document.getElementById('msum-go').focus();
+  }
+  close() { this.layer.hidden = true; }
+
+  render() {
+    const rep = this.rep, ui = this.ui, s = ui.state, lg = s.league;
+    if (!rep) return;
+    const me = lg.team(0), opp = lg.teams.find(t => t.name === rep.opponent);
+    const evs = (rep.events || []).slice().sort((a, b) => a.minute - b.minute);
+    const line = e => {
+      const as = e.assist ? ` <small>(${esc(MatchSummary.short(e.assist))})</small>` : '';
+      return `<div class="ms-ev ${e.type}" title="${esc(L.t('ms.type.' + e.type))}"><span class="m">${pad2(e.minute)}'</span> ${MatchSummary.ICON[e.type] || '•'} ${esc(MatchSummary.short(e.playerName))}${as}</div>`;
+    };
+    const col = (home, title) => {
+      const list = evs.filter(e => e.isHomeTeam === home);
+      const first = list.filter(e => e.minute <= 45), second = list.filter(e => e.minute > 45);
+      const ht = rep.ht ? `<div class="ms-ev ht">— ${L.t('ms.ht')} ${rep.ht[0]}-${rep.ht[1]} —</div>` : '';
+      return `<div class="ms-col ${home ? 'home' : 'away'}"><h4>${esc(title)}</h4>`
+        + (list.length ? first.map(line).join('') + ht + second.map(line).join('') : `<span class="ms-none">${L.t('ms.none')}</span>${ht}`) + '</div>';
+    };
+    const t = rep.totals || [{}, {}];
+    const pct = x => (x.passOk + x.passFail ? Math.round(x.passOk / (x.passOk + x.passFail) * 100) : 0);
+    this.body.innerHTML = `
+      <div class="ms-board">
+        <div class="ms-team home">${emblemHTML(me, 'lg')}<span>${esc(L.team(s.clubName))}</span></div>
+        <div class="ms-score">${rep.gf} - ${rep.ga}</div>
+        <div class="ms-team away">${emblemHTML(opp, 'lg')}<span>${esc(L.team(rep.opponent))}</span></div>
+        <div class="ms-sub"><span class="ms-res ${rep.result}">${L.t('res.' + rep.result)}</span><span>${L.t('ms.md', { n: rep.md })} · ${L.t('venue.' + rep.venue)}</span>${rep.ht ? `<span>${L.t('ms.ht')} ${rep.ht[0]}-${rep.ht[1]}</span>` : ''}${rep.instant ? `<span>${L.t('ms.quick')}</span>` : ''}</div>
+      </div>
+      <div class="ms-timeline">${col(true, L.team(s.clubName))}${col(false, L.team(rep.opponent))}</div>
+      <div class="ms-stats">
+        <div>${L.t('ms.poss')}<b>${rep.poss ?? 50}% - ${100 - (rep.poss ?? 50)}%</b></div>
+        <div>${L.t('ms.shots')}<b>${t[0].shots ?? 0} (${t[0].onTarget ?? 0}) - ${t[1].shots ?? 0} (${t[1].onTarget ?? 0})</b></div>
+        <div>${L.t('ms.pass')}<b>${pct(t[0])}% - ${pct(t[1])}%</b></div>
+        <div>${L.t('ms.cards')}<b>${t[0].yellow ?? 0}/${t[0].red ?? 0} - ${t[1].yellow ?? 0}/${t[1].red ?? 0}</b></div>
+      </div>`;
+    document.getElementById('msum-title').textContent = `MATCH_SUMMARY.EXE — ${L.t('ms.md', { n: rep.md })}`;
+    document.getElementById('msum-status').textContent = L.t('ms.status');
+  }
+}
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -4983,6 +5346,7 @@ class UIController {
     this.teamCard = new TeamRosterCard(this);   // v1.7
     this.debug = new DebugConsole(this);         // v1.8
     this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
+    this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
     this.bind();
@@ -5029,6 +5393,7 @@ class UIController {
     this.renderSpeedBtns();
     this.renderBudget();
     if (this.debug?.isOpen) this.debug.render();   // v1.8
+    if (this.summary?.isOpen) this.summary.render();   // v2.1
   }
 
   /* ---------- language ---------- */
@@ -6056,6 +6421,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const played = a.all;   // starters + substitutes
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
+      // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
+      events: eng.matchEvents.map(e => ({ ...e })), ht: eng.htScore || null, instant: !!eng.instant,
+      totals: [eng.teamTotals(0), eng.teamTotals(1)].map(t => ({ shots: t.shots, onTarget: t.onTarget, passOk: t.passOk, passFail: t.passFail, yellow: t.yellow, red: t.red })),
+      poss: Math.round(eng.possTicks[0] / ((eng.possTicks[0] + eng.possTicks[1]) || 1) * 100),
       players: shuffle(played).slice(0, 3).map(p => ({
         id: p.id, stats: { ...eng.st(p) },
         tired: eng.tired.has(p.id), oop: NATURAL_LINE[p.position] !== eng.lineOf.get(p.id), role: (p.tags || [])[0] || null,
@@ -6073,18 +6442,15 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.save();
     this.tableMd = ctx.md;
     this.renderAll();
-    if (eng.instant) {   // v2.0 Quick Sim: no full-time dialog, straight to the Coach's Notebook
+    this.$('tk-notes').classList.add('alert');
+    if (eng.instant) {   // v2.0 Quick Sim
       this.renderLive(eng);
       this.appendLog({ minute: 90, type: 'coach', key: 'match.instantDone', vars: {}, side: -1, r: 0 });
-      this.show('notes');
+      this.summary.open(s.lastReport);
       return;
     }
-    this.$('tk-notes').classList.add('alert');
-    this.alert(L.t('modal.ft', { h: esc(L.team(s.clubName)), x: a.score, y: b.score, a: esc(L.team(ctx.opp.name)) }), L.t('modal.ftTitle'),
-      result === 'W' ? 'ok' : result === 'D' ? 'info' : 'warn', [
-        { label: L.t('modal.toNotes'), primary: true, onClick: () => this.show('notes') },
-        { label: L.t('modal.stay') },
-      ]);
+    // v2.1: full time → MATCH SUMMARY scoreboard first (a short beat so the final whistle lands on the pitch)
+    setTimeout(() => { if (s.phase === 'post' && s.lastReport) this.summary.open(s.lastReport); }, 700);
   }
 
   /* ---------- NOTEBOOK ---------- */
@@ -6149,6 +6515,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 /* =========================================================
    BOOT
    ========================================================= */
+BootScreen.start();   // v2.1: fake loading screen first (the game builds underneath it)
 const game = new GameState();
 const ui = new UIController(game);
 window.YAM = { game, ui, MatchEngine, League, CalendarEngine, L, ENERGY, FORMATIONS }; // handy for debugging in DevTools

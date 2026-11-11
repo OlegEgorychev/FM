@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v2.0)
+# Youth Academy Manager — design notes (current: v2.1)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -92,3 +92,9 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - `MatchEngine.tick()` is the whole match maths for one beat (minute, drain, action, ambient, half/full time). Drivers: `start()` = setInterval paced by SPEED/HIGHLIGHT with `notify()` → `hooks.onUpdate` each beat; `runInstant()` = synchronous loop over the same `tick()` (≈110 iterations, ~2 ms), `instant = true` → no timers, no onUpdate/onGoal, half-time gives the same +4% without pausing. `onLog`, `onEnd` still fire.
 - UI: `createEngine()` shared by Start and `#btn-instant` (`onInstantSim()`): pre-match → whole match; half-time / mid-match → "SIM TO FULL TIME" plays the rest (subs + shouts kept). `onMatchEnd` records everything as usual; with `eng.instant` it skips the full-time dialog and opens the Notebook.
 - Smoke test: with a seeded `Math.random` the visual and instant drivers produce identical scores, stats and energy (3 seeds).
+
+## Boot screen + Match Summary (v2.1)
+- `#loading-overlay` (z 9999) is static markup at the top of `<body>`; `BootScreen` (02a-boot-screen.js) starts first in 99-boot.js. Scene A = credits art `assets/boot-credits.webp` (CSS chrome "CREATED BY / EGORYCHEV OLEG" fallback if the asset is missing), scene B (after 42%) = `PixelFont.svg()` 5x7 chrome/red pixel logo + sparks. Bar fills in random 5–8 s (chunky steps + ASCII bar), `boot.phases` (EN/RU) change every second, then an 0.8 s fade and removal (`yam:booted` event). Click / any key skips; `?noboot` disables (smoke test).
+- `MatchEngine.matchEvents` `{ minute, type goal|yellow|red|injury, playerName, playerId, isHomeTeam (= our side), side, assist? }`, filled inside tick() → identical in visual and instant mode. `htScore` at half-time.
+- Knocks: failed dribble (tackled) → `maybeInjure()`: 3% × (1.4 − strength·0.04), once per player per match, −25 energy, log `eng.injury`. No long-term absence yet.
+- `lastReport` now carries `events`, `ht`, `totals`, `poss`, `instant`. `MatchSummary` (11e-match-summary.js, `#msum-layer`) opens at full time (0.7 s after the whistle; at once after Quick Sim): score + badges, W/D/L, venue, HT; two-column timeline (our club left), formatted `45' ⚽ L. Smith (A. Jones)`; possession / shots / pass % / cards; "[ Proceed to Coach's Notebook ]". × / Esc keeps you on the match screen.

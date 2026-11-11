@@ -40,6 +40,8 @@ class MatchEngine {
     this.htLogged = false;
     this.possTicks = [0, 0];
     this.ev = { kind: 'kickoff' };
+    this.matchEvents = [];   // v2.1: key events for the Match Summary { minute, type, playerName, playerId, isHomeTeam, side, assist? }
+    this.injured = new Set();
     this.evLog = [];   // recent {seq, ev} so the view never misses an event that was overwritten in the same tick
     this.seq = 0;
   }
@@ -95,6 +97,21 @@ class MatchEngine {
     }
   }
   st(p) { return this.stats.get(p.id); }
+  /** v2.1: key event for the Match Summary (goal / yellow / red / injury). Same in visual and instant mode. */
+  addEvent(type, p, side, extra = {}) {
+    this.matchEvents.push({ minute: Math.max(1, this.minute), type, playerName: p.name, playerId: p.id, isHomeTeam: side === 0, side, ...extra });
+  }
+  /** v2.1: a hard tackle can leave a knock — the victim plays on with −25% energy (once per match). Strength protects. */
+  static INJURY = { CHANCE: 0.03, ENERGY: 25 };
+  maybeInjure(p, side) {
+    if (this.injured.has(p.id) || this.sentOff.has(p.id)) return;
+    const str = p.physical?.strength ?? 10;
+    if (Math.random() >= MatchEngine.INJURY.CHANCE * (1.4 - str * 0.04)) return;
+    this.injured.add(p.id);
+    this.energy.set(p.id, Math.max(0, this.energy.get(p.id) - MatchEngine.INJURY.ENERGY));
+    this.addEvent('injury', p, side);
+    this.log('turn', 'eng.injury', { a: p, n: MatchEngine.INJURY.ENERGY }, side);
+  }
   active(side) { return this.sides[side].players.filter(p => !this.sentOff.has(p.id)); }
   inZone(side, zone) {
     const line = ZONE_LINE[zone];
@@ -236,6 +253,7 @@ class MatchEngine {
       if (!this.sentOff.has(p.id)) this.energy.set(p.id, Math.min(100, this.energy.get(p.id) + ENERGY.HT_REST));
     }
     this.log('flavor', 'ht.rest', { n: ENERGY.HT_REST }, -1);
+    this.htScore = this.sides.map(x => x.score);   // v2.1: for the summary timeline
     this.setEv({ kind: 'halftime' });
     if (this.instant) return;   // instant sim: same +4% rest, no pause
     this.pause();
@@ -396,6 +414,7 @@ class MatchEngine {
       this.st(c).dribbleFail++;
       this.st(def).tackles++;
       this.log('turn', 'drFail', vars, side);
+      this.maybeInjure(c, side);
       this.turnover(def, 2 - z);
       this.setEv({ kind: 'tackle', a: c, d: def });
     }
@@ -406,10 +425,12 @@ class MatchEngine {
     const defSide = 1 - attSide;
     const s = this.st(def);
     s.yellow++;
+    this.addEvent('yellow', def, defSide);
     this.setEv({ kind: 'foul', a: victim, d: def });
     this.log('foul', 'foul', { a: victim, d: def }, defSide);
     if (s.yellow >= 2) {
       s.red = 1;
+      this.addEvent('red', def, defSide);
       this.sentOff.add(def.id);
       this.hold = 1;
       this.log('red', 'red', { d: def, n: this.active(defSide).length }, defSide);
@@ -451,6 +472,7 @@ class MatchEngine {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
+      this.addEvent('goal', shooter, side, assist ? { assist: assist.name } : {});
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
       if (!this.instant) this.hooks.onGoal?.(side);
       this.kickoff(opp);

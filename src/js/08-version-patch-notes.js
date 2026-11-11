@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.1', name: { en: 'Boot Screen & Match Summary', ru: 'Загрузочный экран и итоги матча' },
+    en: [
+      'New atmospheric boot screen: the "Created by" credits, then the chrome pixel logo with sparks, a classic installer progress bar and funny loading messages (5–8 seconds; click or press any key to skip).',
+      'Match Summary: at full time a scoreboard window opens before the Coach\'s Notebook — big final score with club badges, a two-column timeline of goals (with assists), cards and knocks, plus possession, shots, pass accuracy and cards.',
+      'Works the same after a watched match and after a Quick Sim: both read the same event list recorded by the match engine.',
+      'Knocks: a hard tackle can now leave a kid limping (−25% energy for the rest of the match). Strong kids get hurt less.',
+    ],
+    ru: [
+      'Новый атмосферный загрузочный экран: титр «Created by», затем хромированный пиксельный логотип с искрами, классическая полоса установки и забавные сообщения о загрузке (5–8 секунд; щелчок или любая клавиша — пропустить).',
+      'Итоги матча: после финального свистка перед Блокнотом тренера открывается табло — крупный счёт с гербами клубов, хроника в две колонки (голы с ассистентами, карточки, травмы), а также владение, удары, точность пасов и карточки.',
+      'Одинаково работает после просмотренного матча и после быстрой симуляции: оба режима берут один и тот же список событий из матчевого движка.',
+      'Травмы-ушибы: после жёсткого подката игрок может захромать (−25% энергии до конца матча). Сильные ребята травмируются реже.',
+    ] },
   { v: '2.0', name: { en: 'Quick Sim', ru: 'Быстрая симуляция' },
     en: [
       'New [ INSTANT SIM MATCH ] button under Start Match: skip the 2D match and get the final result in a few milliseconds.',
