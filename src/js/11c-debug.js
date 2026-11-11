@@ -22,8 +22,10 @@ class DebugConsole {
     add('DYNAMIC', 'SHP', p => Math.round(p.dyn.sharpness), 100, 'sharpness (match tone); < 50 → technical −2');
     add('DYNAMIC', 'MOR', p => Math.round(p.dyn.morale), 100, 'morale');
     for (const k of Object.keys(COMPOSITE)) add('ENGINE', { Pass: 'PAS*', Mark: 'MRK*', Dribble: 'DRB*', Speed: 'PAC*', Tackle: 'TKL*', Shoot: 'SHT*', Save: 'SAV*' }[k], p => +p.rating(k).toFixed(1), 20, 'composite ' + k + ' = ' + Object.keys(COMPOSITE[k]).join('+'));
+    add('ENGINE', 'OVR', p => +p.overall.toFixed(1), 20, 'hidden overall (position composites) — v1.9 "worst player"');
     add('ENGINE', 'MOOD', p => +p.moodBonus.toFixed(1), null, 'morale × passion roll bonus');
     add('ENGINE', 'ROLE', p => (p.tags || [])[0] || '—');
+    add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
     return c;
   })();
 
@@ -92,12 +94,16 @@ class DebugConsole {
   }
 
   godHTML() {
-    const on = !!this.ui.state.cheats?.forceWin;
+    const on = !!this.ui.state.cheats?.forceWin, ev = this.ui.events.enabled;
     const btn = (id, label, desc, extra = '') => `<div class="dbg-cheat"><button class="btn${extra}" type="button" data-cheat="${id}">${label}</button><span>${desc}</span></div>`;
     return `<div class="dbg-god">
       ${btn('energy', L.t('dbg.energy'), L.t('dbg.energyD'))}
       ${btn('maxms', L.t('dbg.maxMs'), L.t('dbg.maxMsD'))}
       ${btn('force', L.t('dbg.force') + ` <b class="dbg-flag ${on ? 'on' : ''}">[${L.t(on ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.forceD'), on ? ' armed' : '')}
+      <hr class="dbg-hr">
+      ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[$${this.ui.state.budget}]</b>`, L.t('dbg.moneyD'))}
+      ${NARRATIVE_EVENTS.map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
+      ${btn('events', L.t('dbg.events') + ` <b class="dbg-flag ${ev ? '' : 'on'}">[${L.t(ev ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.eventsD'))}
     </div>`;
   }
 
@@ -116,6 +122,17 @@ class DebugConsole {
       s.cheats = { ...(s.cheats || {}), forceWin: !s.cheats?.forceWin };
       this.msg = L.t('dbg.doneForce', { s: L.t(s.cheats.forceWin ? 'dbg.forceOn' : 'dbg.forceOff') })
         + (s.cheats.forceWin && eng ? ' ' + L.t('dbg.forceLive') : '');
+    } else if (id === 'money') {
+      s.addMoney(500);
+      this.msg = L.t('dbg.doneMoney', { b: s.budget });
+    } else if (id === 'events') {
+      ui.events.enabled = !ui.events.enabled;
+      this.msg = L.t('dbg.events') + ': ' + L.t(ui.events.enabled ? 'dbg.forceOn' : 'dbg.forceOff');
+    } else if (id.startsWith('fire:')) {
+      if (eng || ui.events.active || ui.cal.running) { this.msg = L.t('dbg.busy'); this.render(); return; }
+      this.close();
+      ui.events.fire(id.slice(5));
+      return;
     }
     s.save();
     ui.renderAll();

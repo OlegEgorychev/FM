@@ -55,7 +55,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join()].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -80,8 +80,8 @@ class ProfileCard {
     let roleHtml, noteHtml;
     if (own) {
       const tag = p.tags[0];
-      roleHtml = tag ? `${L.t('pi.roleLbl')} ${ui.tagChip(tag, p.id, false)}<small>${esc(L.tagDesc(tag))}</small>`
-        : `<span class="pi-none">${L.t('pi.noRole')}</span>`;
+      roleHtml = (tag ? `${L.t('pi.roleLbl')} ${ui.tagChip(tag, p.id, false)}<small>${esc(L.tagDesc(tag))}</small>`
+        : `<span class="pi-none">${L.t('pi.noRole')}</span>`) + ui.flagChips(p);
       const n = s.coachNotes?.[p.id];
       noteHtml = n
         ? `<div class="pi-note-h">${L.t('pi.noteFrom', { n: n.md, o: esc(L.team(n.opp || '')) })}</div><p>${esc(n.keys.map(k => k === 'note.role' ? L.t(k, { r: L.tag(n.role) }) : L.t(k)).join(' '))}</p>`

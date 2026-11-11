@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v1.8)
+# Youth Academy Manager — design notes (current: v1.9)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -78,3 +78,12 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - `DebugConsole` (11c-debug.js), DOM `#debug-layer`, styles `16-debug.css`, tray button `#btn-debug`.
 - DATABASE: every academy kid × 39 columns (ID, BIO, PHYSICAL, TECHNICAL, TACTICAL, PSYCH, DYNAMIC, ENGINE composites + mood + role), sortable, heat colours, averages row.
 - GOD MODE: restore condition 100 (also live engine), morale & sharpness 100, Force Win toggle (`state.cheats.forceWin`, saved; engine `mod()` +8 for us / −5 for them; cleared at full time). The only UI allowed to show hidden attributes.
+
+## Club economy + narrative events (v1.9)
+- `state.budget` (the user club's money, $500 at a new academy and for pre-v1.9 saves; carried across seasons; never below 0). Change it only via `state.addMoney(delta)` → `onBudget` hook flashes the taskbar `#hdr-budget` (green up / red down). Also in the Dashboard club summary.
+- `EventEngine` + `DialogueView` + `NARRATIVE_EVENTS` in `src/js/11d-events.js`, styles `src/css/17-dialogue.css`, DOM `#talk-layer` (z 90, covers the taskbar too).
+- Event = `{ id, trigger(state, date) → bool, cast(state) → {role: playerId} | null, execute(ctx) }`; `execute` calls `ctx.show({ face, name, role, text, choices })`, choice = `{ key, tone red|gray|green, cost?, gain?, who, run() → diary vars }`. Texts are i18n keys `ev.<id>.*` (+ `.diary`).
+- Flow: `UIController.runCalendar()` → after every simulated non-match day `events.roll(date)` (cooldown 6 days, each event 5%/day) → `fire()` saves `state.pendingEvent {id, date, cast, resume}` and opens the dialogue; calendar stops, sim button disabled. `choose()` applies money + effect, logs `state.eventLog`, writes a diary line, then resumes the calendar if `resume`. A reload re-opens the pending dialogue; Esc / backdrop never close it. Choices with `cost > budget` are rendered `disabled`.
+- Torn Boots: snitch = random kid (his portrait), talented kid = one of the 6 highest potentials (not twice per season). A: −$150, morale 100. B: agility −2 (permanent).
+- Rich Kid's Dad: silhouette portrait (`PortraitGenerator.silhouette()`), son = lowest hidden `player.overall`. A: +$300 and story flag `Promised_Start` (`player.flags`, separate from the role tag, shown as a "$ PROMISED START" chip). B: his morale −20. At kick-off `checkPromises()`: starter → kept; not starting → morale −30 and the father takes back $150. Pre-match log warns either way.
+- DEBUG.EXE GOD MODE: +$500, fire any event, toggle random events. DATABASE: OVR + FLAGS columns.

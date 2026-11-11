@@ -2,8 +2,25 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.9', name: { en: 'Locker Room Drama', ru: 'Драмы раздевалки' },
+    en: [
+      'Club budget: the academy starts with $500. The budget is always visible in the taskbar header and in the club summary.',
+      'Narrative events: on quiet days between matches something may happen. The calendar stops, and you must decide before the season goes on.',
+      'Locker room dialogue: a portrait, the story and big choice buttons. A choice you can\'t afford is greyed out and can\'t be clicked.',
+      'Torn Boots: a teammate tells you a talented kid\'s boots are falling apart. Buy new ones (−$150) or let him play in the old ones.',
+      'Rich Kid\'s Dad: a parent offers +$300 if his (weakest) son starts the next match. Break that promise and he takes $150 back.',
+      'DEBUG.EXE: +$500, trigger any event, switch random events on/off; the database shows a hidden overall and story flags.',
+    ],
+    ru: [
+      'Бюджет клуба: академия начинает с $500. Бюджет всегда виден на панели задач и в сводке клуба.',
+      'Сюжетные события: в тихие дни между матчами что-нибудь может случиться. Календарь останавливается, и решать нужно до продолжения сезона.',
+      'Разговор в раздевалке: портрет, история и большие кнопки выбора. Вариант, на который не хватает денег, серый и не нажимается.',
+      'Порванные бутсы: одноклубник рассказывает, что у талантливого парня развалились бутсы. Купить новые (−$150) или пусть играет в старых.',
+      'Папа богатого мальчика: родитель даёт +$300, если его (самый слабый) сын выйдет в старте на следующий матч. Нарушишь обещание — заберёт $150 назад.',
+      'DEBUG.EXE: +$500, запуск любого события, вкл./выкл. случайных событий; в базе видны скрытый общий рейтинг и сюжетные флаги.',
+    ] },
   { v: '1.8', name: { en: 'Attribute Overhaul + DEBUG.EXE', ru: 'Новые атрибуты + DEBUG.EXE' },
     en: [
       'Every kid now has a full football profile: biometrics (age 13–15, height, weight, strong foot, weak foot), physical, technical and tactical skills, personality (passion, discipline, composure) and a hidden potential. You still never see the numbers: watch the matches and read the Notebook.',

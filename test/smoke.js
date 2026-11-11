@@ -42,7 +42,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     // fast match for testing
     await page.evaluate(() => { for (const k of [1, 2, 5]) { YAM.MatchEngine.SPEED[k] = 6; YAM.MatchEngine.HIGHLIGHT[k] = 12; } });
 
-    // calendar → matchday
+    // calendar → matchday (random narrative events off here; they are tested at the end)
+    await page.evaluate(() => { YAM.ui.events.enabled = false; });
     await page.click('#btn-sim');
     await page.waitForFunction(() => YAM.game.phase === 'matchday', null, { timeout: 20000 });
     check('calendar stops on matchday', true, await page.evaluate(() => YAM.ui.cal.date));
@@ -200,6 +201,61 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       return wins;
     });
     check('force win flag: user wins >= 9/10 engine runs', fw >= 9, fw + '/10');
+    // v1.9: budget + narrative events + locker room dialogue
+    const talkOpen = () => page.evaluate(() => !document.getElementById('talk-layer').hidden);
+    const hdr0 = await page.evaluate(() => ({ b: YAM.game.budget, txt: document.getElementById('hdr-budget').textContent }));
+    await page.evaluate(() => { YAM.game.budget = 100; YAM.ui.renderBudget(); YAM.ui.events.fire('boots'); });
+    await page.waitForTimeout(150);
+    const bt = await page.evaluate(() => {
+      const pe = YAM.game.pendingEvent, kid = YAM.game.player(pe.cast.kid), btns = [...document.querySelectorAll('#talk-choices .talk-btn')];
+      return { kid: kid.id, agi: kid.physical.agility, n: btns.length, dis: btns[0].disabled, en: !btns[1].disabled, face: !!document.querySelector('#talk-face svg'),
+        hdr: document.getElementById('hdr-budget').textContent };
+    });
+    await page.click('#talk-choices .talk-btn[data-i="0"]', { force: true });   // disabled: must do nothing
+    await page.keyboard.press('Escape');                                         // forced choice: Esc does nothing
+    const still = await talkOpen();
+    await page.click('#talk-choices .talk-btn[data-i="1"]');
+    const bt2 = await page.evaluate(k => ({ agi: YAM.game.player(k).physical.agility, closed: document.getElementById('talk-layer').hidden, pe: YAM.game.pendingEvent, b: YAM.game.budget,
+      diary: YAM.game.diary[YAM.game.diary.length - 1].key }), bt.kid);
+    check('budget $500 in header; Torn Boots: snitch face, unaffordable choice disabled, Esc blocked, "no" = agility −2',
+      hdr0.b === 500 && /\$500/.test(hdr0.txt) && bt.n === 2 && bt.dis && bt.en && bt.face && /\$100/.test(bt.hdr) && still
+      && bt2.agi === Math.max(1, bt.agi - 2) && bt2.closed && !bt2.pe && bt2.b === 100 && bt2.diary === 'ev.boots.b.diary', JSON.stringify({ hdr0, bt, still, bt2 }));
+    await page.evaluate(() => YAM.ui.events.fire('dad'));
+    await page.waitForTimeout(100);
+    const dd = await page.evaluate(() => ({ kid: YAM.game.pendingEvent.cast.kid, worst: [...YAM.game.squad].sort((a, b) => a.overall - b.overall)[0].id,
+      sil: document.querySelector('#talk-face svg rect:nth-of-type(2)') !== null }));
+    await page.click('#talk-choices .talk-btn[data-i="0"]');
+    const dd2 = await page.evaluate(k => ({ b: YAM.game.budget, flag: YAM.game.player(k).flags.includes('Promised_Start'), hdr: document.getElementById('hdr-budget').textContent,
+      chip: !!document.querySelector(`#roster .r-row[data-id="${k}"] .tag.flag`) }), dd.kid);
+    check("Rich Kid's Dad: worst player, take money = +$300 + Promised_Start chip", dd.kid === dd.worst && dd.sil && dd2.b === 400 && dd2.flag && /\$400/.test(dd2.hdr) && dd2.chip, JSON.stringify({ dd, dd2 }));
+    // a dilemma survives a reload, then the calendar pauses on a random event and resumes after the choice
+    await page.evaluate(() => YAM.ui.events.fire('boots'));
+    await page.reload();
+    await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    const re = await page.evaluate(() => ({ open: !document.getElementById('talk-layer').hidden, b: YAM.game.budget, kid: YAM.game.pendingEvent?.cast.kid }));
+    await page.click('#talk-choices .talk-btn[data-i="0"]');
+    const re2 = await page.evaluate(k => ({ b: YAM.game.budget, mor: YAM.game.player(k).dyn.morale }), re.kid);
+    await closeModal();
+    await page.evaluate(() => { EVENTS_CFG.DAD_CHANCE = 0; EVENTS_CFG.BOOTS_CHANCE = 1; YAM.game.eventLog = []; });
+    await page.click('#btn-sim');
+    await page.waitForFunction(() => !document.getElementById('talk-layer').hidden, null, { timeout: 10000 });
+    const paused = await page.evaluate(() => ({ running: YAM.ui.cal.running, date: YAM.ui.cal.date, btn: document.getElementById('btn-sim').disabled }));
+    await page.waitForTimeout(900); await shot('9-talk');
+    await page.evaluate(() => { EVENTS_CFG.BOOTS_CHANCE = 0; });
+    await page.click('#talk-choices .talk-btn[data-i="1"]');
+    const resumed = await page.evaluate(() => YAM.ui.cal.running);
+    await page.waitForFunction(() => YAM.game.phase === 'matchday', null, { timeout: 20000 });
+    await closeModal();
+    const pr = await page.evaluate(() => {
+      const p = YAM.game.squad.find(x => x.flags.includes('Promised_Start'));
+      if (YAM.game.isStarter(p.id)) YAM.game.swapPlayers(p.id, YAM.game.bench().find(b => b.position === p.position && b.id !== p.id)?.id || YAM.game.bench()[0].id);
+      const b0 = YAM.game.budget, m0 = p.dyn.morale, starter = YAM.game.isStarter(p.id);
+      YAM.ui.checkPromises();
+      return { starter, refund: b0 - YAM.game.budget, morale: p.dyn.morale < m0 || m0 === 0, cleared: !p.flags.length };
+    });
+    check('event persists over reload; random event pauses + resumes calendar; broken promise refunds $150',
+      re.open && re2.b === re.b - 150 && re2.mor === 100 && !paused.running && paused.btn && resumed && pr.refund === 150 && pr.morale && pr.cleared && !pr.starter,
+      JSON.stringify({ re, re2, paused, resumed, pr }));
     await page.click('#btn-lang'); await page.click('#btn-lang');
     check('frame loop cost < 2 ms', await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0) < 2), (await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0).toFixed(2))) + ' ms');
   } catch (e) {

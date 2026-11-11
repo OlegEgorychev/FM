@@ -11,7 +11,8 @@ Read `docs/DESIGN.md` first (mechanics, formulas, balance). Do NOT read whole fi
   4. `node test/smoke.js` (must print "All N checks passed"; add a check for new features),
   5. commit `vX.Y: <summary>` + annotated tag `vX.Y`, push `main` and the tag.
 - All player-facing text goes through `I18N` (EN + RU) in `src/js/01-i18n.js`; Russian lines keep player names in the nominative case.
-- Hidden player attributes are never shown in the UI.
+- Hidden player attributes are never shown in the UI (only DEBUG.EXE).
+- Money changes go through `state.addMoney()`; narrative events live in `src/js/11d-events.js` (`NARRATIVE_EVENTS`).
 - Keep the 2000s Win98 / CRT look; no native `alert()` — use `Modal` (`this.alert(...)` in the UI).
 
 ## Where things live

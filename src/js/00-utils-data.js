@@ -64,6 +64,13 @@ const COMPOSITE = {
   Save:    { goalkeeping: 2, agility: 1, positioning: 1 },
 };
 const TECH = new Set(ATTR_GROUPS.technical);
+/* v1.9 CLUB ECONOMY + NARRATIVE EVENTS */
+const ECONOMY = { START: 500 };
+const EVENTS_CFG = { COOLDOWN: 6, BOOTS_CHANCE: 0.05, DAD_CHANCE: 0.05, BOOTS_COST: 150, DAD_GIFT: 300, DAD_REFUND: 150,
+  DAD_REFUSE_MORALE: -20, PROMISE_BROKEN_MORALE: -30, BOOTS_AGILITY: -2 };
+/* Story flags on academy kids (separate from the one-per-kid ROLE tag). Shown as chips, never as numbers. */
+const FLAGS = { Promised_Start: { en: ['PROMISED START', 'A parent paid for this kid to start the next match.'],
+  ru: ['ОБЕЩАН СТАРТ', 'Родитель заплатил, чтобы этот игрок вышел в старте в следующем матче.'] } };
 const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -1, FLOOR: 20 };
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */

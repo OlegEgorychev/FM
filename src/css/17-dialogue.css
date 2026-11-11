@@ -1,0 +1,53 @@
+/* =========================================================
+   v1.9 — CLUB BUDGET (taskbar) + LOCKER ROOM DIALOGUE ("This Is the Police" style)
+   Sharp corners, light-grey inset paper box, portrait on top, blocky full-width choices.
+   ========================================================= */
+.budget{ flex: none; height: 26px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; margin-right: 4px;
+  font: bold 14px/1 var(--mono); letter-spacing: .5px; color: #ffcf5a; background: #0d1210; text-shadow: 0 0 6px rgba(255,190,60,.45);
+  border: 2px solid; border-color: var(--shadow) var(--hi) var(--hi) var(--shadow); white-space: nowrap; }
+.budget span{ color: #a8946a; font-weight: normal; text-shadow: none; }
+.budget.up{ animation: budgetUp .9s steps(6); }
+.budget.down{ animation: budgetDown .9s steps(6); }
+@keyframes budgetUp{ 0%, 60%{ color: #8fff7a; background: #10301a; } }
+@keyframes budgetDown{ 0%, 60%{ color: #ff8a7e; background: #3a1210; } }
+.club-kv dd.money, dd.money{ color: #ffcf5a; font-family: var(--mono); }
+.tag.flag{ background: #3a2c10; color: #ffcf5a; border-color: #8a6a28; font-family: var(--mono); font-size: 10px; letter-spacing: .3px; }
+
+.talk-layer{ position: absolute; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.25) 0 2px, transparent 2px 4px), rgba(3,5,4,.72);
+  -webkit-backdrop-filter: blur(2px) grayscale(.7); backdrop-filter: blur(2px) grayscale(.7); }
+.talk-layer[hidden]{ display: none; }
+.talk{ width: min(520px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding: 0 16px 16px;
+  background: #e6e5df; color: #141414; border-radius: 0;
+  border: 2px solid; border-color: #fff #6d6c66 #6d6c66 #fff; box-shadow: inset -2px -2px 0 #a9a8a1, inset 2px 2px 0 #f7f7f3, 10px 12px 0 rgba(0,0,0,.55);
+  animation: talkIn .22s steps(4); }
+@keyframes talkIn{ from{ transform: translateY(14px); opacity: 0; } }
+.talk-strip{ display: flex; justify-content: space-between; align-items: center; margin: 0 -16px; padding: 5px 12px;
+  background: #141414; color: #e6e5df; font: bold 11px/1 var(--mono); letter-spacing: 2px; text-transform: uppercase; }
+.talk-budget{ color: #ffcf5a; letter-spacing: .5px; }
+.talk-top{ display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.talk-face{ width: 120px; height: 120px; border: 3px solid #141414; box-shadow: 4px 4px 0 rgba(0,0,0,.25); background: #222; }
+.talk-face svg{ width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.talk-who{ text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.talk-who b{ font-size: 17px; letter-spacing: .5px; text-transform: uppercase; }
+.talk-who small{ font-size: 12px; color: #55544e; }
+.talk-text{ margin: 0; min-height: 4.6em; padding: 12px 14px; font-size: 16px; line-height: 1.5; cursor: default;
+  background: #f4f4f0; border: 2px solid; border-color: #8f8e88 #fff #fff #8f8e88; box-shadow: inset 1px 1px 0 #6d6c66; }
+.talk-choices{ display: flex; flex-direction: column; gap: 8px; }
+.talk-btn{ width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 10px;
+  padding: 11px 14px; border-radius: 0; cursor: pointer; text-align: left; color: #fff;
+  font: bold 14px/1.2 var(--ui); text-transform: uppercase; letter-spacing: .8px;
+  border: 2px solid; border-color: rgba(255,255,255,.45) rgba(0,0,0,.6) rgba(0,0,0,.6) rgba(255,255,255,.45); }
+.talk-btn.tone-red{ background: #9c2a20; }
+.talk-btn.tone-gray{ background: #5b5d60; }
+.talk-btn.tone-green{ background: #2f6b2a; }
+.talk-btn:hover:not([disabled]), .talk-btn:focus-visible{ filter: brightness(1.18); outline: 2px solid #141414; outline-offset: 1px; }
+.talk-btn:active:not([disabled]){ border-color: rgba(0,0,0,.6) rgba(255,255,255,.45) rgba(255,255,255,.45) rgba(0,0,0,.6); }
+.tb-money{ font-family: var(--mono); font-size: 15px; padding: 2px 6px; background: rgba(0,0,0,.28); }
+.tb-money.pos{ color: #b9ff9e; } .tb-money.neg{ color: #ffd2c8; }
+.talk-btn[disabled]{ cursor: not-allowed; color: #8a8984; background: repeating-linear-gradient(135deg, #cfcec8 0 6px, #c4c3bc 6px 12px);
+  border-color: #b5b4ad; filter: none; }
+.talk-btn[disabled] .tb-money{ color: #8a8984; background: transparent; text-decoration: line-through; }
+.tb-why{ flex-basis: 100%; font: normal 11px/1.2 var(--ui); text-transform: none; letter-spacing: 0; color: #9c2a20; }
+@media (max-width: 820px){ .budget{ font-size: 12px; padding: 0 6px; } .budget span{ display: none; } }
+.tk-line.ev{ color: #ffd98a; }

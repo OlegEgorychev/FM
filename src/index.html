@@ -281,6 +281,19 @@
     </section>
   </div>
 
+  <!-- v1.9: Locker room dialogue (narrative events) — covers everything, even the taskbar: a choice is required -->
+  <div class="talk-layer" id="talk-layer" hidden>
+    <section class="talk" role="dialog" aria-modal="true" aria-labelledby="talk-name" aria-describedby="talk-text">
+      <div class="talk-strip"><span data-i18n="talk.strip"></span><span class="talk-budget" id="talk-budget"></span></div>
+      <div class="talk-top">
+        <span class="portrait talk-face" id="talk-face"></span>
+        <div class="talk-who"><b id="talk-name"></b><small id="talk-role"></small></div>
+      </div>
+      <p class="talk-text" id="talk-text"></p>
+      <div class="talk-choices" id="talk-choices"></div>
+    </section>
+  </div>
+
   <!-- v1.8: DEBUG.EXE (developer mode) -->
   <div class="pinfo-layer dbg-layer" id="debug-layer" hidden>
     <section class="win pinfo dbg open" role="dialog" aria-modal="true" aria-labelledby="debug-title">
@@ -311,6 +324,7 @@
   <footer id="taskbar">
     <button class="tk start" id="btn-startmenu" aria-haspopup="menu"><span class="logo">&#9673;</span><span data-i18n="ui.start">Start</span></button>
     <span class="app-title" id="app-title" title="Youth Academy Manager"></span>
+    <span class="budget" id="hdr-budget" role="status" aria-live="polite"></span>
     <span class="sep"></span>
     <div class="tasks">
       <button class="tk" data-view="dash">&#8962; <span class="lbl" data-i18n="nav.dash"></span></button>

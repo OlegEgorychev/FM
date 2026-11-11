@@ -27,6 +27,8 @@ class UIController {
     this.profile = new ProfileCard(this);
     this.teamCard = new TeamRosterCard(this);   // v1.7
     this.debug = new DebugConsole(this);         // v1.8
+    this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
+    this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
     this.bind();
     this.applyStatic();
@@ -34,6 +36,7 @@ class UIController {
     this.prepareMatch();
     this.renderAll();
     this.show('dash');
+    if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
     this.checkUpdateNotice();
   }
 
@@ -69,6 +72,7 @@ class UIController {
     this.syncLocks();
     this.renderShouts();
     this.renderSpeedBtns();
+    this.renderBudget();
     if (this.debug?.isOpen) this.debug.render();   // v1.8
   }
 
@@ -89,6 +93,7 @@ class UIController {
     L.set(code);
     this.applyStatic();
     this.renderAll();
+    if (this.events.view.isOpen) this.events.open();   // v1.9: re-translate the open dialogue
     if (this.engine) { this.renderLive(this.engine); this.relabelRadar(); } else this.prepareRadar();
     this.rerenderLog();
     this.profile.tick();
@@ -100,6 +105,7 @@ class UIController {
 
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
+    if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
     if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
     if (x && typeof x === 'object' && 'team' in x) return L.team(x.team);
@@ -519,11 +525,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       <dt>${L.t('dash.record')}</dt><dd>${L.t('dash.recordVal', row)}</dd>
       <dt>${L.t('dash.form')}</dt><dd>${this.formChips(row.form) || '—'}</dd>
       <dt>${L.t('dash.formation')}</dt><dd>${s.formation}</dd>
+      <dt>${L.t('dash.budget')}</dt><dd class="money">$${s.budget}</dd>
       <dt>${L.t('dash.energy')}</dt><dd${tired ? ' class="warn"' : ''}>${L.t('dash.energyVal', { a: avg, t: tired })}</dd>`;
 
     // main action button
     const btn = this.$('btn-sim');
-    btn.disabled = this.cal.running || this.live;
+    btn.disabled = this.cal.running || this.live || this.events.active;
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
     else if (phase === 'calendar') btn.innerHTML = L.t('dash.sim');
@@ -650,11 +657,20 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       this.prepareMatch(); this.renderAll();
       return;
     }
+    if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
+    this.runCalendar();
+  }
+
+  /** Visible day-by-day simulation. v1.9: after every non-match day the EventEngine may fire an event,
+      which PAUSES the calendar; EventEngine.choose() calls runCalendar() again to resume. */
+  runCalendar() {
+    if (this.cal.running || this.state.phase !== 'calendar') return;
     this.calMonth = null;   // calendar view follows the days as they pass
     this.cal.simulate({
       stepMs: 180,
       onStep: (date, infos) => {
         for (const info of infos) this.state.addDiary({ date, ...info });
+        if (this.cal.nextEvent() && this.events.roll(date)) this.cal.stop();
         this.state.save();
         this.renderDash();
         this.renderTeam();
@@ -662,6 +678,28 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onStop: () => { this.state.save(); this.renderAll(); },
     });
     this.renderDash();
+  }
+
+  /** v1.9: club budget in the taskbar header (+ a short green/red flash when it changes). */
+  renderBudget(delta = 0) {
+    const el = this.$('hdr-budget');
+    if (!el) return;
+    el.innerHTML = L.t('hdr.budget', { b: this.state.budget });
+    if (delta) { el.classList.remove('up', 'down'); void el.offsetWidth; el.classList.add(delta > 0 ? 'up' : 'down'); }
+  }
+
+  /** v1.9: Promised_Start is checked at kick-off — kept quietly, or broken (morale crash + the parent wants money back). */
+  checkPromises() {
+    const s = this.state;
+    for (const p of s.squad.filter(x => x.hasFlag('Promised_Start'))) {
+      p.flags = p.flags.filter(f => f !== 'Promised_Start');
+      const kept = s.isStarter(p.id);
+      let refund = 0;
+      if (!kept) { p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.PROMISE_BROKEN_MORALE, 0, 100); refund = -s.addMoney(-EVENTS_CFG.DAD_REFUND); }
+      s.addDiary({ date: s.calendar.date, key: kept ? 'ev.promise.kept' : 'ev.promise.broken', vars: { k: { pid: p.id }, m: '$' + refund }, cls: 'ev' });
+      if (this.engine) this.engine.log(kept ? 'coach' : 'turn', kept ? 'ev.promise.kept' : 'ev.promise.brokenLog', { k: p, m: '$' + refund }, 0);
+    }
+    s.save();
   }
 
   onMatchdayArrived(ev) {
@@ -765,7 +803,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <span class="num">${p.number}</span>
         <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×0.5' : ''}</span></div>
-        <span class="r-tags">${p.tags.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') : '<span class="empty">—</span>'}</span>
+        <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
     };
     const roster = this.$('roster');
@@ -852,6 +890,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     return `<button type="button" class="info-btn" data-info="${p.id}" tabindex="0" aria-label="${t}" title="${t}" draggable="false">i</button>`;
   }
 
+  /** v1.9: story flags (e.g. PROMISED START) — visible, unlike the hidden numbers. */
+  flagChips(p) { return (p.flags || []).map(f => `<span class="tag flag" title="${esc(FLAGS[f][L.code][1])}">$ ${esc(FLAGS[f][L.code][0])}</span>`).join(''); }
   tagChip(tag, id, removable) {
     const tone = TAGS[tag]?.tone || 'neutral';
     const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(L.t('squad.remove'))}" title="${esc(L.t('squad.remove'))}">&times;</button>` : '';
@@ -896,6 +936,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       this.appendLog({ minute: 0, type: 'coach', key: 'match.hintShouts', vars: {}, side: -1, r: 0 });
       const tired = s.starters().filter(p => p.energy < ENERGY.TIRED);
       if (tired.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.tiredWarn', vars: { n: { list: tired } }, side: 0, r: 0 });
+      const promised = s.squad.filter(p => p.hasFlag('Promised_Start'));   // v1.9
+      for (const p of promised) this.appendLog({ minute: 0, type: s.isStarter(p.id) ? 'coach' : 'turn', key: s.isStarter(p.id) ? 'ev.promise.ok' : 'ev.promise.warn', vars: { k: p }, side: 0, r: 0 });
       const oop = s.outOfPosition().map(o => o.p);
       if (oop.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.oopWarn', vars: { n: { list: oop } }, side: 0, r: 0 });
     }
@@ -964,6 +1006,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onSub: (out, inP) => this.onSub(out, inP),
     }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin });
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
+    this.checkPromises();   // v1.9
     this.liveSel = null;
     this.radar.setup(this.engine.sides);
     this.engine.start();

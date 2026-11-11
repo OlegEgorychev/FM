@@ -33,6 +33,16 @@ const PortraitGenerator = (() => {
     return SIZES.map(n => { h = Math.imul(h ^ (h >>> 13), 2654435761) >>> 0; return h % n; }); };
 
   return {
+    /** v1.9: anonymous adult (parents, officials): a dark backlit silhouette in a doorway. */
+    silhouette(tie = '#5a2c28') {
+      return `<svg class="portrait-svg" viewBox="0 0 32 32" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`
+        + `<rect width="32" height="32" fill="#2b2a24"/>` + rects([[7, 0, 18, 32]], '#4a4637') + rects([[8, 0, 16, 32]], '#6b6248', '.55')   // lit doorway
+        + rects([[3, 6, 1, 2], [27, 14, 1, 2], [5, 22, 1, 2], [29, 3, 1, 2]], '#9fb2bf', '.18')
+        + rects([[12, 5, 8, 1], [11, 6, 10, 9], [12, 15, 8, 1], [14, 16, 4, 3], [6, 19, 20, 2], [4, 21, 24, 11]], '#0b0c0d')       // head, neck, coat
+        + rects([[11, 7, 1, 7], [5, 21, 1, 11], [26, 21, 1, 11]], '#3a4248', '.8')                                                // rim light
+        + rects([[15, 19, 2, 1], [15, 20, 2, 7]], tie, '.9') + rects([[13, 19, 2, 3], [17, 19, 2, 3]], '#d8d2c0', '.35')          // tie + collar
+        + '</svg>';
+    },
     roll: () => SIZES.map(n => Math.floor(Math.random() * n)),
     valid: f => Array.isArray(f) && f.length === SIZES.length && f.every((v, i) => Number.isInteger(v) && v >= 0 && v < SIZES[i]),
     hashFace,
@@ -102,7 +112,10 @@ class Player {
     this.name = name;
     this.position = position;
     this.number = number;
-    if (tags) this.tags = tags;      // only the academy squad carries tags
+    if (tags) {                      // only the academy squad carries tags (+ v1.9 story flags)
+      this.tags = tags;
+      this.flags = Array.isArray(o.flags) ? o.flags.filter(f => FLAGS[f]) : [];
+    }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
     const fresh = SKILL_KEYS.every(g => AttrGen.validGroup(o[g], g)) && AttrGen.validGroup(o.psych, 'psych') ? null
@@ -137,6 +150,12 @@ class Player {
     for (const k in w) { sum += this.skill(k) * w[k]; n += w[k]; }
     return sum / n;
   }
+  /** v1.9: hidden overall (1–20) = average of the engine composites that matter for his position. */
+  get overall() {
+    const keys = { GK: ['Save', 'Save', 'Pass'], DEF: ['Tackle', 'Mark', 'Pass', 'Speed'], MID: ['Pass', 'Dribble', 'Mark', 'Speed'], FWD: ['Shoot', 'Dribble', 'Speed', 'Pass'] }[this.position] || ['Pass'];
+    return keys.reduce((a, k) => a + this.rating(k), 0) / keys.length;
+  }
+  hasFlag(f) { return !!this.flags?.includes(f); }
   /** Morale swing on every roll: ±2 at the extremes, amplified by passion (0.6×–1.5×). */
   get moodBonus() { return clamp((this.dyn.morale - 50) / 25 * (0.55 + this.psych.passion / 20), -2.5, 2.5); }
   /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */

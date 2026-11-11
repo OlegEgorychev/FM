@@ -50,3 +50,4 @@
 .win.pinfo.dbg .statusbar > span{ font-family: var(--mono); }
 
 @media (max-width: 760px){ .dbg-cheat{ grid-template-columns: 1fr; gap: 4px; } }
+.dbg-hr{ border: 0; border-top: 1px solid var(--dark); border-bottom: 1px solid #fff; margin: 2px 0; }

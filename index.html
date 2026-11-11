@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v1.8</title>
+<title>Youth Academy Manager v1.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1164,6 +1164,60 @@ body.fx .crt-scan{ opacity: .9; }
 .win.pinfo.dbg .statusbar > span{ font-family: var(--mono); }
 
 @media (max-width: 760px){ .dbg-cheat{ grid-template-columns: 1fr; gap: 4px; } }
+.dbg-hr{ border: 0; border-top: 1px solid var(--dark); border-bottom: 1px solid #fff; margin: 2px 0; }
+/* =========================================================
+   v1.9 — CLUB BUDGET (taskbar) + LOCKER ROOM DIALOGUE ("This Is the Police" style)
+   Sharp corners, light-grey inset paper box, portrait on top, blocky full-width choices.
+   ========================================================= */
+.budget{ flex: none; height: 26px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; margin-right: 4px;
+  font: bold 14px/1 var(--mono); letter-spacing: .5px; color: #ffcf5a; background: #0d1210; text-shadow: 0 0 6px rgba(255,190,60,.45);
+  border: 2px solid; border-color: var(--shadow) var(--hi) var(--hi) var(--shadow); white-space: nowrap; }
+.budget span{ color: #a8946a; font-weight: normal; text-shadow: none; }
+.budget.up{ animation: budgetUp .9s steps(6); }
+.budget.down{ animation: budgetDown .9s steps(6); }
+@keyframes budgetUp{ 0%, 60%{ color: #8fff7a; background: #10301a; } }
+@keyframes budgetDown{ 0%, 60%{ color: #ff8a7e; background: #3a1210; } }
+.club-kv dd.money, dd.money{ color: #ffcf5a; font-family: var(--mono); }
+.tag.flag{ background: #3a2c10; color: #ffcf5a; border-color: #8a6a28; font-family: var(--mono); font-size: 10px; letter-spacing: .3px; }
+
+.talk-layer{ position: absolute; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.25) 0 2px, transparent 2px 4px), rgba(3,5,4,.72);
+  -webkit-backdrop-filter: blur(2px) grayscale(.7); backdrop-filter: blur(2px) grayscale(.7); }
+.talk-layer[hidden]{ display: none; }
+.talk{ width: min(520px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding: 0 16px 16px;
+  background: #e6e5df; color: #141414; border-radius: 0;
+  border: 2px solid; border-color: #fff #6d6c66 #6d6c66 #fff; box-shadow: inset -2px -2px 0 #a9a8a1, inset 2px 2px 0 #f7f7f3, 10px 12px 0 rgba(0,0,0,.55);
+  animation: talkIn .22s steps(4); }
+@keyframes talkIn{ from{ transform: translateY(14px); opacity: 0; } }
+.talk-strip{ display: flex; justify-content: space-between; align-items: center; margin: 0 -16px; padding: 5px 12px;
+  background: #141414; color: #e6e5df; font: bold 11px/1 var(--mono); letter-spacing: 2px; text-transform: uppercase; }
+.talk-budget{ color: #ffcf5a; letter-spacing: .5px; }
+.talk-top{ display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.talk-face{ width: 120px; height: 120px; border: 3px solid #141414; box-shadow: 4px 4px 0 rgba(0,0,0,.25); background: #222; }
+.talk-face svg{ width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.talk-who{ text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.talk-who b{ font-size: 17px; letter-spacing: .5px; text-transform: uppercase; }
+.talk-who small{ font-size: 12px; color: #55544e; }
+.talk-text{ margin: 0; min-height: 4.6em; padding: 12px 14px; font-size: 16px; line-height: 1.5; cursor: default;
+  background: #f4f4f0; border: 2px solid; border-color: #8f8e88 #fff #fff #8f8e88; box-shadow: inset 1px 1px 0 #6d6c66; }
+.talk-choices{ display: flex; flex-direction: column; gap: 8px; }
+.talk-btn{ width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 10px;
+  padding: 11px 14px; border-radius: 0; cursor: pointer; text-align: left; color: #fff;
+  font: bold 14px/1.2 var(--ui); text-transform: uppercase; letter-spacing: .8px;
+  border: 2px solid; border-color: rgba(255,255,255,.45) rgba(0,0,0,.6) rgba(0,0,0,.6) rgba(255,255,255,.45); }
+.talk-btn.tone-red{ background: #9c2a20; }
+.talk-btn.tone-gray{ background: #5b5d60; }
+.talk-btn.tone-green{ background: #2f6b2a; }
+.talk-btn:hover:not([disabled]), .talk-btn:focus-visible{ filter: brightness(1.18); outline: 2px solid #141414; outline-offset: 1px; }
+.talk-btn:active:not([disabled]){ border-color: rgba(0,0,0,.6) rgba(255,255,255,.45) rgba(255,255,255,.45) rgba(0,0,0,.6); }
+.tb-money{ font-family: var(--mono); font-size: 15px; padding: 2px 6px; background: rgba(0,0,0,.28); }
+.tb-money.pos{ color: #b9ff9e; } .tb-money.neg{ color: #ffd2c8; }
+.talk-btn[disabled]{ cursor: not-allowed; color: #8a8984; background: repeating-linear-gradient(135deg, #cfcec8 0 6px, #c4c3bc 6px 12px);
+  border-color: #b5b4ad; filter: none; }
+.talk-btn[disabled] .tb-money{ color: #8a8984; background: transparent; text-decoration: line-through; }
+.tb-why{ flex-basis: 100%; font: normal 11px/1.2 var(--ui); text-transform: none; letter-spacing: 0; color: #9c2a20; }
+@media (max-width: 820px){ .budget{ font-size: 12px; padding: 0 6px; } .budget span{ display: none; } }
+.tk-line.ev{ color: #ffd98a; }
 /* =========================================================
    RESPONSIVE
    ========================================================= */
@@ -1454,6 +1508,19 @@ body.fx .crt-scan{ opacity: .9; }
     </section>
   </div>
 
+  <!-- v1.9: Locker room dialogue (narrative events) — covers everything, even the taskbar: a choice is required -->
+  <div class="talk-layer" id="talk-layer" hidden>
+    <section class="talk" role="dialog" aria-modal="true" aria-labelledby="talk-name" aria-describedby="talk-text">
+      <div class="talk-strip"><span data-i18n="talk.strip"></span><span class="talk-budget" id="talk-budget"></span></div>
+      <div class="talk-top">
+        <span class="portrait talk-face" id="talk-face"></span>
+        <div class="talk-who"><b id="talk-name"></b><small id="talk-role"></small></div>
+      </div>
+      <p class="talk-text" id="talk-text"></p>
+      <div class="talk-choices" id="talk-choices"></div>
+    </section>
+  </div>
+
   <!-- v1.8: DEBUG.EXE (developer mode) -->
   <div class="pinfo-layer dbg-layer" id="debug-layer" hidden>
     <section class="win pinfo dbg open" role="dialog" aria-modal="true" aria-labelledby="debug-title">
@@ -1484,6 +1551,7 @@ body.fx .crt-scan{ opacity: .9; }
   <footer id="taskbar">
     <button class="tk start" id="btn-startmenu" aria-haspopup="menu"><span class="logo">&#9673;</span><span data-i18n="ui.start">Start</span></button>
     <span class="app-title" id="app-title" title="Youth Academy Manager"></span>
+    <span class="budget" id="hdr-budget" role="status" aria-live="polite"></span>
     <span class="sep"></span>
     <div class="tasks">
       <button class="tk" data-view="dash">&#8962; <span class="lbl" data-i18n="nav.dash"></span></button>
@@ -1574,6 +1642,13 @@ const COMPOSITE = {
   Save:    { goalkeeping: 2, agility: 1, positioning: 1 },
 };
 const TECH = new Set(ATTR_GROUPS.technical);
+/* v1.9 CLUB ECONOMY + NARRATIVE EVENTS */
+const ECONOMY = { START: 500 };
+const EVENTS_CFG = { COOLDOWN: 6, BOOTS_CHANCE: 0.05, DAD_CHANCE: 0.05, BOOTS_COST: 150, DAD_GIFT: 300, DAD_REFUND: 150,
+  DAD_REFUSE_MORALE: -20, PROMISE_BROKEN_MORALE: -30, BOOTS_AGILITY: -2 };
+/* Story flags on academy kids (separate from the one-per-kid ROLE tag). Shown as chips, never as numbers. */
+const FLAGS = { Promised_Start: { en: ['PROMISED START', 'A parent paid for this kid to start the next match.'],
+  ru: ['ОБЕЩАН СТАРТ', 'Родитель заплатил, чтобы этот игрок вышел в старте в следующем матче.'] } };
 const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAILY: -1, FLOOR: 20 };
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
@@ -2136,6 +2211,55 @@ Object.assign(I18N.ru, {
   'dbg.doneForce': 'OK: гарантированная победа — {s}.', 'dbg.godHint': 'Читы только для тестов. Они сохраняются вместе с академией.',
   'dbg.forceLog': '[DEBUG] В этом матче включена гарантированная победа.',
 });
+
+
+/* ---- v1.9: club budget + narrative events (locker room dialogue) ---- */
+Object.assign(I18N.en, {
+  'hdr.budget': '<span>Budget:</span> ${b}', 'dash.budget': 'Budget',
+  'talk.strip': 'Locker room', 'talk.budget': 'Budget: ${b}', 'talk.short': 'Not enough money: budget ${b}, needs ${c}.',
+  'talk.roleSnitch': '#{n} · {p} · came to talk', 'talk.roleParent': 'Parent · hallway', 'talk.parentName': 'Mr. {s}',
+  'ev.boots.text': '{s} walks in. "Coach, {k} keeps slipping on the pitch. His boots are completely torn, but his family is broke."',
+  'ev.boots.a': 'Buy him professional boots', 'ev.boots.b': 'We can\'t afford it.',
+  'ev.boots.a.diary': 'Bought new boots for {k} ({m}). He hasn\'t stopped smiling.',
+  'ev.boots.b.diary': 'No money for {k}\'s boots. He keeps slipping in the mud.',
+  'ev.dad.text': 'A wealthy parent corners you in the hallway. "Start my son {k} next game, and I\'ll donate to the club. Take it or leave it."',
+  'ev.dad.a': 'Take the money', 'ev.dad.b': 'I pick the squad, not you.',
+  'ev.dad.a.diary': 'Took the money from {k}\'s father ({m}). {k} must start the next match.',
+  'ev.dad.b.diary': 'Sent {k}\'s father away. The kid heard everything.',
+  'ev.promise.ok': 'Promise: {k} starts today, as his father paid for.',
+  'ev.promise.warn': 'Promise! {k} was promised a start but is NOT in the XI. His father will want the money back.',
+  'ev.promise.kept': 'Promise kept: {k} started the match.',
+  'ev.promise.broken': 'Promise broken: {k} did not start. His father took back {m}; the kid is crushed.',
+  'ev.promise.brokenLog': 'Broken promise: {k} is not starting. His father takes back {m}.',
+  'dbg.money': 'Add $500 to the budget', 'dbg.moneyD': 'Test the economy rule: disabled / enabled choice buttons.',
+  'dbg.fire': 'Trigger event: {e}', 'dbg.fireD': 'Opens the dialogue right now (the calendar stays paused).',
+  'dbg.events': 'Random events', 'dbg.eventsD': 'Toggle the daily event rolls during calendar simulation.',
+  'dbg.doneMoney': 'OK: budget is now ${b}.', 'dbg.busy': 'Not now: a match is running or a dialogue is open.',
+  'dbg.ev.boots': 'Torn Boots', 'dbg.ev.dad': "Rich Kid's Dad",
+});
+Object.assign(I18N.ru, {
+  'hdr.budget': '<span>Бюджет:</span> ${b}', 'dash.budget': 'Бюджет',
+  'talk.strip': 'Раздевалка', 'talk.budget': 'Бюджет: ${b}', 'talk.short': 'Не хватает денег: в бюджете ${b}, нужно ${c}.',
+  'talk.roleSnitch': '№{n} · {p} · пришёл поговорить', 'talk.roleParent': 'Родитель · коридор', 'talk.parentName': 'Мистер {s}',
+  'ev.boots.text': 'Входит {s}. «Тренер, {k} всё время скользит на поле. Бутсы у него совсем развалились, а семья без гроша».',
+  'ev.boots.a': 'Купить ему профессиональные бутсы', 'ev.boots.b': 'Нам это не по карману.',
+  'ev.boots.a.diary': 'Купили новые бутсы. Игрок: {k} ({m}). Улыбается весь день.',
+  'ev.boots.b.diary': 'Денег на бутсы нет. Игрок: {k}. Скользит в грязи дальше.',
+  'ev.dad.text': 'Богатый родитель ловит тебя в коридоре. «Поставь моего сына в старт на следующую игру — сделаю пожертвование клубу. Его зовут {k}. Решай».',
+  'ev.dad.a': 'Взять деньги', 'ev.dad.b': 'Состав выбираю я, а не вы.',
+  'ev.dad.a.diary': 'Взяли деньги у отца игрока ({m}). {k} обязан выйти в старте в следующем матче.',
+  'ev.dad.b.diary': 'Отказали отцу игрока. {k} всё слышал.',
+  'ev.promise.ok': 'Обещание: {k} сегодня в старте, как и заплатил его отец.',
+  'ev.promise.warn': 'Обещание! {k} обещан старт, но его НЕТ в основе. Отец потребует деньги назад.',
+  'ev.promise.kept': 'Обещание сдержано: {k} вышел в старте.',
+  'ev.promise.broken': 'Обещание нарушено: {k} не вышел в старте. Отец забрал {m}, парень раздавлен.',
+  'ev.promise.brokenLog': 'Обещание нарушено: {k} не в старте. Отец забирает {m}.',
+  'dbg.money': 'Добавить $500 в бюджет', 'dbg.moneyD': 'Проверка правила экономики: неактивные и активные кнопки выбора.',
+  'dbg.fire': 'Запустить событие: {e}', 'dbg.fireD': 'Сразу открывает диалог (календарь остаётся на паузе).',
+  'dbg.events': 'Случайные события', 'dbg.eventsD': 'Включить или выключить ежедневные броски событий при прокрутке календаря.',
+  'dbg.doneMoney': 'OK: в бюджете теперь ${b}.', 'dbg.busy': 'Не сейчас: идёт матч или открыт диалог.',
+  'dbg.ev.boots': 'Порванные бутсы', 'dbg.ev.dad': 'Папа богатого мальчика',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -2193,6 +2317,16 @@ const PortraitGenerator = (() => {
     return SIZES.map(n => { h = Math.imul(h ^ (h >>> 13), 2654435761) >>> 0; return h % n; }); };
 
   return {
+    /** v1.9: anonymous adult (parents, officials): a dark backlit silhouette in a doorway. */
+    silhouette(tie = '#5a2c28') {
+      return `<svg class="portrait-svg" viewBox="0 0 32 32" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`
+        + `<rect width="32" height="32" fill="#2b2a24"/>` + rects([[7, 0, 18, 32]], '#4a4637') + rects([[8, 0, 16, 32]], '#6b6248', '.55')   // lit doorway
+        + rects([[3, 6, 1, 2], [27, 14, 1, 2], [5, 22, 1, 2], [29, 3, 1, 2]], '#9fb2bf', '.18')
+        + rects([[12, 5, 8, 1], [11, 6, 10, 9], [12, 15, 8, 1], [14, 16, 4, 3], [6, 19, 20, 2], [4, 21, 24, 11]], '#0b0c0d')       // head, neck, coat
+        + rects([[11, 7, 1, 7], [5, 21, 1, 11], [26, 21, 1, 11]], '#3a4248', '.8')                                                // rim light
+        + rects([[15, 19, 2, 1], [15, 20, 2, 7]], tie, '.9') + rects([[13, 19, 2, 3], [17, 19, 2, 3]], '#d8d2c0', '.35')          // tie + collar
+        + '</svg>';
+    },
     roll: () => SIZES.map(n => Math.floor(Math.random() * n)),
     valid: f => Array.isArray(f) && f.length === SIZES.length && f.every((v, i) => Number.isInteger(v) && v >= 0 && v < SIZES[i]),
     hashFace,
@@ -2262,7 +2396,10 @@ class Player {
     this.name = name;
     this.position = position;
     this.number = number;
-    if (tags) this.tags = tags;      // only the academy squad carries tags
+    if (tags) {                      // only the academy squad carries tags (+ v1.9 story flags)
+      this.tags = tags;
+      this.flags = Array.isArray(o.flags) ? o.flags.filter(f => FLAGS[f]) : [];
+    }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
     const fresh = SKILL_KEYS.every(g => AttrGen.validGroup(o[g], g)) && AttrGen.validGroup(o.psych, 'psych') ? null
@@ -2297,6 +2434,12 @@ class Player {
     for (const k in w) { sum += this.skill(k) * w[k]; n += w[k]; }
     return sum / n;
   }
+  /** v1.9: hidden overall (1–20) = average of the engine composites that matter for his position. */
+  get overall() {
+    const keys = { GK: ['Save', 'Save', 'Pass'], DEF: ['Tackle', 'Mark', 'Pass', 'Speed'], MID: ['Pass', 'Dribble', 'Mark', 'Speed'], FWD: ['Shoot', 'Dribble', 'Speed', 'Pass'] }[this.position] || ['Pass'];
+    return keys.reduce((a, k) => a + this.rating(k), 0) / keys.length;
+  }
+  hasFlag(f) { return !!this.flags?.includes(f); }
   /** Morale swing on every roll: ±2 at the extremes, amplified by passion (0.6×–1.5×). */
   get moodBonus() { return clamp((this.dyn.morale - 50) / 25 * (0.55 + this.psych.passion / 20), -2.5, 2.5); }
   /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */
@@ -2638,6 +2781,9 @@ class GameState {
   newAcademy() {
     this.clubName = CLUB_NAME;
     this.formation = '4-4-2';
+    this.budget = ECONOMY.START;   // v1.9: club money ($), carried across seasons
+    this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
+    this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     const used = new Set();
     this.squad = SQUAD_POS.map((pos, i) => Player.generate(`a${i}`, pos, used, 0, true, i + 1));
     this.lineup = this.squad.slice(0, 11).map(p => p.id);
@@ -2788,6 +2934,16 @@ class GameState {
   }
   seasonOf(id) { return this.seasonStats[id] || { ...MatchEngine.blankStats(), apps: 0 }; }
 
+  /* ----- v1.9 economy ----- */
+  canAfford(cost) { return this.budget >= cost; }
+  /** Positive = income, negative = spending. Never goes below $0. Returns the amount actually moved. */
+  addMoney(delta) {
+    const before = this.budget;
+    this.budget = Math.max(0, Math.round(this.budget + delta));
+    this.onBudget?.(this.budget - before);
+    return this.budget - before;
+  }
+
   addDiary(entry) { this.diary.push(entry); if (this.diary.length > 80) this.diary.shift(); }
 
   save() {
@@ -2796,6 +2952,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
+        budget: this.budget, pendingEvent: this.pendingEvent, eventLog: this.eventLog,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -2807,6 +2964,9 @@ class GameState {
       if (!Array.isArray(d.squad) || d.squad.length < 11) return false;
       this.clubName = d.clubName || CLUB_NAME;
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
+      this.budget = Number.isFinite(d.budget) ? Math.max(0, Math.round(d.budget)) : ECONOMY.START;   // pre-v1.9 saves start with $500
+      this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
+      this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
       this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
       if (this.squad.length === 11) {
         const used = new Set(this.squad.map(p => p.surname));
@@ -3379,8 +3539,25 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '1.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '1.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '1.9', name: { en: 'Locker Room Drama', ru: 'Драмы раздевалки' },
+    en: [
+      'Club budget: the academy starts with $500. The budget is always visible in the taskbar header and in the club summary.',
+      'Narrative events: on quiet days between matches something may happen. The calendar stops, and you must decide before the season goes on.',
+      'Locker room dialogue: a portrait, the story and big choice buttons. A choice you can\'t afford is greyed out and can\'t be clicked.',
+      'Torn Boots: a teammate tells you a talented kid\'s boots are falling apart. Buy new ones (−$150) or let him play in the old ones.',
+      'Rich Kid\'s Dad: a parent offers +$300 if his (weakest) son starts the next match. Break that promise and he takes $150 back.',
+      'DEBUG.EXE: +$500, trigger any event, switch random events on/off; the database shows a hidden overall and story flags.',
+    ],
+    ru: [
+      'Бюджет клуба: академия начинает с $500. Бюджет всегда виден на панели задач и в сводке клуба.',
+      'Сюжетные события: в тихие дни между матчами что-нибудь может случиться. Календарь останавливается, и решать нужно до продолжения сезона.',
+      'Разговор в раздевалке: портрет, история и большие кнопки выбора. Вариант, на который не хватает денег, серый и не нажимается.',
+      'Порванные бутсы: одноклубник рассказывает, что у талантливого парня развалились бутсы. Купить новые (−$150) или пусть играет в старых.',
+      'Папа богатого мальчика: родитель даёт +$300, если его (самый слабый) сын выйдет в старте на следующий матч. Нарушишь обещание — заберёт $150 назад.',
+      'DEBUG.EXE: +$500, запуск любого события, вкл./выкл. случайных событий; в базе видны скрытый общий рейтинг и сюжетные флаги.',
+    ] },
   { v: '1.8', name: { en: 'Attribute Overhaul + DEBUG.EXE', ru: 'Новые атрибуты + DEBUG.EXE' },
     en: [
       'Every kid now has a full football profile: biometrics (age 13–15, height, weight, strong foot, weak foot), physical, technical and tactical skills, personality (passion, discipline, composure) and a hidden potential. You still never see the numbers: watch the matches and read the Notebook.',
@@ -4264,7 +4441,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join()].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -4289,8 +4466,8 @@ class ProfileCard {
     let roleHtml, noteHtml;
     if (own) {
       const tag = p.tags[0];
-      roleHtml = tag ? `${L.t('pi.roleLbl')} ${ui.tagChip(tag, p.id, false)}<small>${esc(L.tagDesc(tag))}</small>`
-        : `<span class="pi-none">${L.t('pi.noRole')}</span>`;
+      roleHtml = (tag ? `${L.t('pi.roleLbl')} ${ui.tagChip(tag, p.id, false)}<small>${esc(L.tagDesc(tag))}</small>`
+        : `<span class="pi-none">${L.t('pi.noRole')}</span>`) + ui.flagChips(p);
       const n = s.coachNotes?.[p.id];
       noteHtml = n
         ? `<div class="pi-note-h">${L.t('pi.noteFrom', { n: n.md, o: esc(L.team(n.opp || '')) })}</div><p>${esc(n.keys.map(k => k === 'note.role' ? L.t(k, { r: L.tag(n.role) }) : L.t(k)).join(' '))}</p>`
@@ -4426,8 +4603,10 @@ class DebugConsole {
     add('DYNAMIC', 'SHP', p => Math.round(p.dyn.sharpness), 100, 'sharpness (match tone); < 50 → technical −2');
     add('DYNAMIC', 'MOR', p => Math.round(p.dyn.morale), 100, 'morale');
     for (const k of Object.keys(COMPOSITE)) add('ENGINE', { Pass: 'PAS*', Mark: 'MRK*', Dribble: 'DRB*', Speed: 'PAC*', Tackle: 'TKL*', Shoot: 'SHT*', Save: 'SAV*' }[k], p => +p.rating(k).toFixed(1), 20, 'composite ' + k + ' = ' + Object.keys(COMPOSITE[k]).join('+'));
+    add('ENGINE', 'OVR', p => +p.overall.toFixed(1), 20, 'hidden overall (position composites) — v1.9 "worst player"');
     add('ENGINE', 'MOOD', p => +p.moodBonus.toFixed(1), null, 'morale × passion roll bonus');
     add('ENGINE', 'ROLE', p => (p.tags || [])[0] || '—');
+    add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
     return c;
   })();
 
@@ -4496,12 +4675,16 @@ class DebugConsole {
   }
 
   godHTML() {
-    const on = !!this.ui.state.cheats?.forceWin;
+    const on = !!this.ui.state.cheats?.forceWin, ev = this.ui.events.enabled;
     const btn = (id, label, desc, extra = '') => `<div class="dbg-cheat"><button class="btn${extra}" type="button" data-cheat="${id}">${label}</button><span>${desc}</span></div>`;
     return `<div class="dbg-god">
       ${btn('energy', L.t('dbg.energy'), L.t('dbg.energyD'))}
       ${btn('maxms', L.t('dbg.maxMs'), L.t('dbg.maxMsD'))}
       ${btn('force', L.t('dbg.force') + ` <b class="dbg-flag ${on ? 'on' : ''}">[${L.t(on ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.forceD'), on ? ' armed' : '')}
+      <hr class="dbg-hr">
+      ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[$${this.ui.state.budget}]</b>`, L.t('dbg.moneyD'))}
+      ${NARRATIVE_EVENTS.map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
+      ${btn('events', L.t('dbg.events') + ` <b class="dbg-flag ${ev ? '' : 'on'}">[${L.t(ev ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.eventsD'))}
     </div>`;
   }
 
@@ -4520,12 +4703,202 @@ class DebugConsole {
       s.cheats = { ...(s.cheats || {}), forceWin: !s.cheats?.forceWin };
       this.msg = L.t('dbg.doneForce', { s: L.t(s.cheats.forceWin ? 'dbg.forceOn' : 'dbg.forceOff') })
         + (s.cheats.forceWin && eng ? ' ' + L.t('dbg.forceLive') : '');
+    } else if (id === 'money') {
+      s.addMoney(500);
+      this.msg = L.t('dbg.doneMoney', { b: s.budget });
+    } else if (id === 'events') {
+      ui.events.enabled = !ui.events.enabled;
+      this.msg = L.t('dbg.events') + ': ' + L.t(ui.events.enabled ? 'dbg.forceOn' : 'dbg.forceOff');
+    } else if (id.startsWith('fire:')) {
+      if (eng || ui.events.active || ui.cal.running) { this.msg = L.t('dbg.busy'); this.render(); return; }
+      this.close();
+      ui.events.fire(id.slice(5));
+      return;
     }
     s.save();
     ui.renderAll();
     if (eng) ui.renderLive(eng);
     this.render();
   }
+}
+/* =========================================================
+   v1.9 — NARRATIVE EVENT ENGINE + "LOCKER ROOM DIALOGUE" (This Is the Police style)
+   EventEngine.roll(date) runs after every simulated NON-match day. If an event fires, the calendar
+   pauses, the event is saved as `state.pendingEvent` (a reload re-opens it: the choice can't be dodged),
+   and the simulation resumes by itself once the coach picks a choice.
+
+   Event object:
+     id       — unique key (also the i18n prefix `ev.<id>.*`)
+     trigger  — (state, date) => boolean   probability + conditions
+     cast     — (state) => { ...playerIds } | null   picks the actors (saved, so a reload shows the same people)
+     execute  — (ctx) => void   builds the dialogue: ctx.show({ face, name, role, text, choices: [...] })
+                choice = { key, tone: 'red'|'gray'|'green', cost?, gain?, run: () => diaryVars }
+   ========================================================= */
+const isoDays = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5);
+
+const NARRATIVE_EVENTS = [
+  /* ---------- 1. TORN BOOTS — reported by a Snitch ---------- */
+  {
+    id: 'boots',
+    trigger: (s) => Math.random() < EVENTS_CFG.BOOTS_CHANCE && s.squad.length > 2,
+    cast(s) {
+      const helped = new Set(s.eventLog.filter(e => e.id === 'boots' && e.season === s.season).map(e => e.who));
+      const snitch = pick(s.squad);
+      // the "talented kid" is drawn from the 6 highest potentials (hidden), never the snitch himself
+      const pool = s.squad.filter(p => p !== snitch && !helped.has(p.id)).sort((a, b) => b.psych.potential - a.psych.potential).slice(0, 6);
+      if (!pool.length) return null;
+      return { snitch: snitch.id, kid: pick(pool).id };
+    },
+    execute(ctx) {
+      const { snitch, kid } = ctx.cast;
+      ctx.show({
+        face: snitch.portraitSvg, name: L.name(snitch.name), role: L.t('talk.roleSnitch', { n: snitch.number, p: L.pos(snitch.position) }),
+        text: L.t('ev.boots.text', { s: L.name(snitch.name), k: L.name(kid.name) }),
+        choices: [
+          { key: 'ev.boots.a', tone: 'red', cost: EVENTS_CFG.BOOTS_COST, who: kid.id,
+            run: () => { kid.dyn.morale = 100; return { k: { pid: kid.id } }; } },
+          { key: 'ev.boots.b', tone: 'gray', who: kid.id,
+            run: () => { kid.physical.agility = Math.max(1, kid.physical.agility + EVENTS_CFG.BOOTS_AGILITY); return { k: { pid: kid.id } }; } },
+        ],
+      });
+    },
+  },
+
+  /* ---------- 2. RICH KID'S DAD — reported by a parent (silhouette) ---------- */
+  {
+    id: 'dad',
+    trigger: (s) => Math.random() < EVENTS_CFG.DAD_CHANCE && !s.squad.some(p => p.hasFlag('Promised_Start')),
+    cast(s) {
+      const worst = [...s.squad].sort((a, b) => a.overall - b.overall)[0];   // hidden overall → the weakest kid
+      return worst ? { kid: worst.id } : null;
+    },
+    execute(ctx) {
+      const { kid } = ctx.cast;
+      ctx.show({
+        face: PortraitGenerator.silhouette(), name: L.t('talk.parentName', { s: L.name(kid.surname) }), role: L.t('talk.roleParent'),
+        text: L.t('ev.dad.text', { k: L.name(kid.name) }),
+        choices: [
+          { key: 'ev.dad.a', tone: 'green', gain: EVENTS_CFG.DAD_GIFT, who: kid.id,
+            run: () => { if (!kid.hasFlag('Promised_Start')) kid.flags.push('Promised_Start'); return { k: { pid: kid.id } }; } },
+          { key: 'ev.dad.b', tone: 'gray', who: kid.id,
+            run: () => { kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.DAD_REFUSE_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+        ],
+      });
+    },
+  },
+];
+
+class EventEngine {
+  constructor(ui) {
+    this.ui = ui;
+    this.enabled = true;              // smoke test / debug can switch random events off
+    this.view = new DialogueView(ui, this);
+  }
+  get state() { return this.ui.state; }
+  get active() { return !!this.state.pendingEvent; }
+  get events() { return NARRATIVE_EVENTS; }
+  find(id) { return NARRATIVE_EVENTS.find(e => e.id === id); }
+
+  /** After a non-match day. Returns true when an event fired (the calendar must pause). */
+  roll(date) {
+    if (!this.enabled || this.active) return false;
+    const s = this.state, last = s.eventLog[s.eventLog.length - 1];
+    if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
+    for (const ev of shuffle(NARRATIVE_EVENTS)) if (ev.trigger(s, date) && this.fire(ev.id, date, true)) return true;
+    return false;
+  }
+  /** Starts an event now (also used by DEBUG.EXE). resume = continue the calendar simulation afterwards. */
+  fire(id, date = this.state.calendar.date, resume = false) {
+    const ev = this.find(id);
+    if (!ev || this.active) return false;
+    const cast = ev.cast(this.state);
+    if (!cast) return false;
+    this.state.pendingEvent = { id, date, cast, resume };
+    this.state.save();
+    this.open();
+    return true;
+  }
+  /** Re-builds the dialogue of the pending event (after a fire, a reload or a language switch). */
+  open() {
+    const pe = this.state.pendingEvent;
+    const ev = pe && this.find(pe.id);
+    const cast = {};
+    for (const k in pe?.cast || {}) cast[k] = this.state.player(pe.cast[k]);
+    if (!ev || Object.values(cast).some(p => !p)) { this.state.pendingEvent = null; this.state.save(); return; }
+    ev.execute({ state: this.state, date: pe.date, cast, show: spec => this.view.show(spec) });
+  }
+  /** Applies a choice: money, effect, diary line, log; then closes and (maybe) resumes the calendar. */
+  choose(choice) {
+    const s = this.state, pe = s.pendingEvent;
+    if (!pe || (choice.cost && !s.canAfford(choice.cost))) return;
+    if (choice.cost) s.addMoney(-choice.cost);
+    if (choice.gain) s.addMoney(choice.gain);
+    const vars = choice.run() || {};
+    const money = choice.cost ? -choice.cost : choice.gain || 0;
+    s.eventLog.push({ id: pe.id, date: pe.date, season: s.season, choice: choice.key, who: choice.who });
+    if (s.eventLog.length > 60) s.eventLog.shift();
+    s.addDiary({ date: pe.date, key: choice.key + '.diary', vars: { ...vars, m: money ? (money > 0 ? '+$' : '−$') + Math.abs(money) : '' }, cls: 'ev' });
+    s.pendingEvent = null;
+    s.save();
+    this.view.close();
+    this.ui.renderAll();
+    if (pe.resume && s.phase === 'calendar') this.ui.runCalendar();
+  }
+}
+
+/** The dialogue box itself. Esc / backdrop clicks never close it: the coach has to choose. */
+class DialogueView {
+  constructor(ui, engine) {
+    this.ui = ui; this.engine = engine;
+    this.layer = document.getElementById('talk-layer');
+    this.typer = null;
+    document.addEventListener('keydown', e => {
+      if (this.layer.hidden) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); }
+      if (e.key === 'Tab') {
+        const f = [...this.layer.querySelectorAll('button:not([disabled])')], i = f.indexOf(document.activeElement);
+        e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus();
+      }
+    }, true);
+    this.layer.addEventListener('click', e => {
+      const b = e.target.closest('.talk-btn');
+      if (b && !b.disabled && this.choices) this.engine.choose(this.choices[+b.dataset.i]);
+      else if (e.target.closest('.talk-text')) this.finishTyping();
+    });
+  }
+  get isOpen() { return !this.layer.hidden; }
+
+  show({ face, name, role, text, choices }) {
+    const s = this.ui.state;
+    this.choices = choices;
+    this.ui.modal.close(); this.ui.profile.close(); this.ui.debug?.close();
+    this.layer.querySelector('#talk-face').innerHTML = face;
+    this.layer.querySelector('#talk-name').textContent = name;
+    this.layer.querySelector('#talk-role').textContent = role;
+    this.layer.querySelector('#talk-budget').innerHTML = L.t('talk.budget', { b: s.budget });
+    this.layer.querySelector('#talk-choices').innerHTML = choices.map((c, i) => {
+      const short = c.cost && !s.canAfford(c.cost);
+      const money = c.cost ? `<span class="tb-money neg">−$${c.cost}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '';
+      return `<button type="button" class="talk-btn tone-${c.tone}" data-i="${i}"${short ? ' disabled aria-disabled="true"' : ''}>
+        <span class="tb-label">${esc(L.t(c.key))}</span>${money}
+        ${short ? `<small class="tb-why">${esc(L.t('talk.short', { b: s.budget, c: c.cost }))}</small>` : ''}</button>`;
+    }).join('');
+    this.type(text);
+    this.layer.hidden = false;
+    this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
+  }
+  /** Typewriter for the narrative line (click the text to skip; instant with reduced motion). */
+  type(text) {
+    const el = this.layer.querySelector('#talk-text');
+    clearInterval(this.typer);
+    this.full = text;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = text; return; }
+    let n = 0;
+    el.textContent = '';
+    this.typer = setInterval(() => { n += 2; el.textContent = text.slice(0, n); if (n >= text.length) this.finishTyping(); }, 16);
+  }
+  finishTyping() { clearInterval(this.typer); this.typer = null; this.layer.querySelector('#talk-text').textContent = this.full || ''; }
+  close() { this.finishTyping(); this.layer.hidden = true; this.choices = null; }
 }
 /* =========================================================
    UI CONTROLLER
@@ -4556,6 +4929,8 @@ class UIController {
     this.profile = new ProfileCard(this);
     this.teamCard = new TeamRosterCard(this);   // v1.7
     this.debug = new DebugConsole(this);         // v1.8
+    this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
+    this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
     this.bind();
     this.applyStatic();
@@ -4563,6 +4938,7 @@ class UIController {
     this.prepareMatch();
     this.renderAll();
     this.show('dash');
+    if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
     this.checkUpdateNotice();
   }
 
@@ -4598,6 +4974,7 @@ class UIController {
     this.syncLocks();
     this.renderShouts();
     this.renderSpeedBtns();
+    this.renderBudget();
     if (this.debug?.isOpen) this.debug.render();   // v1.8
   }
 
@@ -4618,6 +4995,7 @@ class UIController {
     L.set(code);
     this.applyStatic();
     this.renderAll();
+    if (this.events.view.isOpen) this.events.open();   // v1.9: re-translate the open dialogue
     if (this.engine) { this.renderLive(this.engine); this.relabelRadar(); } else this.prepareRadar();
     this.rerenderLog();
     this.profile.tick();
@@ -4629,6 +5007,7 @@ class UIController {
 
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
+    if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
     if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
     if (x && typeof x === 'object' && 'team' in x) return L.team(x.team);
@@ -5048,11 +5427,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       <dt>${L.t('dash.record')}</dt><dd>${L.t('dash.recordVal', row)}</dd>
       <dt>${L.t('dash.form')}</dt><dd>${this.formChips(row.form) || '—'}</dd>
       <dt>${L.t('dash.formation')}</dt><dd>${s.formation}</dd>
+      <dt>${L.t('dash.budget')}</dt><dd class="money">$${s.budget}</dd>
       <dt>${L.t('dash.energy')}</dt><dd${tired ? ' class="warn"' : ''}>${L.t('dash.energyVal', { a: avg, t: tired })}</dd>`;
 
     // main action button
     const btn = this.$('btn-sim');
-    btn.disabled = this.cal.running || this.live;
+    btn.disabled = this.cal.running || this.live || this.events.active;
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
     else if (phase === 'calendar') btn.innerHTML = L.t('dash.sim');
@@ -5179,11 +5559,20 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       this.prepareMatch(); this.renderAll();
       return;
     }
+    if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
+    this.runCalendar();
+  }
+
+  /** Visible day-by-day simulation. v1.9: after every non-match day the EventEngine may fire an event,
+      which PAUSES the calendar; EventEngine.choose() calls runCalendar() again to resume. */
+  runCalendar() {
+    if (this.cal.running || this.state.phase !== 'calendar') return;
     this.calMonth = null;   // calendar view follows the days as they pass
     this.cal.simulate({
       stepMs: 180,
       onStep: (date, infos) => {
         for (const info of infos) this.state.addDiary({ date, ...info });
+        if (this.cal.nextEvent() && this.events.roll(date)) this.cal.stop();
         this.state.save();
         this.renderDash();
         this.renderTeam();
@@ -5191,6 +5580,28 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onStop: () => { this.state.save(); this.renderAll(); },
     });
     this.renderDash();
+  }
+
+  /** v1.9: club budget in the taskbar header (+ a short green/red flash when it changes). */
+  renderBudget(delta = 0) {
+    const el = this.$('hdr-budget');
+    if (!el) return;
+    el.innerHTML = L.t('hdr.budget', { b: this.state.budget });
+    if (delta) { el.classList.remove('up', 'down'); void el.offsetWidth; el.classList.add(delta > 0 ? 'up' : 'down'); }
+  }
+
+  /** v1.9: Promised_Start is checked at kick-off — kept quietly, or broken (morale crash + the parent wants money back). */
+  checkPromises() {
+    const s = this.state;
+    for (const p of s.squad.filter(x => x.hasFlag('Promised_Start'))) {
+      p.flags = p.flags.filter(f => f !== 'Promised_Start');
+      const kept = s.isStarter(p.id);
+      let refund = 0;
+      if (!kept) { p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.PROMISE_BROKEN_MORALE, 0, 100); refund = -s.addMoney(-EVENTS_CFG.DAD_REFUND); }
+      s.addDiary({ date: s.calendar.date, key: kept ? 'ev.promise.kept' : 'ev.promise.broken', vars: { k: { pid: p.id }, m: '$' + refund }, cls: 'ev' });
+      if (this.engine) this.engine.log(kept ? 'coach' : 'turn', kept ? 'ev.promise.kept' : 'ev.promise.brokenLog', { k: p, m: '$' + refund }, 0);
+    }
+    s.save();
   }
 
   onMatchdayArrived(ev) {
@@ -5294,7 +5705,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <span class="num">${p.number}</span>
         <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×0.5' : ''}</span></div>
-        <span class="r-tags">${p.tags.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') : '<span class="empty">—</span>'}</span>
+        <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
     };
     const roster = this.$('roster');
@@ -5381,6 +5792,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     return `<button type="button" class="info-btn" data-info="${p.id}" tabindex="0" aria-label="${t}" title="${t}" draggable="false">i</button>`;
   }
 
+  /** v1.9: story flags (e.g. PROMISED START) — visible, unlike the hidden numbers. */
+  flagChips(p) { return (p.flags || []).map(f => `<span class="tag flag" title="${esc(FLAGS[f][L.code][1])}">$ ${esc(FLAGS[f][L.code][0])}</span>`).join(''); }
   tagChip(tag, id, removable) {
     const tone = TAGS[tag]?.tone || 'neutral';
     const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(L.t('squad.remove'))}" title="${esc(L.t('squad.remove'))}">&times;</button>` : '';
@@ -5425,6 +5838,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       this.appendLog({ minute: 0, type: 'coach', key: 'match.hintShouts', vars: {}, side: -1, r: 0 });
       const tired = s.starters().filter(p => p.energy < ENERGY.TIRED);
       if (tired.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.tiredWarn', vars: { n: { list: tired } }, side: 0, r: 0 });
+      const promised = s.squad.filter(p => p.hasFlag('Promised_Start'));   // v1.9
+      for (const p of promised) this.appendLog({ minute: 0, type: s.isStarter(p.id) ? 'coach' : 'turn', key: s.isStarter(p.id) ? 'ev.promise.ok' : 'ev.promise.warn', vars: { k: p }, side: 0, r: 0 });
       const oop = s.outOfPosition().map(o => o.p);
       if (oop.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.oopWarn', vars: { n: { list: oop } }, side: 0, r: 0 });
     }
@@ -5493,6 +5908,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onSub: (out, inP) => this.onSub(out, inP),
     }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin });
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
+    this.checkPromises();   // v1.9
     this.liveSel = null;
     this.radar.setup(this.engine.sides);
     this.engine.start();

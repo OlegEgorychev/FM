@@ -13,6 +13,9 @@ class GameState {
   newAcademy() {
     this.clubName = CLUB_NAME;
     this.formation = '4-4-2';
+    this.budget = ECONOMY.START;   // v1.9: club money ($), carried across seasons
+    this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
+    this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     const used = new Set();
     this.squad = SQUAD_POS.map((pos, i) => Player.generate(`a${i}`, pos, used, 0, true, i + 1));
     this.lineup = this.squad.slice(0, 11).map(p => p.id);
@@ -163,6 +166,16 @@ class GameState {
   }
   seasonOf(id) { return this.seasonStats[id] || { ...MatchEngine.blankStats(), apps: 0 }; }
 
+  /* ----- v1.9 economy ----- */
+  canAfford(cost) { return this.budget >= cost; }
+  /** Positive = income, negative = spending. Never goes below $0. Returns the amount actually moved. */
+  addMoney(delta) {
+    const before = this.budget;
+    this.budget = Math.max(0, Math.round(this.budget + delta));
+    this.onBudget?.(this.budget - before);
+    return this.budget - before;
+  }
+
   addDiary(entry) { this.diary.push(entry); if (this.diary.length > 80) this.diary.shift(); }
 
   save() {
@@ -171,6 +184,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
+        budget: this.budget, pendingEvent: this.pendingEvent, eventLog: this.eventLog,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -182,6 +196,9 @@ class GameState {
       if (!Array.isArray(d.squad) || d.squad.length < 11) return false;
       this.clubName = d.clubName || CLUB_NAME;
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
+      this.budget = Number.isFinite(d.budget) ? Math.max(0, Math.round(d.budget)) : ECONOMY.START;   // pre-v1.9 saves start with $500
+      this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
+      this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
       this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
       if (this.squad.length === 11) {
         const used = new Set(this.squad.map(p => p.surname));
