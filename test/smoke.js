@@ -388,6 +388,13 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         faces: g.querySelectorAll('.lk.here .lk-face svg').length, why: [lk.absent[ids.tired], lk.absent[ids.lazy], lk.absent[ids.hurt]], skipFlag: YAM.game.player(ids.lazy).skipped_training };
     }, lr0);
     await shot('10-locker');
+    // v3.2: in the locker room the office is open only for kids who turned up
+    const ofLk = await page.evaluate(ids => {
+      const ui = YAM.ui, here = YAM.game.squad.find(p => !YAM.game.dayState().locker.absent[p.id]);
+      ui.profile.open(ids.lazy); const absentBtn = { dis: document.getElementById('pinfo-office').disabled, t: document.getElementById('pinfo-office').textContent }; ui.profile.close();
+      ui.profile.open(here.id); const hereBtn = !document.getElementById('pinfo-office').disabled; ui.profile.close();
+      return { absent: ui.officeBlock(ids.lazy), absentBtn, here: ui.officeBlock(here.id), hereBtn };
+    }, lr0);
     // v2.7: profile over the locker room (right-click + [i]), backdrop between them, Esc closes only the top layer
     const here = await page.evaluate(() => document.querySelector('#lr-grid .lk.here').dataset.pid);
     await page.waitForTimeout(1300);   // let the doors finish opening
@@ -437,6 +444,10 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       dl0.today && /1\/1/.test(dl0.ap) && !dl0.btn && [2, 4].includes(dayOf(dl1.date)) && !dl2.btn && dl2.plan === 'cardio'
       && oneDay(dl1.date, dl3.date) && dl3.e === 55 && dl3.m === 57 && dl3.plan === null && dl3.diary && dl3.lazyE === 50 && dl3.tiredE === 20 && dl3.cleared, JSON.stringify({ dl0, dl1, dl2, dl3 }));
     await page.evaluate(id => { YAM.game.player(id).injuryDays = 0; }, lr0.hurt);
+    // v3.2: office talks only when the kid is at the club — Wednesday (day before training), after the briefing
+    const ofPre = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available); return { blk: YAM.ui.officeBlock(p.id), dow: new Date(YAM.game.calendar.date + 'T00:00:00Z').getUTCDay() }; });
+    await page.click('#btn-sim'); await page.click('#mb-go');   // START DAY → briefing → club
+    const ofPost = await page.evaluate(() => YAM.ui.officeBlock(YAM.game.squad.find(x => x.available).id));
     const kidO = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available && x.archetype !== 'GK'); p.dyn.sharpness = 30; p.dyn.morale = 60; YAM.ui.profile.open(p.id); return p.id; });
     const of0 = await page.evaluate(() => ({ vis: !document.getElementById('pinfo-office').hidden, dis: document.getElementById('pinfo-office').disabled }));
     await page.click('#pinfo-office');
@@ -454,9 +465,12 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       JSON.stringify({ of0, of1, of2, of3, of4 }));
 
     // v2.9: office buttons show the coach's lines (not the kid's reactions) + KICK OUT OF THE ACADEMY
+    // (Thursday = training day: the office is only reachable from the locker room now)
+    await page.evaluate(() => YAM.ui.show('team'));
+    await toLocker(); await page.waitForTimeout(1400);
     const kick = await page.evaluate(() => {
       const s = YAM.game, p = s.starters().find(x => x.archetype !== 'GK' && x.available);
-      s.dayState().ap = 1; s.rep.parents = 50; s.rep.squad = 50; YAM.ui.show('team'); YAM.ui.profile.open(p.id);
+      s.dayState().ap = 1; s.rep.parents = 50; s.rep.squad = 50; YAM.ui.profile.open(p.id);
       return { id: p.id, n0: s.squad.length, slot: s.lineup.indexOf(p.id) };
     });
     await page.click('#pinfo-office');
@@ -467,13 +481,24 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const ka = await page.evaluate(k => {
       const s = YAM.game;
       return { gone: !s.player(k.id) && !s.squad.some(p => p.id === k.id), n: s.squad.length, xi: s.lineup.length === 11 && s.lineup.every(id => s.player(id)) && !s.lineup.includes(k.id),
-        rep: [s.rep.parents, s.rep.squad], closed: document.getElementById('talk-layer').hidden, row: !!document.querySelector(`#roster .r-row[data-id="${k.id}"]`),
+        rep: [s.rep.parents, s.rep.squad], closed: document.getElementById('talk-layer').hidden, row: !!document.querySelector(`#roster .r-row[data-id="${k.id}"]`)
+          || !!document.querySelector(`#lr-grid .lk[data-pid="${k.id}"]`) || document.querySelectorAll('#lr-grid .lk').length !== s.squad.length,
         saved: !JSON.parse(localStorage.getItem('yam_save_v1')).squad.some(p => p.id === k.id) };
     }, kick);
     check('office: 4 coach lines (no reaction text / no {k}); KICK OUT (red) asks once, then removes the kid for good: squad −1, XI refilled, Parents −10, Squad −5',
       kb.length === 4 && kb.every(b => !/\{k\}|«|"/.test(b.t)) && kb[3].red && !kb[3].dis && kc.step === 'kickConfirm' && kc.n === 2
       && ka.gone && ka.n === kick.n0 - 1 && ka.xi && ka.rep.join() === '40,45' && ka.closed && !ka.row && ka.saved, JSON.stringify({ kb, kc, ka }));
-    await page.evaluate(() => { YAM.game.rep.parents = 50; YAM.game.rep.squad = 50; YAM.ui.show('dash'); });
+    const ofNo = await page.evaluate(() => { const s = YAM.game, lk = s.dayState().locker, p = s.squad.find(x => !lk.absent[x.id]); s.dayState().ap = 0; YAM.ui.profile.open(p.id);
+      const b = document.getElementById('pinfo-office'), r = { blk: YAM.ui.officeBlock(p.id), dis: b.disabled, t: b.textContent }; YAM.ui.profile.close(); return r; });
+    await page.evaluate(() => { YAM.ui.locker.close(); YAM.game.rep.parents = 50; YAM.game.rep.squad = 50; YAM.ui.show('dash'); });
+    const ofSat = await page.evaluate(() => { const s = YAM.game, d = s.calendar.date; s.dayState().ap = 1;
+      // simulate a Saturday / Sunday at the club: never allowed outside the locker room
+      const sat = ['2002-09-14', '2002-09-15'].map(x => { s.calendar.date = x; s.dayState().briefed = true; s.dayState().ap = 1; return YAM.ui.officeBlock(s.squad[0].id); });
+      s.calendar.date = d; return sat; });
+    check('office access: Wed after briefing ✓ (before: not at the club); locker: present ✓ / absent ✗ "NOT AT FACILITY"; 0 AP → "NO ACTION POINTS"; weekend ✗',
+      ofPre.dow === 3 && ofPre.blk === 'office.blk.notHere' && ofPost === null && ofLk.absent === 'office.blk.absent' && ofLk.absentBtn.dis && /FACILITY|НЕТ В КЛУБЕ/.test(ofLk.absentBtn.t)
+      && ofLk.here === null && ofLk.hereBtn && ofNo.blk === 'office.blk.noAp' && ofNo.dis && /ACTION POINTS|ОЧКОВ/.test(ofNo.t) && ofSat.every(x => x === 'office.blk.notHere'),
+      JSON.stringify({ ofPre, ofPost, ofLk, ofNo, ofSat }));
 
     // v3.0: fog of war — no native positions, coach's tags, exclusive duties, set-piece takers, captain
     const fg = await page.evaluate(() => {

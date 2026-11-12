@@ -2,8 +2,19 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.2';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.2', name: { en: 'Office Hours', ru: 'Часы приёма' },
+    en: [
+      '"Call into office" now makes sense: you can only talk to a kid who is actually at the club — on the day before training (Monday or Wednesday, after the morning briefing) or in the locker room if he turned up.',
+      'Weekends, match days outside the locker room and absent kids: the button is greyed out — "PLAYER NOT AT FACILITY". With no action points left: "NO ACTION POINTS LEFT".',
+      'Kicking a kid out closes the conversation at once and he vanishes from the squad list and the locker room immediately.',
+    ],
+    ru: [
+      '«Вызвать в кабинет» теперь работает по-честному: поговорить можно только с тем, кто в клубе, — накануне тренировки (понедельник или среда, после утренней сводки) или в раздевалке, если он пришёл.',
+      'Выходные, дни матчей вне раздевалки и не пришедшие игроки: кнопка серая — «ИГРОКА НЕТ В КЛУБЕ». Если очков действий нет: «НЕТ ОЧКОВ ДЕЙСТВИЙ».',
+      'Если выгнать игрока, разговор сразу закрывается, и он тут же исчезает из состава и из раздевалки.',
+    ] },
   { v: '3.1', name: { en: 'The Yard Match', ru: 'Дворовый матч' },
     en: [
       'A new academy no longer starts with a ready-made squad. The world now has 100 kids with hidden skills: 40 already play for rival clubs, the rest are free agents.',

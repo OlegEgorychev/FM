@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.1</title>
+<title>Youth Academy Manager v3.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -3130,6 +3130,23 @@ Object.assign(I18N.ru, {
   'draft.start': '&#9654; НАЧАТЬ СЕЗОН', 'draft.startNeed': 'Выбери ещё {n}', 'draft.starsTip': 'Оценка за дворовый матч: грубое впечатление от одного сумбурного дня.',
   'draft.diary': 'Минивэн полон: {n} ребят с дворового матча — это новая академия.',
 });
+
+
+/* ---- v3.2: when the coach may call a kid into the office ---- */
+Object.assign(I18N.en, {
+  'office.blk.notHere': 'He is not at the club right now. Office talks: the day before training (Mon / Wed, after the briefing) or in the locker room.',
+  'office.blk.notHere.btn': '[ PLAYER NOT AT FACILITY ]',
+  'office.blk.absent': 'He didn\'t turn up today — you can\'t talk to an empty locker.', 'office.blk.absent.btn': '[ PLAYER NOT AT FACILITY ]',
+  'office.blk.noAp': 'No action points left today. Come back tomorrow.', 'office.blk.noAp.btn': '[ NO ACTION POINTS LEFT ]',
+  'office.blk.busy': 'Not now: a match or a conversation is in progress.', 'office.blk.busy.btn': '[ NOT NOW ]',
+});
+Object.assign(I18N.ru, {
+  'office.blk.notHere': 'Сейчас его нет в клубе. Разговоры в кабинете: накануне тренировки (пн / ср, после сводки) или в раздевалке.',
+  'office.blk.notHere.btn': '[ ИГРОКА НЕТ В КЛУБЕ ]',
+  'office.blk.absent': 'Он сегодня не пришёл — с пустым шкафчиком не поговоришь.', 'office.blk.absent.btn': '[ ИГРОКА НЕТ В КЛУБЕ ]',
+  'office.blk.noAp': 'Очков действий на сегодня нет. Приходи завтра.', 'office.blk.noAp.btn': '[ НЕТ ОЧКОВ ДЕЙСТВИЙ ]',
+  'office.blk.busy': 'Не сейчас: идёт матч или разговор.', 'office.blk.busy.btn': '[ НЕ СЕЙЧАС ]',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -4897,8 +4914,19 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.2';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.2', name: { en: 'Office Hours', ru: 'Часы приёма' },
+    en: [
+      '"Call into office" now makes sense: you can only talk to a kid who is actually at the club — on the day before training (Monday or Wednesday, after the morning briefing) or in the locker room if he turned up.',
+      'Weekends, match days outside the locker room and absent kids: the button is greyed out — "PLAYER NOT AT FACILITY". With no action points left: "NO ACTION POINTS LEFT".',
+      'Kicking a kid out closes the conversation at once and he vanishes from the squad list and the locker room immediately.',
+    ],
+    ru: [
+      '«Вызвать в кабинет» теперь работает по-честному: поговорить можно только с тем, кто в клубе, — накануне тренировки (понедельник или среда, после утренней сводки) или в раздевалке, если он пришёл.',
+      'Выходные, дни матчей вне раздевалки и не пришедшие игроки: кнопка серая — «ИГРОКА НЕТ В КЛУБЕ». Если очков действий нет: «НЕТ ОЧКОВ ДЕЙСТВИЙ».',
+      'Если выгнать игрока, разговор сразу закрывается, и он тут же исчезает из состава и из раздевалки.',
+    ] },
   { v: '3.1', name: { en: 'The Yard Match', ru: 'Дворовый матч' },
     en: [
       'A new academy no longer starts with a ready-made squad. The world now has 100 kids with hidden skills: 40 already play for rival clubs, the rest are free agents.',
@@ -5972,7 +6000,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale)].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale), own && ui.officeBlock(p.id)].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -6047,9 +6075,10 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
     document.getElementById('pinfo-status').textContent = L.t('pi.status.bar');
     const ob = document.getElementById('pinfo-office');   // v2.5: [ CALL INTO OFFICE ] (1 action point)
     ob.hidden = !own;
-    ob.disabled = !ui.canCallIn(p.id);
-    ob.innerHTML = L.t('office.btn', { n: s.ap });
-    ob.title = L.t(s.ap > 0 ? 'office.btnTip' : 'office.btnNoAp');
+    const blk = own ? ui.officeBlock(p.id) : null;   // v3.2: only when he is at the club, and only with an AP
+    ob.disabled = !!blk;
+    ob.innerHTML = blk ? L.t(blk + '.btn') : L.t('office.btn', { n: s.ap });
+    ob.title = L.t(blk || 'office.btnTip');
   }
 }
 /* =========================================================
@@ -7900,10 +7929,22 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
 
   /** v2.5: [ CALL INTO OFFICE ] — 1 action point, a short talk in the dialogue box. */
-  canCallIn(id) {
-    const s = this.state, p = s.player(id);
-    return !!p && s.ap > 0 && !this.events.active && !(this.engine && !this.engine.finished) && !this.cal.running;
+  /** v3.2: why the coach can NOT call this kid in right now (i18n key), or null. Two windows only:
+      A) the day before a training day (Mon / Wed), in the normal club screens, after the morning briefing;
+      B) in the Locker Room, for a kid who actually turned up. Then: at least 1 action point. */
+  officeBlock(id) {
+    const s = this.state, p = s.player(id), d = s.dayState();
+    if (!p) return 'office.blk.notHere';
+    if (this.events.active || (this.engine && !this.engine.finished) || this.cal.running) return 'office.blk.busy';
+    let here = false;
+    if (this.locker.isOpen && d.locker) here = !d.locker.absent[id];                                   // B
+    else if (s.phase === 'calendar' && d.briefed && !this.briefing.isOpen
+      && isTrainingDay(isoAdd(s.calendar.date, 1)) && this.dayInfo(s.calendar.date).kind === 'rest') here = true;   // A
+    if (!here) return this.locker.isOpen ? 'office.blk.absent' : 'office.blk.notHere';
+    if (s.ap < 1) return 'office.blk.noAp';
+    return null;
   }
+  canCallIn(id) { return !this.officeBlock(id); }
   callIntoOffice(id) {
     if (!this.canCallIn(id) || !this.state.spendAP()) return;
     this.profile.close();

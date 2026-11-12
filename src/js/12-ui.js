@@ -761,10 +761,22 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
 
   /** v2.5: [ CALL INTO OFFICE ] — 1 action point, a short talk in the dialogue box. */
-  canCallIn(id) {
-    const s = this.state, p = s.player(id);
-    return !!p && s.ap > 0 && !this.events.active && !(this.engine && !this.engine.finished) && !this.cal.running;
+  /** v3.2: why the coach can NOT call this kid in right now (i18n key), or null. Two windows only:
+      A) the day before a training day (Mon / Wed), in the normal club screens, after the morning briefing;
+      B) in the Locker Room, for a kid who actually turned up. Then: at least 1 action point. */
+  officeBlock(id) {
+    const s = this.state, p = s.player(id), d = s.dayState();
+    if (!p) return 'office.blk.notHere';
+    if (this.events.active || (this.engine && !this.engine.finished) || this.cal.running) return 'office.blk.busy';
+    let here = false;
+    if (this.locker.isOpen && d.locker) here = !d.locker.absent[id];                                   // B
+    else if (s.phase === 'calendar' && d.briefed && !this.briefing.isOpen
+      && isTrainingDay(isoAdd(s.calendar.date, 1)) && this.dayInfo(s.calendar.date).kind === 'rest') here = true;   // A
+    if (!here) return this.locker.isOpen ? 'office.blk.absent' : 'office.blk.notHere';
+    if (s.ap < 1) return 'office.blk.noAp';
+    return null;
   }
+  canCallIn(id) { return !this.officeBlock(id); }
   callIntoOffice(id) {
     if (!this.canCallIn(id) || !this.state.spendAP()) return;
     this.profile.close();

@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v3.1)
+# Youth Academy Manager — design notes (current: v3.2)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -159,3 +159,7 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - `GameState.buildWorld()` → `state.globalPlayers`: 100 full `Player`s (ids `g0…g99`, hidden archetype mix `WORLD.MIX` GK 12 / DEF 30 / MID 32 / FWD 26), each with `teamId`: 40 → `rival_1…rival_9` (round-robin), 60 → `free_agent`. Saved as `pool` (= world minus squad); `squad` objects are the same instances (`teamId 'player_team'`). Old saves get a world of 100 − squad generated around the squad (ids `g1000+`). Expelled kids become `free_agent` and stay in the world. (The league's AI match squads are still the separate "lite" kids — linking them to the world is future work.)
 - New academy: `phase = 'draft'`, empty squad, `state.draft = { pool: 30 free-agent ids, signed: [] }`. `DraftView` (11h-draft.js, `#intro-draft-view`, `--z-phase`, covers the taskbar): cards show ONLY face, name, age, height, weight and `DraftView.stars(p)` (1–5: (overall − 7)/1.8 + (PA − 50)/25 + seeded luck ±1.1; distribution ≈ 5/21/35/32/7 %). `toggleDraft(id)` (max 15, can release), `finishDraft()` → squad = the 15 in signing order, shirts 1–15, no tags, the tallest in goal, `phase = 'calendar'`. A draft-phase save reloads into the draft (`load()` special path). `renderAll`/`renderDash`/`prepareMatch` are no-ops while drafting.
 - Squad size is now 15 (was 16).
+
+## Office hours (v3.2)
+- `UIController.officeBlock(id)` → i18n key or null; `canCallIn` = !officeBlock. Allowed only (A) the day before a training day (rest-kind day, i.e. Mon / Wed), phase calendar, after the briefing, not inside the briefing/locker overlays — any normal club screen counts as "the Dashboard" (the squad list lives on the Team screen); or (B) the Locker Room is open and the kid is not in `today.locker.absent`. Then ≥ 1 AP. Order: not at the club → no AP. Button text = `<key>.btn` ("[ PLAYER NOT AT FACILITY ]", "[ NO ACTION POINTS LEFT ]"), tooltip = the reason.
+- Kick out from the locker: the dialogue closes, `afterManualEvent()` → `renderAll()` re-renders the Team list and the open Locker Room (slot gone).

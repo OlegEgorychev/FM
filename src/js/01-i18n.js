@@ -975,3 +975,20 @@ Object.assign(I18N.ru, {
   'draft.start': '&#9654; НАЧАТЬ СЕЗОН', 'draft.startNeed': 'Выбери ещё {n}', 'draft.starsTip': 'Оценка за дворовый матч: грубое впечатление от одного сумбурного дня.',
   'draft.diary': 'Минивэн полон: {n} ребят с дворового матча — это новая академия.',
 });
+
+
+/* ---- v3.2: when the coach may call a kid into the office ---- */
+Object.assign(I18N.en, {
+  'office.blk.notHere': 'He is not at the club right now. Office talks: the day before training (Mon / Wed, after the briefing) or in the locker room.',
+  'office.blk.notHere.btn': '[ PLAYER NOT AT FACILITY ]',
+  'office.blk.absent': 'He didn\'t turn up today — you can\'t talk to an empty locker.', 'office.blk.absent.btn': '[ PLAYER NOT AT FACILITY ]',
+  'office.blk.noAp': 'No action points left today. Come back tomorrow.', 'office.blk.noAp.btn': '[ NO ACTION POINTS LEFT ]',
+  'office.blk.busy': 'Not now: a match or a conversation is in progress.', 'office.blk.busy.btn': '[ NOT NOW ]',
+});
+Object.assign(I18N.ru, {
+  'office.blk.notHere': 'Сейчас его нет в клубе. Разговоры в кабинете: накануне тренировки (пн / ср, после сводки) или в раздевалке.',
+  'office.blk.notHere.btn': '[ ИГРОКА НЕТ В КЛУБЕ ]',
+  'office.blk.absent': 'Он сегодня не пришёл — с пустым шкафчиком не поговоришь.', 'office.blk.absent.btn': '[ ИГРОКА НЕТ В КЛУБЕ ]',
+  'office.blk.noAp': 'Очков действий на сегодня нет. Приходи завтра.', 'office.blk.noAp.btn': '[ НЕТ ОЧКОВ ДЕЙСТВИЙ ]',
+  'office.blk.busy': 'Не сейчас: идёт матч или разговор.', 'office.blk.busy.btn': '[ НЕ СЕЙЧАС ]',
+});
