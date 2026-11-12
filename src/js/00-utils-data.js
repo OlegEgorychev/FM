@@ -107,6 +107,9 @@ const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14
 const DUTIES = { captain: 'C', penalty: 'PK', corner: 'CK' };
 const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25, CORNER_BLOCK: 0.3, CORNER_DELIVERY: 3, HEADER_HEIGHT: 6,
   CAPTAIN: 0.5 };   // captain on the pitch: + (0.5 + passion/20) on all our rolls (≈ +0.55 … +1.5)
+/* v3.1 SANDBOX WORLD — 100 kids; 40 at rival clubs, 60 free agents; 30 of them play the Yard Match; you sign 15
+   (≈ 45 free agents remain for future transfers / poaching). MIX = hidden archetypes in the world. */
+const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 } };
 const COACH = { KICK_PARENTS: -10, KICK_SQUAD: -5, MIN_SQUAD: 12,   // v2.9: kick out (keep ≥ 12 kids and ≥ 1 keeper)
   AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());

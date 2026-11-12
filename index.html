@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.0</title>
+<title>Youth Academy Manager v3.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1505,6 +1505,40 @@ body.fx .crt-scan{ opacity: .9; }
 @media (prefers-reduced-motion: reduce){ .mb-rain, .steam{ animation: none; } }
 .mb-date::first-letter{ text-transform: uppercase; }
 /* =========================================================
+   v3.1 — INTRO: THE YARD MATCH DRAFT (muddy pitch, rain, index cards)
+   ========================================================= */
+.draft-layer{ position: absolute; inset: 0; z-index: var(--z-phase); display: grid; place-items: center; padding: 14px;
+  background: radial-gradient(ellipse at 50% 120%, #3b3020 0%, transparent 60%), linear-gradient(#1b2420, #2a3324 55%, #3a3122); }
+.draft-layer[hidden]{ display: none; }
+.dr-panel{ position: relative; width: min(1240px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 10px; overflow: hidden;
+  padding: 16px 18px; background: rgba(12,16,13,.82); border: 2px solid #3a4636; box-shadow: 0 0 0 1px #000, inset 0 0 60px rgba(0,0,0,.7); color: #d7e0cf; }
+.dr-rain{ position: absolute; inset: 0; pointer-events: none; opacity: .25;
+  background: repeating-linear-gradient(105deg, transparent 0 16px, rgba(170,200,220,.2) 16px 17px); background-size: 100% 200%; animation: mbRain .55s linear infinite; }
+.dr-head{ position: relative; display: flex; flex-direction: column; gap: 6px; }
+.dr-head h2{ margin: 0; font: 30px/1 var(--mono); letter-spacing: 2px; color: #e9efe2; text-transform: uppercase; }
+.dr-prompt{ margin: 0; max-width: 900px; font: 15px/1.45 var(--ui); color: #c9d1c4; }
+.dr-bar{ display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.dr-count{ font: bold 22px/1 var(--mono); color: #ffcf5a; } .dr-count.full{ color: #8fe07a; }
+.dr-hint{ font-size: 12px; color: #8a978c; }
+.dr-grid{ position: relative; flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 8px; padding: 4px 2px; }
+.dr-card{ display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; background: #e8e3d0; color: #1b1b16;
+  border: 1px solid #000; box-shadow: 2px 3px 0 rgba(0,0,0,.45); transform: rotate(-.4deg); }
+.dr-card:nth-child(2n){ transform: rotate(.5deg); } .dr-card:nth-child(3n){ transform: rotate(-.8deg); }
+.dr-card.on{ background: #f6e7a8; box-shadow: 0 0 0 3px #3a6b2a, 2px 3px 0 rgba(0,0,0,.45); }
+.dr-face{ width: 72px; height: 72px; border: 2px solid #1b1b16; } .dr-face svg{ width: 100%; height: 100%; display: block; }
+.dr-name{ font: bold 12px/1.1 var(--ui); text-align: center; min-height: 2.2em; }
+.dr-bio{ display: grid; grid-template-columns: auto 1fr; gap: 1px 6px; margin: 0; width: 100%; font-size: 11px; }
+.dr-bio dt{ color: #6a6555; } .dr-bio dd{ margin: 0; text-align: right; font-family: var(--mono); font-size: 13px; }
+.dr-stars{ font-size: 16px; color: #b8860b; letter-spacing: 1px; } .dr-stars span{ color: #c9c2a8; }
+.dr-btn{ width: 100%; padding: 4px; cursor: pointer; font: bold 11px/1.2 var(--mono); letter-spacing: .5px; text-transform: uppercase;
+  color: #fff; background: #2f6b2a; border: 2px solid; border-color: #6aa060 #10240e #10240e #6aa060; border-radius: 0; }
+.dr-card.on .dr-btn{ background: #6b3a2a; border-color: #a0706a #24100e #24100e #a0706a; }
+.dr-btn:disabled{ background: #9a9686; border-color: #b9b5a5; color: #e8e3d0; cursor: not-allowed; }
+.dr-foot{ position: relative; display: flex; justify-content: center; }
+#dr-start{ min-width: 320px; font-family: var(--mono) !important; letter-spacing: 1px; }
+#dr-start:disabled{ background: #3a3f3a; color: #8a978c; cursor: not-allowed; box-shadow: none; }
+@media (prefers-reduced-motion: reduce){ .dr-rain{ animation: none; } }
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1837,6 +1871,20 @@ body.fx .crt-scan{ opacity: .9; }
     </section>
   </div>
 
+  <!-- v3.1: Intro — the Yard Match draft (new academies start here) -->
+  <div class="draft-layer" id="intro-draft-view" hidden>
+    <section class="dr-panel" role="dialog" aria-modal="true" aria-labelledby="dr-title">
+      <div class="dr-rain" aria-hidden="true"></div>
+      <header class="dr-head">
+        <h2 id="dr-title" data-i18n="draft.title"></h2>
+        <p class="dr-prompt" data-i18n="draft.prompt"></p>
+        <div class="dr-bar"><span class="dr-count" id="dr-count"></span><span class="dr-hint" data-i18n="draft.hint"></span></div>
+      </header>
+      <div class="dr-grid" id="dr-grid"></div>
+      <footer class="dr-foot"><button class="btn go big" id="dr-start" type="button"></button></footer>
+    </section>
+  </div>
+
   <!-- v2.8: Morning briefing (START DAY → here → HEAD TO THE CLUB) -->
   <div class="briefing-layer" id="morning-briefing-view" hidden>
     <section class="mb-panel" role="dialog" aria-modal="true" aria-labelledby="mb-date">
@@ -2028,6 +2076,9 @@ const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14
 const DUTIES = { captain: 'C', penalty: 'PK', corner: 'CK' };
 const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25, CORNER_BLOCK: 0.3, CORNER_DELIVERY: 3, HEADER_HEIGHT: 6,
   CAPTAIN: 0.5 };   // captain on the pitch: + (0.5 + passion/20) on all our rolls (≈ +0.55 … +1.5)
+/* v3.1 SANDBOX WORLD — 100 kids; 40 at rival clubs, 60 free agents; 30 of them play the Yard Match; you sign 15
+   (≈ 45 free agents remain for future transfers / poaching). MIX = hidden archetypes in the world. */
+const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 } };
 const COACH = { KICK_PARENTS: -10, KICK_SQUAD: -5, MIN_SQUAD: 12,   // v2.9: kick out (keep ≥ 12 kids and ≥ 1 keeper)
   AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
@@ -3060,6 +3111,25 @@ Object.assign(I18N.ru, {
   'eng.foulPlain': 'Фол! {d} против {a} — штрафной!', 'eng.pen': 'ПЕНАЛЬТИ! {a} ставит мяч на точку…', 'eng.penAim': '{a} разбегается для удара с точки…',
   'eng.corner': 'Угловой. {a} подаёт…', 'eng.cornerClear': '{d} выносит мяч головой.', 'eng.headerAim': '{a} выпрыгивает выше всех!',
 });
+
+
+/* ---- v3.1: the Yard Match draft ---- */
+Object.assign(I18N.en, {
+  'draft.title': 'The Yard Match',
+  'draft.prompt': 'You arrive at a muddy local pitch. Dozens of kids are playing a chaotic tournament. You have room in your minivan for 15 players to form your new Academy. Choose wisely based on their physical builds and their yard-match performance.',
+  'draft.hint': 'All you can see: faces, ages, sizes — and how they did today in the mud (★). Their real football is a mystery.',
+  'draft.count': 'Minivan: <b>{n}</b>/{m}', 'draft.sign': '[ Sign to academy ]', 'draft.release': '[ Leave him ]',
+  'draft.start': '&#9654; START SEASON', 'draft.startNeed': 'Pick {n} more kid(s)', 'draft.starsTip': 'Yard match rating: a rough impression from one chaotic afternoon.',
+  'draft.diary': 'The minivan is full: {n} kids from the yard match form the new academy.',
+});
+Object.assign(I18N.ru, {
+  'draft.title': 'Дворовый матч',
+  'draft.prompt': 'Ты приезжаешь на грязное местное поле. Десятки ребят играют в хаотичный турнир. В твоём минивэне 15 мест — это будет твоя новая академия. Выбирай с умом: по телосложению и по тому, как они играют во дворе.',
+  'draft.hint': 'Видно только лица, возраст, рост и вес — и как они сыграли сегодня в грязи (★). Настоящий их футбол — загадка.',
+  'draft.count': 'Минивэн: <b>{n}</b>/{m}', 'draft.sign': '[ Взять в академию ]', 'draft.release': '[ Оставить ]',
+  'draft.start': '&#9654; НАЧАТЬ СЕЗОН', 'draft.startNeed': 'Выбери ещё {n}', 'draft.starsTip': 'Оценка за дворовый матч: грубое впечатление от одного сумбурного дня.',
+  'draft.diary': 'Минивэн полон: {n} ребят с дворового матча — это новая академия.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -3314,7 +3384,8 @@ class Player {
       this.awayDays = Math.max(0, Math.round(o.awayDays || 0));                    // v2.3: kept at home by a parent (days)
       this.promiseBy = o.promiseBy || null;
       this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
-      this.absentToday = o.absentToday || null;   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
+      this.absentToday = o.absentToday || null;
+      this.teamId = o.teamId || 'player_team';   // v3.1: 'player_team' | 'free_agent' | 'rival_N'   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
@@ -3710,16 +3781,56 @@ class GameState {
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
+    // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
-    this.squad = SQUAD_POS.map((pos, i) => Player.generate(`a${i}`, pos, used, 0, true, i + 1));
-    this.lineup = this.squad.slice(0, 11).map(p => p.id);
-    this.autoArrange();
+    this.globalPlayers = GameState.buildWorld(used);
+    this.squad = [];
+    this.lineup = [];
+    const free = shuffle(this.globalPlayers.filter(p => p.teamId === 'free_agent'));
+    this.draft = { pool: free.slice(0, WORLD.DRAFT_POOL).map(p => p.id), signed: [] };
     this.newSeason(SEASON.FIRST_YEAR);
+    this.phase = 'draft';
+    this.save();
+  }
+  /** v3.1: 100 fully generated kids (hidden stats, biometrics, `teamId`): WORLD.RIVALS go to rival clubs, the rest are free agents. */
+  static buildWorld(used, count = WORLD.SIZE, idFrom = 0) {
+    const arch = [];
+    for (const [k, n] of Object.entries(WORLD.MIX)) for (let i = 0; i < n; i++) arch.push(k);
+    const players = shuffle(arch).slice(0, count).map((pos, i) => {
+      const p = Player.generate(`g${idFrom + i}`, pos, used, 0, true, 0);
+      p.teamId = 'free_agent';
+      return p;
+    });
+    shuffle(players).slice(0, Math.min(WORLD.RIVALS, players.length)).forEach((p, i) => { p.teamId = `rival_${(i % 9) + 1}`; });
+    return players;
+  }
+  /** v3.1 Yard Match draft. */
+  draftSigned() { return this.draft?.signed || []; }
+  toggleDraft(id) {
+    if (this.phase !== 'draft' || !this.draft.pool.includes(id)) return;
+    const s = this.draft.signed, i = s.indexOf(id);
+    if (i >= 0) s.splice(i, 1);
+    else if (s.length < WORLD.DRAFT_SIGN) s.push(id);
+    this.save();
+  }
+  /** 15 signed → they become the academy (teamId 'player_team', shirts 1–15, no tags: fog of war). The tallest kid starts in goal. */
+  finishDraft() {
+    if (this.phase !== 'draft' || this.draft.signed.length !== WORLD.DRAFT_SIGN) return false;
+    const byId = id => this.globalPlayers.find(p => p.id === id);
+    this.squad = this.draft.signed.map((id, i) => { const p = byId(id); p.teamId = 'player_team'; p.number = i + 1; p.tag = null; p.refreshPortrait(); return p; });
+    const keeper = [...this.squad].sort((a, b) => b.bio.height - a.bio.height)[0];
+    this.lineup = [keeper.id, ...this.squad.filter(p => p !== keeper).slice(0, 10).map(p => p.id)];
+    for (const p of this.squad) p.energy = 100;
+    this.draft = null;
+    this.phase = 'calendar';
+    this.addDiary({ date: this.calendar.date, key: 'draft.diary', vars: { n: this.squad.length }, cls: 'ev' });
+    this.save();
+    return true;
   }
 
   newSeason(year) {
     this.season = year;
-    this.league = League.create(this.clubName, this.league?.teams, new Set(this.squad.map(p => p.surname)));
+    this.league = League.create(this.clubName, this.league?.teams, new Set((this.globalPlayers || this.squad).map(p => p.surname)));
     const start = `${year}-${SEASON.START_MONTH_DAY}`;
     const events = [];
     for (let md = 1; md <= this.league.matchdays; md++) {
@@ -3919,6 +4030,7 @@ class GameState {
     if (this.lastReport) this.lastReport.players = this.lastReport.players.filter(r => r.id !== id);
     const lk = this.today?.locker;
     if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; }
+    p.teamId = 'free_agent';   // v3.1: he stays in the world database (future transfers)
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
     this.save();
     return true;
@@ -4066,6 +4178,7 @@ class GameState {
     try {
       localStorage.setItem(GameState.KEY, JSON.stringify({
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
+        pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
         budget: this.budget, rep: this.rep, duties: this.duties, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
@@ -4077,6 +4190,13 @@ class GameState {
       const raw = localStorage.getItem(GameState.KEY);
       if (!raw) return false;
       const d = JSON.parse(raw);
+      if (d.phase === 'draft' && Array.isArray(d.pool) && d.draft) {   // v3.1: reload in the middle of the Yard Match
+        this.newAcademy();
+        this.globalPlayers = d.pool.map(p => new Player({ ...p, tags: [] }));
+        this.draft = { pool: d.draft.pool.filter(id => this.globalPlayers.some(p => p.id === id)), signed: (d.draft.signed || []).filter(id => d.draft.pool.includes(id)) };
+        this.save();
+        return true;
+      }
       if (!Array.isArray(d.squad) || d.squad.length < 11) return false;
       this.clubName = d.clubName || CLUB_NAME;
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
@@ -4089,6 +4209,12 @@ class GameState {
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
       this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
+      // v3.1: the world database (older saves get one: the rest of the 100 kids are generated around the squad)
+      for (const p of this.squad) p.teamId = 'player_team';
+      const rest = Array.isArray(d.pool) ? d.pool.map(p => new Player({ ...p, tags: [] }))
+        : GameState.buildWorld(new Set(this.squad.map(p => p.surname)), Math.max(0, WORLD.SIZE - this.squad.length), 1000);
+      this.globalPlayers = [...this.squad, ...rest];
+      this.draft = null;
       const du = d.duties || {};   // v3.0 (after the squad: duties point at kids)
       this.duties = Object.fromEntries(Object.keys(DUTIES).map(k => [k, du[k] && this.player(du[k]) ? du[k] : null]));
       if (this.squad.length === 11) {
@@ -4771,8 +4897,21 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.1', name: { en: 'The Yard Match', ru: 'Дворовый матч' },
+    en: [
+      'A new academy no longer starts with a ready-made squad. The world now has 100 kids with hidden skills: 40 already play for rival clubs, the rest are free agents.',
+      'Intro — the Yard Match: you arrive at a muddy pitch where 30 free agents play a chaotic tournament. You see only their faces, ages, heights, weights and a rough star rating for today\'s performance.',
+      'Sign exactly 15 kids for your minivan (you can change your mind until the end), then START SEASON. They become your academy — shirts 1 to 15, no labels: you decide who plays where. The tallest one starts in goal.',
+      'The draft survives a reload. Kids you kick out return to the pool of free agents — ready for future transfer and poaching mechanics.',
+    ],
+    ru: [
+      'Новая академия больше не начинается с готового состава. В мире теперь 100 ребят со скрытыми навыками: 40 уже играют за клубы-соперники, остальные — свободные агенты.',
+      'Вступление — дворовый матч: ты приезжаешь на грязное поле, где 30 свободных ребят играют сумбурный турнир. Видно только лица, возраст, рост, вес и примерную оценку в звёздах за сегодняшнюю игру.',
+      'Возьми ровно 15 человек в свой минивэн (до конца можно передумать), затем «НАЧАТЬ СЕЗОН». Они становятся твоей академией — номера с 1 по 15, без меток: кто где играет, решаешь ты. В воротах сначала стоит самый высокий.',
+      'Отбор переживает перезагрузку. Выгнанные из академии возвращаются в пул свободных агентов — задел для будущих переходов и переманиваний.',
+    ] },
   { v: '3.0', name: { en: 'Fog of War', ru: 'Туман войны' },
     en: [
       'Fog of war: a kid\'s profile shows only what a coach can see — age, height, weight, energy, morale and his season numbers (matches, goals, assists, cards…). Skills stay hidden; judge them by results and size.',
@@ -6941,6 +7080,64 @@ class MorningBriefing {
   }
 }
 /* =========================================================
+   v3.1 — INTRO: THE YARD MATCH DRAFT ("#intro-draft-view")
+   A new academy starts here: 30 free agents from the world database play a muddy yard tournament.
+   The coach sees ONLY face, age, height, weight and a vague "yard match" star rating, and signs exactly 15.
+   ========================================================= */
+class DraftView {
+  constructor(ui) {
+    this.ui = ui;
+    this.layer = document.getElementById('intro-draft-view');
+    this.grid = document.getElementById('dr-grid');
+    this.grid.addEventListener('click', e => {
+      const b = e.target.closest('[data-sign]');
+      if (!b || b.disabled) return;
+      this.ui.state.toggleDraft(b.dataset.sign);
+      this.render();
+    });
+    document.getElementById('dr-start').addEventListener('click', () => this.start());
+  }
+  get isOpen() { return !this.layer.hidden; }
+  /** 1–5 stars: a loose mix of hidden quality and potential, plus yard-match luck (stable per kid). */
+  static stars(p) {
+    const luck = (seeded('yard' + p.id)() - 0.5) * 2.2;
+    return clamp(Math.round((p.overall - 7) / 1.8 + (p.psych.potential - 50) / 25 + luck), 1, 5);
+  }
+  open() { this.render(); this.layer.hidden = false; }
+  close() { this.layer.hidden = true; }
+  render() {
+    const s = this.ui.state;
+    if (s.phase !== 'draft' || !s.draft) { this.close(); return; }
+    const signed = s.draftSigned(), full = signed.length >= WORLD.DRAFT_SIGN;
+    const pool = s.draft.pool.map(id => s.globalPlayers.find(p => p.id === id)).filter(Boolean);
+    this.grid.innerHTML = pool.map(p => {
+      const on = signed.includes(p.id), st = DraftView.stars(p);
+      return `<div class="dr-card${on ? ' on' : ''}" data-pid="${p.id}">
+        <span class="portrait dr-face">${p.portraitSvg}</span>
+        <div class="dr-name">${esc(L.name(p.name))}</div>
+        <dl class="dr-bio"><dt>${L.t('pi.age')}</dt><dd>${p.bio.age}</dd><dt>${L.t('pi.height')}</dt><dd>${L.t('pi.cm', { n: p.bio.height })}</dd>
+          <dt>${L.t('pi.weight')}</dt><dd>${L.t('pi.kg', { n: p.bio.weight })}</dd></dl>
+        <div class="dr-stars" title="${esc(L.t('draft.starsTip'))}">${'★'.repeat(st)}<span>${'★'.repeat(5 - st)}</span></div>
+        <button type="button" class="dr-btn" data-sign="${p.id}"${!on && full ? ' disabled' : ''}>${L.t(on ? 'draft.release' : 'draft.sign')}</button>
+      </div>`;
+    }).join('');
+    document.getElementById('dr-count').innerHTML = L.t('draft.count', { n: signed.length, m: WORLD.DRAFT_SIGN });
+    document.getElementById('dr-count').classList.toggle('full', full);
+    const btn = document.getElementById('dr-start');
+    btn.disabled = !full;
+    btn.innerHTML = L.t(full ? 'draft.start' : 'draft.startNeed', { n: WORLD.DRAFT_SIGN - signed.length });
+  }
+  start() {
+    const ui = this.ui, s = ui.state;
+    if (!s.finishDraft()) return;
+    this.close();
+    ui.cal.attach(s.calendar);
+    ui.prepareMatch();
+    ui.renderAll();
+    ui.show('dash');
+  }
+}
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -6972,6 +7169,7 @@ class UIController {
     this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
     this.locker = new LockerRoom(this);          // v2.6: who turned up today
     this.briefing = new MorningBriefing(this);   // v2.8: the morning routine
+    this.draft = new DraftView(this);            // v3.1: the Yard Match intro
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
@@ -6981,6 +7179,7 @@ class UIController {
     this.prepareMatch();
     this.renderAll();
     this.show('dash');
+    if (this.state.phase === 'draft') this.draft.open();   // v3.1: a new academy starts at the Yard Match
     if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
     this.checkUpdateNotice();
   }
@@ -7015,6 +7214,7 @@ class UIController {
   }
 
   renderAll() {
+    if (this.state.phase === 'draft') { this.draft?.render(); this.renderBudget?.(); return; }   // v3.1: no squad yet
     this.renderLiveRoster(); this.renderAssistant(this.engine);
     this.renderDash();
     this.renderTeam();
@@ -7142,7 +7342,7 @@ class UIController {
       this.state.reset(); this.cal.attach(this.state.calendar);
       this.engine = null; this.selected = null; this.tableMd = null;
       this.prepareMatch(); this.renderAll(); this.show('dash');
-      this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
+      if (this.state.phase === 'draft') { this.draft.open(); return; }   // v3.1: back to the Yard Match
     });
     /* v2.7: ONE Escape manager. Window capture runs before every other key handler: Esc closes only the
        top-most open layer (highest computed z-index, later in the DOM on a tie) and stops there, so a profile
@@ -7479,6 +7679,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   seasonVars() { return { y: this.state.season, z: String(this.state.season + 1).slice(2) }; }
 
   renderDash() {
+    if (this.state.phase === 'draft') return;   // v3.1
     const s = this.state, lg = s.league, phase = s.phase;
     const date = this.cal.date;
 
@@ -8050,6 +8251,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   }
 
   prepareMatch() {
+    if (this.state.phase === 'draft') return;   // v3.1
     this.$('sb-score').textContent = '0 - 0';
     this.$('sb-min').textContent = "00'";
     this.$('sb-bar').style.width = '0%';

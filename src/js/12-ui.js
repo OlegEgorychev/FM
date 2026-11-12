@@ -30,6 +30,7 @@ class UIController {
     this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
     this.locker = new LockerRoom(this);          // v2.6: who turned up today
     this.briefing = new MorningBriefing(this);   // v2.8: the morning routine
+    this.draft = new DraftView(this);            // v3.1: the Yard Match intro
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
@@ -39,6 +40,7 @@ class UIController {
     this.prepareMatch();
     this.renderAll();
     this.show('dash');
+    if (this.state.phase === 'draft') this.draft.open();   // v3.1: a new academy starts at the Yard Match
     if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
     this.checkUpdateNotice();
   }
@@ -73,6 +75,7 @@ class UIController {
   }
 
   renderAll() {
+    if (this.state.phase === 'draft') { this.draft?.render(); this.renderBudget?.(); return; }   // v3.1: no squad yet
     this.renderLiveRoster(); this.renderAssistant(this.engine);
     this.renderDash();
     this.renderTeam();
@@ -200,7 +203,7 @@ class UIController {
       this.state.reset(); this.cal.attach(this.state.calendar);
       this.engine = null; this.selected = null; this.tableMd = null;
       this.prepareMatch(); this.renderAll(); this.show('dash');
-      this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
+      if (this.state.phase === 'draft') { this.draft.open(); return; }   // v3.1: back to the Yard Match
     });
     /* v2.7: ONE Escape manager. Window capture runs before every other key handler: Esc closes only the
        top-most open layer (highest computed z-index, later in the DOM on a tie) and stops there, so a profile
@@ -537,6 +540,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   seasonVars() { return { y: this.state.season, z: String(this.state.season + 1).slice(2) }; }
 
   renderDash() {
+    if (this.state.phase === 'draft') return;   // v3.1
     const s = this.state, lg = s.league, phase = s.phase;
     const date = this.cal.date;
 
@@ -1108,6 +1112,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   }
 
   prepareMatch() {
+    if (this.state.phase === 'draft') return;   // v3.1
     this.$('sb-score').textContent = '0 - 0';
     this.$('sb-min').textContent = "00'";
     this.$('sb-bar').style.width = '0%';

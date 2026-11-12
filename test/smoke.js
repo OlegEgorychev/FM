@@ -64,6 +64,31 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('dashboard backdrop visible', await page.evaluate(() => document.getElementById('scene-office').classList.contains('active')));
     await closeModal();
 
+    // v3.1: a new academy starts with the Yard Match draft (world of 100 kids, 30 on the pitch, sign 15)
+    const dr0 = await page.evaluate(() => {
+      const s = YAM.game, w = s.globalPlayers, g = document.getElementById('dr-grid'), card = g.querySelector('.dr-card');
+      return { open: !document.getElementById('intro-draft-view').hidden, phase: s.phase, world: w.length, free: w.filter(p => p.teamId === 'free_agent').length,
+        rivals: w.filter(p => /^rival_/.test(p.teamId)).length, squad: s.squad.length, cards: g.querySelectorAll('.dr-card').length,
+        allFree: s.draft.pool.every(id => w.find(p => p.id === id).teamId === 'free_agent'), stars: !!card.querySelector('.dr-stars'), face: !!card.querySelector('svg'),
+        noPos: !card.querySelector('.pos'), bio: (card.querySelector('.dr-bio').textContent.match(/\d+/g) || []).length === 3, start: document.getElementById('dr-start').disabled };
+    });
+    for (let i = 0; i < 16; i++) await page.click(`#dr-grid .dr-card:nth-child(${i + 1}) [data-sign]`, { force: true });   // the 16th must be refused
+    await page.evaluate(() => YAM.game.save());
+    await page.reload();   // the draft survives a reload
+    await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    await closeModal();
+    const dr1 = await page.evaluate(() => ({ signed: YAM.game.draftSigned().length, open: !document.getElementById('intro-draft-view').hidden, start: !document.getElementById('dr-start').disabled,
+      off: document.querySelectorAll('#dr-grid .dr-card:not(.on) [data-sign]:disabled').length }));
+    const picked = await page.evaluate(() => [...YAM.game.draftSigned()]);
+    await page.click('#dr-start');
+    const dr2 = await page.evaluate(ids => { const s = YAM.game; return { phase: s.phase, n: s.squad.length, same: s.squad.every(p => ids.includes(p.id)) && ids.length === 15,
+      team: s.squad.every(p => p.teamId === 'player_team'), free: s.globalPlayers.filter(p => p.teamId === 'free_agent').length, world: s.globalPlayers.length,
+      xi: s.lineup.length === 11 && s.lineup.every(id => ids.includes(id)), closed: document.getElementById('intro-draft-view').hidden, nums: s.squad.map(p => p.number).sort((a, b) => a - b).join() }; }, picked);
+    check('Yard Match draft: 100-kid world (40 at rivals, 60 free), 30 free agents shown with face/age/height/weight/stars only; exactly 15 signed (16th refused, survives reload); START SEASON → squad = those 15',
+      dr0.open && dr0.phase === 'draft' && dr0.world === 100 && dr0.free === 60 && dr0.rivals === 40 && dr0.squad === 0 && dr0.cards === 30 && dr0.allFree && dr0.stars && dr0.face && dr0.noPos && dr0.bio && dr0.start
+      && dr1.signed === 15 && dr1.open && dr1.start && dr1.off === 15 && dr2.phase === 'calendar' && dr2.n === 15 && dr2.same && dr2.team && dr2.free === 45 && dr2.world === 100 && dr2.xi && dr2.closed
+      && dr2.nums === Array.from({ length: 15 }, (_, i) => i + 1).join(), JSON.stringify({ dr0, dr1, dr2 }));
+
     // fast match for testing
     await page.evaluate(() => { for (const k of [1, 2, 5]) { YAM.MatchEngine.SPEED[k] = 6; YAM.MatchEngine.HIGHLIGHT[k] = 12; } });
 
@@ -359,7 +384,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.waitForTimeout(250);
     const lr1 = await page.evaluate(ids => {
       const g = document.getElementById('lr-grid'), lk = YAM.game.dayState().locker;
-      return { open: !document.getElementById('locker-room-view').hidden, cells: g.querySelectorAll('.lk').length, empty: [...g.querySelectorAll('.lk.empty')].map(x => x.dataset.pid).sort(),
+      return { n: YAM.game.squad.length, open: !document.getElementById('locker-room-view').hidden, cells: g.querySelectorAll('.lk').length, empty: [...g.querySelectorAll('.lk.empty')].map(x => x.dataset.pid).sort(),
         faces: g.querySelectorAll('.lk.here .lk-face svg').length, why: [lk.absent[ids.tired], lk.absent[ids.lazy], lk.absent[ids.hurt]], skipFlag: YAM.game.player(ids.lazy).skipped_training };
     }, lr0);
     await shot('10-locker');
@@ -394,7 +419,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       swap: YAM.game.swapPlayers(YAM.game.lineup[1], id),
       need: !!document.querySelector('#today-box .td-req.need'), plans: document.querySelectorAll('#today-box .plan-btn').length }), lr0.lazy);
     check('locker room: START DAY opens it, absences = exhausted / skipped / injured (empty lockers), absent kids locked out, roll call = 1 AP + fine, Proceed → plan',
-      !lr0.btn && lr0.need && lr0.plans === 0 && lr0.lazyStarter && lr1.open && lr1.cells === 16 && lr1.empty.length === 3 + lr0.pre && lr1.faces === 13 - lr0.pre
+      !lr0.btn && lr0.need && lr0.plans === 0 && lr0.lazyStarter && lr1.open && lr1.cells === lr1.n && lr1.empty.length === 3 + lr0.pre && lr1.faces === lr1.n - 3 - lr0.pre
       && lr1.why.join() === 'exhausted,skipped,injury' && lr1.skipFlag && lr4.swap === 'unavail_absent' && lr2.ap === 0 && lr2.talk && lr2.n === 2
       && lr3.b === lr2.b - 10 && lr3.disc === disc0 + 2 && lr3.still && lr3.noAp && lr3.note && !lr4.open && !lr4.lazyStarter && lr4.btn && lr4.need && lr4.plans === 4,
       JSON.stringify({ lr0, lr1, lr2, lr3, lr4 }));

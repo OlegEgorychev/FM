@@ -956,3 +956,22 @@ Object.assign(I18N.ru, {
   'eng.foulPlain': 'Фол! {d} против {a} — штрафной!', 'eng.pen': 'ПЕНАЛЬТИ! {a} ставит мяч на точку…', 'eng.penAim': '{a} разбегается для удара с точки…',
   'eng.corner': 'Угловой. {a} подаёт…', 'eng.cornerClear': '{d} выносит мяч головой.', 'eng.headerAim': '{a} выпрыгивает выше всех!',
 });
+
+
+/* ---- v3.1: the Yard Match draft ---- */
+Object.assign(I18N.en, {
+  'draft.title': 'The Yard Match',
+  'draft.prompt': 'You arrive at a muddy local pitch. Dozens of kids are playing a chaotic tournament. You have room in your minivan for 15 players to form your new Academy. Choose wisely based on their physical builds and their yard-match performance.',
+  'draft.hint': 'All you can see: faces, ages, sizes — and how they did today in the mud (★). Their real football is a mystery.',
+  'draft.count': 'Minivan: <b>{n}</b>/{m}', 'draft.sign': '[ Sign to academy ]', 'draft.release': '[ Leave him ]',
+  'draft.start': '&#9654; START SEASON', 'draft.startNeed': 'Pick {n} more kid(s)', 'draft.starsTip': 'Yard match rating: a rough impression from one chaotic afternoon.',
+  'draft.diary': 'The minivan is full: {n} kids from the yard match form the new academy.',
+});
+Object.assign(I18N.ru, {
+  'draft.title': 'Дворовый матч',
+  'draft.prompt': 'Ты приезжаешь на грязное местное поле. Десятки ребят играют в хаотичный турнир. В твоём минивэне 15 мест — это будет твоя новая академия. Выбирай с умом: по телосложению и по тому, как они играют во дворе.',
+  'draft.hint': 'Видно только лица, возраст, рост и вес — и как они сыграли сегодня в грязи (★). Настоящий их футбол — загадка.',
+  'draft.count': 'Минивэн: <b>{n}</b>/{m}', 'draft.sign': '[ Взять в академию ]', 'draft.release': '[ Оставить ]',
+  'draft.start': '&#9654; НАЧАТЬ СЕЗОН', 'draft.startNeed': 'Выбери ещё {n}', 'draft.starsTip': 'Оценка за дворовый матч: грубое впечатление от одного сумбурного дня.',
+  'draft.diary': 'Минивэн полон: {n} ребят с дворового матча — это новая академия.',
+});

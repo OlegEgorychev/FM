@@ -19,16 +19,56 @@ class GameState {
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
+    // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
-    this.squad = SQUAD_POS.map((pos, i) => Player.generate(`a${i}`, pos, used, 0, true, i + 1));
-    this.lineup = this.squad.slice(0, 11).map(p => p.id);
-    this.autoArrange();
+    this.globalPlayers = GameState.buildWorld(used);
+    this.squad = [];
+    this.lineup = [];
+    const free = shuffle(this.globalPlayers.filter(p => p.teamId === 'free_agent'));
+    this.draft = { pool: free.slice(0, WORLD.DRAFT_POOL).map(p => p.id), signed: [] };
     this.newSeason(SEASON.FIRST_YEAR);
+    this.phase = 'draft';
+    this.save();
+  }
+  /** v3.1: 100 fully generated kids (hidden stats, biometrics, `teamId`): WORLD.RIVALS go to rival clubs, the rest are free agents. */
+  static buildWorld(used, count = WORLD.SIZE, idFrom = 0) {
+    const arch = [];
+    for (const [k, n] of Object.entries(WORLD.MIX)) for (let i = 0; i < n; i++) arch.push(k);
+    const players = shuffle(arch).slice(0, count).map((pos, i) => {
+      const p = Player.generate(`g${idFrom + i}`, pos, used, 0, true, 0);
+      p.teamId = 'free_agent';
+      return p;
+    });
+    shuffle(players).slice(0, Math.min(WORLD.RIVALS, players.length)).forEach((p, i) => { p.teamId = `rival_${(i % 9) + 1}`; });
+    return players;
+  }
+  /** v3.1 Yard Match draft. */
+  draftSigned() { return this.draft?.signed || []; }
+  toggleDraft(id) {
+    if (this.phase !== 'draft' || !this.draft.pool.includes(id)) return;
+    const s = this.draft.signed, i = s.indexOf(id);
+    if (i >= 0) s.splice(i, 1);
+    else if (s.length < WORLD.DRAFT_SIGN) s.push(id);
+    this.save();
+  }
+  /** 15 signed → they become the academy (teamId 'player_team', shirts 1–15, no tags: fog of war). The tallest kid starts in goal. */
+  finishDraft() {
+    if (this.phase !== 'draft' || this.draft.signed.length !== WORLD.DRAFT_SIGN) return false;
+    const byId = id => this.globalPlayers.find(p => p.id === id);
+    this.squad = this.draft.signed.map((id, i) => { const p = byId(id); p.teamId = 'player_team'; p.number = i + 1; p.tag = null; p.refreshPortrait(); return p; });
+    const keeper = [...this.squad].sort((a, b) => b.bio.height - a.bio.height)[0];
+    this.lineup = [keeper.id, ...this.squad.filter(p => p !== keeper).slice(0, 10).map(p => p.id)];
+    for (const p of this.squad) p.energy = 100;
+    this.draft = null;
+    this.phase = 'calendar';
+    this.addDiary({ date: this.calendar.date, key: 'draft.diary', vars: { n: this.squad.length }, cls: 'ev' });
+    this.save();
+    return true;
   }
 
   newSeason(year) {
     this.season = year;
-    this.league = League.create(this.clubName, this.league?.teams, new Set(this.squad.map(p => p.surname)));
+    this.league = League.create(this.clubName, this.league?.teams, new Set((this.globalPlayers || this.squad).map(p => p.surname)));
     const start = `${year}-${SEASON.START_MONTH_DAY}`;
     const events = [];
     for (let md = 1; md <= this.league.matchdays; md++) {
@@ -228,6 +268,7 @@ class GameState {
     if (this.lastReport) this.lastReport.players = this.lastReport.players.filter(r => r.id !== id);
     const lk = this.today?.locker;
     if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; }
+    p.teamId = 'free_agent';   // v3.1: he stays in the world database (future transfers)
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
     this.save();
     return true;
@@ -375,6 +416,7 @@ class GameState {
     try {
       localStorage.setItem(GameState.KEY, JSON.stringify({
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
+        pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
         budget: this.budget, rep: this.rep, duties: this.duties, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
@@ -386,6 +428,13 @@ class GameState {
       const raw = localStorage.getItem(GameState.KEY);
       if (!raw) return false;
       const d = JSON.parse(raw);
+      if (d.phase === 'draft' && Array.isArray(d.pool) && d.draft) {   // v3.1: reload in the middle of the Yard Match
+        this.newAcademy();
+        this.globalPlayers = d.pool.map(p => new Player({ ...p, tags: [] }));
+        this.draft = { pool: d.draft.pool.filter(id => this.globalPlayers.some(p => p.id === id)), signed: (d.draft.signed || []).filter(id => d.draft.pool.includes(id)) };
+        this.save();
+        return true;
+      }
       if (!Array.isArray(d.squad) || d.squad.length < 11) return false;
       this.clubName = d.clubName || CLUB_NAME;
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
@@ -398,6 +447,12 @@ class GameState {
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
       this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
+      // v3.1: the world database (older saves get one: the rest of the 100 kids are generated around the squad)
+      for (const p of this.squad) p.teamId = 'player_team';
+      const rest = Array.isArray(d.pool) ? d.pool.map(p => new Player({ ...p, tags: [] }))
+        : GameState.buildWorld(new Set(this.squad.map(p => p.surname)), Math.max(0, WORLD.SIZE - this.squad.length), 1000);
+      this.globalPlayers = [...this.squad, ...rest];
+      this.draft = null;
       const du = d.duties || {};   // v3.0 (after the squad: duties point at kids)
       this.duties = Object.fromEntries(Object.keys(DUTIES).map(k => [k, du[k] && this.player(du[k]) ? du[k] : null]));
       if (this.squad.length === 11) {

@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.1', name: { en: 'The Yard Match', ru: 'Дворовый матч' },
+    en: [
+      'A new academy no longer starts with a ready-made squad. The world now has 100 kids with hidden skills: 40 already play for rival clubs, the rest are free agents.',
+      'Intro — the Yard Match: you arrive at a muddy pitch where 30 free agents play a chaotic tournament. You see only their faces, ages, heights, weights and a rough star rating for today\'s performance.',
+      'Sign exactly 15 kids for your minivan (you can change your mind until the end), then START SEASON. They become your academy — shirts 1 to 15, no labels: you decide who plays where. The tallest one starts in goal.',
+      'The draft survives a reload. Kids you kick out return to the pool of free agents — ready for future transfer and poaching mechanics.',
+    ],
+    ru: [
+      'Новая академия больше не начинается с готового состава. В мире теперь 100 ребят со скрытыми навыками: 40 уже играют за клубы-соперники, остальные — свободные агенты.',
+      'Вступление — дворовый матч: ты приезжаешь на грязное поле, где 30 свободных ребят играют сумбурный турнир. Видно только лица, возраст, рост, вес и примерную оценку в звёздах за сегодняшнюю игру.',
+      'Возьми ровно 15 человек в свой минивэн (до конца можно передумать), затем «НАЧАТЬ СЕЗОН». Они становятся твоей академией — номера с 1 по 15, без меток: кто где играет, решаешь ты. В воротах сначала стоит самый высокий.',
+      'Отбор переживает перезагрузку. Выгнанные из академии возвращаются в пул свободных агентов — задел для будущих переходов и переманиваний.',
+    ] },
   { v: '3.0', name: { en: 'Fog of War', ru: 'Туман войны' },
     en: [
       'Fog of war: a kid\'s profile shows only what a coach can see — age, height, weight, energy, morale and his season numbers (matches, goals, assists, cards…). Skills stay hidden; judge them by results and size.',

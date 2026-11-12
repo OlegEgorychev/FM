@@ -123,7 +123,8 @@ class Player {
       this.awayDays = Math.max(0, Math.round(o.awayDays || 0));                    // v2.3: kept at home by a parent (days)
       this.promiseBy = o.promiseBy || null;
       this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
-      this.absentToday = o.absentToday || null;   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
+      this.absentToday = o.absentToday || null;
+      this.teamId = o.teamId || 'player_team';   // v3.1: 'player_team' | 'free_agent' | 'rival_N'   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
