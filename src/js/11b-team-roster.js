@@ -40,7 +40,7 @@ class TeamRosterCard {
     if (this.teamId == null) return;
     const s = this.ui.state, lg = s.league, team = lg.team(this.teamId);
     const table = lg.table(), i = table.findIndex(r => r.team.id === team.id), row = table[i];
-    const posOf = id => team.user ? s.player(id)?.position : team.squad.find(k => k.id === id)?.pos;
+    const posOf = id => team.user ? s.player(id)?.position : team.squad.find(k => k.id === id)?.pos;   // v3.0: our kids show the coach's tag
     const kids = lg.scorers(s.squad, s.seasonStats).filter(k => k.team === team)
       .sort((a, b) => b.goals - a.goals || b.assists - a.assists || b.mp - a.mp || a.name.localeCompare(b.name));
     const title = `${L.team(team.name).replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_|_$/g, '').toUpperCase()}_ROSTER.EXE`;

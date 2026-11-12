@@ -336,18 +336,18 @@ class UIController {
     const onPitch = eng ? eng.sides[0].entries.map(e => e.p) : s.starters();
     const lines = eng ? eng.sides[0].entries.map(e => e.line) : s.slots().map(x => x.line);
     const onIds = onPitch.map(p => p.id);
-    const bench = s.squad.filter(p => !onIds.includes(p.id)).sort((a, b) => POS_ORDER[a.position] - POS_ORDER[b.position]);
+    const bench = s.squad.filter(p => !onIds.includes(p.id)).sort((a, b) => posRank(a) - posRank(b) || a.number - b.number);
     const selP = this.liveSel ? s.player(this.liveSel) : null;
     const over = !!(eng && eng.finished) || (!eng && s.phase !== 'matchday');
     const row = (p, i, pitch) => {
       const status = eng?.sentOff.has(p.id) ? 'sent' : eng?.subbedOff.has(p.id) ? 'off' : '';
       const out = !pitch && !p.available;   // v2.2: can't come on
       const disabled = over || !!status || out;
-      const hint = selP && p.id !== selP.id && !disabled ? (p.position === selP.position ? ' suggested-swap' : ' dimmed-swap') : '';
+      const hint = selP && p.id !== selP.id && !disabled ? (p.position && p.position === selP.position ? ' suggested-swap' : ' dimmed-swap') : '';
       const sub = status ? L.t('lr.' + status) : out ? L.t('st.short.' + p.unavailableReason) : pitch ? L.line(lines[i]) : L.t('team.onBench');
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
-        <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
+        <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>
         <span class="lr-name"><b>${esc(L.name(p.surname))}${this.statusBadge(p)}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
         <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
       </div>`;
@@ -847,6 +847,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       }
     }
   }
+  /** v3.0: exclusive duties as small badges (C / PK / CK). */
+  dutyBadges(p) { return this.state.dutiesOf(p.id).map(d => `<span class="duty-badge d-${d}" title="${esc(L.t('duty.' + d))}">${L.t('duty.short.' + d)}</span>`).join(''); }
   /** v2.2: red cross (injured, days left) / red card (suspended, matches left) / deal lock. */
   statusBadge(p) {
     const r = p.unavailableReason;
@@ -970,12 +972,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const s = this.state, live = this.live;
     if (live || (this.selected && !s.player(this.selected))) this.selected = null;
     const slots = s.slots();
-    const byPos = (a, b) => POS_ORDER[a.position] - POS_ORDER[b.position];
+    const byPos = (a, b) => posRank(a) - posRank(b) || a.number - b.number;   // v3.0: by the coach's tags
 
     const row = (p, starter) => {
       const e = Math.round(p.energy);
       const line = starter ? slots[s.lineup.indexOf(p.id)].line : null;
-      const oop = line && line !== 'GK' && NATURAL_LINE[p.position] !== line;
+      const oop = false;   // v3.0: no native positions
       const sub = starter
         ? `<small class="r-slot${oop ? ' warn' : ''}">${oop ? L.t('squad.oop', { l: L.line(line) }) : L.t('team.slot', { l: L.line(line) })}</small>`
         : `<small class="r-slot">${L.t('team.onBench')}</small>`;
@@ -985,7 +987,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}${out ? ' unavail' : ''}" data-id="${p.id}"
           role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
-        <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.statusBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
+        <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×0.5' : ''}</span></div>
         <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
@@ -1033,7 +1035,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   swapClass(p) {
     const selP = this.selected ? this.state.player(this.selected) : null;
     if (!selP || p.id === selP.id) return '';
-    return p.position === selP.position ? 'suggested-swap' : 'dimmed-swap';
+    return p.position && p.position === selP.position ? 'suggested-swap' : 'dimmed-swap';
   }
 
   /** Unified swap: select one player (list row or pitch dot), then pick another (row or dot). */
@@ -1215,7 +1217,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties });
     if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
@@ -1297,7 +1299,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       poss: Math.round(eng.possTicks[0] / ((eng.possTicks[0] + eng.possTicks[1]) || 1) * 100),
       players: shuffle(played).slice(0, 3).map(p => ({
         id: p.id, stats: { ...eng.st(p) },
-        tired: eng.tired.has(p.id), oop: NATURAL_LINE[p.position] !== eng.lineOf.get(p.id), role: (p.tags || [])[0] || null,
+        tired: eng.tired.has(p.id), oop: false, gk: eng.lineOf.get(p.id) === 'GK', role: (p.tags || [])[0] || null,   // v3.0
       })),
     };
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
@@ -1351,7 +1353,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         L.t('nb.intercepts', { a: s.intercepts || 0, b: season.intercepts || 0 }),
         L.t('nb.shots', { a: s.shots, b: s.onTarget, c: s.goals, g: season.goals }),
       ];
-      if (p.position === 'GK') lines.push(L.t('nb.saves', { a: s.saves, b: season.saves }));
+      if (pr.gk || s.saves) lines.push(L.t('nb.saves', { a: s.saves, b: season.saves }));
       if (s.yellow || s.red) lines.push(L.t('notes.cards', { a: s.yellow, b: s.red }));
       lines.push(`${L.t('notes.energy', { a: Math.round(p.energy) })} · ${L.t('nb.apps', { n: season.apps })}`);
       const note = coachNote(p, s, pr).map(k => k === 'note.role' ? L.t(k, { r: L.tag(pr.role) }) : L.t(k)).join(' ');
@@ -1363,7 +1365,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       }).join('');
       return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
-        <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
+        <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${this.dutyBadges(p)}</h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>

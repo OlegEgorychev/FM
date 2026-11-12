@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.0', name: { en: 'Fog of War', ru: 'Туман войны' },
+    en: [
+      'Fog of war: a kid\'s profile shows only what a coach can see — age, height, weight, energy, morale and his season numbers (matches, goals, assists, cards…). Skills stay hidden; judge them by results and size.',
+      'No more native positions. New kids arrive without a label and nobody is ever "out of position": any kid can play anywhere, even in goal.',
+      'Coach\'s assignment (in the profile): tag a kid as Goalkeeper, Defender, Midfielder or Forward — just to organise your squad, it changes nothing on the pitch.',
+      'Exclusive team duties: Captain, Penalty taker, Corner taker (one kid each — giving a duty to someone takes it away from the old holder). Badges C / PK / CK in the squad list.',
+      'Set pieces in the match engine: fouls can now give penalties (taken by your penalty taker) and saved or blocked shots can go out for corners (your corner taker swings it in; tall, strong kids win the headers). A captain on the pitch lifts the whole team a little.',
+    ],
+    ru: [
+      'Туман войны: в профиле игрока только то, что видит тренер, — возраст, рост, вес, энергия, мораль и цифры сезона (матчи, голы, передачи, карточки…). Навыки скрыты; суди по результатам и габаритам.',
+      'Родных позиций больше нет. Новые игроки приходят без метки, и никто не бывает «не на своей позиции»: любой может играть где угодно, даже в воротах.',
+      'Решение тренера (в профиле): отметь игрока как вратаря, защитника, полузащитника или нападающего — только чтобы упорядочить состав, на поле это ничего не меняет.',
+      'Исключительные обязанности: капитан, пенальтист, исполнитель угловых (у каждой — один игрок; передав обязанность, ты снимаешь её с прежнего). Значки К / П / У в составе.',
+      'Стандарты в матчевом движке: фолы теперь могут приводить к пенальти (бьёт твой пенальтист), а отбитые и заблокированные удары — к угловым (подаёт твой исполнитель; высокие и сильные выигрывают верх). Капитан на поле чуть-чуть подтягивает всю команду.',
+    ] },
   { v: '2.9', name: { en: 'Clear Your Locker', ru: 'Освободи шкафчик' },
     en: [
       'Fixed: in "Call into office" two buttons showed the kid\'s reply (with a raw {k}) instead of what the coach says. The four lines are now: Praise for recent form · Criticize behavior · Just checking in · Kick out of the academy.',

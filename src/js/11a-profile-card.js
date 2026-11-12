@@ -14,6 +14,16 @@ class ProfileCard {
     document.getElementById('pinfo-x').addEventListener('click', () => this.close());
     document.getElementById('pinfo-ok').addEventListener('click', () => this.close());
     document.getElementById('pinfo-office').addEventListener('click', () => this.ui.callIntoOffice(this.id));   // v2.5
+    this.body.addEventListener('click', e => {   // v3.0: coach's assignment (visual tag + exclusive duties)
+      const t = e.target.closest('[data-postag]'), d = e.target.closest('[data-duty]');
+      if (!t && !d) return;
+      const s = this.ui.state;
+      if (t) s.setPosTag(this.id, t.dataset.postag);
+      else s.setDuty(d.dataset.duty, this.id);
+      this.lastSig = '';
+      this.ui.renderAll();
+      this.render();
+    });
     this.layer.addEventListener('mousedown', e => { if (e.target === this.layer) this.close(); });
     this.layer.addEventListener('contextmenu', e => { e.preventDefault(); if (e.target === this.layer) this.close(); });
     document.addEventListener('keydown', e => {
@@ -56,7 +66,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale)].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -70,7 +80,8 @@ class ProfileCard {
       [L.t('pi.shots'), `${st.shots} <small>(${L.t('pi.onTarget', { n: st.onTarget })})</small>`],
       [L.t('pi.tackles'), `${st.tackles} <small>/ ${st.tackles + st.tacklesLost}</small>`, pct(st.tackles, st.tacklesLost)],
       [L.t('pi.passAcc'), pct(st.passOk, st.passFail) == null ? '—' : pct(st.passOk, st.passFail) + '% <small>(' + st.passOk + '/' + (st.passOk + st.passFail) + ')</small>', pct(st.passOk, st.passFail)],
-      ...(p.position === 'GK' ? [[L.t('pi.saves'), st.saves]] : []),
+      [L.t('pi.cards'), `${st.yellow ?? 0} <small>/ ${st.red ?? 0}</small>`],   // v3.0
+      ...(p.position === 'GK' || st.saves ? [[L.t('pi.saves'), st.saves]] : []),
     ];
     const base = season || MatchEngine.blankStats();
     const sRows = rows(base), lRows = live ? rows(live) : null;
@@ -106,8 +117,7 @@ class ProfileCard {
           <dt>${L.t('pi.age')}</dt><dd>${p.age}</dd>
           <dt>${L.t('pi.height')}</dt><dd>${L.t('pi.cm', { n: p.bio.height })}</dd>
           <dt>${L.t('pi.weight')}</dt><dd>${L.t('pi.kg', { n: p.bio.weight })}</dd>
-          <dt>${L.t('pi.foot')}</dt><dd>${L.t(p.bio.strongFoot === 'L' ? 'pi.footL' : 'pi.footR')}</dd>
-          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.position}">${L.pos(p.position)}</span></dd>
+${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.position}">${L.pos(p.position)}</span></dd>`}
           <dt>${L.t('pi.status')}</dt><dd>${where}</dd>
           ${own && !p.available ? `<dt>${L.t('pi.avail')}</dt><dd class="pi-out">${ui.statusBadge(p)} ${esc(L.t('st.' + p.unavailableReason, { n: { inj: p.injuryDays, sus: p.suspensionMatches, home: p.awayDays }[p.unavailableReason] ?? '' }))}</dd>` : ''}
         </dl>
@@ -116,6 +126,14 @@ class ProfileCard {
         <fieldset><legend>${L.t('pi.energy')}</legend>
           <div class="energy ${ui.energyClass(energy)}"><i style="width:${energy}%"></i><span>${energy}%${tired ? ' ×0.5' : ''}</span></div>
         </fieldset>
+        ${own ? `<fieldset><legend>${L.t('pi.morale')}</legend>
+          <div class="energy morale ${ui.energyClass(Math.round(p.dyn.morale))}"><i style="width:${Math.round(p.dyn.morale)}%"></i><span>${Math.round(p.dyn.morale)}%</span></div>
+        </fieldset>
+        <fieldset class="pi-assign"><legend>${L.t('pi.assign')}</legend><div class="pa-wrap">
+          <div class="pa-row"><span class="pa-lbl">${L.t('pi.assignPos')}</span>${['GK', 'DEF', 'MID', 'FWD'].map(t => `<button type="button" class="pa-btn${p.tag === t ? ' on' : ''}" data-postag="${t}" aria-pressed="${p.tag === t}">${L.t('tag.pos.' + t)}</button>`).join('')}</div>
+          <div class="pa-row"><span class="pa-lbl">${L.t('pi.assignDuty')}</span>${Object.keys(DUTIES).map(d => { const holder = s.duties[d], mine = holder === p.id, other = holder && !mine ? s.player(holder) : null;
+            return `<button type="button" class="pa-btn duty${mine ? ' on' : ''}" data-duty="${d}" aria-pressed="${mine}" title="${esc(other ? L.t('pi.dutyHeld', { n: L.name(other.name) }) : L.t('duty.' + d + '.d'))}">${L.t('duty.' + d)}${other ? ` <small>(${esc(L.name(other.surname))})</small>` : ''}</button>`; }).join('')}</div>
+        </div></fieldset>` : ''}
         <fieldset><legend>${L.t('pi.tags')}</legend><div class="pi-role">${roleHtml}</div></fieldset>
         <fieldset><legend>${L.t('pi.stats')}</legend>${table}</fieldset>
         <fieldset class="pi-note"><legend>${L.t('nb.coachNote')}</legend>${noteHtml}</fieldset>

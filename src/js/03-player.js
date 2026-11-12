@@ -107,10 +107,13 @@ const AttrGen = {
 
 class Player {
   constructor(o) {
-    const { id, name, position, tags, number, face } = o;
+    const { id, name, tags, number, face } = o;
+    // v3.0 FOG OF WAR: the generated role is HIDDEN (`archetype`, only shapes the hidden stats);
+    // academy kids show the coach's own `tag` instead (null = not assigned). Old saves keep their known position as the tag.
+    const position = POS_ORDER[o.archetype] !== undefined ? o.archetype : o.position;
     this.id = id;
     this.name = name;
-    this.position = position;
+    this.archetype = position;
     this.number = number;
     if (tags) {                      // only the academy squad carries tags (+ v1.9 story flags)
       this.tags = tags;
@@ -119,6 +122,7 @@ class Player {
       this.suspensionMatches = Math.max(0, Math.round(o.suspensionMatches || 0));  // v2.2: matches banned
       this.awayDays = Math.max(0, Math.round(o.awayDays || 0));                    // v2.3: kept at home by a parent (days)
       this.promiseBy = o.promiseBy || null;
+      this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
       this.absentToday = o.absentToday || null;   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
@@ -136,8 +140,12 @@ class Player {
     this.dyn = { condition: clamp(Math.round(d.condition ?? o.energy ?? 100), 0, 100),
       sharpness: clamp(Math.round(d.sharpness ?? rndR(r, 55, 75)), 0, 100),
       morale: clamp(Math.round(d.morale ?? rndR(r, 55, 75)), 0, 100) };
-    this.portraitSvg = PortraitGenerator.svg(this.face, position === 'GK' ? 'gk' : tags ? 'home' : 'away');
+    this.refreshPortrait();
   }
+  /** v3.0: what the UI calls the position — the coach's tag for academy kids, the (scouted) role for opponents. */
+  get position() { return this.tags ? this.tag : this.archetype; }
+  /** v3.0: the keeper kit follows the coach's tag (academy) or the role (opponents). */
+  refreshPortrait() { this.portraitSvg = PortraitGenerator.svg(this.face, this.position === 'GK' ? 'gk' : this.tags ? 'home' : 'away'); }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
   get age() { return this.bio.age; }
   /** `energy` is the old name of dyn.condition — kept so every v1.1–v1.7 system keeps working. */
@@ -157,7 +165,7 @@ class Player {
   }
   /** v1.9: hidden overall (1–20) = average of the engine composites that matter for his position. */
   get overall() {
-    const keys = { GK: ['Save', 'Save', 'Pass'], DEF: ['Tackle', 'Mark', 'Pass', 'Speed'], MID: ['Pass', 'Dribble', 'Mark', 'Speed'], FWD: ['Shoot', 'Dribble', 'Speed', 'Pass'] }[this.position] || ['Pass'];
+    const keys = { GK: ['Save', 'Save', 'Pass'], DEF: ['Tackle', 'Mark', 'Pass', 'Speed'], MID: ['Pass', 'Dribble', 'Mark', 'Speed'], FWD: ['Shoot', 'Dribble', 'Speed', 'Pass'] }[this.archetype] || ['Pass'];
     return keys.reduce((a, k) => a + this.rating(k), 0) / keys.length;
   }
   hasFlag(f) { return !!this.flags?.includes(f); }
@@ -174,7 +182,7 @@ class Player {
     do { last = pick(LAST); } while (usedSurnames.has(last) && guard++ < 200);
     usedSurnames.add(last);
     const a = AttrGen.roll(position, Math.random, mod);
-    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(),
+    return new Player({ id, name: `${pick(FIRST)} ${last}`, archetype: position, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(),
       ...a, dyn: { condition: 100, sharpness: rnd(55, 75), morale: rnd(55, 75) } });
   }
 }

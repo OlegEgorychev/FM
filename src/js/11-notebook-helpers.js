@@ -14,7 +14,7 @@ function rateStyle(r) {
 function coachNote(p, s, flags = {}) {
   const out = [];
   if (flags.tired) out.push('note.tired');
-  if (p.position === 'GK') {
+  if (flags.gk) {   // v3.0: he was in goal in THAT match (no native positions)
     out.push(s.saves >= 3 ? 'note.gkBusy' : s.saves ? 'note.gkOk' : 'note.gkQuiet');
   } else {
     const rate = (ok, fail, min) => (ok + fail >= min ? { r: ok / (ok + fail), n: ok + fail } : null);

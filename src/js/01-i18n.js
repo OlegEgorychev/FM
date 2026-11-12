@@ -929,3 +929,30 @@ Object.assign(I18N.ru, {
   'office.btn.kickYes.diary': 'Игрок {n} выгнан из академии. Родители судачат, в раздевалке тихо.',
   'office.kickNo.size': 'Состав слишком мал: должно остаться не меньше 12 игроков.', 'office.kickNo.gk': 'Это наш последний вратарь.', 'office.kickNo.gone': 'Его здесь уже нет.',
 });
+
+
+/* ---- v3.0: fog of war — coach's tags, exclusive duties, set pieces ---- */
+Object.assign(I18N.en, {
+  'pi.morale': 'Morale', 'pi.assign': 'Coach\'s assignment', 'pi.assignPos': 'Position tag (for your eyes only — it changes nothing on the pitch):',
+  'pi.assignDuty': 'Team duties (one kid each):', 'pi.dutyHeld': 'Currently: {n}. Click to give it to this kid instead.', 'pi.cards': 'Cards (Y / R)',
+  'tag.pos.GK': 'Goalkeeper', 'tag.pos.DEF': 'Defender', 'tag.pos.MID': 'Midfielder', 'tag.pos.FWD': 'Forward',
+  'duty.captain': 'Captain', 'duty.penalty': 'Penalty taker', 'duty.corner': 'Corner taker',
+  'duty.short.captain': 'C', 'duty.short.penalty': 'PK', 'duty.short.corner': 'CK',
+  'duty.captain.d': 'On the pitch, he lifts everyone a little.', 'duty.penalty.d': 'Takes our penalties.', 'duty.corner.d': 'Takes our corners.',
+  'team.posNone': 'No position tag yet — set one in his profile (right-click / [i])',
+  'ms.pen': '(pen.)', 'ms.corner': '(corner)',
+  'eng.foulPlain': '{d} clips {a} — free kick!', 'eng.pen': 'PENALTY! {a} puts the ball on the spot…', 'eng.penAim': '{a} steps up for the penalty…',
+  'eng.corner': 'Corner. {a} swings it in…', 'eng.cornerClear': '{d} heads it clear.', 'eng.headerAim': '{a} rises highest!',
+});
+Object.assign(I18N.ru, {
+  'pi.morale': 'Мораль', 'pi.assign': 'Решение тренера', 'pi.assignPos': 'Метка позиции (только для тебя — на поле она ничего не меняет):',
+  'pi.assignDuty': 'Обязанности в команде (у каждой — один игрок):', 'pi.dutyHeld': 'Сейчас: {n}. Щёлкни, чтобы передать этому игроку.', 'pi.cards': 'Карточки (Ж / К)',
+  'tag.pos.GK': 'Вратарь', 'tag.pos.DEF': 'Защитник', 'tag.pos.MID': 'Полузащитник', 'tag.pos.FWD': 'Нападающий',
+  'duty.captain': 'Капитан', 'duty.penalty': 'Пенальти', 'duty.corner': 'Угловые',
+  'duty.short.captain': 'К', 'duty.short.penalty': 'П', 'duty.short.corner': 'У',
+  'duty.captain.d': 'Пока он на поле, все играют чуть лучше.', 'duty.penalty.d': 'Бьёт наши пенальти.', 'duty.corner.d': 'Подаёт наши угловые.',
+  'team.posNone': 'Метки позиции пока нет — поставь её в профиле (правый клик / [i])',
+  'ms.pen': '(пен.)', 'ms.corner': '(угловой)',
+  'eng.foulPlain': 'Фол! {d} против {a} — штрафной!', 'eng.pen': 'ПЕНАЛЬТИ! {a} ставит мяч на точку…', 'eng.penAim': '{a} разбегается для удара с точки…',
+  'eng.corner': 'Угловой. {a} подаёт…', 'eng.cornerClear': '{d} выносит мяч головой.', 'eng.headerAim': '{a} выпрыгивает выше всех!',
+});

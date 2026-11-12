@@ -12,7 +12,7 @@ class Lang {
   }
   name(full) { return this.code === 'ru' ? full.split(' ').map(w => RU_NAMES[w] || w).join(' ') : full; }
   team(n) { return this.code === 'ru' ? (RU_TEAMS[n] || n) : n; }
-  pos(p) { return POS_LABEL[this.code][p] || p; }
+  pos(p) { return p ? (POS_LABEL[this.code][p] || p) : '—'; }   // v3.0: untagged kid
   line(l) { return this.pos(LINE_POS[l]); }
   tag(key) { return TAGS[key] ? TAGS[key][this.code][0] : key; }
   tagDesc(key) { return TAGS[key] ? TAGS[key][this.code][1] : ''; }

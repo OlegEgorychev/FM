@@ -37,7 +37,8 @@ class MatchSummary {
     const me = lg.team(0), opp = lg.teams.find(t => t.name === rep.opponent);
     const evs = (rep.events || []).slice().sort((a, b) => a.minute - b.minute);
     const line = e => {
-      const as = e.assist ? ` <small>(${esc(MatchSummary.short(e.assist))})</small>` : '';
+      const as = (e.pen ? ` <small>${L.t('ms.pen')}</small>` : '') + (e.corner ? ` <small>${L.t('ms.corner')}</small>` : '')
+        + (e.assist ? ` <small>(${esc(MatchSummary.short(e.assist))})</small>` : '');
       return `<div class="ms-ev ${e.type}" title="${esc(L.t('ms.type.' + e.type))}"><span class="m">${pad2(e.minute)}'</span> ${MatchSummary.ICON[e.type] || '•'} ${esc(MatchSummary.short(e.playerName))}${as}</div>`;
     };
     const col = (home, title) => {

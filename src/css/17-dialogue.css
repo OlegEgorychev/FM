@@ -94,3 +94,18 @@
 .dash-left{ overflow-y: auto; }
 @media (max-width: 820px){ .ap-chip span{ display: none; } }
 #btn-sim:disabled{ background: repeating-linear-gradient(135deg, #4a3a1a 0 8px, #3a2e16 8px 16px); color: #ffcf8a; box-shadow: inset -1px -1px 0 #1a140a, inset 1px 1px 0 #7a6230; cursor: not-allowed; text-shadow: none; }
+
+/* v3.0: fog of war — coach's tags, duties */
+.pos.none{ background: #2a3138; color: #8a959e; border-color: #3a4650; }
+.duty-badge{ display: inline-block; margin-left: 4px; padding: 0 3px; font: bold 10px/14px var(--mono); vertical-align: middle; color: #111; border: 1px solid #000; }
+.duty-badge.d-captain{ background: #ffcf5a; } .duty-badge.d-penalty{ background: #9fd3ff; } .duty-badge.d-corner{ background: #b9e8a8; }
+.pi-assign .pa-wrap{ display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; }
+.pa-row{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.pa-lbl{ flex-basis: 100%; font-size: 11px; color: var(--muted); }
+.pa-btn{ padding: 3px 7px; cursor: pointer; font: bold 11px/1.2 var(--mono); letter-spacing: .5px; text-transform: uppercase; color: var(--text);
+  background: #1a2026; border: 2px solid; border-color: #4a5660 #0a0d0f #0a0d0f #4a5660; border-radius: 0; }
+.pa-btn small{ font-weight: normal; color: var(--muted); text-transform: none; }
+.pa-btn.on{ background: #3a2a10; color: #ffcf5a; border-color: #0a0d0f #ffcf5a #ffcf5a #0a0d0f; }
+.pa-btn.duty.on{ background: #10243a; color: #9fd3ff; border-color: #0a0d0f #9fd3ff #9fd3ff #0a0d0f; }
+.energy.morale i{ background: linear-gradient(#c9a2e0, #7a4fa0) !important; }
+.win.pinfo{ overflow-y: auto; }

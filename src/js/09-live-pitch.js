@@ -98,7 +98,7 @@ class PitchModel {
       case 'intercept': bark(ev.d, 'bark.mine', 'good'); if (Math.random() < 0.6) bark(ev.a, 'bark.huh'); break;
       case 'tackle':    bark(ev.d, 'bark.tackle', 'good'); bark(ev.a, 'bark.huh'); break;
       case 'dribble':   if (Math.random() < 0.35) bark(ev.a, 'bark.ole', 'good'); if (Math.random() < 0.4) bark(ev.d, 'bark.huh'); break;
-      case 'foul':      bark(ev.a, 'bark.ouch', 'bad', true); bark(ev.d, 'bark.yellow', 'card-y', true); this.fx.push({ type: 'shake' }); break;
+      case 'foul':      bark(ev.a, 'bark.ouch', 'bad', true); if (ev.card !== false) bark(ev.d, 'bark.yellow', 'card-y', true); this.fx.push({ type: 'shake' }); break;
       case 'save':      bark(ev.k, 'bark.saved', 'good', true); break;
       case 'block':     bark(ev.d, 'bark.block', 'good'); break;
       case 'wide':      bark(ev.a, 'bark.argh', 'bad'); break;

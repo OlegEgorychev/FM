@@ -9,7 +9,7 @@ class DebugConsole {
   static COLS = (() => {
     const c = [];
     const add = (g, h, v, s = null, t = '') => c.push({ g, h, v, s, t });
-    add('ID', '#', p => p.number); add('ID', 'NAME', p => p.name); add('ID', 'POS', p => p.position);
+    add('ID', '#', p => p.number); add('ID', 'NAME', p => p.name); add('ID', 'ARCH', p => p.archetype, null, 'v3.0 hidden generated role (shapes the hidden stats only)'); add('ID', 'TAG', p => p.tag || '—', null, 'coach\'s visual tag');
     add('BIO', 'AGE', p => p.bio.age); add('BIO', 'HT', p => p.bio.height, null, 'height, cm'); add('BIO', 'WT', p => p.bio.weight, null, 'weight, kg');
     add('BIO', 'FT', p => p.bio.strongFoot, null, 'strong foot'); add('BIO', 'WF', p => p.bio.weakFoot, 5, 'weak foot 1-5');
     const short = { acceleration: 'ACC', speed: 'SPD', agility: 'AGI', strength: 'STR', baseStamina: 'STA',
@@ -78,7 +78,7 @@ class DebugConsole {
   dbHTML() {
     const C = DebugConsole.COLS, { i, dir } = this.sort;
     const squad = [...this.ui.state.squad].sort((a, b) => {
-      if (i === 2) return dir * ((POS_ORDER[a.position] - POS_ORDER[b.position]) || a.number - b.number);
+      if (i === 2) return dir * ((POS_ORDER[a.archetype] - POS_ORDER[b.archetype]) || a.number - b.number);
       const x = C[i].v(a), y = C[i].v(b);
       return dir * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y)));
     });

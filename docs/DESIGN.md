@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v2.9)
+# Youth Academy Manager — design notes (current: v3.0)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -147,3 +147,10 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Bug: the office choice keys `office.crit` / `office.check` were also used for the kid's reaction texts, so the later i18n block overwrote the button labels. Buttons are now `office.btn.*`, reactions `office.react.*` (never reuse a key for two meanings).
 - Dialogue choices accept `blocked: '<i18n key>'` (disabled with that reason, like an unaffordable cost).
 - `office.btn.kick` (red) → step `kickConfirm` → `GameState.expel(id)`: removed from `squad`, his XI slot gets the best bench kid (available, same line, keeper rules), `coachNotes`, queued events that name him, today's locker entries and `lastReport.players` are cleaned, a record goes to `state.expelled`. Parents −10, Squad −5. `expelBlock(id)`: not below `COACH.MIN_SQUAD` (12) and never the last goalkeeper. His season stats stay in `seasonStats` (league totals), but he leaves the leaders list (built from the squad).
+
+## Fog of war, coach's tags, duties, set pieces (v3.0)
+- `Player.archetype` = the generated role (GK/DEF/MID/FWD) — HIDDEN, only shapes the hidden stats (`PROFILES`, `overall`, growth). `player.tag` = the coach's visual label (academy kids; null until assigned; old saves keep their known position). `player.position` is now a getter: tag for academy kids, archetype for opponents. `refreshPortrait()` → keeper kit follows the tag. Debug shows ARCH + TAG.
+- No position rules at all: `outOfPosition()` → [], `gkError()` → null, no `OUT_OF_POSITION` multiplier in `eff()`, any kid can be swapped or subbed into any slot including goal. Auto-arrange / replacements use tags (untagged kids fill the gaps).
+- Profile (own kids): left = name, number, age, height, weight, status; right = energy, MORALE, Coach's assignment (`setPosTag`, toggles off when clicked again) and duties (`setDuty`, exclusive), role, season stats (+ cards row; saves if tagged GK or any saves), coach note. Opponents still show their scouted position.
+- `state.duties = { captain, penalty, corner }` (ids, saved, cleared on expel); `dutiesOf(id)`; badges C / PK / CK (`ui.dutyBadges`). Engine gets `opts.duties` as a function (read live). `taker(side, duty)`: assigned kid if on the pitch (our side), else a random outfield kid. `captainBonus()`: captain on the pitch → +0.5 + passion/20 on all our rolls.
+- Set pieces (`SETPIECE`): tackle won → 5% it was a foul (our ball; aggressive defenders still book themselves); a foul in the final third → 25% penalty (`penalty()`: shot + 6 + composure·0.2, no block, no assist) else 50% free kick. Saved shot → 25% corner, blocked → 30% (`corner()`: taker's crossing vs a defender's Mark, target weighted by height; header bonus (height − 160)/6 + (strength − 10)·0.1; taker gets the assist). Goals carry `pen` / `corner` in `matchEvents` (summary shows "(pen.)"/"(corner)"). Goals ≈ 2.3 per match (was 2.1).

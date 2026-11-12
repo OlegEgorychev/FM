@@ -17,6 +17,7 @@ const fmt = (tpl, map) => tpl.replace(/\{(\w+)\}/g, (_, k) => map[k] ?? '');
 const CLUB_NAME = 'Ashford Rovers U-14';
 const SQUAD_POS = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'GK', 'DEF', 'MID', 'MID', 'FWD'];
 const POS_ORDER = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
+const posRank = p => POS_ORDER[p.position] ?? 9;   // v3.0: untagged kids sort last
 const NATURAL_LINE = { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'ATT' };   // player position -> tactical line
 const LINE_POS = { GK: 'GK', DEF: 'DEF', MID: 'MID', ATT: 'FWD' };
 const LINE_IDX = { DEF: 0, MID: 1, ATT: 2 };
@@ -102,6 +103,10 @@ const REGIMES = {
 const REGIME_KEYS = Object.keys(REGIMES);
 const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14), 8, 20);   // PA 50 → 13, PA 100 → 20
 /* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
+/* v3.0 EXCLUSIVE TEAM DUTIES + SET PIECES */
+const DUTIES = { captain: 'C', penalty: 'PK', corner: 'CK' };
+const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25, CORNER_BLOCK: 0.3, CORNER_DELIVERY: 3, HEADER_HEIGHT: 6,
+  CAPTAIN: 0.5 };   // captain on the pitch: + (0.5 + passion/20) on all our rolls (≈ +0.55 … +1.5)
 const COACH = { KICK_PARENTS: -10, KICK_SQUAD: -5, MIN_SQUAD: 12,   // v2.9: kick out (keep ≥ 12 kids and ≥ 1 keeper)
   AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());

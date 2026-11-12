@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v2.9</title>
+<title>Youth Academy Manager v3.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1282,6 +1282,21 @@ body.fx .crt-scan{ opacity: .9; }
 .dash-left{ overflow-y: auto; }
 @media (max-width: 820px){ .ap-chip span{ display: none; } }
 #btn-sim:disabled{ background: repeating-linear-gradient(135deg, #4a3a1a 0 8px, #3a2e16 8px 16px); color: #ffcf8a; box-shadow: inset -1px -1px 0 #1a140a, inset 1px 1px 0 #7a6230; cursor: not-allowed; text-shadow: none; }
+
+/* v3.0: fog of war — coach's tags, duties */
+.pos.none{ background: #2a3138; color: #8a959e; border-color: #3a4650; }
+.duty-badge{ display: inline-block; margin-left: 4px; padding: 0 3px; font: bold 10px/14px var(--mono); vertical-align: middle; color: #111; border: 1px solid #000; }
+.duty-badge.d-captain{ background: #ffcf5a; } .duty-badge.d-penalty{ background: #9fd3ff; } .duty-badge.d-corner{ background: #b9e8a8; }
+.pi-assign .pa-wrap{ display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; }
+.pa-row{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.pa-lbl{ flex-basis: 100%; font-size: 11px; color: var(--muted); }
+.pa-btn{ padding: 3px 7px; cursor: pointer; font: bold 11px/1.2 var(--mono); letter-spacing: .5px; text-transform: uppercase; color: var(--text);
+  background: #1a2026; border: 2px solid; border-color: #4a5660 #0a0d0f #0a0d0f #4a5660; border-radius: 0; }
+.pa-btn small{ font-weight: normal; color: var(--muted); text-transform: none; }
+.pa-btn.on{ background: #3a2a10; color: #ffcf5a; border-color: #0a0d0f #ffcf5a #ffcf5a #0a0d0f; }
+.pa-btn.duty.on{ background: #10243a; color: #9fd3ff; border-color: #0a0d0f #9fd3ff #9fd3ff #0a0d0f; }
+.energy.morale i{ background: linear-gradient(#c9a2e0, #7a4fa0) !important; }
+.win.pinfo{ overflow-y: auto; }
 /* =========================================================
    v2.1 — BOOT SCREEN (#loading-overlay) + MATCH SUMMARY
    Boot look follows the credits art: deep-space nebula, chrome/blood-red metal type, sparks, VHS glitches.
@@ -1923,6 +1938,7 @@ const fmt = (tpl, map) => tpl.replace(/\{(\w+)\}/g, (_, k) => map[k] ?? '');
 const CLUB_NAME = 'Ashford Rovers U-14';
 const SQUAD_POS = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'GK', 'DEF', 'MID', 'MID', 'FWD'];
 const POS_ORDER = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
+const posRank = p => POS_ORDER[p.position] ?? 9;   // v3.0: untagged kids sort last
 const NATURAL_LINE = { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'ATT' };   // player position -> tactical line
 const LINE_POS = { GK: 'GK', DEF: 'DEF', MID: 'MID', ATT: 'FWD' };
 const LINE_IDX = { DEF: 0, MID: 1, ATT: 2 };
@@ -2008,6 +2024,10 @@ const REGIMES = {
 const REGIME_KEYS = Object.keys(REGIMES);
 const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14), 8, 20);   // PA 50 → 13, PA 100 → 20
 /* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
+/* v3.0 EXCLUSIVE TEAM DUTIES + SET PIECES */
+const DUTIES = { captain: 'C', penalty: 'PK', corner: 'CK' };
+const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25, CORNER_BLOCK: 0.3, CORNER_DELIVERY: 3, HEADER_HEIGHT: 6,
+  CAPTAIN: 0.5 };   // captain on the pitch: + (0.5 + passion/20) on all our rolls (≈ +0.55 … +1.5)
 const COACH = { KICK_PARENTS: -10, KICK_SQUAD: -5, MIN_SQUAD: 12,   // v2.9: kick out (keep ≥ 12 kids and ≥ 1 keeper)
   AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
@@ -3013,6 +3033,33 @@ Object.assign(I18N.ru, {
   'office.btn.kickYes.diary': 'Игрок {n} выгнан из академии. Родители судачат, в раздевалке тихо.',
   'office.kickNo.size': 'Состав слишком мал: должно остаться не меньше 12 игроков.', 'office.kickNo.gk': 'Это наш последний вратарь.', 'office.kickNo.gone': 'Его здесь уже нет.',
 });
+
+
+/* ---- v3.0: fog of war — coach's tags, exclusive duties, set pieces ---- */
+Object.assign(I18N.en, {
+  'pi.morale': 'Morale', 'pi.assign': 'Coach\'s assignment', 'pi.assignPos': 'Position tag (for your eyes only — it changes nothing on the pitch):',
+  'pi.assignDuty': 'Team duties (one kid each):', 'pi.dutyHeld': 'Currently: {n}. Click to give it to this kid instead.', 'pi.cards': 'Cards (Y / R)',
+  'tag.pos.GK': 'Goalkeeper', 'tag.pos.DEF': 'Defender', 'tag.pos.MID': 'Midfielder', 'tag.pos.FWD': 'Forward',
+  'duty.captain': 'Captain', 'duty.penalty': 'Penalty taker', 'duty.corner': 'Corner taker',
+  'duty.short.captain': 'C', 'duty.short.penalty': 'PK', 'duty.short.corner': 'CK',
+  'duty.captain.d': 'On the pitch, he lifts everyone a little.', 'duty.penalty.d': 'Takes our penalties.', 'duty.corner.d': 'Takes our corners.',
+  'team.posNone': 'No position tag yet — set one in his profile (right-click / [i])',
+  'ms.pen': '(pen.)', 'ms.corner': '(corner)',
+  'eng.foulPlain': '{d} clips {a} — free kick!', 'eng.pen': 'PENALTY! {a} puts the ball on the spot…', 'eng.penAim': '{a} steps up for the penalty…',
+  'eng.corner': 'Corner. {a} swings it in…', 'eng.cornerClear': '{d} heads it clear.', 'eng.headerAim': '{a} rises highest!',
+});
+Object.assign(I18N.ru, {
+  'pi.morale': 'Мораль', 'pi.assign': 'Решение тренера', 'pi.assignPos': 'Метка позиции (только для тебя — на поле она ничего не меняет):',
+  'pi.assignDuty': 'Обязанности в команде (у каждой — один игрок):', 'pi.dutyHeld': 'Сейчас: {n}. Щёлкни, чтобы передать этому игроку.', 'pi.cards': 'Карточки (Ж / К)',
+  'tag.pos.GK': 'Вратарь', 'tag.pos.DEF': 'Защитник', 'tag.pos.MID': 'Полузащитник', 'tag.pos.FWD': 'Нападающий',
+  'duty.captain': 'Капитан', 'duty.penalty': 'Пенальти', 'duty.corner': 'Угловые',
+  'duty.short.captain': 'К', 'duty.short.penalty': 'П', 'duty.short.corner': 'У',
+  'duty.captain.d': 'Пока он на поле, все играют чуть лучше.', 'duty.penalty.d': 'Бьёт наши пенальти.', 'duty.corner.d': 'Подаёт наши угловые.',
+  'team.posNone': 'Метки позиции пока нет — поставь её в профиле (правый клик / [i])',
+  'ms.pen': '(пен.)', 'ms.corner': '(угловой)',
+  'eng.foulPlain': 'Фол! {d} против {a} — штрафной!', 'eng.pen': 'ПЕНАЛЬТИ! {a} ставит мяч на точку…', 'eng.penAim': '{a} разбегается для удара с точки…',
+  'eng.corner': 'Угловой. {a} подаёт…', 'eng.cornerClear': '{d} выносит мяч головой.', 'eng.headerAim': '{a} выпрыгивает выше всех!',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -3027,7 +3074,7 @@ class Lang {
   }
   name(full) { return this.code === 'ru' ? full.split(' ').map(w => RU_NAMES[w] || w).join(' ') : full; }
   team(n) { return this.code === 'ru' ? (RU_TEAMS[n] || n) : n; }
-  pos(p) { return POS_LABEL[this.code][p] || p; }
+  pos(p) { return p ? (POS_LABEL[this.code][p] || p) : '—'; }   // v3.0: untagged kid
   line(l) { return this.pos(LINE_POS[l]); }
   tag(key) { return TAGS[key] ? TAGS[key][this.code][0] : key; }
   tagDesc(key) { return TAGS[key] ? TAGS[key][this.code][1] : ''; }
@@ -3251,10 +3298,13 @@ const AttrGen = {
 
 class Player {
   constructor(o) {
-    const { id, name, position, tags, number, face } = o;
+    const { id, name, tags, number, face } = o;
+    // v3.0 FOG OF WAR: the generated role is HIDDEN (`archetype`, only shapes the hidden stats);
+    // academy kids show the coach's own `tag` instead (null = not assigned). Old saves keep their known position as the tag.
+    const position = POS_ORDER[o.archetype] !== undefined ? o.archetype : o.position;
     this.id = id;
     this.name = name;
-    this.position = position;
+    this.archetype = position;
     this.number = number;
     if (tags) {                      // only the academy squad carries tags (+ v1.9 story flags)
       this.tags = tags;
@@ -3263,6 +3313,7 @@ class Player {
       this.suspensionMatches = Math.max(0, Math.round(o.suspensionMatches || 0));  // v2.2: matches banned
       this.awayDays = Math.max(0, Math.round(o.awayDays || 0));                    // v2.3: kept at home by a parent (days)
       this.promiseBy = o.promiseBy || null;
+      this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
       this.absentToday = o.absentToday || null;   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
@@ -3280,8 +3331,12 @@ class Player {
     this.dyn = { condition: clamp(Math.round(d.condition ?? o.energy ?? 100), 0, 100),
       sharpness: clamp(Math.round(d.sharpness ?? rndR(r, 55, 75)), 0, 100),
       morale: clamp(Math.round(d.morale ?? rndR(r, 55, 75)), 0, 100) };
-    this.portraitSvg = PortraitGenerator.svg(this.face, position === 'GK' ? 'gk' : tags ? 'home' : 'away');
+    this.refreshPortrait();
   }
+  /** v3.0: what the UI calls the position — the coach's tag for academy kids, the (scouted) role for opponents. */
+  get position() { return this.tags ? this.tag : this.archetype; }
+  /** v3.0: the keeper kit follows the coach's tag (academy) or the role (opponents). */
+  refreshPortrait() { this.portraitSvg = PortraitGenerator.svg(this.face, this.position === 'GK' ? 'gk' : this.tags ? 'home' : 'away'); }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
   get age() { return this.bio.age; }
   /** `energy` is the old name of dyn.condition — kept so every v1.1–v1.7 system keeps working. */
@@ -3301,7 +3356,7 @@ class Player {
   }
   /** v1.9: hidden overall (1–20) = average of the engine composites that matter for his position. */
   get overall() {
-    const keys = { GK: ['Save', 'Save', 'Pass'], DEF: ['Tackle', 'Mark', 'Pass', 'Speed'], MID: ['Pass', 'Dribble', 'Mark', 'Speed'], FWD: ['Shoot', 'Dribble', 'Speed', 'Pass'] }[this.position] || ['Pass'];
+    const keys = { GK: ['Save', 'Save', 'Pass'], DEF: ['Tackle', 'Mark', 'Pass', 'Speed'], MID: ['Pass', 'Dribble', 'Mark', 'Speed'], FWD: ['Shoot', 'Dribble', 'Speed', 'Pass'] }[this.archetype] || ['Pass'];
     return keys.reduce((a, k) => a + this.rating(k), 0) / keys.length;
   }
   hasFlag(f) { return !!this.flags?.includes(f); }
@@ -3318,7 +3373,7 @@ class Player {
     do { last = pick(LAST); } while (usedSurnames.has(last) && guard++ < 200);
     usedSurnames.add(last);
     const a = AttrGen.roll(position, Math.random, mod);
-    return new Player({ id, name: `${pick(FIRST)} ${last}`, position, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(),
+    return new Player({ id, name: `${pick(FIRST)} ${last}`, archetype: position, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(),
       ...a, dyn: { condition: 100, sharpness: rnd(55, 75), morale: rnd(55, 75) } });
   }
 }
@@ -3651,6 +3706,7 @@ class GameState {
     this.formation = '4-4-2';
     this.budget = ECONOMY.START;   // v1.9: club money ($), carried across seasons
     this.rep = { board: REP.START, parents: REP.START, squad: REP.START };   // v2.8 faction reputation
+    this.duties = { captain: null, penalty: null, corner: null };            // v3.0 exclusive team duties (player ids)
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
@@ -3703,14 +3759,14 @@ class GameState {
   slotLine(id) { const i = this.lineup.indexOf(id); return i < 0 ? null : this.slots()[i].line; }
   outOfPosition() {
     const slots = this.slots();
-    return this.starters().map((p, i) => ({ p, line: slots[i].line })).filter(({ p, line }) => NATURAL_LINE[p.position] !== line);
+    return [];   // v3.0: no native positions → nobody is "out of position" (kept for old callers)
   }
-  static gkError(players) { return players.filter(p => p.position === 'GK').length !== 1 ? 'gk' : null; }
+  static gkError() { return null; }   // v3.0: anyone may play in goal
 
   autoArrange() {
     const slots = this.slots();
     const pool = this.starters();
-    const gk = pool.find(p => p.position === 'GK') || pool[0];
+    const gk = pool.find(p => p.position === 'GK') || pool[0];   // v3.0: by the coach's tags (untagged kids just fill the gaps)
     const free = pool.filter(p => p !== gk).sort((a, b) => b.energy - a.energy);
     const assigned = new Array(slots.length).fill(null);
     slots.forEach((s, i) => {
@@ -3738,17 +3794,29 @@ class GameState {
     if ((ia < 0 && !pa.available) || (ib < 0 && !pb.available)) return 'unavail_' + (ia < 0 ? pa : pb).unavailableReason;   // v2.2
     if ((ia < 0) !== (ib < 0) && (ia >= 0 ? pa : pb).hasFlag('Showcase')) return 'showcase';   // v2.3: the scout came for him
     if (ia >= 0 && ib >= 0) {
-      if (ia === 0 || ib === 0) return 'gkSlot';
-      [this.lineup[ia], this.lineup[ib]] = [b, a];
+      [this.lineup[ia], this.lineup[ib]] = [b, a];   // v3.0: any kid can go anywhere, goal included
     } else {
       const [slot, incoming] = ia >= 0 ? [ia, pb] : [ib, pa];
-      if (slot === 0 && incoming.position !== 'GK') return 'gkOnly';
-      if (slot !== 0 && incoming.position === 'GK') return 'gkTwo';
       this.lineup[slot] = incoming.id;
     }
     this.save();
     return null;
   }
+  /* ---------- v3.0 coach's assignment: visual position tag + exclusive duties ---------- */
+  setPosTag(id, tag) {
+    const p = this.player(id);
+    if (!p) return;
+    p.tag = POS_ORDER[tag] !== undefined && p.tag !== tag ? tag : null;   // clicking the active tag clears it
+    p.refreshPortrait();
+    this.save();
+  }
+  /** Exclusive: assigning a duty takes it away from whoever had it. Clicking the holder again clears it. */
+  setDuty(duty, id) {
+    if (!(duty in DUTIES)) return;
+    this.duties[duty] = this.duties[duty] === id ? null : id;
+    this.save();
+  }
+  dutiesOf(id) { return Object.keys(DUTIES).filter(d => this.duties?.[d] === id); }
   setTag(id, tag) { const p = this.player(id); if (p && TAGS[tag]) { p.tags = [tag]; this.save(); } }
   removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
 
@@ -3790,7 +3858,7 @@ class GameState {
   /** v2.5: one random skill of a group +1 (capped by potential). Returns true if something improved. */
   growSkill(p, g) {
     let keys = g.keys || ATTR_GROUPS[g.group];
-    if (g.group === 'technical') keys = p.position === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
+    if (g.group === 'technical') keys = p.archetype === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
     const k = pick(keys), cap = potentialCap(p);
     if (!k || p[g.group][k] >= cap) return false;
     p[g.group][k]++;
@@ -3830,7 +3898,6 @@ class GameState {
     const p = this.player(id);
     if (!p) return 'office.kickNo.gone';
     if (this.squad.length <= COACH.MIN_SQUAD) return 'office.kickNo.size';
-    if (p.position === 'GK' && this.squad.filter(x => x.position === 'GK').length <= 1) return 'office.kickNo.gk';
     return null;
   }
   /** Permanently removes a kid: squad, XI (best bench replacement), notes, queued events, today's locker, last report. */
@@ -3842,11 +3909,12 @@ class GameState {
     if (slot >= 0) {
       const bench = this.squad.filter(x => !this.lineup.includes(x.id));
       const want = slot === 0 ? 'GK' : LINE_POS[this.slots()[slot].line];
-      const score = b => (b.available ? 1000 : 0) + (b.position === want ? 100 : 0) - ((slot === 0) !== (b.position === 'GK') ? 500 : 0) + b.overall;
+      const score = b => (b.available ? 1000 : 0) + (b.position === want ? 100 : 0) + b.overall;   // v3.0: by the coach's tags
       const best = bench.sort((a, b) => score(b) - score(a))[0];
       this.lineup[slot] = best.id;
     }
     delete this.coachNotes[id];
+    for (const d in this.duties) if (this.duties[d] === id) this.duties[d] = null;   // v3.0
     this.eventQueue = this.eventQueue.filter(q => !q.cast || ![].concat(...Object.values(q.cast)).includes(id));
     if (this.lastReport) this.lastReport.players = this.lastReport.players.filter(r => r.id !== id);
     const lk = this.today?.locker;
@@ -3925,7 +3993,7 @@ class GameState {
       if (!p || p.available) return;
       const bench = this.bench().filter(b => b.available);
       const want = i === 0 ? 'GK' : LINE_POS[slots[i].line];
-      const score = b => (b.position === want ? 100 : 0) + (i === 0 ? (b.position === 'GK' ? 1000 : 0) : (b.position === 'GK' ? -1000 : 0)) + b.overall;
+      const score = b => (b.position === want ? 100 : 0) + (i === 0 ? (b.position === 'GK' ? 1000 : 0) : (b.position === 'GK' ? -1000 : 0)) + b.overall;   // v3.0: tags, not hidden roles
       const best = bench.sort((a, b) => score(b) - score(a))[0];
       if (!best) return;
       this.lineup[i] = best.id;
@@ -4000,7 +4068,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -4021,6 +4089,8 @@ class GameState {
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
       this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
+      const du = d.duties || {};   // v3.0 (after the squad: duties point at kids)
+      this.duties = Object.fromEntries(Object.keys(DUTIES).map(k => [k, du[k] && this.player(du[k]) ? du[k] : null]));
       if (this.squad.length === 11) {
         const used = new Set(this.squad.map(p => p.surname));
         SQUAD_POS.slice(11).forEach((pos, i) => this.squad.push(Player.generate(`a${11 + i}`, pos, used, 0, true)));
@@ -4031,7 +4101,7 @@ class GameState {
       const ok = Array.isArray(d.lineup) && d.lineup.length === 11 && d.lineup.every(id => this.player(id))
         && !GameState.gkError(d.lineup.map(id => this.player(id)));
       this.lineup = ok ? d.lineup : this.squad.slice(0, 11).map(p => p.id);
-      if (!d.v || d.v < 3 || this.player(this.lineup[0]).position !== 'GK') this.autoArrange();
+      if (!d.v || d.v < 3) this.autoArrange();
       if (d.v >= 4 && d.league && d.calendar) {
         this.season = d.season;
         this.league = new League(d.league, new Set(this.squad.map(p => p.surname)));
@@ -4089,7 +4159,8 @@ class MatchEngine {
     this.paused = false;
     this.mentality = opts.mentality || 'balanced';
     this.forceWin = !!opts.forceWin;
-    this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
+    this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8
+    this.dutiesFn = typeof opts.duties === 'function' ? opts.duties : () => (opts.duties || {});   // v3.0: read live (changes at half-time count)   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
     this.speed = opts.speed || 1;
     this.sentOff = new Set();
     this.timer = null;
@@ -4159,6 +4230,57 @@ class MatchEngine {
     }
   }
   st(p) { return this.stats.get(p.id); }
+  /* ---------- v3.0 duties + set pieces ---------- */
+  /** The assigned taker if he is on the pitch (our side), else a random outfield kid. */
+  taker(side, duty) {
+    const act = this.active(side).filter(p => !this.isGK(p));
+    if (side === 0) { const id = this.dutiesFn()[duty]; const p = act.find(x => x.id === id); if (p) return p; }
+    return pick(act.length ? act : this.active(side));
+  }
+  /** Captain on the pitch → small boost on all our rolls (0.5 + passion/20). */
+  captainBonus() {
+    const id = this.dutiesFn().captain;
+    if (!id || this.sentOff.has(id)) return 0;
+    const p = this.sides[0].players.find(x => x.id === id);
+    return p ? SETPIECE.CAPTAIN + (p.psych?.passion ?? 10) / 20 : 0;
+  }
+  /** A foul in the box may be a penalty; elsewhere in the final third a free kick at goal. */
+  setPiece(victim, side) {
+    if (this.zone !== 2) return;
+    if (Math.random() < SETPIECE.PEN_IN_BOX) this.penalty(side);
+    else if (Math.random() < 0.5) this.startShot(victim, true);
+  }
+  penalty(side) {
+    const t = this.taker(side, 'penalty');
+    this.lastPass = null;
+    this.log('foul', 'eng.pen', { a: t }, side);
+    this.startShot(t, false, { penalty: true });
+  }
+  /** Corner: the taker's delivery vs the defence; a tall, strong target gets a header on goal. */
+  corner(side) {
+    const opp = 1 - side, t = this.taker(side, 'corner');
+    const heads = this.active(side).filter(p => p !== t && !this.isGK(p));
+    if (!heads.length) { this.turnover(this.keeper(opp), 0); return; }
+    const w = heads.map(p => Math.max(1, (p.bio?.height ?? 160) - 135)), tot = w.reduce((a, b) => a + b, 0);
+    let r = Math.random() * tot, target = heads[heads.length - 1];
+    for (let i = 0; i < heads.length; i++) { if ((r -= w[i]) < 0) { target = heads[i]; break; } }
+    const def = pick(this.inZone(opp, 0));
+    const header = ((target.bio?.height ?? 160) - 160) / SETPIECE.HEADER_HEIGHT + ((target.physical?.strength ?? 10) - 10) * 0.1;
+    const atk = (t.skill ? t.skill('crossing') : 10) + Math.random() * 10 + SETPIECE.CORNER_DELIVERY + header + this.mod(side, 'atk');
+    const dfn = this.eff(def, 'Mark') + Math.random() * 10 + this.mod(opp, 'def');
+    this.poss = side; this.zone = 2;
+    this.log('', 'eng.corner', { a: t }, side);
+    if (atk >= dfn) {
+      this.lastPass = { p: t, side };   // a headed goal is an assist for the taker
+      this.setEv({ kind: 'pass', a: t, b: target, d: def });
+      this.startShot(target, false, { corner: true, bonus: Math.max(0, header) });
+    } else {
+      this.st(def).intercepts++;
+      this.log('turn', 'eng.cornerClear', { d: def }, opp);
+      this.turnover(def, 0);
+      this.setEv({ kind: 'block', d: def });
+    }
+  }
   /** v2.1: key event for the Match Summary (goal / yellow / red / injury). Same in visual and instant mode. */
   addEvent(type, p, side, extra = {}) {
     this.matchEvents.push({ minute: Math.max(1, this.minute), type, playerName: p.name, playerId: p.id, isHomeTeam: side === 0, side, ...extra });
@@ -4197,7 +4319,7 @@ class MatchEngine {
     if (this.tired.has(p.id)) v *= 0.5;
     const en = this.energy?.get(p.id);
     if (en !== undefined && en < ENERGY.EXHAUSTED) v *= ENERGY.EXHAUSTED_MULT;
-    if (NATURAL_LINE[p.position] !== this.lineOf.get(p.id)) v *= OUT_OF_POSITION;
+    // v3.0: no "out of position" penalty any more — only hidden stats and biometrics decide
     const t = p.tags || [];
     if (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) v *= 1.5;
     if (t.includes('Playmaker') && attr === 'Pass') v *= 1.5;
@@ -4205,7 +4327,7 @@ class MatchEngine {
     return v + (p.moodBonus ?? 0);
   }
   mod(side, role) {
-    const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus : 0);   // v2.8: dressing-room mood (repSquad)
+    const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus + this.captainBonus() : 0);   // v2.8 mood + v3.0 captain
     if (side !== 0 || this.mentality === 'balanced') return cheat;
     const pushing = this.mentality === 'attack';
     return cheat + ((role === 'atk') === pushing ? 3 : -3);
@@ -4343,8 +4465,7 @@ class MatchEngine {
     const line = side.entries[idx].line;
     if (inP.available === false) return 'unavail';   // v2.2: injured / suspended kids can't come on
     if (side.entries[idx].p.hasFlag?.('Showcase')) return 'showcase';   // v2.3: the scout wants the full 90
-    if (line === 'GK' && inP.position !== 'GK') return 'gkOnly';
-    if (line !== 'GK' && inP.position === 'GK') return 'gkTwo';
+    // v3.0: any kid may replace anyone, in goal too
     const out = side.entries[idx].p;
     side.entries[idx] = { ...side.entries[idx], p: inP };
     side.players = side.players.map(p => (p === out ? inP : p));
@@ -4475,6 +4596,13 @@ class MatchEngine {
       this.log('', 'drOk', vars, side);
       if ((def.tags || []).includes('Aggressive')) this.commitFoul(def, c, side);
     } else {
+      if (Math.random() < SETPIECE.FOUL) {   // v3.0: a mistimed tackle — our ball, maybe a penalty
+        if ((def.tags || []).includes('Aggressive')) { this.commitFoul(def, c, side); return; }
+        this.setEv({ kind: 'foul', a: c, d: def, card: false });
+        this.log('foul', 'eng.foulPlain', vars, 1 - side);
+        this.setPiece(c, side);
+        return;
+      }
       this.st(c).dribbleFail++;
       this.st(def).tackles++;
       this.log('turn', 'drFail', vars, side);
@@ -4499,33 +4627,35 @@ class MatchEngine {
       this.hold = 1;
       this.log('red', 'red', { d: def, n: this.active(defSide).length }, defSide);
     }
-    if (this.zone === 2 && Math.random() < 0.5) this.startShot(victim, true);
+    this.setPiece(victim, attSide);   // v3.0: penalty or free kick in the final third
   }
 
-  startShot(c, freeKick) {
+  startShot(c, freeKick, sp = {}) {
     const side = this.poss;
-    const long = !freeKick && this.zone < 2;
+    const long = !freeKick && !sp.penalty && !sp.corner && this.zone < 2;
     this.st(c).shots++;
-    const lp = this.lastPass, assist = !freeKick && lp && lp.side === side && lp.p !== c ? lp.p : null;
-    this.pendingShot = { shooter: c, side, long, freeKick, assist, bonus: freeKick ? 1 : this.boxBonus, phase: 1 };
+    const lp = this.lastPass, assist = !freeKick && !sp.penalty && lp && lp.side === side && lp.p !== c ? lp.p : null;
+    this.pendingShot = { shooter: c, side, long, freeKick, assist, penalty: !!sp.penalty, corner: !!sp.corner,
+      bonus: sp.penalty ? SETPIECE.PEN_BONUS + (c.psych?.composure ?? 10) * 0.2 : sp.corner ? sp.bonus || 0 : freeKick ? 1 : this.boxBonus, phase: 1 };
     this.boxBonus = 0;
     this.setEv({ kind: 'aim', a: c, side });
-    this.log('shot', freeKick ? 'fkAim' : long ? 'aimLong' : 'aim', { a: c }, side);
+    this.log('shot', sp.penalty ? 'eng.penAim' : sp.corner ? 'eng.headerAim' : freeKick ? 'fkAim' : long ? 'aimLong' : 'aim', { a: c }, side);
   }
 
   resolveShot() {
-    const { shooter, side, long, bonus, assist } = this.pendingShot;
+    const { shooter, side, long, bonus, assist, penalty, corner } = this.pendingShot;
     this.pendingShot = null;
     const opp = 1 - side;
     const blocker = pick(this.inZone(opp, 0));
     const keeper = this.keeper(opp);
 
-    if (Math.random() < 0.2 &&
+    if (!penalty && Math.random() < 0.2 &&
         this.eff(blocker, 'Mark') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
       this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
-      this.turnover(blocker, 0);
       this.setEv({ kind: 'block', d: blocker });
+      if (Math.random() < SETPIECE.CORNER_BLOCK) { this.corner(side); return; }   // v3.0: deflected out → corner
+      this.turnover(blocker, 0);
       return;
     }
     const atk = this.eff(shooter, 'Shoot') + Math.random() * 10 + bonus - (long ? 5 : 0) + this.mod(side, 'atk');
@@ -4536,7 +4666,7 @@ class MatchEngine {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
-      this.addEvent('goal', shooter, side, assist ? { assist: assist.name } : {});
+      this.addEvent('goal', shooter, side, { ...(assist ? { assist: assist.name } : {}), ...(penalty ? { pen: true } : {}), ...(corner ? { corner: true } : {}) });
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
       if (!this.instant) this.hooks.onGoal?.(side);
       this.kickoff(opp);
@@ -4550,8 +4680,9 @@ class MatchEngine {
       this.st(shooter).onTarget++;
       this.st(keeper).saves++;
       this.log('', 'save', vars, opp);
-      this.turnover(keeper, 0);
       this.setEv({ kind: 'save', k: keeper });
+      if (!penalty && Math.random() < SETPIECE.CORNER_SAVE) this.corner(side);   // v3.0: tipped over → corner
+      else this.turnover(keeper, 0);
     }
   }
 
@@ -4640,8 +4771,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.0';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.0', name: { en: 'Fog of War', ru: 'Туман войны' },
+    en: [
+      'Fog of war: a kid\'s profile shows only what a coach can see — age, height, weight, energy, morale and his season numbers (matches, goals, assists, cards…). Skills stay hidden; judge them by results and size.',
+      'No more native positions. New kids arrive without a label and nobody is ever "out of position": any kid can play anywhere, even in goal.',
+      'Coach\'s assignment (in the profile): tag a kid as Goalkeeper, Defender, Midfielder or Forward — just to organise your squad, it changes nothing on the pitch.',
+      'Exclusive team duties: Captain, Penalty taker, Corner taker (one kid each — giving a duty to someone takes it away from the old holder). Badges C / PK / CK in the squad list.',
+      'Set pieces in the match engine: fouls can now give penalties (taken by your penalty taker) and saved or blocked shots can go out for corners (your corner taker swings it in; tall, strong kids win the headers). A captain on the pitch lifts the whole team a little.',
+    ],
+    ru: [
+      'Туман войны: в профиле игрока только то, что видит тренер, — возраст, рост, вес, энергия, мораль и цифры сезона (матчи, голы, передачи, карточки…). Навыки скрыты; суди по результатам и габаритам.',
+      'Родных позиций больше нет. Новые игроки приходят без метки, и никто не бывает «не на своей позиции»: любой может играть где угодно, даже в воротах.',
+      'Решение тренера (в профиле): отметь игрока как вратаря, защитника, полузащитника или нападающего — только чтобы упорядочить состав, на поле это ничего не меняет.',
+      'Исключительные обязанности: капитан, пенальтист, исполнитель угловых (у каждой — один игрок; передав обязанность, ты снимаешь её с прежнего). Значки К / П / У в составе.',
+      'Стандарты в матчевом движке: фолы теперь могут приводить к пенальти (бьёт твой пенальтист), а отбитые и заблокированные удары — к угловым (подаёт твой исполнитель; высокие и сильные выигрывают верх). Капитан на поле чуть-чуть подтягивает всю команду.',
+    ] },
   { v: '2.9', name: { en: 'Clear Your Locker', ru: 'Освободи шкафчик' },
     en: [
       'Fixed: in "Call into office" two buttons showed the kid\'s reply (with a raw {k}) instead of what the coach says. The four lines are now: Praise for recent form · Criticize behavior · Just checking in · Kick out of the academy.',
@@ -5163,7 +5309,7 @@ class PitchModel {
       case 'intercept': bark(ev.d, 'bark.mine', 'good'); if (Math.random() < 0.6) bark(ev.a, 'bark.huh'); break;
       case 'tackle':    bark(ev.d, 'bark.tackle', 'good'); bark(ev.a, 'bark.huh'); break;
       case 'dribble':   if (Math.random() < 0.35) bark(ev.a, 'bark.ole', 'good'); if (Math.random() < 0.4) bark(ev.d, 'bark.huh'); break;
-      case 'foul':      bark(ev.a, 'bark.ouch', 'bad', true); bark(ev.d, 'bark.yellow', 'card-y', true); this.fx.push({ type: 'shake' }); break;
+      case 'foul':      bark(ev.a, 'bark.ouch', 'bad', true); if (ev.card !== false) bark(ev.d, 'bark.yellow', 'card-y', true); this.fx.push({ type: 'shake' }); break;
       case 'save':      bark(ev.k, 'bark.saved', 'good', true); break;
       case 'block':     bark(ev.d, 'bark.block', 'good'); break;
       case 'wide':      bark(ev.a, 'bark.argh', 'bad'); break;
@@ -5595,7 +5741,7 @@ function rateStyle(r) {
 function coachNote(p, s, flags = {}) {
   const out = [];
   if (flags.tired) out.push('note.tired');
-  if (p.position === 'GK') {
+  if (flags.gk) {   // v3.0: he was in goal in THAT match (no native positions)
     out.push(s.saves >= 3 ? 'note.gkBusy' : s.saves ? 'note.gkOk' : 'note.gkQuiet');
   } else {
     const rate = (ok, fail, min) => (ok + fail >= min ? { r: ok / (ok + fail), n: ok + fail } : null);
@@ -5635,6 +5781,16 @@ class ProfileCard {
     document.getElementById('pinfo-x').addEventListener('click', () => this.close());
     document.getElementById('pinfo-ok').addEventListener('click', () => this.close());
     document.getElementById('pinfo-office').addEventListener('click', () => this.ui.callIntoOffice(this.id));   // v2.5
+    this.body.addEventListener('click', e => {   // v3.0: coach's assignment (visual tag + exclusive duties)
+      const t = e.target.closest('[data-postag]'), d = e.target.closest('[data-duty]');
+      if (!t && !d) return;
+      const s = this.ui.state;
+      if (t) s.setPosTag(this.id, t.dataset.postag);
+      else s.setDuty(d.dataset.duty, this.id);
+      this.lastSig = '';
+      this.ui.renderAll();
+      this.render();
+    });
     this.layer.addEventListener('mousedown', e => { if (e.target === this.layer) this.close(); });
     this.layer.addEventListener('contextmenu', e => { e.preventDefault(); if (e.target === this.layer) this.close(); });
     document.addEventListener('keydown', e => {
@@ -5677,7 +5833,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale)].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -5691,7 +5847,8 @@ class ProfileCard {
       [L.t('pi.shots'), `${st.shots} <small>(${L.t('pi.onTarget', { n: st.onTarget })})</small>`],
       [L.t('pi.tackles'), `${st.tackles} <small>/ ${st.tackles + st.tacklesLost}</small>`, pct(st.tackles, st.tacklesLost)],
       [L.t('pi.passAcc'), pct(st.passOk, st.passFail) == null ? '—' : pct(st.passOk, st.passFail) + '% <small>(' + st.passOk + '/' + (st.passOk + st.passFail) + ')</small>', pct(st.passOk, st.passFail)],
-      ...(p.position === 'GK' ? [[L.t('pi.saves'), st.saves]] : []),
+      [L.t('pi.cards'), `${st.yellow ?? 0} <small>/ ${st.red ?? 0}</small>`],   // v3.0
+      ...(p.position === 'GK' || st.saves ? [[L.t('pi.saves'), st.saves]] : []),
     ];
     const base = season || MatchEngine.blankStats();
     const sRows = rows(base), lRows = live ? rows(live) : null;
@@ -5727,8 +5884,7 @@ class ProfileCard {
           <dt>${L.t('pi.age')}</dt><dd>${p.age}</dd>
           <dt>${L.t('pi.height')}</dt><dd>${L.t('pi.cm', { n: p.bio.height })}</dd>
           <dt>${L.t('pi.weight')}</dt><dd>${L.t('pi.kg', { n: p.bio.weight })}</dd>
-          <dt>${L.t('pi.foot')}</dt><dd>${L.t(p.bio.strongFoot === 'L' ? 'pi.footL' : 'pi.footR')}</dd>
-          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.position}">${L.pos(p.position)}</span></dd>
+${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.position}">${L.pos(p.position)}</span></dd>`}
           <dt>${L.t('pi.status')}</dt><dd>${where}</dd>
           ${own && !p.available ? `<dt>${L.t('pi.avail')}</dt><dd class="pi-out">${ui.statusBadge(p)} ${esc(L.t('st.' + p.unavailableReason, { n: { inj: p.injuryDays, sus: p.suspensionMatches, home: p.awayDays }[p.unavailableReason] ?? '' }))}</dd>` : ''}
         </dl>
@@ -5737,6 +5893,14 @@ class ProfileCard {
         <fieldset><legend>${L.t('pi.energy')}</legend>
           <div class="energy ${ui.energyClass(energy)}"><i style="width:${energy}%"></i><span>${energy}%${tired ? ' ×0.5' : ''}</span></div>
         </fieldset>
+        ${own ? `<fieldset><legend>${L.t('pi.morale')}</legend>
+          <div class="energy morale ${ui.energyClass(Math.round(p.dyn.morale))}"><i style="width:${Math.round(p.dyn.morale)}%"></i><span>${Math.round(p.dyn.morale)}%</span></div>
+        </fieldset>
+        <fieldset class="pi-assign"><legend>${L.t('pi.assign')}</legend><div class="pa-wrap">
+          <div class="pa-row"><span class="pa-lbl">${L.t('pi.assignPos')}</span>${['GK', 'DEF', 'MID', 'FWD'].map(t => `<button type="button" class="pa-btn${p.tag === t ? ' on' : ''}" data-postag="${t}" aria-pressed="${p.tag === t}">${L.t('tag.pos.' + t)}</button>`).join('')}</div>
+          <div class="pa-row"><span class="pa-lbl">${L.t('pi.assignDuty')}</span>${Object.keys(DUTIES).map(d => { const holder = s.duties[d], mine = holder === p.id, other = holder && !mine ? s.player(holder) : null;
+            return `<button type="button" class="pa-btn duty${mine ? ' on' : ''}" data-duty="${d}" aria-pressed="${mine}" title="${esc(other ? L.t('pi.dutyHeld', { n: L.name(other.name) }) : L.t('duty.' + d + '.d'))}">${L.t('duty.' + d)}${other ? ` <small>(${esc(L.name(other.surname))})</small>` : ''}</button>`; }).join('')}</div>
+        </div></fieldset>` : ''}
         <fieldset><legend>${L.t('pi.tags')}</legend><div class="pi-role">${roleHtml}</div></fieldset>
         <fieldset><legend>${L.t('pi.stats')}</legend>${table}</fieldset>
         <fieldset class="pi-note"><legend>${L.t('nb.coachNote')}</legend>${noteHtml}</fieldset>
@@ -5791,7 +5955,7 @@ class TeamRosterCard {
     if (this.teamId == null) return;
     const s = this.ui.state, lg = s.league, team = lg.team(this.teamId);
     const table = lg.table(), i = table.findIndex(r => r.team.id === team.id), row = table[i];
-    const posOf = id => team.user ? s.player(id)?.position : team.squad.find(k => k.id === id)?.pos;
+    const posOf = id => team.user ? s.player(id)?.position : team.squad.find(k => k.id === id)?.pos;   // v3.0: our kids show the coach's tag
     const kids = lg.scorers(s.squad, s.seasonStats).filter(k => k.team === team)
       .sort((a, b) => b.goals - a.goals || b.assists - a.assists || b.mp - a.mp || a.name.localeCompare(b.name));
     const title = `${L.team(team.name).replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_|_$/g, '').toUpperCase()}_ROSTER.EXE`;
@@ -5832,7 +5996,7 @@ class DebugConsole {
   static COLS = (() => {
     const c = [];
     const add = (g, h, v, s = null, t = '') => c.push({ g, h, v, s, t });
-    add('ID', '#', p => p.number); add('ID', 'NAME', p => p.name); add('ID', 'POS', p => p.position);
+    add('ID', '#', p => p.number); add('ID', 'NAME', p => p.name); add('ID', 'ARCH', p => p.archetype, null, 'v3.0 hidden generated role (shapes the hidden stats only)'); add('ID', 'TAG', p => p.tag || '—', null, 'coach\'s visual tag');
     add('BIO', 'AGE', p => p.bio.age); add('BIO', 'HT', p => p.bio.height, null, 'height, cm'); add('BIO', 'WT', p => p.bio.weight, null, 'weight, kg');
     add('BIO', 'FT', p => p.bio.strongFoot, null, 'strong foot'); add('BIO', 'WF', p => p.bio.weakFoot, 5, 'weak foot 1-5');
     const short = { acceleration: 'ACC', speed: 'SPD', agility: 'AGI', strength: 'STR', baseStamina: 'STA',
@@ -5901,7 +6065,7 @@ class DebugConsole {
   dbHTML() {
     const C = DebugConsole.COLS, { i, dir } = this.sort;
     const squad = [...this.ui.state.squad].sort((a, b) => {
-      if (i === 2) return dir * ((POS_ORDER[a.position] - POS_ORDER[b.position]) || a.number - b.number);
+      if (i === 2) return dir * ((POS_ORDER[a.archetype] - POS_ORDER[b.archetype]) || a.number - b.number);
       const x = C[i].v(a), y = C[i].v(b);
       return dir * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y)));
     });
@@ -6555,7 +6719,8 @@ class MatchSummary {
     const me = lg.team(0), opp = lg.teams.find(t => t.name === rep.opponent);
     const evs = (rep.events || []).slice().sort((a, b) => a.minute - b.minute);
     const line = e => {
-      const as = e.assist ? ` <small>(${esc(MatchSummary.short(e.assist))})</small>` : '';
+      const as = (e.pen ? ` <small>${L.t('ms.pen')}</small>` : '') + (e.corner ? ` <small>${L.t('ms.corner')}</small>` : '')
+        + (e.assist ? ` <small>(${esc(MatchSummary.short(e.assist))})</small>` : '');
       return `<div class="ms-ev ${e.type}" title="${esc(L.t('ms.type.' + e.type))}"><span class="m">${pad2(e.minute)}'</span> ${MatchSummary.ICON[e.type] || '•'} ${esc(MatchSummary.short(e.playerName))}${as}</div>`;
     };
     const col = (home, title) => {
@@ -6651,7 +6816,7 @@ class LockerRoom {
     const present = squad.filter(p => !lk.absent[p.id]).length;
     this.grid.innerHTML = squad.map((p, i) => {
       const why = lk.absent[p.id], checked = lk.checked.includes(p.id), delay = reveal ? `style="animation-delay:${i * 70}ms"` : '';
-      const plate = `<div class="lk-plate"><span class="lk-no">${p.number}</span>${this.ui.infoBtn(p)}<span class="pos ${p.position}">${L.pos(p.position)}</span></div>`;   // v2.7: [i] / right-click → profile
+      const plate = `<div class="lk-plate"><span class="lk-no">${p.number}</span>${this.ui.infoBtn(p)}<span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span></div>`;   // v2.7: [i] / right-click → profile
       if (!why) {
         const e = Math.round(p.energy);
         return `<div class="lk here${reveal ? ' rv' : ''}" ${delay} data-pid="${p.id}">${plate}
@@ -7113,18 +7278,18 @@ class UIController {
     const onPitch = eng ? eng.sides[0].entries.map(e => e.p) : s.starters();
     const lines = eng ? eng.sides[0].entries.map(e => e.line) : s.slots().map(x => x.line);
     const onIds = onPitch.map(p => p.id);
-    const bench = s.squad.filter(p => !onIds.includes(p.id)).sort((a, b) => POS_ORDER[a.position] - POS_ORDER[b.position]);
+    const bench = s.squad.filter(p => !onIds.includes(p.id)).sort((a, b) => posRank(a) - posRank(b) || a.number - b.number);
     const selP = this.liveSel ? s.player(this.liveSel) : null;
     const over = !!(eng && eng.finished) || (!eng && s.phase !== 'matchday');
     const row = (p, i, pitch) => {
       const status = eng?.sentOff.has(p.id) ? 'sent' : eng?.subbedOff.has(p.id) ? 'off' : '';
       const out = !pitch && !p.available;   // v2.2: can't come on
       const disabled = over || !!status || out;
-      const hint = selP && p.id !== selP.id && !disabled ? (p.position === selP.position ? ' suggested-swap' : ' dimmed-swap') : '';
+      const hint = selP && p.id !== selP.id && !disabled ? (p.position && p.position === selP.position ? ' suggested-swap' : ' dimmed-swap') : '';
       const sub = status ? L.t('lr.' + status) : out ? L.t('st.short.' + p.unavailableReason) : pitch ? L.line(lines[i]) : L.t('team.onBench');
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
-        <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span>
+        <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>
         <span class="lr-name"><b>${esc(L.name(p.surname))}${this.statusBadge(p)}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
         <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
       </div>`;
@@ -7624,6 +7789,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       }
     }
   }
+  /** v3.0: exclusive duties as small badges (C / PK / CK). */
+  dutyBadges(p) { return this.state.dutiesOf(p.id).map(d => `<span class="duty-badge d-${d}" title="${esc(L.t('duty.' + d))}">${L.t('duty.short.' + d)}</span>`).join(''); }
   /** v2.2: red cross (injured, days left) / red card (suspended, matches left) / deal lock. */
   statusBadge(p) {
     const r = p.unavailableReason;
@@ -7747,12 +7914,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const s = this.state, live = this.live;
     if (live || (this.selected && !s.player(this.selected))) this.selected = null;
     const slots = s.slots();
-    const byPos = (a, b) => POS_ORDER[a.position] - POS_ORDER[b.position];
+    const byPos = (a, b) => posRank(a) - posRank(b) || a.number - b.number;   // v3.0: by the coach's tags
 
     const row = (p, starter) => {
       const e = Math.round(p.energy);
       const line = starter ? slots[s.lineup.indexOf(p.id)].line : null;
-      const oop = line && line !== 'GK' && NATURAL_LINE[p.position] !== line;
+      const oop = false;   // v3.0: no native positions
       const sub = starter
         ? `<small class="r-slot${oop ? ' warn' : ''}">${oop ? L.t('squad.oop', { l: L.line(line) }) : L.t('team.slot', { l: L.line(line) })}</small>`
         : `<small class="r-slot">${L.t('team.onBench')}</small>`;
@@ -7762,7 +7929,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}${out ? ' unavail' : ''}" data-id="${p.id}"
           role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
-        <span class="r-name"><span class="r-line"><span class="pos ${p.position}" title="${esc(L.t('team.posTitle', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.statusBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
+        <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×0.5' : ''}</span></div>
         <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
@@ -7810,7 +7977,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   swapClass(p) {
     const selP = this.selected ? this.state.player(this.selected) : null;
     if (!selP || p.id === selP.id) return '';
-    return p.position === selP.position ? 'suggested-swap' : 'dimmed-swap';
+    return p.position && p.position === selP.position ? 'suggested-swap' : 'dimmed-swap';
   }
 
   /** Unified swap: select one player (list row or pitch dot), then pick another (row or dot). */
@@ -7992,7 +8159,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties });
     if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
@@ -8074,7 +8241,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       poss: Math.round(eng.possTicks[0] / ((eng.possTicks[0] + eng.possTicks[1]) || 1) * 100),
       players: shuffle(played).slice(0, 3).map(p => ({
         id: p.id, stats: { ...eng.st(p) },
-        tired: eng.tired.has(p.id), oop: NATURAL_LINE[p.position] !== eng.lineOf.get(p.id), role: (p.tags || [])[0] || null,
+        tired: eng.tired.has(p.id), oop: false, gk: eng.lineOf.get(p.id) === 'GK', role: (p.tags || [])[0] || null,   // v3.0
       })),
     };
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
@@ -8128,7 +8295,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         L.t('nb.intercepts', { a: s.intercepts || 0, b: season.intercepts || 0 }),
         L.t('nb.shots', { a: s.shots, b: s.onTarget, c: s.goals, g: season.goals }),
       ];
-      if (p.position === 'GK') lines.push(L.t('nb.saves', { a: s.saves, b: season.saves }));
+      if (pr.gk || s.saves) lines.push(L.t('nb.saves', { a: s.saves, b: season.saves }));
       if (s.yellow || s.red) lines.push(L.t('notes.cards', { a: s.yellow, b: s.red }));
       lines.push(`${L.t('notes.energy', { a: Math.round(p.energy) })} · ${L.t('nb.apps', { n: season.apps })}`);
       const note = coachNote(p, s, pr).map(k => k === 'note.role' ? L.t(k, { r: L.tag(pr.role) }) : L.t(k)).join(' ');
@@ -8140,7 +8307,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       }).join('');
       return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
-        <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position}">${L.pos(p.position)}</span></h3>
+        <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${this.dutyBadges(p)}</h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>

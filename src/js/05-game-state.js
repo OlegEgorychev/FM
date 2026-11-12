@@ -15,6 +15,7 @@ class GameState {
     this.formation = '4-4-2';
     this.budget = ECONOMY.START;   // v1.9: club money ($), carried across seasons
     this.rep = { board: REP.START, parents: REP.START, squad: REP.START };   // v2.8 faction reputation
+    this.duties = { captain: null, penalty: null, corner: null };            // v3.0 exclusive team duties (player ids)
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
@@ -67,14 +68,14 @@ class GameState {
   slotLine(id) { const i = this.lineup.indexOf(id); return i < 0 ? null : this.slots()[i].line; }
   outOfPosition() {
     const slots = this.slots();
-    return this.starters().map((p, i) => ({ p, line: slots[i].line })).filter(({ p, line }) => NATURAL_LINE[p.position] !== line);
+    return [];   // v3.0: no native positions → nobody is "out of position" (kept for old callers)
   }
-  static gkError(players) { return players.filter(p => p.position === 'GK').length !== 1 ? 'gk' : null; }
+  static gkError() { return null; }   // v3.0: anyone may play in goal
 
   autoArrange() {
     const slots = this.slots();
     const pool = this.starters();
-    const gk = pool.find(p => p.position === 'GK') || pool[0];
+    const gk = pool.find(p => p.position === 'GK') || pool[0];   // v3.0: by the coach's tags (untagged kids just fill the gaps)
     const free = pool.filter(p => p !== gk).sort((a, b) => b.energy - a.energy);
     const assigned = new Array(slots.length).fill(null);
     slots.forEach((s, i) => {
@@ -102,17 +103,29 @@ class GameState {
     if ((ia < 0 && !pa.available) || (ib < 0 && !pb.available)) return 'unavail_' + (ia < 0 ? pa : pb).unavailableReason;   // v2.2
     if ((ia < 0) !== (ib < 0) && (ia >= 0 ? pa : pb).hasFlag('Showcase')) return 'showcase';   // v2.3: the scout came for him
     if (ia >= 0 && ib >= 0) {
-      if (ia === 0 || ib === 0) return 'gkSlot';
-      [this.lineup[ia], this.lineup[ib]] = [b, a];
+      [this.lineup[ia], this.lineup[ib]] = [b, a];   // v3.0: any kid can go anywhere, goal included
     } else {
       const [slot, incoming] = ia >= 0 ? [ia, pb] : [ib, pa];
-      if (slot === 0 && incoming.position !== 'GK') return 'gkOnly';
-      if (slot !== 0 && incoming.position === 'GK') return 'gkTwo';
       this.lineup[slot] = incoming.id;
     }
     this.save();
     return null;
   }
+  /* ---------- v3.0 coach's assignment: visual position tag + exclusive duties ---------- */
+  setPosTag(id, tag) {
+    const p = this.player(id);
+    if (!p) return;
+    p.tag = POS_ORDER[tag] !== undefined && p.tag !== tag ? tag : null;   // clicking the active tag clears it
+    p.refreshPortrait();
+    this.save();
+  }
+  /** Exclusive: assigning a duty takes it away from whoever had it. Clicking the holder again clears it. */
+  setDuty(duty, id) {
+    if (!(duty in DUTIES)) return;
+    this.duties[duty] = this.duties[duty] === id ? null : id;
+    this.save();
+  }
+  dutiesOf(id) { return Object.keys(DUTIES).filter(d => this.duties?.[d] === id); }
   setTag(id, tag) { const p = this.player(id); if (p && TAGS[tag]) { p.tags = [tag]; this.save(); } }
   removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
 
@@ -154,7 +167,7 @@ class GameState {
   /** v2.5: one random skill of a group +1 (capped by potential). Returns true if something improved. */
   growSkill(p, g) {
     let keys = g.keys || ATTR_GROUPS[g.group];
-    if (g.group === 'technical') keys = p.position === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
+    if (g.group === 'technical') keys = p.archetype === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
     const k = pick(keys), cap = potentialCap(p);
     if (!k || p[g.group][k] >= cap) return false;
     p[g.group][k]++;
@@ -194,7 +207,6 @@ class GameState {
     const p = this.player(id);
     if (!p) return 'office.kickNo.gone';
     if (this.squad.length <= COACH.MIN_SQUAD) return 'office.kickNo.size';
-    if (p.position === 'GK' && this.squad.filter(x => x.position === 'GK').length <= 1) return 'office.kickNo.gk';
     return null;
   }
   /** Permanently removes a kid: squad, XI (best bench replacement), notes, queued events, today's locker, last report. */
@@ -206,11 +218,12 @@ class GameState {
     if (slot >= 0) {
       const bench = this.squad.filter(x => !this.lineup.includes(x.id));
       const want = slot === 0 ? 'GK' : LINE_POS[this.slots()[slot].line];
-      const score = b => (b.available ? 1000 : 0) + (b.position === want ? 100 : 0) - ((slot === 0) !== (b.position === 'GK') ? 500 : 0) + b.overall;
+      const score = b => (b.available ? 1000 : 0) + (b.position === want ? 100 : 0) + b.overall;   // v3.0: by the coach's tags
       const best = bench.sort((a, b) => score(b) - score(a))[0];
       this.lineup[slot] = best.id;
     }
     delete this.coachNotes[id];
+    for (const d in this.duties) if (this.duties[d] === id) this.duties[d] = null;   // v3.0
     this.eventQueue = this.eventQueue.filter(q => !q.cast || ![].concat(...Object.values(q.cast)).includes(id));
     if (this.lastReport) this.lastReport.players = this.lastReport.players.filter(r => r.id !== id);
     const lk = this.today?.locker;
@@ -289,7 +302,7 @@ class GameState {
       if (!p || p.available) return;
       const bench = this.bench().filter(b => b.available);
       const want = i === 0 ? 'GK' : LINE_POS[slots[i].line];
-      const score = b => (b.position === want ? 100 : 0) + (i === 0 ? (b.position === 'GK' ? 1000 : 0) : (b.position === 'GK' ? -1000 : 0)) + b.overall;
+      const score = b => (b.position === want ? 100 : 0) + (i === 0 ? (b.position === 'GK' ? 1000 : 0) : (b.position === 'GK' ? -1000 : 0)) + b.overall;   // v3.0: tags, not hidden roles
       const best = bench.sort((a, b) => score(b) - score(a))[0];
       if (!best) return;
       this.lineup[i] = best.id;
@@ -364,7 +377,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -385,6 +398,8 @@ class GameState {
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
       this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
+      const du = d.duties || {};   // v3.0 (after the squad: duties point at kids)
+      this.duties = Object.fromEntries(Object.keys(DUTIES).map(k => [k, du[k] && this.player(du[k]) ? du[k] : null]));
       if (this.squad.length === 11) {
         const used = new Set(this.squad.map(p => p.surname));
         SQUAD_POS.slice(11).forEach((pos, i) => this.squad.push(Player.generate(`a${11 + i}`, pos, used, 0, true)));
@@ -395,7 +410,7 @@ class GameState {
       const ok = Array.isArray(d.lineup) && d.lineup.length === 11 && d.lineup.every(id => this.player(id))
         && !GameState.gkError(d.lineup.map(id => this.player(id)));
       this.lineup = ok ? d.lineup : this.squad.slice(0, 11).map(p => p.id);
-      if (!d.v || d.v < 3 || this.player(this.lineup[0]).position !== 'GK') this.autoArrange();
+      if (!d.v || d.v < 3) this.autoArrange();
       if (d.v >= 4 && d.league && d.calendar) {
         this.season = d.season;
         this.league = new League(d.league, new Set(this.squad.map(p => p.surname)));

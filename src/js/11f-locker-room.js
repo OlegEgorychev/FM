@@ -64,7 +64,7 @@ class LockerRoom {
     const present = squad.filter(p => !lk.absent[p.id]).length;
     this.grid.innerHTML = squad.map((p, i) => {
       const why = lk.absent[p.id], checked = lk.checked.includes(p.id), delay = reveal ? `style="animation-delay:${i * 70}ms"` : '';
-      const plate = `<div class="lk-plate"><span class="lk-no">${p.number}</span>${this.ui.infoBtn(p)}<span class="pos ${p.position}">${L.pos(p.position)}</span></div>`;   // v2.7: [i] / right-click → profile
+      const plate = `<div class="lk-plate"><span class="lk-no">${p.number}</span>${this.ui.infoBtn(p)}<span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span></div>`;   // v2.7: [i] / right-click → profile
       if (!why) {
         const e = Math.round(p.energy);
         return `<div class="lk here${reveal ? ' rv' : ''}" ${delay} data-pid="${p.id}">${plate}

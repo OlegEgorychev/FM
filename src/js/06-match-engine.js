@@ -29,7 +29,8 @@ class MatchEngine {
     this.paused = false;
     this.mentality = opts.mentality || 'balanced';
     this.forceWin = !!opts.forceWin;
-    this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
+    this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8
+    this.dutiesFn = typeof opts.duties === 'function' ? opts.duties : () => (opts.duties || {});   // v3.0: read live (changes at half-time count)   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
     this.speed = opts.speed || 1;
     this.sentOff = new Set();
     this.timer = null;
@@ -99,6 +100,57 @@ class MatchEngine {
     }
   }
   st(p) { return this.stats.get(p.id); }
+  /* ---------- v3.0 duties + set pieces ---------- */
+  /** The assigned taker if he is on the pitch (our side), else a random outfield kid. */
+  taker(side, duty) {
+    const act = this.active(side).filter(p => !this.isGK(p));
+    if (side === 0) { const id = this.dutiesFn()[duty]; const p = act.find(x => x.id === id); if (p) return p; }
+    return pick(act.length ? act : this.active(side));
+  }
+  /** Captain on the pitch → small boost on all our rolls (0.5 + passion/20). */
+  captainBonus() {
+    const id = this.dutiesFn().captain;
+    if (!id || this.sentOff.has(id)) return 0;
+    const p = this.sides[0].players.find(x => x.id === id);
+    return p ? SETPIECE.CAPTAIN + (p.psych?.passion ?? 10) / 20 : 0;
+  }
+  /** A foul in the box may be a penalty; elsewhere in the final third a free kick at goal. */
+  setPiece(victim, side) {
+    if (this.zone !== 2) return;
+    if (Math.random() < SETPIECE.PEN_IN_BOX) this.penalty(side);
+    else if (Math.random() < 0.5) this.startShot(victim, true);
+  }
+  penalty(side) {
+    const t = this.taker(side, 'penalty');
+    this.lastPass = null;
+    this.log('foul', 'eng.pen', { a: t }, side);
+    this.startShot(t, false, { penalty: true });
+  }
+  /** Corner: the taker's delivery vs the defence; a tall, strong target gets a header on goal. */
+  corner(side) {
+    const opp = 1 - side, t = this.taker(side, 'corner');
+    const heads = this.active(side).filter(p => p !== t && !this.isGK(p));
+    if (!heads.length) { this.turnover(this.keeper(opp), 0); return; }
+    const w = heads.map(p => Math.max(1, (p.bio?.height ?? 160) - 135)), tot = w.reduce((a, b) => a + b, 0);
+    let r = Math.random() * tot, target = heads[heads.length - 1];
+    for (let i = 0; i < heads.length; i++) { if ((r -= w[i]) < 0) { target = heads[i]; break; } }
+    const def = pick(this.inZone(opp, 0));
+    const header = ((target.bio?.height ?? 160) - 160) / SETPIECE.HEADER_HEIGHT + ((target.physical?.strength ?? 10) - 10) * 0.1;
+    const atk = (t.skill ? t.skill('crossing') : 10) + Math.random() * 10 + SETPIECE.CORNER_DELIVERY + header + this.mod(side, 'atk');
+    const dfn = this.eff(def, 'Mark') + Math.random() * 10 + this.mod(opp, 'def');
+    this.poss = side; this.zone = 2;
+    this.log('', 'eng.corner', { a: t }, side);
+    if (atk >= dfn) {
+      this.lastPass = { p: t, side };   // a headed goal is an assist for the taker
+      this.setEv({ kind: 'pass', a: t, b: target, d: def });
+      this.startShot(target, false, { corner: true, bonus: Math.max(0, header) });
+    } else {
+      this.st(def).intercepts++;
+      this.log('turn', 'eng.cornerClear', { d: def }, opp);
+      this.turnover(def, 0);
+      this.setEv({ kind: 'block', d: def });
+    }
+  }
   /** v2.1: key event for the Match Summary (goal / yellow / red / injury). Same in visual and instant mode. */
   addEvent(type, p, side, extra = {}) {
     this.matchEvents.push({ minute: Math.max(1, this.minute), type, playerName: p.name, playerId: p.id, isHomeTeam: side === 0, side, ...extra });
@@ -137,7 +189,7 @@ class MatchEngine {
     if (this.tired.has(p.id)) v *= 0.5;
     const en = this.energy?.get(p.id);
     if (en !== undefined && en < ENERGY.EXHAUSTED) v *= ENERGY.EXHAUSTED_MULT;
-    if (NATURAL_LINE[p.position] !== this.lineOf.get(p.id)) v *= OUT_OF_POSITION;
+    // v3.0: no "out of position" penalty any more — only hidden stats and biometrics decide
     const t = p.tags || [];
     if (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) v *= 1.5;
     if (t.includes('Playmaker') && attr === 'Pass') v *= 1.5;
@@ -145,7 +197,7 @@ class MatchEngine {
     return v + (p.moodBonus ?? 0);
   }
   mod(side, role) {
-    const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus : 0);   // v2.8: dressing-room mood (repSquad)
+    const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus + this.captainBonus() : 0);   // v2.8 mood + v3.0 captain
     if (side !== 0 || this.mentality === 'balanced') return cheat;
     const pushing = this.mentality === 'attack';
     return cheat + ((role === 'atk') === pushing ? 3 : -3);
@@ -283,8 +335,7 @@ class MatchEngine {
     const line = side.entries[idx].line;
     if (inP.available === false) return 'unavail';   // v2.2: injured / suspended kids can't come on
     if (side.entries[idx].p.hasFlag?.('Showcase')) return 'showcase';   // v2.3: the scout wants the full 90
-    if (line === 'GK' && inP.position !== 'GK') return 'gkOnly';
-    if (line !== 'GK' && inP.position === 'GK') return 'gkTwo';
+    // v3.0: any kid may replace anyone, in goal too
     const out = side.entries[idx].p;
     side.entries[idx] = { ...side.entries[idx], p: inP };
     side.players = side.players.map(p => (p === out ? inP : p));
@@ -415,6 +466,13 @@ class MatchEngine {
       this.log('', 'drOk', vars, side);
       if ((def.tags || []).includes('Aggressive')) this.commitFoul(def, c, side);
     } else {
+      if (Math.random() < SETPIECE.FOUL) {   // v3.0: a mistimed tackle — our ball, maybe a penalty
+        if ((def.tags || []).includes('Aggressive')) { this.commitFoul(def, c, side); return; }
+        this.setEv({ kind: 'foul', a: c, d: def, card: false });
+        this.log('foul', 'eng.foulPlain', vars, 1 - side);
+        this.setPiece(c, side);
+        return;
+      }
       this.st(c).dribbleFail++;
       this.st(def).tackles++;
       this.log('turn', 'drFail', vars, side);
@@ -439,33 +497,35 @@ class MatchEngine {
       this.hold = 1;
       this.log('red', 'red', { d: def, n: this.active(defSide).length }, defSide);
     }
-    if (this.zone === 2 && Math.random() < 0.5) this.startShot(victim, true);
+    this.setPiece(victim, attSide);   // v3.0: penalty or free kick in the final third
   }
 
-  startShot(c, freeKick) {
+  startShot(c, freeKick, sp = {}) {
     const side = this.poss;
-    const long = !freeKick && this.zone < 2;
+    const long = !freeKick && !sp.penalty && !sp.corner && this.zone < 2;
     this.st(c).shots++;
-    const lp = this.lastPass, assist = !freeKick && lp && lp.side === side && lp.p !== c ? lp.p : null;
-    this.pendingShot = { shooter: c, side, long, freeKick, assist, bonus: freeKick ? 1 : this.boxBonus, phase: 1 };
+    const lp = this.lastPass, assist = !freeKick && !sp.penalty && lp && lp.side === side && lp.p !== c ? lp.p : null;
+    this.pendingShot = { shooter: c, side, long, freeKick, assist, penalty: !!sp.penalty, corner: !!sp.corner,
+      bonus: sp.penalty ? SETPIECE.PEN_BONUS + (c.psych?.composure ?? 10) * 0.2 : sp.corner ? sp.bonus || 0 : freeKick ? 1 : this.boxBonus, phase: 1 };
     this.boxBonus = 0;
     this.setEv({ kind: 'aim', a: c, side });
-    this.log('shot', freeKick ? 'fkAim' : long ? 'aimLong' : 'aim', { a: c }, side);
+    this.log('shot', sp.penalty ? 'eng.penAim' : sp.corner ? 'eng.headerAim' : freeKick ? 'fkAim' : long ? 'aimLong' : 'aim', { a: c }, side);
   }
 
   resolveShot() {
-    const { shooter, side, long, bonus, assist } = this.pendingShot;
+    const { shooter, side, long, bonus, assist, penalty, corner } = this.pendingShot;
     this.pendingShot = null;
     const opp = 1 - side;
     const blocker = pick(this.inZone(opp, 0));
     const keeper = this.keeper(opp);
 
-    if (Math.random() < 0.2 &&
+    if (!penalty && Math.random() < 0.2 &&
         this.eff(blocker, 'Mark') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
       this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
-      this.turnover(blocker, 0);
       this.setEv({ kind: 'block', d: blocker });
+      if (Math.random() < SETPIECE.CORNER_BLOCK) { this.corner(side); return; }   // v3.0: deflected out → corner
+      this.turnover(blocker, 0);
       return;
     }
     const atk = this.eff(shooter, 'Shoot') + Math.random() * 10 + bonus - (long ? 5 : 0) + this.mod(side, 'atk');
@@ -476,7 +536,7 @@ class MatchEngine {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
-      this.addEvent('goal', shooter, side, assist ? { assist: assist.name } : {});
+      this.addEvent('goal', shooter, side, { ...(assist ? { assist: assist.name } : {}), ...(penalty ? { pen: true } : {}), ...(corner ? { corner: true } : {}) });
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
       if (!this.instant) this.hooks.onGoal?.(side);
       this.kickoff(opp);
@@ -490,8 +550,9 @@ class MatchEngine {
       this.st(shooter).onTarget++;
       this.st(keeper).saves++;
       this.log('', 'save', vars, opp);
-      this.turnover(keeper, 0);
       this.setEv({ kind: 'save', k: keeper });
+      if (!penalty && Math.random() < SETPIECE.CORNER_SAVE) this.corner(side);   // v3.0: tipped over → corner
+      else this.turnover(keeper, 0);
     }
   }
 

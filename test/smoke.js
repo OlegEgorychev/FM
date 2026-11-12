@@ -94,8 +94,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const sub = await page.evaluate(() => {
       const e = YAM.ui.engine;
       const out = e.sides[0].entries.find(x => x.line === 'MID').p;
-      const inn = YAM.game.squad.find(p => !e.sides[0].players.includes(p) && p.position === 'MID' && p.available)
-        || YAM.game.squad.find(p => !e.sides[0].players.includes(p) && p.position !== 'GK' && p.available);
+      const inn = YAM.game.squad.find(p => !e.sides[0].players.includes(p) && p.archetype === 'MID' && p.available)
+        || YAM.game.squad.find(p => !e.sides[0].players.includes(p) && p.archetype !== 'GK' && p.available);
       return { out: out.id, in: inn.id };
     });
     // v1.5: profile card during the match (right-click a pitch token, [i] in the roster) must not touch the swap
@@ -273,17 +273,17 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const talk = async i => { await page.click(`#talk-choices .talk-btn[data-i="${i}"]`); await page.waitForTimeout(30); };
     await page.evaluate(() => { YAM.game.budget = 1000; YAM.ui.events.fire('knock'); });
     const kn = await page.evaluate(() => YAM.game.pendingEvent.cast.kid);
-    await page.evaluate(k => { const s = YAM.game; if (!s.isStarter(k)) s.swapPlayers(k, s.starters().find(p => p.position === s.player(k).position && p.position !== 'GK')?.id || s.lineup[1]); }, kn);
+    await page.evaluate(k => { const s = YAM.game; if (!s.isStarter(k)) s.swapPlayers(k, s.starters().find(p => p.archetype === s.player(k).archetype && p.archetype !== 'GK')?.id || s.lineup[1]); }, kn);
     await talk(1);   // ice → 14 days
     const kn2 = await page.evaluate(k => {
-      const s = YAM.game, p = s.player(k), slot = s.lineup[p.position === 'GK' ? 0 : 1];
+      const s = YAM.game, p = s.player(k), slot = s.lineup[p.archetype === 'GK' ? 0 : 1];
       const err = s.swapPlayers(slot === k ? s.lineup[2] : slot, k);
       return { days: p.injuryDays, starter: s.isStarter(k), err, badge: !!document.querySelector(`#roster .r-row[data-id="${k}"].unavail .st-badge.inj`) };
     }, kn);
     await page.evaluate(() => YAM.game.restDay());
     const kn3 = await page.evaluate(k => YAM.game.player(k).injuryDays, kn);
     check('injury: ice = 14 days, auto-benched, red-cross badge, swap into XI blocked, heals daily', kn2.days === 14 && !kn2.starter && kn2.err === 'unavail_inj' && kn2.badge && kn3 === 13, JSON.stringify({ kn2, kn3 }));
-    await page.evaluate(() => { const p = YAM.game.squad.find(x => x.position === 'MID' && x.available); p.psych.discipline = 5; YAM.game.squad.forEach(x => { if (x !== p && x.psych.discipline < 8) x.psych.discipline = 8; }); YAM.ui.events.fire('ulti'); });
+    await page.evaluate(() => { const p = YAM.game.squad.find(x => x.archetype === 'MID' && x.available); p.psych.discipline = 5; YAM.game.squad.forEach(x => { if (x !== p && x.psych.discipline < 8) x.psych.discipline = 8; }); YAM.ui.events.fire('ulti'); });
     const ul = await page.evaluate(() => YAM.game.pendingEvent.cast.kid);
     await talk(1);   // call him into the office → step 2
     const ul2 = await page.evaluate(() => ({ open: !document.getElementById('talk-layer').hidden, step: YAM.game.pendingEvent?.step, n: document.querySelectorAll('#talk-choices .talk-btn').length }));
@@ -342,7 +342,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     while (!(await page.evaluate(() => isTrainingDay(YAM.game.calendar.date))) && guard++ < 7) await endDay();
     // v2.6: training day → START DAY → locker room (forced absences) → roll call → Proceed → plan → END DAY
     const lr0 = await page.evaluate(() => {
-      const s = YAM.game, fit = s.squad.filter(p => p.available && p.position !== 'GK' && !(p.suspensionMatches > 0));
+      const s = YAM.game, fit = s.squad.filter(p => p.available && p.archetype !== 'GK' && !(p.suspensionMatches > 0));
       for (const p of s.squad) { p.energy = 50; p.dyn.morale = 60; p.psych.discipline = 15; p.injuryDays = 0; p.awayDays = 0; }
       const [tired, lazy, hurt, keep] = [fit[0], fit[1], fit[2], fit[3]];
       tired.energy = 10; lazy.psych.discipline = 1; hurt.injuryDays = 5;
@@ -412,7 +412,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       dl0.today && /1\/1/.test(dl0.ap) && !dl0.btn && [2, 4].includes(dayOf(dl1.date)) && !dl2.btn && dl2.plan === 'cardio'
       && oneDay(dl1.date, dl3.date) && dl3.e === 55 && dl3.m === 57 && dl3.plan === null && dl3.diary && dl3.lazyE === 50 && dl3.tiredE === 20 && dl3.cleared, JSON.stringify({ dl0, dl1, dl2, dl3 }));
     await page.evaluate(id => { YAM.game.player(id).injuryDays = 0; }, lr0.hurt);
-    const kidO = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available && x.position !== 'GK'); p.dyn.sharpness = 30; p.dyn.morale = 60; YAM.ui.profile.open(p.id); return p.id; });
+    const kidO = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available && x.archetype !== 'GK'); p.dyn.sharpness = 30; p.dyn.morale = 60; YAM.ui.profile.open(p.id); return p.id; });
     const of0 = await page.evaluate(() => ({ vis: !document.getElementById('pinfo-office').hidden, dis: document.getElementById('pinfo-office').disabled }));
     await page.click('#pinfo-office');
     const of1 = await page.evaluate(() => ({ ap: YAM.game.ap, open: !document.getElementById('talk-layer').hidden, n: document.querySelectorAll('#talk-choices .talk-btn').length, chip: document.getElementById('hdr-ap').className }));
@@ -430,7 +430,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
 
     // v2.9: office buttons show the coach's lines (not the kid's reactions) + KICK OUT OF THE ACADEMY
     const kick = await page.evaluate(() => {
-      const s = YAM.game, p = s.starters().find(x => x.position !== 'GK' && x.available);
+      const s = YAM.game, p = s.starters().find(x => x.archetype !== 'GK' && x.available);
       s.dayState().ap = 1; s.rep.parents = 50; s.rep.squad = 50; YAM.ui.show('team'); YAM.ui.profile.open(p.id);
       return { id: p.id, n0: s.squad.length, slot: s.lineup.indexOf(p.id) };
     });
@@ -449,6 +449,48 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       kb.length === 4 && kb.every(b => !/\{k\}|«|"/.test(b.t)) && kb[3].red && !kb[3].dis && kc.step === 'kickConfirm' && kc.n === 2
       && ka.gone && ka.n === kick.n0 - 1 && ka.xi && ka.rep.join() === '40,45' && ka.closed && !ka.row && ka.saved, JSON.stringify({ kb, kc, ka }));
     await page.evaluate(() => { YAM.game.rep.parents = 50; YAM.game.rep.squad = 50; YAM.ui.show('dash'); });
+
+    // v3.0: fog of war — no native positions, coach's tags, exclusive duties, set-piece takers, captain
+    const fg = await page.evaluate(() => {
+      const s = YAM.game, ids = s.squad.map(p => p.id), [a, b, c] = [s.squad[3], s.squad[6], s.squad[9]];
+      a.tag = null; YAM.ui.profile.open(a.id);
+      const body = document.getElementById('pinfo-body'), txt = body.textContent;
+      return { ids, a: a.id, b: b.id, c: c.id, posGetter: a.position === null && !!a.archetype,
+        noFoot: !/Нога|Foot/.test(txt), bio: /см|cm/.test(txt) && /кг|kg/.test(txt), morale: !!body.querySelector('.energy.morale'),
+        tagBtns: body.querySelectorAll('[data-postag]').length, dutyBtns: body.querySelectorAll('[data-duty]').length,
+        noNums: !/\b(passing|tackling|vision|discipline|composure)\b\s*[:=]?\s*\d/i.test(txt) };
+    });
+    await page.click('#pinfo-body [data-postag="FWD"]');
+    await page.click('#pinfo-body [data-duty="captain"]');
+    const fg1 = await page.evaluate(k => ({ tag: YAM.game.player(k).tag, cap: YAM.game.duties.captain, rowChip: document.querySelector(`#roster .r-row[data-id="${k}"] .pos`)?.textContent,
+      badge: !!document.querySelector(`#roster .r-row[data-id="${k}"] .duty-badge.d-captain`) }), fg.a);
+    await page.keyboard.press('Escape');
+    const fg2 = await page.evaluate(([a, b, c]) => {
+      const s = YAM.game;
+      s.setDuty('captain', b);                         // exclusive: moves from a to b
+      s.setDuty('penalty', c); s.setDuty('corner', a);
+      const cap = s.duties.captain, aDuties = s.dutiesOf(a).join();
+      // anyone can go in goal: an outfield-archetype kid into slot 0
+      const out = s.squad.find(p => p.archetype === 'FWD' && !s.isStarter(p.id) && p.available) || s.squad.find(p => p.archetype !== 'GK' && !s.isStarter(p.id) && p.available);
+      const keep0 = s.lineup[0], sw = out ? s.swapPlayers(keep0, out.id) : 'none';
+      if (out) s.lineup[0] = keep0;
+      // engine: takers + captain + no out-of-position penalty
+      for (const id of [a, b, c]) if (!s.isStarter(id)) { const i = s.lineup.findIndex((x, k) => k > 0 && ![a, b, c].includes(x)); s.lineup[i] = id; }
+      const e = new YAM.MatchEngine(YAM.ui.homeTeam(), s.matchContext() ? s.matchContext().team : { name: 'X', players: YAM.game.league.roster(YAM.game.league.teams[1], new Set()), formation: '4-4-2' },
+        { onLog() {}, onUpdate() {}, onEnd() {} }, { duties: () => s.duties });
+      e.started = true; e.kickoff(0); e.poss = 0; e.zone = 2;
+      e.penalty(0); const pen = e.pendingShot?.shooter?.id, penFlag = !!e.pendingShot?.penalty;
+      e.pendingShot = null;
+      const ck = e.taker(0, 'corner').id, capB = e.captainBonus();
+      const P = s.player(b), line0 = e.lineOf.get(P.id); const v1 = e.eff(P, 'Pass'); e.lineOf.set(P.id, line0 === 'ATT' ? 'DEF' : 'ATT'); const v2 = e.eff(P, 'Pass');
+      e.sentOff.add(b); const capOff = e.captainBonus();
+      return { cap, aDuties, sw, pen, penFlag, ck, capB, capOff, oop: v1 === v2 };
+    }, [fg.a, fg.b, fg.c]);
+    check('fog of war: profile = age/height/weight + energy & morale (no foot, no native position, no numbers); untagged kids show "—"; tag + exclusive duties; anyone in goal; takers & captain in the engine; no out-of-position penalty',
+      fg.posGetter && fg.noFoot && fg.bio && fg.morale && fg.tagBtns === 4 && fg.dutyBtns === 3 && fg.noNums && fg1.tag === 'FWD' && fg1.cap === fg.a && fg1.badge
+      && fg2.cap === fg.b && fg2.aDuties === 'corner' && fg2.sw === null && fg2.pen === fg.c && fg2.penFlag && fg2.ck === fg.a && fg2.capB > 0.5 && fg2.capOff === 0 && fg2.oop,
+      JSON.stringify({ fg, fg1, fg2 }));
+    await page.evaluate(() => { for (const k in YAM.game.duties) YAM.game.duties[k] = null; YAM.game.save(); YAM.ui.renderAll(); });
 
     // v2.4: Monday-first calendar grid + training days + The Truant
     await page.evaluate(() => { YAM.ui.calMonth = '2002-09'; YAM.ui.renderDash(); });
@@ -525,16 +567,16 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const fv = await page.evaluate(() => ({ id: YAM.game.pendingEvent?.id, top: YAM.game.pendingEvent?.cast.top, q: YAM.game.eventQueue.length, modal: !document.getElementById('modal-layer').hidden }));
     await talk(0);   // they start and play the full match
     const fv2 = await page.evaluate(t => {
-      const s = YAM.game, bench = s.bench().find(b => b.available && b.position !== 'GK');
+      const s = YAM.game, bench = s.bench().find(b => b.available && b.archetype !== 'GK');
       return { showcase: t.every(id => s.isStarter(id) && s.player(id).hasFlag('Showcase')), modal: !document.getElementById('modal-layer').hidden,
-        lock: bench ? s.swapPlayers(t.find(id => s.player(id).position !== 'GK') || t[0], bench.id) : 'showcase' };
+        lock: bench ? s.swapPlayers(t.find(id => s.player(id).archetype !== 'GK') || t[0], bench.id) : 'showcase' };
     }, fv.top);
     check('scheduled scout visit: queue persisted (reload), fires on match day before the matchday dialog, top 3 start and are locked in', qPersist && fv.id === 'scoutvisit' && fv.top.length === 3 && fv.q === 0
       && !fv.modal && fv2.showcase && fv2.modal && fv2.lock === 'showcase', JSON.stringify({ qPersist, fv, fv2 }));
     await closeModal();
     const pr = await page.evaluate(() => {
       const p = YAM.game.squad.find(x => x.flags.includes('Promised_Start'));
-      if (YAM.game.isStarter(p.id)) { const fit = YAM.game.bench().filter(b => (b.position === 'GK') === (p.position === 'GK')); const i = YAM.game.lineup.indexOf(p.id); if (fit.length) YAM.game.lineup[i] = (fit.find(b => b.position === p.position) || fit[0]).id; else window.__noFit = YAM.game.bench().map(b => [b.id, b.position, b.available]); }
+      if (YAM.game.isStarter(p.id)) { const fit = YAM.game.bench(); /* v3.0: no position rules */ const i = YAM.game.lineup.indexOf(p.id); if (fit.length) YAM.game.lineup[i] = (fit.find(b => b.archetype === p.archetype) || fit[0]).id; else window.__noFit = YAM.game.bench().map(b => [b.id, b.archetype, b.available]); }
       const b0 = YAM.game.budget, m0 = p.dyn.morale, starter = YAM.game.isStarter(p.id);
       YAM.ui.checkPromises();
       return { starter, refund: b0 - YAM.game.budget, morale: p.dyn.morale < m0 || m0 === 0, cleared: !p.flags.length };
