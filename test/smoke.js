@@ -173,7 +173,46 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       return t.squad.map(k => ({ en: k.en, played: e.sides[1].all.some(p => p.id === k.id), end: Math.round(e.energy.get(k.id) ?? -1) })); }, opp0.name);
     check('AI fatigue: the opponent XI keeps its end-of-match energy, the rest +6 (capped)', aiAfter.filter(k => k.played).length === 11
       && aiAfter.every(k => k.played ? k.en === Math.max(0, Math.min(100, k.end)) && k.en < 100 : k.en === 100), JSON.stringify(aiAfter.map(k => k.en)));
+    // v3.5: Match Summary = blocking modal until the team talk; then Coach's Word unlocks Proceed
+    const lock = await page.evaluate(() => {
+      const ui = YAM.ui, view0 = ui.view, id = YAM.game.squad[0].id;
+      document.querySelector('.tk[data-view=table]').click();
+      document.getElementById('btn-startmenu').click();
+      ui.show('team'); ui.profile.open(id); ui.teamCard.open(1); ui.debug.open(); ui.locker.open();
+      document.querySelector('#roster .r-row')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      document.getElementById('msum-go').click(); document.getElementById('msum-x').click();
+      return { view: ui.view === view0, lock: ui.modalLock, cls: document.body.classList.contains('modal-lock'),
+        inert: ['desktop', 'taskbar', 'startmenu'].every(i => document.getElementById(i).inert),
+        start: !document.getElementById('startmenu').classList.contains('open'),
+        others: ['pinfo-layer', 'troster-layer', 'debug-layer', 'locker-room-view'].every(i => document.getElementById(i).hidden),
+        table: !document.getElementById('win-table').classList.contains('open'), open: !document.getElementById('msum-layer').hidden,
+        goOff: document.getElementById('msum-go').disabled && document.getElementById('msum-x').disabled,
+        btns: document.querySelectorAll('#msum-body .ms-talk-btn:not([disabled])').length,
+        tags: [...document.querySelectorAll('#msum-body .ms-talk-btn')].every(b => b.querySelector('.fx i')),
+        pending: YAM.game.lastReport.talk === null && /"talk":null/.test(localStorage.getItem('yam_save_v1')) };
+    });
+    await page.keyboard.press('Escape');
+    lock.escKept = await page.evaluate(() => !document.getElementById('msum-layer').hidden);
+    check('v3.5 modal lock: Match Summary blocks taskbar / Start / views / profile / roster / debug / locker; Esc, × and Proceed refused before the team talk',
+      Object.values(lock).every(Boolean) && lock.btns === 3, JSON.stringify(lock));
+    const before = await page.evaluate(() => ({ m: YAM.game.squad.map(p => p.dyn.morale), rep: { ...YAM.game.rep }, d: YAM.game.diary.length }));
+    await page.click('#msum-body [data-talk="praise"]');
+    await shot('3b-teamtalk');
+    const tt = await page.evaluate(b => {
+      const s = YAM.game, fx = talkEffects('praise', s.lastReport), cl = v => Math.max(0, Math.min(100, v));
+      return { fx: !!fx, talk: s.lastReport.talk === 'praise', saved: /"talk":"praise"/.test(localStorage.getItem('yam_save_v1')),
+        morale: s.squad.every((p, i) => p.dyn.morale === cl(b.m[i] + fx.morale)),
+        rep: ['board', 'parents', 'squad'].every(k => s.rep[k] === cl(b.rep[k] + (fx[k] || 0))),
+        diary: s.diary.length === Math.min(80, b.d + 1) && s.diary[s.diary.length - 1].key === 'tt.diary',
+        react: !!document.querySelector('#msum-body .ms-talk-react:not(.wait)'),
+        locked: document.querySelectorAll('#msum-body .ms-talk-btn:not([disabled])').length === 0 && !!document.querySelector('#msum-body .ms-talk-btn.chosen'),
+        go: !document.getElementById('msum-go').disabled, stillLocked: YAM.ui.modalLock };
+    }, before);
     await page.click('#msum-go');
+    tt.unlocked = await page.evaluate(() => !YAM.ui.modalLock && YAM.ui.view === 'notes' && !document.getElementById('taskbar').inert && !document.body.classList.contains('modal-lock'));
+    check('v3.5 team talk: praise applies morale + factions once, diary + save, reaction line, buttons locked, Proceed enabled → Notebook unlocks the desktop',
+      Object.values(tt).every(Boolean), JSON.stringify(tt));
 
     // notebook
     await closeModal();
@@ -710,6 +749,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.waitForFunction(() => YAM.game.phase === 'post', null, { timeout: 5000 });
     const qsum = await page.evaluate(() => ({ open: !document.getElementById('msum-layer').hidden, quick: /QUICK|БЫСТР/.test(document.getElementById('msum-body').textContent),
       goals: document.querySelectorAll('#msum-body .ms-ev.goal').length, total: YAM.game.lastReport.gf + YAM.game.lastReport.ga }));
+    await page.click('#msum-body [data-talk="excuse"]');
     await page.click('#msum-go');
     check('Quick Sim → Match Summary first (same event list), then Notebook', qsum.open && qsum.quick && qsum.goals === qsum.total, JSON.stringify(qsum));
     const qs = await page.evaluate(e0 => ({ ms: YAM.ui.lastSimMs, view: YAM.ui.view, cards: document.querySelectorAll('#notes-body .card').length,
@@ -721,6 +761,22 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('after the match: showcase cleared (+ diary per kid), suspension served (2 → 1)', !after.showcase && after.sus === 1 && after.diary === fv.top.filter(id => id !== ex0.kid).length, JSON.stringify(after));
     check('Quick Sim: button → result in ms, Notebook opens, stats/energy/fixtures recorded', qs0.btn && qs.ms < 250 && qs.view === 'notes' && qs.cards === 3 && qs.md2 && !qs.modal
       && qs.apps >= qs0.apps + 11 && qs.tired && qs.score.replace(/\s/g, '') === qs.rep, JSON.stringify(qs));
+    // v3.5: reload before the team talk → straight back to the locked Match Summary; tough love = discipline + Board, Parents −3 after a win
+    await page.evaluate(() => { const s = YAM.game; s.lastReport.talk = null; s.lastReport.result = 'W'; s.lastReport.gf = Math.max(s.lastReport.gf, s.lastReport.ga + 1);
+      s.squad.forEach(p => { p.dyn.morale = 50; p.psych.discipline = Math.min(p.psych.discipline, 10); }); s.rep.board = 50; s.rep.parents = 50; s.save(); });
+    await page.reload();
+    await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    await page.evaluate(() => { YAM.game.excusesOff = true; });
+    const rl = await page.evaluate(() => ({ open: !document.getElementById('msum-layer').hidden, lock: YAM.ui.modalLock && document.getElementById('taskbar').inert,
+      go: document.getElementById('msum-go').disabled, csv: document.getElementById('msum-csv').disabled,
+      disc: YAM.game.squad.map(p => p.psych.discipline) }));
+    await page.click('#msum-body [data-talk="tough"]');
+    const rl2 = await page.evaluate(d => ({ talk: YAM.game.lastReport.talk, board: YAM.game.rep.board, parents: YAM.game.rep.parents,
+      morale: YAM.game.squad.every(p => p.dyn.morale === 44), disc: YAM.game.squad.every((p, i) => p.psych.discipline === d[i] + 1) }), rl.disc);
+    await page.click('#msum-go');
+    rl2.notes = await page.evaluate(() => YAM.ui.view === 'notes' && !YAM.ui.modalLock);
+    check('v3.5 save: reload before the talk re-opens the locked Match Summary; tough love after a win = discipline +1, morale −6, Board +2, Parents −3',
+      rl.open && rl.lock && rl.go && rl.csv && rl2.talk === 'tough' && rl2.board === 52 && rl2.parents === 47 && rl2.morale && rl2.disc && rl2.notes, JSON.stringify({ rl, rl2 }));
     // v3.3: smooth fatigue curve + asymmetric shouts
     const fm = await page.evaluate(() => {
       const pts = [[100, 1.00], [75, 0.994], [50, 0.975], [25, 0.944], [0, 0.90]].map(([e, t]) => ({ e, v: fatigueMult(e), ok: Math.abs(fatigueMult(e) - t) <= 0.005 }));

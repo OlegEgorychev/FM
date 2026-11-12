@@ -58,7 +58,7 @@ class DebugConsole {
     }, true);
   }
   get isOpen() { return !this.layer.hidden; }
-  open() { if (this.ui.modal.isOpen) return; this.ui.profile.close(); this.msg = ''; this.render(); this.layer.hidden = false; document.getElementById('debug-ok').focus(); }
+  open() { if (this.ui.modal.isOpen || this.ui.modalLock) return; this.ui.profile.close(); this.msg = ''; this.render(); this.layer.hidden = false; document.getElementById('debug-ok').focus(); }
   close() { this.layer.hidden = true; }
 
   heat(v, s) {

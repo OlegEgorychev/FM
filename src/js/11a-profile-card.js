@@ -43,7 +43,7 @@ class ProfileCard {
   }
 
   open(id) {
-    if (!this.resolve(id) || this.ui.modal.isOpen || this.ui.events?.view.isOpen) return;   // v2.7: never under a dialogue
+    if (this.ui.modalLock || !this.resolve(id) || this.ui.modal.isOpen || this.ui.events?.view.isOpen) return;   // v2.7: never under a dialogue
     this.id = id;
     this.lastSig = '';
     this.render();

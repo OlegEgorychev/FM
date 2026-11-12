@@ -22,7 +22,7 @@ class TeamRosterCard {
 
   open(teamId) {
     const team = this.ui.state.league.team(teamId);
-    if (!team || this.ui.modal.isOpen) return;
+    if (!team || this.ui.modal.isOpen || this.ui.modalLock) return;   // v3.5
     this.teamId = teamId;
     this.render();
     this.lastFocus = document.activeElement;

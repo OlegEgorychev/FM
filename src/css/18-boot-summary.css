@@ -99,3 +99,31 @@
 .ms-stats b{ display: block; font: bold 15px/1.2 var(--mono); color: #111; }
 .ms-go{ width: 100%; padding: 12px; font: bold 15px/1 var(--mono) !important; letter-spacing: 1px; text-transform: uppercase; }
 @media (max-width: 640px){ .ms-score{ font-size: 38px; } .ms-stats{ grid-template-columns: repeat(2, 1fr); } }
+
+/* v3.5 MODAL LOCK — Match Summary blocks the desktop: dark backdrop over everything (taskbar included),
+   locked navigation shown greyed out. The DOM behind is `inert` (12-ui.js setModalLock). */
+#msum-layer{ inset: 0; padding-bottom: 50px; }
+body.modal-lock #taskbar, body.modal-lock .icons{ filter: grayscale(1) brightness(.7); cursor: not-allowed; }
+body.modal-lock #taskbar *, body.modal-lock .icons *{ pointer-events: none; }
+body.modal-lock #startmenu{ display: none; }
+#msum-x:disabled{ opacity: .45; cursor: not-allowed; }
+.ms-go:disabled{ color: var(--shadow) !important; text-shadow: 1px 1px 0 #fff; cursor: not-allowed; }
+
+/* v3.5 POST-MATCH TEAM TALK ("Coach's Word") */
+.ms-talk{ padding: 8px 10px 10px; border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); background: #d4d0c8; }
+.ms-talk h4{ margin: 0 0 6px; font: bold 12px/1 var(--mono); letter-spacing: 1.5px; text-transform: uppercase; color: #6b1d1d; }
+.ms-talk-btns{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ms-talk-btn{ display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 6px 8px !important; text-align: left; min-height: 74px; white-space: normal; }
+.ms-talk-btn b{ font: bold 13px/1.2 var(--ui); color: #111; }
+.ms-talk-btn .q{ font: italic 12px/1.25 var(--ui); color: #333; }
+.ms-talk-btn .fx{ display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; }
+.ms-talk-btn .fx i{ font: bold 10px/1 var(--mono); font-style: normal; padding: 2px 4px; border: 1px solid #0003; letter-spacing: .3px; }
+.ms-talk-btn .fx i.up{ background: #b9e3ad; color: #134d0b; } .ms-talk-btn .fx i.dn{ background: #f0b8ae; color: #6d150a; } .ms-talk-btn .fx i.eq{ background: #e6e2d8; color: #555; }
+.ms-talk-btn:disabled{ opacity: .55; cursor: default; }
+.ms-talk-btn.chosen:disabled{ opacity: 1; outline: 2px solid #6b1d1d; outline-offset: -4px; }
+.ms-talk-react{ margin-top: 7px; font: 13px/1.35 var(--mono); color: #111; }
+.ms-talk-react.wait{ color: #555; font-style: italic; }
+.ms-talk.nudge{ animation: msTalkNudge .45s steps(2) 2; }
+@keyframes msTalkNudge{ 50%{ background: #f1d27a; } }
+@media (max-width: 640px){ .ms-talk-btns{ grid-template-columns: 1fr; } .ms-talk-btn{ min-height: 0; } }
+@media (prefers-reduced-motion: reduce){ .ms-talk.nudge{ animation: none; } }

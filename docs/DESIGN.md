@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v3.4)
+# Youth Academy Manager — design notes (current: v3.5)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -189,3 +189,17 @@ Leading by one at 60' → win%: before Neutral 80.8 / Attack 66.0 / Defense 90.4
 - **Briefing**: on match day `mb.oppForm` adds "their starters average X% energy (N running on fumes)" (`league.oppCondition()`).
 - **Match log**: `MatchEngine.rs()` builds each side of a headline duel with all terms (`rating`, `fat`, `tag`, `stat` = rating×fat×tag, `mood`, `rand`, `flat` extras {base, fwd, gk, touch, cross, sup, bonus, long, keeper, delivery, header}, `shout`, `rep`, `cap`, `cheat`, `total`); `tr()` stores {min, kind, side, zone, A, D, margin, out}. Kinds: pass, passFwd, dribble, block, shot, longShot, freekick, penalty, corner, header; outcomes ok/intercepted/tackled/foul/blocked/through/goal/saved/wide/header/cleared. Ambient play is not traced. RNG order unchanged (balance tables identical). `logData(meta)` = JSON (teams: duel stats per kind, avg terms, players with energy/fatigue start+end, shouts, subs, events, trace); `MatchEngine.traceCsv(trace, names, pre)` = CSV (comma, dot decimals). UI: `ui.lastMatchLog` (memory only, last match) → Match Summary buttons LOG .CSV / LOG .JSON (`ui.download()`). Note: the log contains hidden ratings — a deliberate developer tool exception. `node test/balance.js --log out.csv` writes the trace of 20 matches per setup + `out.matches.csv`.
 - **Fix**: `sentOff` is created before `opts.missing` is applied — short-handed kick-offs (fewer than 11 at the locker room) used to throw.
+
+## Match Summary modal lock + post-match team talk (v3.5)
+- **Modal lock**: while `MATCH_SUMMARY.EXE` is open, `ui.modalLock` is true. `setModalLock(true)` (called by `MatchSummary.open`) closes the Modal / profile / team roster / DEBUG / locker / briefing, adds `body.modal-lock` (taskbar + desktop icons greyed out, Start menu hidden) and makes `#desktop`, `#taskbar`, `#startmenu` `inert`. A window-capture blocker swallows click / dblclick / mousedown / pointerdown / contextmenu / dragstart outside `#msum-layer`, `#modal-layer`, `#talk-layer` (and `a[download]` for the log export). `show()`, `toggleStart()`, `profile.open`, `teamCard.open`, `debug.open`, `locker.open`, `briefing.open` all refuse while locked. The lock is released only by `MatchSummary.close()`: Proceed (→ Notebook) or × / Esc once the talk is done.
+- **Esc / ×**: the v2.7 Escape manager calls `summary.requestClose()`, which refuses (status-bar hint + flash on the talk block) while the talk is owed. Proceed and × are `disabled` until then.
+- **Team talk ("Coach's Word")**: a block under the stats with 3 buttons (`TEAM_TALK.KEYS` in 00-utils-data.js). `talkOutcome(rep)` = W / D / L, or `heavy` when lost by ≥ `HEAVY_LOSS` (2) goals; `talkEffects(key, rep)` picks the row. `GameState.applyTeamTalk(key)` applies it once (only while `state.talkPending`): `morale` = flat to every kid's `dyn.morale` (0–100); `disc` = +discipline for kids below `DISC_CAP` 16 (1–20 scale, so +1 ≈ "+5" on a 0–100 scale); `board` / `parents` / `squad` via `addRep()`. Then diary `tt.diary`, save.
+
+| Talk | W | D | L | heavy L (−2+) |
+|---|---|---|---|---|
+| praise ("Good effort, lads") | morale +6, squad +2 | morale +6, squad +2 | morale +5, squad +2 | morale +5, squad +2, **board −3** |
+| tough ("Too lazy") | morale −6, disc +1, board +2, **parents −3** | morale −6, disc +1, board +2 | morale −5, disc +1, board +2 | morale −5, disc +2, board +2 |
+| excuse ("Ref and mud") | morale 0, parents +2, board −3 | morale +3, parents +2, board −3 | morale +5, parents +2, board −3 | morale +5, parents +2, board −4 |
+
+  These come on top of the result itself (`MORALE[W/D/L]`, `REP.MATCH`), so "excuse" softens a loss (−6 → about −1) instead of reversing it. Buttons show direction tags only (+Morale / −Board), the tooltip explains the rule; after the click a one-line reaction (`tt.react.<key>.<outcome>`) replaces the prompt.
+- **Save**: `lastReport.talk` = `null` (owed) → key once chosen; older reports have no field = nothing owed. On load `talkPending` re-opens the Match Summary (locked) before anything else (after a pending narrative event); `closeMatchday()` also re-opens it instead of closing the day. The match log (`ui.lastMatchLog`) is still memory-only, so LOG buttons are disabled after a reload.

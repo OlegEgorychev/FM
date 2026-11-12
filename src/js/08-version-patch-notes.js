@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.5', name: { en: 'Coach\'s Word', ru: 'Слово тренера' },
+    en: [
+      'After every match the Match Summary asks for your Coach\'s Word: praise the squad, give them some tough love, or blame the ref and the mud.',
+      'Each talk has a clear trade-off between morale, discipline and the Board, Parents and Squad — the tags on the buttons show which way things move, and the dressing room reacts at once.',
+      'What fits a win can backfire after a defeat (and the other way round): praising a heavy defeat annoys the Board, a hard word after a win upsets the parents.',
+      'Fixed: other windows could open behind the Match Summary. It is now a proper blocking window — the taskbar, Start menu and desktop are locked until you leave it, and Esc no longer skips the talk.',
+      'Reloading before the talk brings you straight back to the Match Summary. The chosen talk is written in the club diary.',
+    ],
+    ru: [
+      'После каждого матча в итогах появилось «Слово тренера»: похвалить команду, жёстко разобрать игру или свалить всё на судью и грязь.',
+      'У каждого варианта свой размен между моралью, дисциплиной и Правлением, Родителями и Командой — метки на кнопках показывают, что вырастет, а что упадёт, и раздевалка реагирует сразу.',
+      'Что хорошо после победы, может навредить после поражения (и наоборот): похвала после разгрома злит Правление, а разнос после победы — родителей.',
+      'Исправлено: за итогами матча могли открываться другие окна. Теперь это настоящее блокирующее окно — панель задач, меню «Пуск» и рабочий стол заблокированы, пока ты его не покинешь, а Esc больше не пропускает разговор.',
+      'Если перезагрузить игру до разговора, она сразу вернёт тебя в итоги матча. Выбранное слово тренера записывается в дневник клуба.',
+    ] },
   { v: '3.4', name: { en: 'Tired Legs Everywhere', ru: 'Устают все' },
     en: [
       'Rival clubs now get tired too: their kids train, rest and play by the same rules as yours, and a worn-out starter gets rotated. A strong club can turn up with heavy legs.',

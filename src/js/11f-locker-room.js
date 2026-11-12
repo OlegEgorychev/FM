@@ -30,6 +30,7 @@ class LockerRoom {
   /** Opens the room; the first time today the arrivals are rolled and the doors open one by one. */
   open() {
     const s = this.state;
+    if (this.ui.modalLock) return;   // v3.5
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
     if (!s.dayState().briefed) { this.ui.briefing.open(); return; }   // v2.8: morning briefing first

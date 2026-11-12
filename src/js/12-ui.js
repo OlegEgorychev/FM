@@ -42,6 +42,7 @@ class UIController {
     this.show('dash');
     if (this.state.phase === 'draft') this.draft.open();   // v3.1: a new academy starts at the Yard Match
     if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
+    else if (this.state.talkPending) this.summary.open(this.state.lastReport);   // v3.5: reload before the team talk → back to the Match Summary
     this.checkUpdateNotice();
   }
 
@@ -132,6 +133,7 @@ class UIController {
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
     if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
+    if (x && typeof x === 'object' && 'talk' in x) return L.t('tt.name.' + x.talk);  // v3.5 diary
     if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
@@ -152,6 +154,15 @@ class UIController {
 
   /* ---------- navigation ---------- */
   bind() {
+    /* v3.5: MODAL LOCK — while the Match Summary is open nothing behind it reacts (taskbar, Start menu, desktop icons,
+       right-click profiles, table rows…). The DOM behind is also `inert` (no focus / keyboard), see setModalLock(). */
+    const MODAL_OK = '#msum-layer, #modal-layer, #talk-layer, a[download]';   // a[download]: ui.download() (LOG .CSV)
+    for (const type of ['click', 'dblclick', 'mousedown', 'pointerdown', 'contextmenu', 'dragstart']) {
+      window.addEventListener(type, e => {
+        if (!this.modalLock || e.target.closest?.(MODAL_OK)) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+      }, true);
+    }
     /* v1.5: Player Profile Card — right-click any player element, or press its [i] button.
        Capture phase + stopPropagation so the [i] never triggers the click-to-swap underneath. */
     const pidOf = el => el?.closest('[data-info]')?.dataset.info || el?.closest('[data-pid]')?.dataset.pid
@@ -221,7 +232,7 @@ class UIController {
       { el: this.events.view.layer, close: null },
       { el: this.modal.layer, close: () => this.modal.close() },
       { el: this.debug.layer, close: () => this.debug.close() },
-      { el: this.summary.layer, close: () => this.summary.close() },
+      { el: this.summary.layer, close: () => this.summary.requestClose() },   // v3.5: no Esc-out before the team talk
       { el: this.teamCard.layer, close: () => this.teamCard.close() },
       { el: this.profile.layer, close: () => this.profile.close() },
       { el: this.locker.layer, close: () => this.locker.close() },
@@ -337,10 +348,22 @@ class UIController {
 
   toggleStart(force) {
     const m = this.$('startmenu');
+    if (this.modalLock) force = false;   // v3.5
     m.classList.toggle('open', force ?? !m.classList.contains('open'));
   }
 
   get live() { return !!(this.engine && !this.engine.finished); }
+
+  /** v3.5: true while MATCH_SUMMARY.EXE is open — a blocking modal: no other window or navigation until it is left. */
+  get modalLock() { return !!this.summary?.isOpen; }
+  setModalLock(on) {
+    document.body.classList.toggle('modal-lock', on);
+    for (const id of ['desktop', 'taskbar', 'startmenu']) this.$(id).inert = on;
+    if (on) {
+      this.toggleStart(false);
+      this.modal.close(); this.profile.close(); this.teamCard.close(); this.debug.close(); if (this.locker.isOpen) this.locker.close(); if (this.briefing.isOpen) this.briefing.close();
+    }
+  }
 
   /* ---------- MATCH: live roster & substitutions (left column, v1.1) ---------- */
   renderLiveRoster() {
@@ -479,6 +502,7 @@ class UIController {
   get notesOpen() { return this.state.phase === 'post' && this.state.notebookUnlocked && !!this.state.lastReport; }
 
   show(view) {
+    if (this.modalLock) return;   // v3.5: the Match Summary decides where we go next
     if (view === 'notes' && !this.notesOpen) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'), 'warn'); return; }
     if (view === 'match' && !this.matchOpen) { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
     this.view = view;
@@ -932,6 +956,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   closeMatchday() {
     const s = this.state;
     if (s.phase !== 'post') { this.show('dash'); return; }
+    if (s.talkPending) { this.summary.open(s.lastReport); return; }   // v3.5: no closing the matchday before the team talk
     const ev = s.nextMatchEvent();
     const rep = s.lastReport;
     this.cal.completeEvent(ev.id);
@@ -1323,6 +1348,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
       events: eng.matchEvents.map(e => ({ ...e })), ht: eng.htScore || null, instant: !!eng.instant,
+      talk: null,   // v3.5: post-match team talk still owed (forced in the Match Summary)
       totals: [eng.teamTotals(0), eng.teamTotals(1)].map(t => ({ shots: t.shots, onTarget: t.onTarget, passOk: t.passOk, passFail: t.passFail, yellow: t.yellow, red: t.red })),
       poss: Math.round(eng.possTicks[0] / ((eng.possTicks[0] + eng.possTicks[1]) || 1) * 100),
       players: shuffle(played).slice(0, 3).map(p => ({

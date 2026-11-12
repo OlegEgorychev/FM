@@ -368,6 +368,22 @@ class GameState {
       p.dyn.morale = clamp(Math.round(p.dyn.morale + m * (0.6 + p.psych.passion / 25)), 0, 100);
     }
   }
+  /** v3.5: the post-match team talk is still owed (lastReport.talk === null; older saves have no field = done). */
+  get talkPending() { return this.phase === 'post' && !!this.lastReport && this.lastReport.talk === null; }
+  /** v3.5: apply the chosen post-match talk once (TEAM_TALK table), log it in the diary and save. Returns the effects or null. */
+  applyTeamTalk(key) {
+    const rep = this.lastReport, fx = rep && talkEffects(key, rep);
+    if (!fx || !this.talkPending) return null;
+    for (const p of this.squad) {
+      if (fx.morale) p.dyn.morale = clamp(Math.round(p.dyn.morale + fx.morale), 0, 100);
+      if (fx.disc && p.psych.discipline < TEAM_TALK.DISC_CAP) p.psych.discipline = Math.min(TEAM_TALK.DISC_CAP, p.psych.discipline + fx.disc);
+    }
+    for (const k of ['board', 'parents', 'squad']) if (fx[k]) this.addRep(k, fx[k]);
+    rep.talk = key;
+    this.addDiary({ date: this.calendar.date, key: 'tt.diary', vars: { o: { team: rep.opponent }, t: { talk: key } }, cls: 'ev' });
+    this.save();
+    return fx;
+  }
   /** v1.1: players who played keep their LIVE end-of-match energy; unused subs rest. */
   applyLiveFatigue(eng) {
     for (const p of this.squad) {

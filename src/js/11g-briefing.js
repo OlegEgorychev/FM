@@ -33,6 +33,7 @@ class MorningBriefing {
 
   open() {
     const s = this.state;
+    if (this.ui.modalLock) return;   // v3.5
     if (this.ui.events.active) { this.ui.events.open(); return; }
     this.ui.modal.close(); this.ui.profile.close();
     this.render();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.4</title>
+<title>Youth Academy Manager v3.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1398,6 +1398,34 @@ body.fx .crt-scan{ opacity: .9; }
 .ms-stats b{ display: block; font: bold 15px/1.2 var(--mono); color: #111; }
 .ms-go{ width: 100%; padding: 12px; font: bold 15px/1 var(--mono) !important; letter-spacing: 1px; text-transform: uppercase; }
 @media (max-width: 640px){ .ms-score{ font-size: 38px; } .ms-stats{ grid-template-columns: repeat(2, 1fr); } }
+
+/* v3.5 MODAL LOCK — Match Summary blocks the desktop: dark backdrop over everything (taskbar included),
+   locked navigation shown greyed out. The DOM behind is `inert` (12-ui.js setModalLock). */
+#msum-layer{ inset: 0; padding-bottom: 50px; }
+body.modal-lock #taskbar, body.modal-lock .icons{ filter: grayscale(1) brightness(.7); cursor: not-allowed; }
+body.modal-lock #taskbar *, body.modal-lock .icons *{ pointer-events: none; }
+body.modal-lock #startmenu{ display: none; }
+#msum-x:disabled{ opacity: .45; cursor: not-allowed; }
+.ms-go:disabled{ color: var(--shadow) !important; text-shadow: 1px 1px 0 #fff; cursor: not-allowed; }
+
+/* v3.5 POST-MATCH TEAM TALK ("Coach's Word") */
+.ms-talk{ padding: 8px 10px 10px; border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); background: #d4d0c8; }
+.ms-talk h4{ margin: 0 0 6px; font: bold 12px/1 var(--mono); letter-spacing: 1.5px; text-transform: uppercase; color: #6b1d1d; }
+.ms-talk-btns{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ms-talk-btn{ display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 6px 8px !important; text-align: left; min-height: 74px; white-space: normal; }
+.ms-talk-btn b{ font: bold 13px/1.2 var(--ui); color: #111; }
+.ms-talk-btn .q{ font: italic 12px/1.25 var(--ui); color: #333; }
+.ms-talk-btn .fx{ display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; }
+.ms-talk-btn .fx i{ font: bold 10px/1 var(--mono); font-style: normal; padding: 2px 4px; border: 1px solid #0003; letter-spacing: .3px; }
+.ms-talk-btn .fx i.up{ background: #b9e3ad; color: #134d0b; } .ms-talk-btn .fx i.dn{ background: #f0b8ae; color: #6d150a; } .ms-talk-btn .fx i.eq{ background: #e6e2d8; color: #555; }
+.ms-talk-btn:disabled{ opacity: .55; cursor: default; }
+.ms-talk-btn.chosen:disabled{ opacity: 1; outline: 2px solid #6b1d1d; outline-offset: -4px; }
+.ms-talk-react{ margin-top: 7px; font: 13px/1.35 var(--mono); color: #111; }
+.ms-talk-react.wait{ color: #555; font-style: italic; }
+.ms-talk.nudge{ animation: msTalkNudge .45s steps(2) 2; }
+@keyframes msTalkNudge{ 50%{ background: #f1d27a; } }
+@media (max-width: 640px){ .ms-talk-btns{ grid-template-columns: 1fr; } .ms-talk-btn{ min-height: 0; } }
+@media (prefers-reduced-motion: reduce){ .ms-talk.nudge{ animation: none; } }
 /* =========================================================
    v2.6 — LOCKER ROOM (row of metal lockers; doors swing open one by one)
    ========================================================= */
@@ -2099,6 +2127,19 @@ const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
+/* v3.5 POST-MATCH TEAM TALK ("Coach's Word" in the Match Summary). One forced choice per match, effects by result (W / D / L).
+   morale = every kid's dyn.morale (0–100, flat); board / parents / squad = state.rep (0–100);
+   disc = +discipline (1–20 scale) for kids below DISC_CAP. "Heavy loss" = lost by HEAVY_LOSS+ goals. */
+const TEAM_TALK = {
+  KEYS: ['praise', 'tough', 'excuse'],
+  HEAVY_LOSS: 2, DISC_CAP: 16,
+  praise: { W: { morale: 6, squad: 2 }, D: { morale: 6, squad: 2 }, L: { morale: 5, squad: 2 }, heavy: { morale: 5, squad: 2, board: -3 } },
+  tough:  { W: { morale: -6, disc: 1, board: 2, parents: -3 }, D: { morale: -6, disc: 1, board: 2 }, L: { morale: -5, disc: 1, board: 2 }, heavy: { morale: -5, disc: 2, board: 2 } },
+  excuse: { W: { morale: 0, parents: 2, board: -3 }, D: { morale: 3, parents: 2, board: -3 }, L: { morale: 5, parents: 2, board: -3 }, heavy: { morale: 5, parents: 2, board: -4 } },
+};
+/** v3.5: 'W' | 'D' | 'L' | 'heavy' for a lastReport. */
+const talkOutcome = rep => rep.result === 'L' && rep.ga - rep.gf >= TEAM_TALK.HEAVY_LOSS ? 'heavy' : rep.result;
+const talkEffects = (key, rep) => (TEAM_TALK[key] && TEAM_TALK[key][talkOutcome(rep)]) || null;
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
 const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 10,   // v2.4: rest days +10 (training days cost 10)
   EXHAUSTED: 30,                        // assistant warning threshold (live energy)
@@ -3165,6 +3206,61 @@ Object.assign(I18N.ru, {
   'office.blk.noAp': 'Очков действий на сегодня нет. Приходи завтра.', 'office.blk.noAp.btn': '[ НЕТ ОЧКОВ ДЕЙСТВИЙ ]',
   'office.blk.busy': 'Не сейчас: идёт матч или разговор.', 'office.blk.busy.btn': '[ НЕ СЕЙЧАС ]',
 });
+
+
+/* ---- v3.5: post-match team talk ("Coach's Word") in the Match Summary ---- */
+Object.assign(I18N.en, {
+  'tt.title': 'Coach\'s Word',
+  'tt.needed': 'The kids are waiting in the dressing room. Say your word before you leave.',
+  'tt.prompt.W': 'They won. A row of muddy faces looks up at you.', 'tt.prompt.D': 'A draw. Nobody is sure whether to smile.',
+  'tt.prompt.L': 'A defeat. Heads down, boots still on.', 'tt.prompt.heavy': 'A heavy defeat. Silence, apart from one kid sniffing.',
+  'tt.name.praise': 'Praise the squad', 'tt.name.tough': 'Tough love', 'tt.name.excuse': 'Blame the ref and the mud',
+  'tt.say.praise': '"Good effort, lads — you fought to the end!"', 'tt.say.tough': '"Not good enough. Too lazy. We\'ll fix it at training."',
+  'tt.say.excuse': '"The ref and that swamp ruined the game."',
+  'tt.tip.praise': 'Morale up and the dressing room likes you. The Board frowns at praise after a heavy defeat.',
+  'tt.tip.tough': 'Discipline up and the Board approves, but morale drops. After a win the parents think you are too harsh.',
+  'tt.tip.excuse': 'Shields morale after a draw or a loss and the parents agree, but the Board sees excuses.',
+  'tt.fx.morale': 'Morale', 'tt.fx.disc': 'Discipline', 'tt.fx.board': 'Board', 'tt.fx.parents': 'Parents', 'tt.fx.squad': 'Squad', 'tt.fx.none': 'No change',
+  'tt.react.praise.W': 'Cheers and shin pads in the air. Someone starts a chant.',
+  'tt.react.praise.D': 'Shoulders relax. A few kids grin at each other.',
+  'tt.react.praise.L': 'They nod quietly. At least the coach is with them.',
+  'tt.react.praise.heavy': 'The kids perk up — but the Board rep by the door shakes his head.',
+  'tt.react.tough.W': 'The cheering stops dead. A parent at the door mutters "they WON, though".',
+  'tt.react.tough.D': 'Nobody speaks. Boots get laced a little tighter.',
+  'tt.react.tough.L': 'Red ears all round. They know you are right.',
+  'tt.react.tough.heavy': 'Dead silence. Tomorrow\'s training will be a long one.',
+  'tt.react.excuse.W': 'The kids look confused — they won, didn\'t they?',
+  'tt.react.excuse.D': '"Yeah, that ref!" The mood lifts, the parents nod along.',
+  'tt.react.excuse.L': 'The blame moves off their shoulders. The parents agree loudly.',
+  'tt.react.excuse.heavy': 'It softens the blow for the kids — but the Board hears excuses.',
+  'tt.diary': 'Coach\'s word after {o}: {t}.',
+});
+Object.assign(I18N.ru, {
+  'tt.title': 'Слово тренера',
+  'tt.needed': 'Ребята ждут в раздевалке. Скажи своё слово, прежде чем уйти.',
+  'tt.prompt.W': 'Победа. Ряд чумазых лиц смотрит на тебя.', 'tt.prompt.D': 'Ничья. Никто не знает, улыбаться или нет.',
+  'tt.prompt.L': 'Поражение. Головы опущены, бутсы ещё на ногах.', 'tt.prompt.heavy': 'Разгром. Тишина, только кто-то шмыгает носом.',
+  'tt.name.praise': 'Похвалить команду', 'tt.name.tough': 'Жёсткий разбор', 'tt.name.excuse': 'Свалить на судью и грязь',
+  'tt.say.praise': '«Молодцы, бились до конца!»', 'tt.say.tough': '«Расслабились. На тренировке отработаете.»',
+  'tt.say.excuse': '«Судья и болото испортили игру.»',
+  'tt.tip.praise': 'Мораль растёт, раздевалка за тебя. Правлению не нравится хвалить после разгрома.',
+  'tt.tip.tough': 'Дисциплина растёт, Правление довольно, но мораль падает. После победы родители сочтут тебя слишком строгим.',
+  'tt.tip.excuse': 'Защищает мораль после ничьей или поражения, родители согласны, но Правление видит отговорки.',
+  'tt.fx.morale': 'Мораль', 'tt.fx.disc': 'Дисциплина', 'tt.fx.board': 'Правление', 'tt.fx.parents': 'Родители', 'tt.fx.squad': 'Команда', 'tt.fx.none': 'Без изменений',
+  'tt.react.praise.W': 'Крики радости, щитки летят вверх. Кто-то затягивает кричалку.',
+  'tt.react.praise.D': 'Плечи расслабились. Пара ребят переглядывается с улыбкой.',
+  'tt.react.praise.L': 'Молча кивают. Хотя бы тренер на их стороне.',
+  'tt.react.praise.heavy': 'Ребята оживились — но человек из Правления у двери качает головой.',
+  'tt.react.tough.W': 'Ликование обрывается. Родитель у двери бормочет: «Они же ВЫИГРАЛИ».',
+  'tt.react.tough.D': 'Все молчат. Шнурки затягивают покрепче.',
+  'tt.react.tough.L': 'Уши у всех красные. Они знают, что ты прав.',
+  'tt.react.tough.heavy': 'Мёртвая тишина. Завтрашняя тренировка будет долгой.',
+  'tt.react.excuse.W': 'Ребята в недоумении — они же выиграли?',
+  'tt.react.excuse.D': '«Да, судья тот ещё!» Настроение поднимается, родители кивают.',
+  'tt.react.excuse.L': 'Вина уходит с их плеч. Родители громко соглашаются.',
+  'tt.react.excuse.heavy': 'Удар для ребят смягчён — но Правление слышит отговорки.',
+  'tt.diary': 'Слово тренера после матча ({o}): {t}.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -4220,6 +4316,22 @@ class GameState {
       p.dyn.morale = clamp(Math.round(p.dyn.morale + m * (0.6 + p.psych.passion / 25)), 0, 100);
     }
   }
+  /** v3.5: the post-match team talk is still owed (lastReport.talk === null; older saves have no field = done). */
+  get talkPending() { return this.phase === 'post' && !!this.lastReport && this.lastReport.talk === null; }
+  /** v3.5: apply the chosen post-match talk once (TEAM_TALK table), log it in the diary and save. Returns the effects or null. */
+  applyTeamTalk(key) {
+    const rep = this.lastReport, fx = rep && talkEffects(key, rep);
+    if (!fx || !this.talkPending) return null;
+    for (const p of this.squad) {
+      if (fx.morale) p.dyn.morale = clamp(Math.round(p.dyn.morale + fx.morale), 0, 100);
+      if (fx.disc && p.psych.discipline < TEAM_TALK.DISC_CAP) p.psych.discipline = Math.min(TEAM_TALK.DISC_CAP, p.psych.discipline + fx.disc);
+    }
+    for (const k of ['board', 'parents', 'squad']) if (fx[k]) this.addRep(k, fx[k]);
+    rep.talk = key;
+    this.addDiary({ date: this.calendar.date, key: 'tt.diary', vars: { o: { team: rep.opponent }, t: { talk: key } }, cls: 'ev' });
+    this.save();
+    return fx;
+  }
   /** v1.1: players who played keep their LIVE end-of-match energy; unused subs rest. */
   applyLiveFatigue(eng) {
     for (const p of this.squad) {
@@ -5067,8 +5179,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.5', name: { en: 'Coach\'s Word', ru: 'Слово тренера' },
+    en: [
+      'After every match the Match Summary asks for your Coach\'s Word: praise the squad, give them some tough love, or blame the ref and the mud.',
+      'Each talk has a clear trade-off between morale, discipline and the Board, Parents and Squad — the tags on the buttons show which way things move, and the dressing room reacts at once.',
+      'What fits a win can backfire after a defeat (and the other way round): praising a heavy defeat annoys the Board, a hard word after a win upsets the parents.',
+      'Fixed: other windows could open behind the Match Summary. It is now a proper blocking window — the taskbar, Start menu and desktop are locked until you leave it, and Esc no longer skips the talk.',
+      'Reloading before the talk brings you straight back to the Match Summary. The chosen talk is written in the club diary.',
+    ],
+    ru: [
+      'После каждого матча в итогах появилось «Слово тренера»: похвалить команду, жёстко разобрать игру или свалить всё на судью и грязь.',
+      'У каждого варианта свой размен между моралью, дисциплиной и Правлением, Родителями и Командой — метки на кнопках показывают, что вырастет, а что упадёт, и раздевалка реагирует сразу.',
+      'Что хорошо после победы, может навредить после поражения (и наоборот): похвала после разгрома злит Правление, а разнос после победы — родителей.',
+      'Исправлено: за итогами матча могли открываться другие окна. Теперь это настоящее блокирующее окно — панель задач, меню «Пуск» и рабочий стол заблокированы, пока ты его не покинешь, а Esc больше не пропускает разговор.',
+      'Если перезагрузить игру до разговора, она сразу вернёт тебя в итоги матча. Выбранное слово тренера записывается в дневник клуба.',
+    ] },
   { v: '3.4', name: { en: 'Tired Legs Everywhere', ru: 'Устают все' },
     en: [
       'Rival clubs now get tired too: their kids train, rest and play by the same rules as yours, and a worn-out starter gets rotated. A strong club can turn up with heavy legs.',
@@ -6158,7 +6285,7 @@ class ProfileCard {
   }
 
   open(id) {
-    if (!this.resolve(id) || this.ui.modal.isOpen || this.ui.events?.view.isOpen) return;   // v2.7: never under a dialogue
+    if (this.ui.modalLock || !this.resolve(id) || this.ui.modal.isOpen || this.ui.events?.view.isOpen) return;   // v2.7: never under a dialogue
     this.id = id;
     this.lastSig = '';
     this.render();
@@ -6286,7 +6413,7 @@ class TeamRosterCard {
 
   open(teamId) {
     const team = this.ui.state.league.team(teamId);
-    if (!team || this.ui.modal.isOpen) return;
+    if (!team || this.ui.modal.isOpen || this.ui.modalLock) return;   // v3.5
     this.teamId = teamId;
     this.render();
     this.lastFocus = document.activeElement;
@@ -6394,7 +6521,7 @@ class DebugConsole {
     }, true);
   }
   get isOpen() { return !this.layer.hidden; }
-  open() { if (this.ui.modal.isOpen) return; this.ui.profile.close(); this.msg = ''; this.render(); this.layer.hidden = false; document.getElementById('debug-ok').focus(); }
+  open() { if (this.ui.modal.isOpen || this.ui.modalLock) return; this.ui.profile.close(); this.msg = ''; this.render(); this.layer.hidden = false; document.getElementById('debug-ok').focus(); }
   close() { this.layer.hidden = true; }
 
   heat(v, s) {
@@ -7034,6 +7161,9 @@ class DialogueView {
    Opens at full time (visual and Quick Sim) BEFORE the Coach's Notebook.
    Built only from state.lastReport (events come from MatchEngine.matchEvents), so it can be re-opened after a reload.
    Our club is always on the left (like the live scoreboard); the venue is shown underneath.
+   v3.5: a BLOCKING modal (ui.modalLock: nothing behind it opens or reacts) with a forced post-match team talk
+   ("Coach's Word"): Proceed / × / Esc stay locked until one of the 3 talks (TEAM_TALK) is chosen. A reload before
+   the choice re-opens the summary (state.talkPending).
    ========================================================= */
 class MatchSummary {
   static ICON = { goal: '⚽', yellow: '🟨', red: '🟥', injury: '✚' };
@@ -7041,14 +7171,15 @@ class MatchSummary {
     this.ui = ui;
     this.layer = document.getElementById('msum-layer');
     this.body = document.getElementById('msum-body');
-    document.getElementById('msum-x').addEventListener('click', () => this.close());
-    document.getElementById('msum-go').addEventListener('click', () => { this.close(); this.ui.show('notes'); });
+    document.getElementById('msum-x').addEventListener('click', () => this.requestClose());
+    document.getElementById('msum-go').addEventListener('click', () => this.proceed());
+    this.body.addEventListener('click', e => { const b = e.target.closest('[data-talk]'); if (b && !b.disabled) this.chooseTalk(b.dataset.talk); });
     // v3.4: match log export (kept in memory for the last match only — not in the save)
     document.getElementById('msum-csv').addEventListener('click', () => this.exportLog('csv'));
     document.getElementById('msum-json').addEventListener('click', () => this.exportLog('json'));
     document.addEventListener('keydown', e => {
       if (!this.isOpen || e.key !== 'Escape') return;
-      e.preventDefault(); e.stopImmediatePropagation(); this.close();
+      e.preventDefault(); e.stopImmediatePropagation(); this.requestClose();
     }, true);
   }
   get isOpen() { return !this.layer.hidden; }
@@ -7058,13 +7189,55 @@ class MatchSummary {
   open(rep) {
     if (!rep) return;
     this.rep = rep;
-    this.ui.modal.close(); this.ui.profile.close();
     this.render();
     this.layer.hidden = false;
-    document.getElementById('msum-go').focus();
+    this.ui.setModalLock(true);   // v3.5: closes whatever was open behind and makes it inert
+    (this.body.querySelector('[data-talk]:not([disabled])') || document.getElementById('msum-go')).focus();
     for (const id of ['msum-csv', 'msum-json']) document.getElementById(id).disabled = !this.log;
   }
-  close() { this.layer.hidden = true; }
+  close() { if (this.layer.hidden) return; this.layer.hidden = true; this.ui.setModalLock(false); }
+  /** v3.5: the team talk is still owed for THIS report. */
+  get pending() { return !!this.rep && this.rep === this.ui.state.lastReport && this.ui.state.talkPending; }
+  /** v3.5: × / Esc — refused (status bar hint) until the team talk is chosen. */
+  requestClose() {
+    if (this.pending) { this.nudge(); return false; }
+    this.close(); return true;
+  }
+  proceed() {
+    if (this.pending) { this.nudge(); return; }
+    this.close(); this.ui.show('notes');
+  }
+  nudge() {
+    const st = document.getElementById('msum-status');
+    st.textContent = L.t('tt.needed');
+    const t = this.body.querySelector('.ms-talk');
+    if (t) { t.classList.remove('nudge'); void t.offsetWidth; t.classList.add('nudge'); }
+  }
+  chooseTalk(key) {
+    const fx = this.ui.state.applyTeamTalk(key);
+    if (!fx) return;
+    this.ui.renderAll();   // morale / reputation / diary changed (this also re-renders the summary)
+    document.getElementById('msum-go').focus();
+  }
+  /** v3.5: compact effect tags ("+Morale", "−Board") for one talk option — no numbers, just the direction. */
+  static fxTags(fx) {
+    const order = [['morale', 'morale'], ['disc', 'disc'], ['board', 'board'], ['parents', 'parents'], ['squad', 'squad']];
+    return order.filter(([k]) => fx[k]).map(([k, lbl]) => {
+      const up = fx[k] > 0;
+      return `<i class="${up ? 'up' : 'dn'}">${up ? '+' : '\u2212'}${L.t('tt.fx.' + lbl)}</i>`;
+    }).join('') || `<i class="eq">${L.t('tt.fx.none')}</i>`;
+  }
+  talkHTML(rep) {
+    if (rep.talk === undefined) return '';   // pre-v3.5 report: no talk owed
+    const out = talkOutcome(rep), chosen = rep.talk;
+    const btns = TEAM_TALK.KEYS.map(k => {
+      const fx = talkEffects(k, rep);
+      return `<button class="btn ms-talk-btn${chosen === k ? ' chosen' : ''}" type="button" data-talk="${k}" ${chosen ? 'disabled' : ''} title="${esc(L.t('tt.tip.' + k))}">
+        <b>${L.t('tt.name.' + k)}</b><span class="q">${L.t('tt.say.' + k)}</span><span class="fx">${MatchSummary.fxTags(fx)}</span></button>`;
+    }).join('');
+    const react = chosen ? `<div class="ms-talk-react">&#9658; ${L.t('tt.react.' + chosen + '.' + out)}</div>` : `<div class="ms-talk-react wait">${L.t('tt.prompt.' + out)}</div>`;
+    return `<div class="ms-talk${chosen ? ' done' : ''}"><h4>${L.t('tt.title')}</h4><div class="ms-talk-btns">${btns}</div>${react}</div>`;
+  }
   /** v3.4: the log of THIS match, if it is still in memory (it is not saved, so a reload loses it). */
   get log() { const g = this.ui.lastMatchLog; return g && this.rep && g.md === this.rep.md && g.opponent === this.rep.opponent ? g : null; }
   exportLog(kind) {
@@ -7106,9 +7279,12 @@ class MatchSummary {
         <div>${L.t('ms.shots')}<b>${t[0].shots ?? 0} (${t[0].onTarget ?? 0}) - ${t[1].shots ?? 0} (${t[1].onTarget ?? 0})</b></div>
         <div>${L.t('ms.pass')}<b>${pct(t[0])}% - ${pct(t[1])}%</b></div>
         <div>${L.t('ms.cards')}<b>${t[0].yellow ?? 0}/${t[0].red ?? 0} - ${t[1].yellow ?? 0}/${t[1].red ?? 0}</b></div>
-      </div>`;
+      </div>${this.talkHTML(rep)}`;
     document.getElementById('msum-title').textContent = `MATCH_SUMMARY.EXE — ${L.t('ms.md', { n: rep.md })}`;
-    document.getElementById('msum-status').textContent = L.t('ms.status');
+    const pending = this.pending;
+    document.getElementById('msum-status').textContent = L.t(pending ? 'tt.needed' : 'ms.status');
+    document.getElementById('msum-go').disabled = pending;   // v3.5
+    document.getElementById('msum-x').disabled = pending;
   }
 }
 /* =========================================================
@@ -7143,6 +7319,7 @@ class LockerRoom {
   /** Opens the room; the first time today the arrivals are rolled and the doors open one by one. */
   open() {
     const s = this.state;
+    if (this.ui.modalLock) return;   // v3.5
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
     if (!s.dayState().briefed) { this.ui.briefing.open(); return; }   // v2.8: morning briefing first
@@ -7267,6 +7444,7 @@ class MorningBriefing {
 
   open() {
     const s = this.state;
+    if (this.ui.modalLock) return;   // v3.5
     if (this.ui.events.active) { this.ui.events.open(); return; }
     this.ui.modal.close(); this.ui.profile.close();
     this.render();
@@ -7409,6 +7587,7 @@ class UIController {
     this.show('dash');
     if (this.state.phase === 'draft') this.draft.open();   // v3.1: a new academy starts at the Yard Match
     if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
+    else if (this.state.talkPending) this.summary.open(this.state.lastReport);   // v3.5: reload before the team talk → back to the Match Summary
     this.checkUpdateNotice();
   }
 
@@ -7499,6 +7678,7 @@ class UIController {
   v(x) {
     if (x instanceof Player) return L.name(x.surname);
     if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
+    if (x && typeof x === 'object' && 'talk' in x) return L.t('tt.name.' + x.talk);  // v3.5 diary
     if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
@@ -7519,6 +7699,15 @@ class UIController {
 
   /* ---------- navigation ---------- */
   bind() {
+    /* v3.5: MODAL LOCK — while the Match Summary is open nothing behind it reacts (taskbar, Start menu, desktop icons,
+       right-click profiles, table rows…). The DOM behind is also `inert` (no focus / keyboard), see setModalLock(). */
+    const MODAL_OK = '#msum-layer, #modal-layer, #talk-layer, a[download]';   // a[download]: ui.download() (LOG .CSV)
+    for (const type of ['click', 'dblclick', 'mousedown', 'pointerdown', 'contextmenu', 'dragstart']) {
+      window.addEventListener(type, e => {
+        if (!this.modalLock || e.target.closest?.(MODAL_OK)) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+      }, true);
+    }
     /* v1.5: Player Profile Card — right-click any player element, or press its [i] button.
        Capture phase + stopPropagation so the [i] never triggers the click-to-swap underneath. */
     const pidOf = el => el?.closest('[data-info]')?.dataset.info || el?.closest('[data-pid]')?.dataset.pid
@@ -7588,7 +7777,7 @@ class UIController {
       { el: this.events.view.layer, close: null },
       { el: this.modal.layer, close: () => this.modal.close() },
       { el: this.debug.layer, close: () => this.debug.close() },
-      { el: this.summary.layer, close: () => this.summary.close() },
+      { el: this.summary.layer, close: () => this.summary.requestClose() },   // v3.5: no Esc-out before the team talk
       { el: this.teamCard.layer, close: () => this.teamCard.close() },
       { el: this.profile.layer, close: () => this.profile.close() },
       { el: this.locker.layer, close: () => this.locker.close() },
@@ -7704,10 +7893,22 @@ class UIController {
 
   toggleStart(force) {
     const m = this.$('startmenu');
+    if (this.modalLock) force = false;   // v3.5
     m.classList.toggle('open', force ?? !m.classList.contains('open'));
   }
 
   get live() { return !!(this.engine && !this.engine.finished); }
+
+  /** v3.5: true while MATCH_SUMMARY.EXE is open — a blocking modal: no other window or navigation until it is left. */
+  get modalLock() { return !!this.summary?.isOpen; }
+  setModalLock(on) {
+    document.body.classList.toggle('modal-lock', on);
+    for (const id of ['desktop', 'taskbar', 'startmenu']) this.$(id).inert = on;
+    if (on) {
+      this.toggleStart(false);
+      this.modal.close(); this.profile.close(); this.teamCard.close(); this.debug.close(); if (this.locker.isOpen) this.locker.close(); if (this.briefing.isOpen) this.briefing.close();
+    }
+  }
 
   /* ---------- MATCH: live roster & substitutions (left column, v1.1) ---------- */
   renderLiveRoster() {
@@ -7846,6 +8047,7 @@ class UIController {
   get notesOpen() { return this.state.phase === 'post' && this.state.notebookUnlocked && !!this.state.lastReport; }
 
   show(view) {
+    if (this.modalLock) return;   // v3.5: the Match Summary decides where we go next
     if (view === 'notes' && !this.notesOpen) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'), 'warn'); return; }
     if (view === 'match' && !this.matchOpen) { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
     this.view = view;
@@ -8299,6 +8501,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   closeMatchday() {
     const s = this.state;
     if (s.phase !== 'post') { this.show('dash'); return; }
+    if (s.talkPending) { this.summary.open(s.lastReport); return; }   // v3.5: no closing the matchday before the team talk
     const ev = s.nextMatchEvent();
     const rep = s.lastReport;
     this.cal.completeEvent(ev.id);
@@ -8690,6 +8893,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
       events: eng.matchEvents.map(e => ({ ...e })), ht: eng.htScore || null, instant: !!eng.instant,
+      talk: null,   // v3.5: post-match team talk still owed (forced in the Match Summary)
       totals: [eng.teamTotals(0), eng.teamTotals(1)].map(t => ({ shots: t.shots, onTarget: t.onTarget, passOk: t.passOk, passFail: t.passFail, yellow: t.yellow, red: t.red })),
       poss: Math.round(eng.possTicks[0] / ((eng.possTicks[0] + eng.possTicks[1]) || 1) * 100),
       players: shuffle(played).slice(0, 3).map(p => ({

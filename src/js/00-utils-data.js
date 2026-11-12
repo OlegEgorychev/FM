@@ -130,6 +130,19 @@ const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
+/* v3.5 POST-MATCH TEAM TALK ("Coach's Word" in the Match Summary). One forced choice per match, effects by result (W / D / L).
+   morale = every kid's dyn.morale (0–100, flat); board / parents / squad = state.rep (0–100);
+   disc = +discipline (1–20 scale) for kids below DISC_CAP. "Heavy loss" = lost by HEAVY_LOSS+ goals. */
+const TEAM_TALK = {
+  KEYS: ['praise', 'tough', 'excuse'],
+  HEAVY_LOSS: 2, DISC_CAP: 16,
+  praise: { W: { morale: 6, squad: 2 }, D: { morale: 6, squad: 2 }, L: { morale: 5, squad: 2 }, heavy: { morale: 5, squad: 2, board: -3 } },
+  tough:  { W: { morale: -6, disc: 1, board: 2, parents: -3 }, D: { morale: -6, disc: 1, board: 2 }, L: { morale: -5, disc: 1, board: 2 }, heavy: { morale: -5, disc: 2, board: 2 } },
+  excuse: { W: { morale: 0, parents: 2, board: -3 }, D: { morale: 3, parents: 2, board: -3 }, L: { morale: 5, parents: 2, board: -3 }, heavy: { morale: 5, parents: 2, board: -4 } },
+};
+/** v3.5: 'W' | 'D' | 'L' | 'heavy' for a lastReport. */
+const talkOutcome = rep => rep.result === 'L' && rep.ga - rep.gf >= TEAM_TALK.HEAVY_LOSS ? 'heavy' : rep.result;
+const talkEffects = (key, rep) => (TEAM_TALK[key] && TEAM_TALK[key][talkOutcome(rep)]) || null;
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
 const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 10,   // v2.4: rest days +10 (training days cost 10)
   EXHAUSTED: 30,                        // assistant warning threshold (live energy)
