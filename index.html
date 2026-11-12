@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v2.6</title>
+<title>Youth Academy Manager v2.7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -11,6 +11,9 @@
    THEME TOKENS
    ========================================================= */
 :root{
+  /* v2.7 Z-INDEX HIERARCHY (one place). base UI < phase overlays < info modals < interactive events < CRT glass < boot */
+  --z-base: 10; --z-window: 20; --z-taskbar: 40; --z-phase: 50; --z-info: 100; --z-tool: 120; --z-menu: 160;
+  --z-event: 200; --z-alert: 210; --z-fx: 290; --z-crt: 300; --z-boot: 9999;
   --glass: rgba(30, 40, 50, 0.85);
   --glass-deep: rgba(8, 12, 16, 0.78);
   --text: #d5dce2;
@@ -76,15 +79,15 @@ button{ font-family: var(--ui); }
 @keyframes rain{ to{ background-position: -70px 300px, -90px 420px; } }
 
 .crt{ position: absolute; inset: 0; pointer-events: none; }
-.crt-scan{ z-index: 90; background: repeating-linear-gradient(to bottom, rgba(0,0,0,.24) 0 1px, transparent 1px 3px); }
-.crt-grille{ z-index: 91; opacity: .6;
+.crt-scan{ z-index: var(--z-crt); background: repeating-linear-gradient(to bottom, rgba(0,0,0,.24) 0 1px, transparent 1px 3px); }
+.crt-grille{ z-index: calc(var(--z-crt) + 1); opacity: .6;
   background: repeating-linear-gradient(90deg, rgba(255,40,40,.035) 0 1px, rgba(40,255,40,.025) 1px 2px, rgba(40,80,255,.035) 2px 3px); }
-.crt-vignette{ z-index: 92;
+.crt-vignette{ z-index: calc(var(--z-crt) + 2);
   background: radial-gradient(ellipse at center, transparent 68%, rgba(0,0,0,.18) 92%, rgba(0,0,0,.32) 100%);
   box-shadow: inset 0 0 60px rgba(0,0,0,.35), inset 0 0 10px rgba(0,0,0,.5); border-radius: inherit; }
-.crt-glare{ z-index: 93; background: radial-gradient(ellipse at 28% 12%, rgba(255,255,255,.06), transparent 42%); }
-.crt-flicker{ z-index: 94; background: rgba(180,220,255,.018); animation: flicker .13s steps(2) infinite; }
-.crt-roll{ z-index: 95; height: 18%; background: linear-gradient(to bottom, transparent, rgba(255,255,255,.025), transparent);
+.crt-glare{ z-index: calc(var(--z-crt) + 3); background: radial-gradient(ellipse at 28% 12%, rgba(255,255,255,.06), transparent 42%); }
+.crt-flicker{ z-index: calc(var(--z-crt) + 4); background: rgba(180,220,255,.018); animation: flicker .13s steps(2) infinite; }
+.crt-roll{ z-index: calc(var(--z-crt) + 5); height: 18%; background: linear-gradient(to bottom, transparent, rgba(255,255,255,.025), transparent);
   animation: roll 9s linear infinite; }
 @keyframes flicker{ 0%{ opacity: .4; } 100%{ opacity: 1; } }
 @keyframes roll{ from{ transform: translateY(-120%); } to{ transform: translateY(650%); } }
@@ -93,7 +96,7 @@ button{ font-family: var(--ui); }
 /* =========================================================
    DESKTOP
    ========================================================= */
-#desktop{ position: absolute; inset: 0 0 38px 0; z-index: 10; }
+#desktop{ position: absolute; inset: 0 0 38px 0; z-index: var(--z-base); }
 .icons{ position: absolute; top: 18px; left: 18px; display: flex; flex-direction: column; gap: 14px; z-index: 11; }
 .icon{
   width: 78px; background: none; border: 1px dotted transparent; color: #fff; cursor: pointer;
@@ -120,7 +123,7 @@ button{ font-family: var(--ui); }
   border: 2px solid; border-color: var(--frame-hi) var(--frame-lo) var(--frame-lo) var(--frame-hi);
   border-radius: 7px 7px 3px 3px;
   box-shadow: inset 1px 1px 0 #55626c, inset -1px -1px 0 #161d23, 7px 9px 0 rgba(0,0,0,.38);
-  z-index: 20; max-height: calc(100% - 40px);
+  z-index: var(--z-window); max-height: calc(100% - 40px);
   animation: winOpen .18s steps(4);
 }
 .win.open{ display: flex; }
@@ -176,7 +179,7 @@ button{ font-family: var(--ui); }
 #win-tactics{ left: 50%; top: 4%; width: min(1000px, 95%); transform: translateX(-50%); }
 #win-notes{ left: 50%; top: 4%; width: min(860px, 94%); transform: translateX(-50%); }
 #win-office.open, #win-match.open, #win-notes.open, #win-tactics.open, #win-dash.open, #win-table.open{ animation: none; }
-#dlg{ left: 50%; top: 38%; width: min(360px, 90%); transform: translate(-50%, -50%); z-index: 60; }
+#dlg{ left: 50%; top: 38%; width: min(360px, 90%); transform: translate(-50%, -50%); z-index: var(--z-alert); }
 
 /* =========================================================
    OFFICE
@@ -305,7 +308,7 @@ table.grid{ width: 100%; border-collapse: collapse; }
    TASKBAR
    ========================================================= */
 #taskbar{
-  position: absolute; left: 0; right: 0; bottom: 0; height: 38px; z-index: 40;
+  position: absolute; left: 0; right: 0; bottom: 0; height: 38px; z-index: var(--z-taskbar);
   display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 14px;
   background: rgba(182,186,180,.94); border-top: 2px solid var(--hi); color: #000;
 }
@@ -327,7 +330,7 @@ table.grid{ width: 100%; border-collapse: collapse; }
   border: 1px solid; border-color: var(--shadow) var(--hi) var(--hi) var(--shadow); }
 .sep{ width: 2px; height: 26px; border-left: 1px solid var(--shadow); border-right: 1px solid var(--hi); }
 #startmenu{
-  position: absolute; left: 14px; bottom: 38px; z-index: 45; display: none; width: 230px;
+  position: absolute; left: 14px; bottom: 38px; z-index: var(--z-menu); display: none; width: 230px;
   background: var(--face); color: #000; border: 2px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
   box-shadow: inset -1px -1px 0 var(--shadow), 4px 4px 0 rgba(0,0,0,.35);
 }
@@ -636,7 +639,7 @@ body.fx .crt-scan{ opacity: .9; }
 .log-jump{ position: absolute; right: 24px; bottom: 8px; z-index: 3; box-shadow: 0 2px 6px rgba(0,0,0,.6); }
 
 /* ---- in-game modal ---- */
-.modal-layer{ position: absolute; inset: 0 0 38px 0; z-index: 70; display: grid; place-items: center; background: rgba(0,0,0,.5); }
+.modal-layer{ position: absolute; inset: 0 0 38px 0; z-index: var(--z-alert); display: grid; place-items: center; background: rgba(0,0,0,.5); }
 .modal-layer[hidden]{ display: none; }
 .modal-layer .modal{ position: relative; left: auto; top: auto; transform: none; width: min(430px, 92%); animation: winOpen .15s steps(3); }
 .modal .dlg-body{ align-items: center; }
@@ -751,7 +754,7 @@ body.fx .crt-scan{ opacity: .9; }
   45%{ transform: translate(-3px, -2px); } 60%{ transform: translate(3px, 2px); } 80%{ transform: translate(-1px, 1px); } 100%{ transform: translate(0, 0); }
 }
 .screen-shake{ animation: screenShake .3s linear; }
-.surge{ position: absolute; inset: 0; z-index: 85; pointer-events: none; background: #fff; opacity: 0; }
+.surge{ position: absolute; inset: 0; z-index: var(--z-fx); pointer-events: none; background: #fff; opacity: 0; }
 .surge.red{ background: #ff3b2f; }
 .surge-go{ animation: surge .35s ease-out; }
 @keyframes surge{ 0%{ opacity: 0; } 20%{ opacity: .2; } 100%{ opacity: 0; } }
@@ -902,7 +905,7 @@ body.fx .crt-scan{ opacity: .9; }
    v1.5 — PLAYER PROFILE CARD ("PLAYER_INFO.EXE", Win9x Properties)
    Gray chrome + sunken dark wells (the CRT shows through the wells).
    ========================================================= */
-.pinfo-layer{ position: absolute; inset: 0 0 38px 0; z-index: 75; display: grid; place-items: center; padding: 12px;
+.pinfo-layer{ position: absolute; inset: 0 0 38px 0; z-index: var(--z-info); display: grid; place-items: center; padding: 12px;
   background: repeating-linear-gradient(to bottom, rgba(0,0,0,.18) 0 2px, transparent 2px 4px), rgba(4,8,6,.5);
   -webkit-backdrop-filter: blur(3px) saturate(.6); backdrop-filter: blur(3px) saturate(.6); }
 .pinfo-layer[hidden]{ display: none; }
@@ -1136,7 +1139,7 @@ body.fx .crt-scan{ opacity: .9; }
   background: transparent; border: 1px dotted transparent; opacity: .55; }
 .dbg-btn:hover, .dbg-btn:focus-visible{ opacity: 1; color: #9fe58f; border-color: #3f5a3a; outline: none; }
 
-.dbg-layer{ z-index: 76; }
+.dbg-layer{ z-index: var(--z-tool); }
 .win.pinfo.dbg{ width: min(1220px, 100%); height: min(640px, 100%); display: flex; flex-direction: column; }
 .win.pinfo.dbg .titlebar{ background: linear-gradient(90deg, #5a0a0a, #a5523a); }
 .dbg-tabs{ gap: 2px; }
@@ -1198,7 +1201,7 @@ body.fx .crt-scan{ opacity: .9; }
 .club-kv dd.money, dd.money{ color: #ffcf5a; font-family: var(--mono); }
 .tag.flag{ background: #3a2c10; color: #ffcf5a; border-color: #8a6a28; font-family: var(--mono); font-size: 10px; letter-spacing: .3px; }
 
-.talk-layer{ position: absolute; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px;
+.talk-layer{ position: absolute; inset: 0; z-index: var(--z-event); display: grid; place-items: center; padding: 16px;
   background: repeating-linear-gradient(to bottom, rgba(0,0,0,.25) 0 2px, transparent 2px 4px), rgba(3,5,4,.72);
   -webkit-backdrop-filter: blur(2px) grayscale(.7); backdrop-filter: blur(2px) grayscale(.7); }
 .talk-layer[hidden]{ display: none; }
@@ -1283,7 +1286,7 @@ body.fx .crt-scan{ opacity: .9; }
    v2.1 — BOOT SCREEN (#loading-overlay) + MATCH SUMMARY
    Boot look follows the credits art: deep-space nebula, chrome/blood-red metal type, sparks, VHS glitches.
    ========================================================= */
-#loading-overlay{ position: fixed; inset: 0; z-index: 9999; overflow: hidden; cursor: progress; color: #d9dce3;
+#loading-overlay{ position: fixed; inset: 0; z-index: var(--z-boot); overflow: hidden; cursor: progress; color: #d9dce3;
   background: #07060b; font-family: var(--mono, monospace); transition: opacity .8s ease, filter .8s ease; }
 #loading-overlay.fade{ opacity: 0; filter: brightness(2.2) blur(2px); pointer-events: none; }
 .boot-nebula{ position: absolute; inset: -10%;
@@ -1383,7 +1386,7 @@ body.fx .crt-scan{ opacity: .9; }
 /* =========================================================
    v2.6 — LOCKER ROOM (row of metal lockers; doors swing open one by one)
    ========================================================= */
-.locker-layer{ position: absolute; inset: 0 0 38px 0; z-index: 80; display: grid; place-items: center; padding: 12px;
+.locker-layer{ position: absolute; inset: 0 0 38px 0; z-index: var(--z-phase); display: grid; place-items: center; padding: 12px;
   background: repeating-linear-gradient(to bottom, rgba(0,0,0,.2) 0 2px, transparent 2px 4px), rgba(4,6,8,.72);
   -webkit-backdrop-filter: blur(3px) grayscale(.5); backdrop-filter: blur(3px) grayscale(.5); }
 .locker-layer[hidden]{ display: none; }
@@ -4400,8 +4403,19 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.7', name: { en: 'Window Order Fix', ru: 'Порядок окон' },
+    en: [
+      'Fixed: a player profile opened from the Locker Room was hidden behind it. Profiles (right-click or the [i] on a locker) now always open on top, with their dark backdrop between the room and the card.',
+      'One clear window order for the whole game: desktop & windows → Locker Room → info cards (profile, team roster, match summary) → debug → event dialogues → alerts → CRT glass → boot screen.',
+      'Escape now closes only the top-most window: closing a profile leaves the Locker Room open; event dialogues still can\'t be dismissed.',
+    ],
+    ru: [
+      'Исправлено: карточка игрока, открытая из раздевалки, пряталась за ней. Теперь профиль (правый клик или [i] на шкафчике) всегда открывается поверх, а его затемнённый фон лежит между раздевалкой и карточкой.',
+      'Единый порядок окон во всей игре: рабочий стол и окна → раздевалка → информационные карточки (профиль, состав команды, итоги матча) → отладка → диалоги событий → сообщения → «стекло» ЭЛТ → загрузочный экран.',
+      'Escape теперь закрывает только самое верхнее окно: закрыв профиль, ты остаёшься в раздевалке; диалоги событий по-прежнему не закрываются.',
+    ] },
   { v: '2.6', name: { en: 'The Locker Room', ru: 'Раздевалка' },
     en: [
       'Training and match days now start in the LOCKER ROOM: the doors swing open one by one and you see who actually turned up.',
@@ -5379,7 +5393,7 @@ class ProfileCard {
   }
 
   open(id) {
-    if (!this.resolve(id) || this.ui.modal.isOpen) return;
+    if (!this.resolve(id) || this.ui.modal.isOpen || this.ui.events?.view.isOpen) return;   // v2.7: never under a dialogue
     this.id = id;
     this.lastSig = '';
     this.render();
@@ -6279,6 +6293,7 @@ class LockerRoom {
     document.getElementById('lr-x').addEventListener('click', () => this.close());
     document.getElementById('lr-proceed').addEventListener('click', () => this.proceed());
     this.grid.addEventListener('click', e => {
+      if (e.target.closest('[data-info]')) return;   // v2.7: the [i] opens the profile, not the roll call
       const box = e.target.closest('.lk.empty');
       if (box) this.investigate(box.dataset.pid);
     });
@@ -6295,7 +6310,7 @@ class LockerRoom {
     const s = this.state;
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
-    this.ui.modal.close(); this.ui.profile.close();
+    this.ui.modal.close();   // v2.7: an open profile may stay — it sits above the room
     const lk = s.runLocker(s.phase === 'calendar');
     const reveal = !lk.revealed;
     lk.revealed = true;
@@ -6314,7 +6329,7 @@ class LockerRoom {
     const present = squad.filter(p => !lk.absent[p.id]).length;
     this.grid.innerHTML = squad.map((p, i) => {
       const why = lk.absent[p.id], checked = lk.checked.includes(p.id), delay = reveal ? `style="animation-delay:${i * 70}ms"` : '';
-      const plate = `<div class="lk-plate"><span class="lk-no">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span></div>`;
+      const plate = `<div class="lk-plate"><span class="lk-no">${p.number}</span>${this.ui.infoBtn(p)}<span class="pos ${p.position}">${L.pos(p.position)}</span></div>`;   // v2.7: [i] / right-click → profile
       if (!why) {
         const e = Math.round(p.energy);
         return `<div class="lk here${reveal ? ' rv' : ''}" ${delay} data-pid="${p.id}">${plate}
@@ -6569,6 +6584,30 @@ class UIController {
       this.prepareMatch(); this.renderAll(); this.show('dash');
       this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
     });
+    /* v2.7: ONE Escape manager. Window capture runs before every other key handler: Esc closes only the
+       top-most open layer (highest computed z-index, later in the DOM on a tie) and stops there, so a profile
+       opened over the Locker Room closes without closing the room. Event dialogues swallow Esc (forced choice). */
+    const layers = () => [
+      { el: this.events.view.layer, close: null },
+      { el: this.modal.layer, close: () => this.modal.close() },
+      { el: this.debug.layer, close: () => this.debug.close() },
+      { el: this.summary.layer, close: () => this.summary.close() },
+      { el: this.teamCard.layer, close: () => this.teamCard.close() },
+      { el: this.profile.layer, close: () => this.profile.close() },
+      { el: this.locker.layer, close: () => this.locker.close() },
+    ];
+    this.topLayer = () => {
+      const z = el => parseInt(getComputedStyle(el).zIndex, 10) || 0;
+      return layers().filter(l => l.el && !l.el.hidden)
+        .sort((a, b) => z(b.el) - z(a.el) || (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : -1))[0] || null;
+    };
+    window.addEventListener('keydown', e => {
+      if (e.key !== 'Escape' || document.getElementById('loading-overlay')) return;
+      const top = this.topLayer();
+      if (!top) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      top.close?.();
+    }, true);
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape' || this.modal.isOpen || this.profile.isOpen || this.teamCard.isOpen) return;
       this.toggleStart(false);

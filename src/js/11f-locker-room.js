@@ -14,6 +14,7 @@ class LockerRoom {
     document.getElementById('lr-x').addEventListener('click', () => this.close());
     document.getElementById('lr-proceed').addEventListener('click', () => this.proceed());
     this.grid.addEventListener('click', e => {
+      if (e.target.closest('[data-info]')) return;   // v2.7: the [i] opens the profile, not the roll call
       const box = e.target.closest('.lk.empty');
       if (box) this.investigate(box.dataset.pid);
     });
@@ -30,7 +31,7 @@ class LockerRoom {
     const s = this.state;
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
-    this.ui.modal.close(); this.ui.profile.close();
+    this.ui.modal.close();   // v2.7: an open profile may stay — it sits above the room
     const lk = s.runLocker(s.phase === 'calendar');
     const reveal = !lk.revealed;
     lk.revealed = true;
@@ -49,7 +50,7 @@ class LockerRoom {
     const present = squad.filter(p => !lk.absent[p.id]).length;
     this.grid.innerHTML = squad.map((p, i) => {
       const why = lk.absent[p.id], checked = lk.checked.includes(p.id), delay = reveal ? `style="animation-delay:${i * 70}ms"` : '';
-      const plate = `<div class="lk-plate"><span class="lk-no">${p.number}</span><span class="pos ${p.position}">${L.pos(p.position)}</span></div>`;
+      const plate = `<div class="lk-plate"><span class="lk-no">${p.number}</span>${this.ui.infoBtn(p)}<span class="pos ${p.position}">${L.pos(p.position)}</span></div>`;   // v2.7: [i] / right-click → profile
       if (!why) {
         const e = Math.round(p.energy);
         return `<div class="lk here${reveal ? ' rv' : ''}" ${delay} data-pid="${p.id}">${plate}

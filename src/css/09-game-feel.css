@@ -46,7 +46,7 @@
   45%{ transform: translate(-3px, -2px); } 60%{ transform: translate(3px, 2px); } 80%{ transform: translate(-1px, 1px); } 100%{ transform: translate(0, 0); }
 }
 .screen-shake{ animation: screenShake .3s linear; }
-.surge{ position: absolute; inset: 0; z-index: 85; pointer-events: none; background: #fff; opacity: 0; }
+.surge{ position: absolute; inset: 0; z-index: var(--z-fx); pointer-events: none; background: #fff; opacity: 0; }
 .surge.red{ background: #ff3b2f; }
 .surge-go{ animation: surge .35s ease-out; }
 @keyframes surge{ 0%{ opacity: 0; } 20%{ opacity: .2; } 100%{ opacity: 0; } }

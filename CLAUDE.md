@@ -20,7 +20,7 @@ Read `docs/DESIGN.md` first (mechanics, formulas, balance). Do NOT read whole fi
 - Match maths: `MatchEngine.eff()` (multipliers), `mod()` (shouts), `sup()` (line superiority), `ambient()` (background stats).
 - Live pitch: `PitchModel` (data) → `PitchRenderer` (DOM) → `MatchView` (rAF loop) in `09-live-pitch.js`.
 - UI: `UIController` in `12-ui.js` (search `/* ---------- SECTION`).
-- Styles: one file per feature in `src/css/`, `99-responsive.css` last.
+- Styles: one file per feature in `src/css/`, `99-responsive.css` last. Layer z-index only via the `--z-*` tokens in `01-core.css`.
 
 ## Cheap workflow
 `grep -n "keyword" src -r` → edit the few lines → build → smoke test → commit. Screenshots only for visual changes (`node test/smoke.js --shots` → `test/shots/`).

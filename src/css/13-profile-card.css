@@ -2,7 +2,7 @@
    v1.5 — PLAYER PROFILE CARD ("PLAYER_INFO.EXE", Win9x Properties)
    Gray chrome + sunken dark wells (the CRT shows through the wells).
    ========================================================= */
-.pinfo-layer{ position: absolute; inset: 0 0 38px 0; z-index: 75; display: grid; place-items: center; padding: 12px;
+.pinfo-layer{ position: absolute; inset: 0 0 38px 0; z-index: var(--z-info); display: grid; place-items: center; padding: 12px;
   background: repeating-linear-gradient(to bottom, rgba(0,0,0,.18) 0 2px, transparent 2px 4px), rgba(4,8,6,.5);
   -webkit-backdrop-filter: blur(3px) saturate(.6); backdrop-filter: blur(3px) saturate(.6); }
 .pinfo-layer[hidden]{ display: none; }

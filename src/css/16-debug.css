@@ -5,7 +5,7 @@
   background: transparent; border: 1px dotted transparent; opacity: .55; }
 .dbg-btn:hover, .dbg-btn:focus-visible{ opacity: 1; color: #9fe58f; border-color: #3f5a3a; outline: none; }
 
-.dbg-layer{ z-index: 76; }
+.dbg-layer{ z-index: var(--z-tool); }
 .win.pinfo.dbg{ width: min(1220px, 100%); height: min(640px, 100%); display: flex; flex-direction: column; }
 .win.pinfo.dbg .titlebar{ background: linear-gradient(90deg, #5a0a0a, #a5523a); }
 .dbg-tabs{ gap: 2px; }

@@ -2,8 +2,19 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.7', name: { en: 'Window Order Fix', ru: 'Порядок окон' },
+    en: [
+      'Fixed: a player profile opened from the Locker Room was hidden behind it. Profiles (right-click or the [i] on a locker) now always open on top, with their dark backdrop between the room and the card.',
+      'One clear window order for the whole game: desktop & windows → Locker Room → info cards (profile, team roster, match summary) → debug → event dialogues → alerts → CRT glass → boot screen.',
+      'Escape now closes only the top-most window: closing a profile leaves the Locker Room open; event dialogues still can\'t be dismissed.',
+    ],
+    ru: [
+      'Исправлено: карточка игрока, открытая из раздевалки, пряталась за ней. Теперь профиль (правый клик или [i] на шкафчике) всегда открывается поверх, а его затемнённый фон лежит между раздевалкой и карточкой.',
+      'Единый порядок окон во всей игре: рабочий стол и окна → раздевалка → информационные карточки (профиль, состав команды, итоги матча) → отладка → диалоги событий → сообщения → «стекло» ЭЛТ → загрузочный экран.',
+      'Escape теперь закрывает только самое верхнее окно: закрыв профиль, ты остаёшься в раздевалке; диалоги событий по-прежнему не закрываются.',
+    ] },
   { v: '2.6', name: { en: 'The Locker Room', ru: 'Раздевалка' },
     en: [
       'Training and match days now start in the LOCKER ROOM: the doors swing open one by one and you see who actually turned up.',

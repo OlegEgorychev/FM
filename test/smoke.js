@@ -340,6 +340,26 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         faces: g.querySelectorAll('.lk.here .lk-face svg').length, why: [lk.absent[ids.tired], lk.absent[ids.lazy], lk.absent[ids.hurt]], skipFlag: YAM.game.player(ids.lazy).skipped_training };
     }, lr0);
     await shot('10-locker');
+    // v2.7: profile over the locker room (right-click + [i]), backdrop between them, Esc closes only the top layer
+    const here = await page.evaluate(() => document.querySelector('#lr-grid .lk.here').dataset.pid);
+    await page.waitForTimeout(1300);   // let the doors finish opening
+    await page.click(`#lr-grid .lk.here[data-pid="${here}"] .lk-in`, { button: 'right' });
+    await page.waitForTimeout(250);
+    const zz = await page.evaluate(() => {
+      const z = id => +getComputedStyle(document.getElementById(id)).zIndex;
+      const win = document.querySelector('#pinfo-layer .pinfo').getBoundingClientRect(), hit = document.elementFromPoint(win.left + win.width / 2, win.top + 20);
+      const g = document.getElementById('lr-grid').getBoundingClientRect(), edge = document.elementFromPoint(g.left + 8, g.top + 8);   // a locker corner, outside the card
+      return { open: !document.getElementById('pinfo-layer').hidden, onTop: !!hit?.closest('#pinfo-layer .pinfo'), backdrop: edge?.id === 'pinfo-layer',
+        z: [z('desktop'), z('locker-room-view'), z('pinfo-layer'), z('talk-layer'), z('modal-layer')] };
+    });
+    await page.keyboard.press('Escape');
+    const esc1 = await page.evaluate(() => ({ profile: !document.getElementById('pinfo-layer').hidden, locker: !document.getElementById('locker-room-view').hidden }));
+    await page.click(`#lr-grid .lk.here[data-pid="${here}"] .info-btn`);
+    const viaI = await page.evaluate(() => !document.getElementById('pinfo-layer').hidden && YAM.ui.topLayer().el.id === 'pinfo-layer');
+    await page.keyboard.press('Escape');
+    check('z-order: profile (right-click / [i]) opens ABOVE the locker room with its backdrop between; Esc closes only the top layer',
+      zz.open && zz.onTop && zz.backdrop && zz.z.join() === '10,50,100,200,210' && !esc1.profile && esc1.locker && viaI
+      && (await page.evaluate(() => !document.getElementById('locker-room-view').hidden)), JSON.stringify({ zz, esc1, viaI }));
     await page.click(`#lr-grid .lk.empty[data-pid="${lr0.lazy}"]`);   // roll call: 1 AP
     const lr2 = await page.evaluate(() => ({ ap: YAM.game.ap, talk: !document.getElementById('talk-layer').hidden, n: document.querySelectorAll('#talk-choices .talk-btn').length, b: YAM.game.budget }));
     const disc0 = await page.evaluate(id => YAM.game.player(id).psych.discipline, lr0.lazy);

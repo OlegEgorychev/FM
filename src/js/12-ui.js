@@ -199,6 +199,30 @@ class UIController {
       this.prepareMatch(); this.renderAll(); this.show('dash');
       this.alert(L.t('dlg.reset'), L.t('dlg.academy'));
     });
+    /* v2.7: ONE Escape manager. Window capture runs before every other key handler: Esc closes only the
+       top-most open layer (highest computed z-index, later in the DOM on a tie) and stops there, so a profile
+       opened over the Locker Room closes without closing the room. Event dialogues swallow Esc (forced choice). */
+    const layers = () => [
+      { el: this.events.view.layer, close: null },
+      { el: this.modal.layer, close: () => this.modal.close() },
+      { el: this.debug.layer, close: () => this.debug.close() },
+      { el: this.summary.layer, close: () => this.summary.close() },
+      { el: this.teamCard.layer, close: () => this.teamCard.close() },
+      { el: this.profile.layer, close: () => this.profile.close() },
+      { el: this.locker.layer, close: () => this.locker.close() },
+    ];
+    this.topLayer = () => {
+      const z = el => parseInt(getComputedStyle(el).zIndex, 10) || 0;
+      return layers().filter(l => l.el && !l.el.hidden)
+        .sort((a, b) => z(b.el) - z(a.el) || (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : -1))[0] || null;
+    };
+    window.addEventListener('keydown', e => {
+      if (e.key !== 'Escape' || document.getElementById('loading-overlay')) return;
+      const top = this.topLayer();
+      if (!top) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      top.close?.();
+    }, true);
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape' || this.modal.isOpen || this.profile.isOpen || this.teamCard.isOpen) return;
       this.toggleStart(false);

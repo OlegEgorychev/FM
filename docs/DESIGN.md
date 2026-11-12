@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v2.6)
+# Youth Academy Manager — design notes (current: v2.7)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -131,3 +131,8 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Training regime only for present kids; skippers unchanged; exhausted / injured / banned kids rest (+10). Tactics' extra skip is now a walk-out among those present.
 - Roll call: clicking an empty locker spends 1 AP and fires the manual event `rollcall` (reason text; skipped → fine −$10 & discipline +2, or ignore). Manual events (office, rollcall) return to the same day (`ui.afterManualEvent()`), not to `morning()`.
 - Proceed: `ensureAvailableXI()` (diary `xi.auto`), diary `lr.diary`. If fewer than 11 fit kids remain, `createEngine()` passes `missing` → `MatchEngine` marks them sent off from minute 0 (not counted as played) and logs `lr.shortHanded`.
+
+## Window order + Escape (v2.7)
+- Z-index tokens on `:root` (01-core.css): `--z-base 10` (#desktop) · `--z-window 20` (.win) · `--z-taskbar 40` · `--z-phase 50` (Locker Room) · `--z-info 100` (profile, team roster, match summary — `.pinfo-layer` = backdrop + card) · `--z-tool 120` (DEBUG.EXE) · `--z-menu 160` (Start menu) · `--z-event 200` (event / office / roll-call dialogue) · `--z-alert 210` (Modal) · `--z-fx 290` (surge flash) · `--z-crt 300–305` (glass, pointer-events none) · `--z-boot 9999`. Never hard-code a layer z-index again; use the tokens. (The match screen is a normal window, not an overlay.)
+- One Escape manager (`UIController.topLayer()`, window capture listener in `bind()`): Esc closes only the top-most open layer (computed z-index, then DOM order) and stops propagation; event dialogues swallow it. With no layer open, the old handlers (Start menu, selections) run.
+- Locker slots carry `data-pid` (right-click → profile) and an [i] button; opening the room no longer closes an open profile; `ProfileCard.open` refuses while a dialogue is open.

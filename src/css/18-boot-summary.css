@@ -2,7 +2,7 @@
    v2.1 — BOOT SCREEN (#loading-overlay) + MATCH SUMMARY
    Boot look follows the credits art: deep-space nebula, chrome/blood-red metal type, sparks, VHS glitches.
    ========================================================= */
-#loading-overlay{ position: fixed; inset: 0; z-index: 9999; overflow: hidden; cursor: progress; color: #d9dce3;
+#loading-overlay{ position: fixed; inset: 0; z-index: var(--z-boot); overflow: hidden; cursor: progress; color: #d9dce3;
   background: #07060b; font-family: var(--mono, monospace); transition: opacity .8s ease, filter .8s ease; }
 #loading-overlay.fade{ opacity: 0; filter: brightness(2.2) blur(2px); pointer-events: none; }
 .boot-nebula{ position: absolute; inset: -10%;

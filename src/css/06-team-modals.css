@@ -94,7 +94,7 @@ body.fx .crt-scan{ opacity: .9; }
 .log-jump{ position: absolute; right: 24px; bottom: 8px; z-index: 3; box-shadow: 0 2px 6px rgba(0,0,0,.6); }
 
 /* ---- in-game modal ---- */
-.modal-layer{ position: absolute; inset: 0 0 38px 0; z-index: 70; display: grid; place-items: center; background: rgba(0,0,0,.5); }
+.modal-layer{ position: absolute; inset: 0 0 38px 0; z-index: var(--z-alert); display: grid; place-items: center; background: rgba(0,0,0,.5); }
 .modal-layer[hidden]{ display: none; }
 .modal-layer .modal{ position: relative; left: auto; top: auto; transform: none; width: min(430px, 92%); animation: winOpen .15s steps(3); }
 .modal .dlg-body{ align-items: center; }

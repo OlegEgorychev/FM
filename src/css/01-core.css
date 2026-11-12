@@ -2,6 +2,9 @@
    THEME TOKENS
    ========================================================= */
 :root{
+  /* v2.7 Z-INDEX HIERARCHY (one place). base UI < phase overlays < info modals < interactive events < CRT glass < boot */
+  --z-base: 10; --z-window: 20; --z-taskbar: 40; --z-phase: 50; --z-info: 100; --z-tool: 120; --z-menu: 160;
+  --z-event: 200; --z-alert: 210; --z-fx: 290; --z-crt: 300; --z-boot: 9999;
   --glass: rgba(30, 40, 50, 0.85);
   --glass-deep: rgba(8, 12, 16, 0.78);
   --text: #d5dce2;
@@ -67,15 +70,15 @@ button{ font-family: var(--ui); }
 @keyframes rain{ to{ background-position: -70px 300px, -90px 420px; } }
 
 .crt{ position: absolute; inset: 0; pointer-events: none; }
-.crt-scan{ z-index: 90; background: repeating-linear-gradient(to bottom, rgba(0,0,0,.24) 0 1px, transparent 1px 3px); }
-.crt-grille{ z-index: 91; opacity: .6;
+.crt-scan{ z-index: var(--z-crt); background: repeating-linear-gradient(to bottom, rgba(0,0,0,.24) 0 1px, transparent 1px 3px); }
+.crt-grille{ z-index: calc(var(--z-crt) + 1); opacity: .6;
   background: repeating-linear-gradient(90deg, rgba(255,40,40,.035) 0 1px, rgba(40,255,40,.025) 1px 2px, rgba(40,80,255,.035) 2px 3px); }
-.crt-vignette{ z-index: 92;
+.crt-vignette{ z-index: calc(var(--z-crt) + 2);
   background: radial-gradient(ellipse at center, transparent 68%, rgba(0,0,0,.18) 92%, rgba(0,0,0,.32) 100%);
   box-shadow: inset 0 0 60px rgba(0,0,0,.35), inset 0 0 10px rgba(0,0,0,.5); border-radius: inherit; }
-.crt-glare{ z-index: 93; background: radial-gradient(ellipse at 28% 12%, rgba(255,255,255,.06), transparent 42%); }
-.crt-flicker{ z-index: 94; background: rgba(180,220,255,.018); animation: flicker .13s steps(2) infinite; }
-.crt-roll{ z-index: 95; height: 18%; background: linear-gradient(to bottom, transparent, rgba(255,255,255,.025), transparent);
+.crt-glare{ z-index: calc(var(--z-crt) + 3); background: radial-gradient(ellipse at 28% 12%, rgba(255,255,255,.06), transparent 42%); }
+.crt-flicker{ z-index: calc(var(--z-crt) + 4); background: rgba(180,220,255,.018); animation: flicker .13s steps(2) infinite; }
+.crt-roll{ z-index: calc(var(--z-crt) + 5); height: 18%; background: linear-gradient(to bottom, transparent, rgba(255,255,255,.025), transparent);
   animation: roll 9s linear infinite; }
 @keyframes flicker{ 0%{ opacity: .4; } 100%{ opacity: 1; } }
 @keyframes roll{ from{ transform: translateY(-120%); } to{ transform: translateY(650%); } }
@@ -84,7 +87,7 @@ button{ font-family: var(--ui); }
 /* =========================================================
    DESKTOP
    ========================================================= */
-#desktop{ position: absolute; inset: 0 0 38px 0; z-index: 10; }
+#desktop{ position: absolute; inset: 0 0 38px 0; z-index: var(--z-base); }
 .icons{ position: absolute; top: 18px; left: 18px; display: flex; flex-direction: column; gap: 14px; z-index: 11; }
 .icon{
   width: 78px; background: none; border: 1px dotted transparent; color: #fff; cursor: pointer;
@@ -111,7 +114,7 @@ button{ font-family: var(--ui); }
   border: 2px solid; border-color: var(--frame-hi) var(--frame-lo) var(--frame-lo) var(--frame-hi);
   border-radius: 7px 7px 3px 3px;
   box-shadow: inset 1px 1px 0 #55626c, inset -1px -1px 0 #161d23, 7px 9px 0 rgba(0,0,0,.38);
-  z-index: 20; max-height: calc(100% - 40px);
+  z-index: var(--z-window); max-height: calc(100% - 40px);
   animation: winOpen .18s steps(4);
 }
 .win.open{ display: flex; }
@@ -167,7 +170,7 @@ button{ font-family: var(--ui); }
 #win-tactics{ left: 50%; top: 4%; width: min(1000px, 95%); transform: translateX(-50%); }
 #win-notes{ left: 50%; top: 4%; width: min(860px, 94%); transform: translateX(-50%); }
 #win-office.open, #win-match.open, #win-notes.open, #win-tactics.open, #win-dash.open, #win-table.open{ animation: none; }
-#dlg{ left: 50%; top: 38%; width: min(360px, 90%); transform: translate(-50%, -50%); z-index: 60; }
+#dlg{ left: 50%; top: 38%; width: min(360px, 90%); transform: translate(-50%, -50%); z-index: var(--z-alert); }
 
 /* =========================================================
    OFFICE
@@ -296,7 +299,7 @@ table.grid{ width: 100%; border-collapse: collapse; }
    TASKBAR
    ========================================================= */
 #taskbar{
-  position: absolute; left: 0; right: 0; bottom: 0; height: 38px; z-index: 40;
+  position: absolute; left: 0; right: 0; bottom: 0; height: 38px; z-index: var(--z-taskbar);
   display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 14px;
   background: rgba(182,186,180,.94); border-top: 2px solid var(--hi); color: #000;
 }
@@ -318,7 +321,7 @@ table.grid{ width: 100%; border-collapse: collapse; }
   border: 1px solid; border-color: var(--shadow) var(--hi) var(--hi) var(--shadow); }
 .sep{ width: 2px; height: 26px; border-left: 1px solid var(--shadow); border-right: 1px solid var(--hi); }
 #startmenu{
-  position: absolute; left: 14px; bottom: 38px; z-index: 45; display: none; width: 230px;
+  position: absolute; left: 14px; bottom: 38px; z-index: var(--z-menu); display: none; width: 230px;
   background: var(--face); color: #000; border: 2px solid; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
   box-shadow: inset -1px -1px 0 var(--shadow), 4px 4px 0 rgba(0,0,0,.35);
 }
