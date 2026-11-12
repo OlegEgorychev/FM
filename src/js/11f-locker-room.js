@@ -6,7 +6,7 @@
    XI, the bench and the training until the next morning. An empty locker can be investigated for 1 AP.
    ========================================================= */
 class LockerRoom {
-  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?' };
+  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?', excused: '\u2302' };
   constructor(ui) {
     this.ui = ui;
     this.layer = document.getElementById('locker-room-view');
@@ -15,6 +15,7 @@ class LockerRoom {
     document.getElementById('lr-proceed').addEventListener('click', () => this.proceed());
     this.grid.addEventListener('click', e => {
       if (e.target.closest('[data-info]')) return;   // v2.7: the [i] opens the profile, not the roll call
+      if (this.requestPending) return;               // v2.8: answer the kid first
       const box = e.target.closest('.lk.empty');
       if (box) this.investigate(box.dataset.pid);
     });
@@ -31,6 +32,7 @@ class LockerRoom {
     const s = this.state;
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (!s.dayState().briefed) { this.ui.briefing.open(); return; }   // v2.8: morning briefing first
     this.ui.modal.close();   // v2.7: an open profile may stay — it sits above the room
     const lk = s.runLocker(s.phase === 'calendar');
     const reveal = !lk.revealed;
@@ -39,6 +41,18 @@ class LockerRoom {
     this.render(reveal);
     this.layer.hidden = false;
     document.getElementById('lr-proceed').focus();
+    this.maybeRequest(reveal ? 1300 : 0);   // v2.8: a kid interrupts before you can look around
+  }
+  get requestPending() { const r = this.state.dayState().locker?.request; return !!(r && !r.done); }
+  maybeRequest(delay) {
+    if (!this.requestPending) return;
+    clearTimeout(this.reqTimer);
+    this.reqTimer = setTimeout(() => {
+      const r = this.state.dayState().locker?.request;
+      if (!this.isOpen || !r || r.done || this.ui.events.active) return;
+      this.ui.profile.close();
+      this.ui.events.fire('excuse', this.state.calendar.date, { cast: { kid: r.pid } });
+    }, delay);
   }
   close() { this.layer.hidden = true; this.ui.renderDash(); }
 
@@ -72,7 +86,7 @@ class LockerRoom {
       <span class="lr-kind ${match ? 'k-match' : 'k-training'}">${match ? L.t('lr.kindMatch', { o: esc(L.team(ctx?.opp.name || '')) }) : L.t('lr.kindTraining')}</span>
       <span class="lr-count${present < 11 ? ' low' : ''}">${L.t('lr.arrived', { n: present, t: squad.length })}</span>
       <span class="lr-ap">${L.t('ap.left')} <b>${d.ap}/${COACH.AP}</b></span>`;
-    document.getElementById('lr-proceed').innerHTML = L.t(match ? 'lr.toMatch' : 'lr.toPlan');
+    document.getElementById('lr-proceed').innerHTML = L.t('lr.toPitch');   // v2.8: [ HEAD TO PITCH ]
     document.getElementById('lr-status').textContent = L.t(present < 11 ? 'lr.statusShort' : 'lr.status');
   }
 
@@ -92,6 +106,7 @@ class LockerRoom {
   proceed() {
     const s = this.state, lk = s.dayState().locker;
     if (!lk || this.ui.events.active) return;
+    if (this.requestPending) { this.maybeRequest(0); return; }   // v2.8
     lk.done = true;
     for (const c of s.ensureAvailableXI()) s.addDiary({ date: s.calendar.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
     const miss = Object.keys(lk.absent).length;

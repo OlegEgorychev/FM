@@ -29,6 +29,7 @@ class UIController {
     this.debug = new DebugConsole(this);         // v1.8
     this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
     this.locker = new LockerRoom(this);          // v2.6: who turned up today
+    this.briefing = new MorningBriefing(this);   // v2.8: the morning routine
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
@@ -59,6 +60,7 @@ class UIController {
     // cal.registerType('dialogue', { blocking: true,  label: ev => '…', onArrive: ev => this.openDialogue(ev) });
     cal.onDay(date => {   // v2.4/2.5: Tue/Thu = training with the coach's regime (auto-sim falls back to Match Practice)
       const s = this.state, r = s.dayRoutine(date, isTrainingDay(date), s.dayState().plan || 'match');
+      s.repDaily(date);   // v2.8: faction reputation (board grant on the 1st, parents on Sundays, squad drift)
       if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
       const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
       if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
@@ -84,6 +86,7 @@ class UIController {
     this.renderBudget();
     if (this.debug?.isOpen) this.debug.render();   // v1.8
     if (this.locker?.isOpen) this.locker.render();   // v2.6
+    if (this.briefing?.isOpen) this.briefing.render();   // v2.8
     if (this.summary?.isOpen) this.summary.render();   // v2.1
   }
 
@@ -210,6 +213,7 @@ class UIController {
       { el: this.teamCard.layer, close: () => this.teamCard.close() },
       { el: this.profile.layer, close: () => this.profile.close() },
       { el: this.locker.layer, close: () => this.locker.close() },
+      { el: this.briefing.layer, close: () => this.briefing.close() },
     ];
     this.topLayer = () => {
       const z = el => parseInt(getComputedStyle(el).zIndex, 10) || 0;
@@ -568,6 +572,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       <dt>${L.t('dash.record')}</dt><dd>${L.t('dash.recordVal', row)}</dd>
       <dt>${L.t('dash.form')}</dt><dd>${this.formChips(row.form) || '—'}</dd>
       <dt>${L.t('dash.formation')}</dt><dd>${s.formation}</dd>
+      <dt>${L.t('dash.rep')}</dt><dd class="rep-mini">${['board', 'parents', 'squad'].map(k => `<span title="${esc(L.t('rep.' + k))}">${L.t('rep.short.' + k)} <b>${s.rep[k]}</b></span>`).join(' ')}</dd>
       <dt>${L.t('dash.budget')}</dt><dd class="money${s.budget < 0 ? " debt" : ""}">${money(s.budget)}</dd>
       <dt>${L.t('dash.energy')}</dt><dd${tired ? ' class="warn"' : ''}>${L.t('dash.energyVal', { a: avg, t: tired })}</dd>`;
 
@@ -577,7 +582,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     btn.disabled = this.cal.running || this.live || this.events.active || blk === 'plan';
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
-    else if (phase === 'calendar') btn.innerHTML = L.t(blk === 'locker' ? 'dash.startDay' : blk === 'plan' ? 'dash.endDayBlocked' : 'dash.endDay');
+    else if (phase === 'calendar') btn.innerHTML = L.t({ briefing: 'dash.startDay', locker: 'dash.toLocker', plan: 'dash.endDayBlocked' }[blk] || 'dash.endDay');
+    else if (phase === 'matchday' && !s.dayState().briefed) btn.innerHTML = L.t('dash.startDay');
     else if (phase === 'matchday' && !s.dayState().locker?.done) btn.innerHTML = L.t('dash.startMatchDay');
     else if (phase === 'matchday') btn.innerHTML = L.t('dash.goMatch');
     else if (phase === 'post') btn.innerHTML = L.t('dash.close');
@@ -706,7 +712,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return;
     }
     if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
-    if (this.dayBlockers()[0] === 'locker') { this.locker.open(); return; }   // v2.6: START DAY on a training day
+    if (this.dayBlockers()[0] === 'briefing') { this.briefing.open(); return; }   // v2.8: START DAY → morning briefing
+    if (this.dayBlockers()[0] === 'locker') { this.locker.open(); return; }   // v2.6: back to the locker room
     this.endDay();   // v2.5: one day per click
   }
 
@@ -714,6 +721,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** Mandatory tasks that block END DAY. */
   dayBlockers() {
     const s = this.state, out = [];
+    if (s.phase === 'calendar' && !s.dayState().briefed) { out.push('briefing'); return out; }   // v2.8: START DAY → morning briefing
     if (s.phase === 'calendar' && this.dayInfo(s.calendar.date).kind === 'training') {
       if (!s.dayState().locker?.done) out.push('locker');   // v2.6: START DAY → locker room first
       else if (!s.dayState().plan) out.push('plan');
@@ -786,7 +794,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const d = s.dayState(), info = this.dayInfo(s.calendar.date), live = s.phase === 'calendar';
     const pips = Array.from({ length: COACH.AP }, (_, i) => `<i class="${i < d.ap ? 'on' : ''}"></i>`).join('');
     let body = '';
-    if (live && info.kind === 'training' && !d.locker?.done) {   // v2.6: the locker room comes first
+    if (live && !d.briefed) {   // v2.8: every day starts with the morning briefing
+      body = `<div class="td-req need">${L.t('today.briefReq')}</div><div class="td-note">${L.t('today.briefNote')}</div>`;
+    } else if (live && info.kind === 'training' && !d.locker?.done) {   // v2.6: the locker room comes first
       body = `<div class="td-req need">${L.t('today.lockerReq')}</div><div class="td-note">${L.t('today.lockerNote')}</div>`;
     } else if (live && info.kind === 'training') {
       const need = !d.plan;
@@ -1205,7 +1215,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad });
     if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9

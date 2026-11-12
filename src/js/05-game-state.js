@@ -14,6 +14,7 @@ class GameState {
     this.clubName = CLUB_NAME;
     this.formation = '4-4-2';
     this.budget = ECONOMY.START;   // v1.9: club money ($), carried across seasons
+    this.rep = { board: REP.START, parents: REP.START, squad: REP.START };   // v2.8 faction reputation
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
@@ -124,6 +125,30 @@ class GameState {
     return this.today;
   }
   get ap() { return this.dayState().ap; }
+  /* ---------- v2.8 faction reputation ---------- */
+  addRep(key, delta) { if (this.rep && key in this.rep) this.rep[key] = clamp(Math.round(this.rep[key] + delta), 0, 100); }
+  /** Daily: squad rep drifts 1 toward the squad's average morale; 1st of the month: board grant; Sundays: parents. */
+  repDaily(date) {
+    const avg = this.squad.reduce((a, p) => a + p.dyn.morale, 0) / this.squad.length;
+    this.addRep('squad', Math.sign(Math.round(avg) - this.rep.squad));
+    const d = new Date(date + 'T00:00:00Z');
+    const seasonStart = isoAdd(this.calendar.events[0]?.date || date, -SEASON.FIRST_MATCH_OFFSET);
+    if (d.getUTCDate() === 1 && date > seasonStart) {   // no grant on the opening day of the season
+      const grant = Math.max(0, Math.round(REP.BOARD_GRANT_BASE + (this.rep.board - 50) * REP.BOARD_GRANT_STEP));
+      if (grant) this.addMoney(grant);
+      this.addDiary({ date, key: grant ? 'rep.boardGrant' : 'rep.boardNone', vars: { m: '$' + grant }, cls: 'ev' });
+    }
+    if (d.getUTCDay() === 0) {
+      if (this.rep.parents >= REP.PARENTS_HIGH) {
+        const gift = rnd(10, 30) + (this.rep.parents - REP.PARENTS_HIGH);
+        this.addMoney(gift);
+        this.addDiary({ date, key: 'rep.parentsGift', vars: { m: '$' + gift }, cls: 'ev' });
+      } else if (this.rep.parents <= REP.PARENTS_LOW) {
+        const kid = pick(this.squad.filter(p => p.available));
+        if (kid) { kid.awayDays = Math.max(kid.awayDays, REP.PARENTS_HOME_DAYS); this.addDiary({ date, key: 'rep.parentsAngry', vars: { k: { pid: kid.id }, d: REP.PARENTS_HOME_DAYS }, cls: 'ev' }); }
+      }
+    }
+  }
   spendAP() { const d = this.dayState(); if (d.ap < 1) return false; d.ap--; this.save(); return true; }
   setPlan(plan) { if (REGIMES[plan]) { this.dayState().plan = plan; this.save(); } }
   /** v2.5: one random skill of a group +1 (capped by potential). Returns true if something improved. */
@@ -159,9 +184,17 @@ class GameState {
       p.skipped_training = training && r === 'skipped';                   // feeds The Truant
       if (r) absent[p.id] = r;
     }
-    d.locker = { done: false, revealed: false, absent, checked: [] };
+    d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent) };
     this.save();
     return d.locker;
+  }
+  /** v2.8: "Immediate request" — maybe one present kid asks to go home (low discipline asks more). Rolled with the arrivals. */
+  rollExcuse(absent) {
+    if (this.excusesOff) return null;
+    for (const p of shuffle(this.squad.filter(x => !absent[x.id]))) {
+      if (Math.random() < EXCUSE.BASE + (20 - p.psych.discipline) * EXCUSE.PER_DISC) return { pid: p.id, kind: pick(EXCUSE.KINDS), done: false };
+    }
+    return null;
   }
   /** Every morning (and after a match): nobody is "absent" any more. */
   clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
@@ -236,6 +269,8 @@ class GameState {
   /** v1.8: after a match — sharpness from minutes (full game +12, sub +6, unused −2); morale from the result,
       goals and red cards, amplified by passion (0.6×–1.4×). */
   applyMatchDynamics(eng, result) {
+    const rm = REP.MATCH[result];   // v2.8: results move the Board and the dressing room
+    if (rm) { this.addRep('board', rm.board); this.addRep('squad', rm.squad); }
     const subIn = new Set(eng.subs.map(x => x.in));
     for (const p of this.squad) {
       const played = eng.everPlayed.has(p.id), st = eng.stats.get(p.id);
@@ -297,7 +332,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, today: this.today, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, today: this.today, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -311,6 +346,8 @@ class GameState {
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
+      const r = d.rep || {};   // v2.8 (older saves start neutral)
+      this.rep = { board: clamp(r.board ?? REP.START, 0, 100), parents: clamp(r.parents ?? REP.START, 0, 100), squad: clamp(r.squad ?? REP.START, 0, 100) };
       this.eventQueue = Array.isArray(d.eventQueue) ? d.eventQueue.filter(q => q && q.id && q.due) : [];
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];

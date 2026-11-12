@@ -28,7 +28,8 @@ class MatchEngine {
     this.subs = [];
     this.paused = false;
     this.mentality = opts.mentality || 'balanced';
-    this.forceWin = !!opts.forceWin;   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
+    this.forceWin = !!opts.forceWin;
+    this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
     this.speed = opts.speed || 1;
     this.sentOff = new Set();
     this.timer = null;
@@ -144,7 +145,7 @@ class MatchEngine {
     return v + (p.moodBonus ?? 0);
   }
   mod(side, role) {
-    const cheat = this.forceWin ? (side === 0 ? 8 : -5) : 0;
+    const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus : 0);   // v2.8: dressing-room mood (repSquad)
     if (side !== 0 || this.mentality === 'balanced') return cheat;
     const pushing = this.mentality === 'attack';
     return cheat + ((role === 'atk') === pushing ? 3 : -3);

@@ -299,6 +299,41 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v2.8 IMMEDIATE REQUEST — a kid who DID turn up asks to go home (locker room, before you look around) ---------- */
+  {
+    id: 'excuse', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast, lk = s.dayState().locker, req = lk?.request, kind = req?.kind || 'test', name = L.name(kid.name);
+      const finish = () => { if (req) req.done = true; };
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleExcuse', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('ex.' + kind, { k: name }),
+        choices: [
+          { key: 'ex.home', tone: 'gray', who: kid.id,
+            run: () => {
+              finish();
+              kid.absentToday = 'excused'; kid.skipped_training = false;
+              if (lk) { lk.absent[kid.id] = 'excused'; if (!lk.checked.includes(kid.id)) lk.checked.push(kid.id); }
+              s.addRep('parents', REP.EXCUSE_HOME_PARENTS);
+              return { k: { pid: kid.id } };
+            } },
+          { key: 'ex.stay', tone: 'red', who: kid.id,
+            run: () => {
+              finish();
+              s.addRep('squad', REP.EXCUSE_STAY_SQUAD);
+              kid.dyn.morale = clamp(kid.dyn.morale + REP.EXCUSE_STAY_MORALE, 0, 100);
+              if (kind === 'ankle' && Math.random() < REP.EXCUSE_ANKLE_INJURY) {   // it really was something
+                kid.injuryDays = Math.max(kid.injuryDays, rnd(...REP.EXCUSE_ANKLE_DAYS));
+                if (lk) { lk.absent[kid.id] = 'injury'; if (!lk.checked.includes(kid.id)) lk.checked.push(kid.id); }
+                s.addDiary({ date: ctx.date, key: 'ex.ankleHurt', vars: { k: { pid: kid.id }, d: kid.injuryDays }, cls: 'ev' });
+              }
+              return { k: { pid: kid.id } };
+            } },
+        ] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',

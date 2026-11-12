@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.8', name: { en: 'The Morning Routine', ru: 'Утро тренера' },
+    en: [
+      'Every day now starts with START DAY → the MORNING BRIEFING: date, weather, one or two local news items and your three reputations. Then [ HEAD TO THE CLUB ].',
+      'Three factions (0–100, start 50): the Board (monthly grant on the 1st — the happier they are, the bigger it is), the Parents (small donations on Sundays when happy, kids kept at home when angry) and the Squad (the dressing-room mood: a small bonus or penalty in every match). Wins and defeats move the Board and the Squad.',
+      'Training and match days continue in the Locker Room. Before you can look around, a kid who did turn up may ask to go home (a maths test, a weird ankle, nan\'s birthday…). "Go home": he leaves today\'s squad, Parents +5. "Stay and train": Squad −5 and his morale drops — and a weird ankle can turn out to be a real injury.',
+      'The Locker Room button is now [ HEAD TO PITCH ] → training plan or match prep. Rest days: briefing, then the quiet Dashboard and END DAY.',
+    ],
+    ru: [
+      'Каждый день теперь начинается с «Начать день» → УТРЕННЯЯ СВОДКА: дата, погода, одна-две местные новости и три твоих репутации. Затем [ ПОЕХАТЬ В КЛУБ ].',
+      'Три стороны (0–100, старт 50): Правление (ежемесячный грант 1-го числа — чем они довольнее, тем он больше), Родители (по воскресеньям небольшие пожертвования, если довольны, или детей не пускают, если злы) и Команда (настроение в раздевалке: небольшой бонус или штраф в каждом матче). Победы и поражения двигают Правление и Команду.',
+      'Дни тренировок и матчей продолжаются в раздевалке. Пока ты не огляделся, кто-то из пришедших может попроситься домой (контрольная по математике, странная лодыжка, день рождения бабушки…). «Иди домой»: он выбывает на сегодня, Родители +5. «Остаёшься и тренируешься»: Команда −5, его мораль падает — а «странная лодыжка» может оказаться настоящей травмой.',
+      'Кнопка в раздевалке теперь [ НА ПОЛЕ ] → план тренировки или подготовка к матчу. В дни отдыха: сводка, затем спокойный Штаб и «Завершить день».',
+    ] },
   { v: '2.7', name: { en: 'Window Order Fix', ru: 'Порядок окон' },
     en: [
       'Fixed: a player profile opened from the Locker Room was hidden behind it. Profiles (right-click or the [i] on a locker) now always open on top, with their dark backdrop between the room and the card.',

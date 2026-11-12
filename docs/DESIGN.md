@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v2.7)
+# Youth Academy Manager — design notes (current: v2.8)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -136,3 +136,9 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Z-index tokens on `:root` (01-core.css): `--z-base 10` (#desktop) · `--z-window 20` (.win) · `--z-taskbar 40` · `--z-phase 50` (Locker Room) · `--z-info 100` (profile, team roster, match summary — `.pinfo-layer` = backdrop + card) · `--z-tool 120` (DEBUG.EXE) · `--z-menu 160` (Start menu) · `--z-event 200` (event / office / roll-call dialogue) · `--z-alert 210` (Modal) · `--z-fx 290` (surge flash) · `--z-crt 300–305` (glass, pointer-events none) · `--z-boot 9999`. Never hard-code a layer z-index again; use the tokens. (The match screen is a normal window, not an overlay.)
 - One Escape manager (`UIController.topLayer()`, window capture listener in `bind()`): Esc closes only the top-most open layer (computed z-index, then DOM order) and stops propagation; event dialogues swallow it. With no layer open, the old handlers (Start menu, selections) run.
 - Locker slots carry `data-pid` (right-click → profile) and an [i] button; opening the room no longer closes an open profile; `ProfileCard.open` refuses while a dialogue is open.
+
+## Morning routine + faction reputation (v2.8)
+- Day flow: START DAY (blocker `briefing` while `today.briefed` is false, every calendar day) → `MorningBriefing` (11g-briefing.js, `#morning-briefing-view`, `--z-phase`) → [ HEAD TO THE CLUB ] → Locker Room on training / match days (`LockerRoom.open()` redirects to the briefing if needed), Dashboard on rest days → … → END DAY. Locker button = [ HEAD TO PITCH ].
+- Weather (`WEATHER`/`WEATHER_W`) and 1–2 news (`MorningBriefing.NEWS`, i18n `news.*`, filled with league names) are seeded by the date → same morning after a reload.
+- `state.rep = { board, parents, squad }` 0–100, start 50, saved; `addRep()`. `repDaily(date)` in the daily hook: squad rep drifts 1/day toward the squad's average morale; 1st of the month (not the season's opening day): board grant $50 + (board − 50) × 4 (≥ 0); Sundays: parents ≥ 65 donate $10–30 + surplus, ≤ 30 keep a random kid at home 3 days. Match results: W board +3 squad +2, L board −2 squad −2. Engine: `opts.squadRep` → `repBonus = clamp((squad − 50) / 25, −2, 2)` added to every roll of our side in `mod()`.
+- Immediate request: `runLocker()` → `rollExcuse()` (per present kid 4% + (20 − discipline) × 0.6%, one per day, kinds test / ankle / birthday, stored in `today.locker.request`, off with `state.excusesOff` / the DEBUG random-events switch). `LockerRoom.maybeRequest()` fires the manual event `excuse` ~1.3 s after the doors open; grid clicks and Proceed are blocked until answered. Go home → `absentToday = 'excused'`, Parents +5. Stay → Squad −5, morale −10; ankle: 30% injury 3–6 days.

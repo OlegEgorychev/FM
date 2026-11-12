@@ -141,6 +141,7 @@ class DebugConsole {
       this.msg = L.t('dbg.doneMoney', { b: money(s.budget) });
     } else if (id === 'events') {
       ui.events.enabled = !ui.events.enabled;
+      s.excusesOff = !ui.events.enabled;   // v2.8: morning requests follow the same switch
       this.msg = L.t('dbg.events') + ': ' + L.t(ui.events.enabled ? 'dbg.forceOn' : 'dbg.forceOff');
     } else if (id.startsWith('fire:')) {
       if (eng || ui.events.active || ui.cal.running) { this.msg = L.t('dbg.busy'); this.render(); return; }

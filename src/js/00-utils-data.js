@@ -107,6 +107,16 @@ const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:0
 /* v2.6 LOCKER ROOM — who turns up on training / match days.
    Absent if: condition < MIN_COND, injured / suspended / kept at home, or skips: random·20 > discipline + DISC_GRACE.
    (The brief's raw roll random·20 > discipline would leave ~half the squad at home: DISC_GRACE = 8 → discipline 10 ≈ 10%, 3 ≈ 45%, 12+ never.) */
+/* v2.8 FACTION REPUTATION (0–100, start 50) + MORNING ROUTINE */
+const REP = { START: 50,
+  BOARD_GRANT_BASE: 50, BOARD_GRANT_STEP: 4,          // 1st of the month: $50 + (board − 50) × 4 (board 100 → $250, under ~38 → nothing)
+  PARENTS_HIGH: 65, PARENTS_LOW: 30, PARENTS_HOME_DAYS: 3,   // Sundays: happy parents donate, angry parents keep a kid at home
+  SQUAD_BONUS: 25,                                    // match rolls for us: (squad − 50) / 25 → −2 … +2
+  MATCH: { W: { board: 3, squad: 2 }, D: { board: 0, squad: 0 }, L: { board: -2, squad: -2 } },
+  EXCUSE_HOME_PARENTS: 5, EXCUSE_STAY_SQUAD: -5, EXCUSE_STAY_MORALE: -10, EXCUSE_ANKLE_INJURY: 0.3, EXCUSE_ANKLE_DAYS: [3, 6] };
+const EXCUSE = { BASE: 0.04, PER_DISC: 0.006, KINDS: ['test', 'ankle', 'birthday'] };   // per present kid: 4% + (20 − discipline) × 0.6%
+const WEATHER = ['heavyRain', 'rain', 'drizzle', 'overcast', 'fog', 'wind', 'clearCold'];
+const WEATHER_W = [4, 4, 3, 4, 2, 2, 1];
 const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);

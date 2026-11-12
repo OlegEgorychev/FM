@@ -23,6 +23,12 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_/.test(m.text())) errors.push(m.text()); });
   page.on('dialog', d => { errors.push('native dialog: ' + d.message()); d.dismiss(); });
+  // v2.8: START DAY → morning briefing → [ HEAD TO THE CLUB ] → locker room
+  const toLocker = async () => {
+    await page.evaluate(() => YAM.ui.locker.open());
+    if (await page.evaluate(() => !document.getElementById('morning-briefing-view').hidden)) await page.click('#mb-go');
+    await page.waitForTimeout(60);
+  };
   const shot = async name => { if (SHOTS) { fs.mkdirSync(path.join(__dirname, 'shots'), { recursive: true }); await page.screenshot({ path: path.join(__dirname, 'shots', name + '.png') }); } };
   const modalOpen = () => page.evaluate(() => !document.getElementById('modal-layer').hidden);
   const closeModal = async () => { if (await modalOpen()) await page.keyboard.press('Escape'); };
@@ -49,6 +55,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    await page.evaluate(() => { YAM.game.excusesOff = true; });
 
     const ver = await page.evaluate(() => APP_VERSION);
     const title = await page.title();
@@ -61,13 +68,13 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.evaluate(() => { for (const k of [1, 2, 5]) { YAM.MatchEngine.SPEED[k] = 6; YAM.MatchEngine.HIGHLIGHT[k] = 12; } });
 
     // calendar → matchday (random narrative events off here; they are tested at the end)
-    await page.evaluate(() => { YAM.ui.events.enabled = false; YAM.game.squad.forEach(p => { p.psych.discipline = 20; }); });   // v2.6: everyone turns up (deterministic)
+    await page.evaluate(() => { YAM.ui.events.enabled = false; YAM.game.excusesOff = true; YAM.game.squad.forEach(p => { p.psych.discipline = 20; }); });   // v2.6: everyone turns up (deterministic)
     await page.evaluate(() => YAM.ui.autoSim());   // v2.5: END DAY is manual; debug auto-sim to the match
     await page.waitForFunction(() => YAM.game.phase === 'matchday', null, { timeout: 20000 });
     check('calendar stops on matchday', true, await page.evaluate(() => YAM.ui.cal.date));
     await shot('1-dashboard');
     await closeModal();
-    await page.evaluate(() => YAM.ui.locker.open()); await page.click('#lr-proceed');   // v2.6: roll call before kick-off
+    await toLocker(); await page.click('#lr-proceed');   // v2.6: roll call before kick-off
     await page.click('.tk[data-view=match]');
 
     // layout: three columns, no scrolling
@@ -155,6 +162,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const facesBefore = await page.evaluate(() => JSON.stringify(YAM.game.squad.map(p => p.face)));
     await page.reload();
     await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    await page.evaluate(() => { YAM.game.excusesOff = true; });
     check('save survives reload', await page.evaluate(() => YAM.game.league.playedMatchdays() === 1 && Object.keys(YAM.game.seasonStats).length >= 11));
     check('faces stable after reload', await page.evaluate(f => JSON.stringify(YAM.game.squad.map(p => p.face)) === f, facesBefore));
     // v1.6: club badges + calendar dashboard
@@ -314,7 +322,21 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     // v2.5: END DAY loop, mandatory training plan, regimes, action points + call into office
     await page.evaluate(() => { YAM.ui.events.enabled = false; YAM.ui.show('dash'); });
     const dl0 = await page.evaluate(() => ({ date: YAM.game.calendar.date, ap: document.getElementById('hdr-ap').textContent, btn: document.getElementById('btn-sim').disabled, today: !!document.querySelector('#today-box .td-ap') }));
-    const endDay = async () => { await page.click('#btn-sim'); await page.waitForTimeout(40); };
+    const endDay = async () => {   // v2.8: a fresh day starts with the briefing (rest days go back to the Dashboard)
+      if (await page.evaluate(() => YAM.ui.dayBlockers()[0] === 'briefing')) { await page.click('#btn-sim'); await page.click('#mb-go'); await page.waitForTimeout(30); }
+      await page.click('#btn-sim'); await page.waitForTimeout(40);
+    };
+    // v2.8: morning briefing on a plain day
+    await page.click('#btn-sim');
+    const mb = await page.evaluate(() => ({ open: !document.getElementById('morning-briefing-view').hidden, z: +getComputedStyle(document.getElementById('morning-briefing-view')).zIndex,
+      date: document.getElementById('mb-date').textContent, wx: document.getElementById('mb-weather').textContent.trim(), news: document.querySelectorAll('#mb-news li').length,
+      rep: document.querySelectorAll('#mb-rep .rep-row .rep-bar').length, btn: document.getElementById('mb-go').textContent, kind: YAM.ui.dayInfo(YAM.game.calendar.date).kind }));
+    await shot('11-briefing');
+    await page.click('#mb-go');
+    const mb2 = await page.evaluate(() => ({ briefed: YAM.game.dayState().briefed, locker: !document.getElementById('locker-room-view').hidden, endDay: !document.getElementById('btn-sim').disabled }));
+    check('morning briefing: START DAY opens it (z 50), date + weather + 1–2 news + 3 reputation bars; HEAD TO THE CLUB on a rest day → Dashboard, END DAY ready',
+      mb.open && mb.z === 50 && mb.date.length > 6 && mb.wx.length > 2 && mb.news >= 1 && mb.news <= 2 && mb.rep === 3 && /CLUB|КЛУБ/.test(mb.btn) && mb.kind === 'rest'
+      && mb2.briefed && !mb2.locker && mb2.endDay, JSON.stringify({ mb, mb2 }));
     const dayOf = d => new Date(d + 'T00:00:00Z').getUTCDay();
     let guard = 0;
     while (!(await page.evaluate(() => isTrainingDay(YAM.game.calendar.date))) && guard++ < 7) await endDay();
@@ -331,7 +353,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         plans: document.querySelectorAll('#today-box .plan-btn').length };
     });
     await page.evaluate(() => { window.__R = Math.random; Math.random = () => 0.99; });
-    await page.click('#btn-sim');   // START DAY → locker room
+    await page.click('#btn-sim');   // START DAY → morning briefing
+    await page.click('#mb-go');     // HEAD TO THE CLUB → locker room (arrivals rolled here)
     await page.evaluate(() => { Math.random = window.__R; });
     await page.waitForTimeout(250);
     const lr1 = await page.evaluate(ids => {
@@ -460,6 +483,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.evaluate(() => YAM.ui.events.fire('boots'));
     await page.reload();
     await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    await page.evaluate(() => { YAM.game.excusesOff = true; });
     const re = await page.evaluate(() => ({ open: !document.getElementById('talk-layer').hidden, b: YAM.game.budget, kid: YAM.game.pendingEvent?.cast.kid }));
     await page.click('#talk-choices .talk-btn[data-i="0"]');
     const re2 = await page.evaluate(k => ({ b: YAM.game.budget, mor: YAM.game.player(k).dyn.morale }), re.kid);
@@ -515,7 +539,30 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       return out;
     });
     check('Quick Sim: instant and visual drivers give identical results (3 seeds)', same.every(Boolean), JSON.stringify(same));
-    await page.evaluate(() => { YAM.game.squad.forEach(p => { p.psych.discipline = 20; if (p.energy < 30) p.energy = 60; }); YAM.ui.locker.open(); });
+    // v2.8: an immediate request in the match-day locker room (forced: every present kid asks) → "Go home"
+    await page.evaluate(() => { YAM.game.squad.forEach(p => { p.psych.discipline = 20; if (p.energy < 30) p.energy = 60; }); YAM.game.excusesOff = false; window.__EB = EXCUSE.BASE; EXCUSE.BASE = 1;
+      YAM.game.rep.parents = 50; });
+    await toLocker();
+    await page.waitForFunction(() => !document.getElementById('talk-layer').hidden, null, { timeout: 4000 });
+    const ex0 = await page.evaluate(() => ({ id: YAM.game.pendingEvent?.id, kid: YAM.game.pendingEvent?.cast.kid, n: document.querySelectorAll('#talk-choices .talk-btn').length,
+      blocked: (YAM.ui.locker.proceed(), !document.getElementById('locker-room-view').hidden) }));
+    await talk(0);   // go home
+    const ex1 = await page.evaluate(k => ({ parents: YAM.game.rep.parents, absent: YAM.game.player(k).absentToday, slot: !!document.querySelector(`#lr-grid .lk.empty.checked[data-pid="${k}"]`),
+      done: YAM.game.dayState().locker.request.done }), ex0.kid);
+    await page.evaluate(() => { EXCUSE.BASE = window.__EB; YAM.game.excusesOff = true; });
+    check('immediate request: a present kid interrupts the locker room (Proceed blocked); "Go home" → out of today\'s squad, Parents +5',
+      ex0.id === 'excuse' && ex0.n === 2 && ex0.blocked && ex1.parents === 55 && ex1.absent === 'excused' && ex1.slot && ex1.done, JSON.stringify({ ex0, ex1 }));
+    const rp = await page.evaluate(() => {
+      const s = YAM.game, b0 = s.budget; s.rep.board = 75; s.rep.parents = 80;
+      s.repDaily('2002-10-01'); const grant = s.budget - b0;
+      const b1 = s.budget; s.repDaily('2002-10-06'); const gift = s.budget - b1;
+      const e = new YAM.MatchEngine(YAM.ui.homeTeam(), s.matchContext().team, { onLog() {}, onUpdate() {}, onEnd() {} }, { squadRep: 100 });
+      s.rep.board = 50; s.rep.parents = 55; s.budget = b0;
+      return { grant, gift, bonus: e.repBonus, mod: e.mod(0, 'atk') - e.mod(1, 'atk') };
+    });
+    check('reputation: board grant on the 1st ($50 + (75−50)×4 = $150), happy parents donate on Sunday, squad rep 100 → +2 on our rolls',
+      rp.grant === 150 && rp.gift > 0 && rp.bonus === 2 && rp.mod === 2, JSON.stringify(rp));
+    await page.evaluate(() => YAM.ui.locker.open());
     const lrMatch = await page.evaluate(() => ({ open: !document.getElementById('locker-room-view').hidden, kind: !!document.querySelector('#lr-head .k-match'),
       btn: document.getElementById('lr-proceed').textContent }));
     await page.click('#lr-proceed');

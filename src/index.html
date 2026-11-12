@@ -324,6 +324,21 @@
     </section>
   </div>
 
+  <!-- v2.8: Morning briefing (START DAY → here → HEAD TO THE CLUB) -->
+  <div class="briefing-layer" id="morning-briefing-view" hidden>
+    <section class="mb-panel" role="dialog" aria-modal="true" aria-labelledby="mb-date">
+      <div class="mb-rain" aria-hidden="true"></div>
+      <header class="mb-top">
+        <div><div class="mb-kicker" data-i18n="mb.kicker"></div><h2 class="mb-date" id="mb-date"></h2><div class="mb-weather" id="mb-weather"></div></div>
+        <div class="mb-cupbox" aria-hidden="true"><svg class="mb-cup" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true"><g fill="#3b2a20"><rect x="7" y="14" width="16" height="12"/><rect x="8" y="26" width="14" height="2"/></g><g fill="#d9d2c0"><rect x="7" y="13" width="16" height="2"/><rect x="6" y="14" width="1" height="11"/><rect x="23" y="14" width="1" height="11"/><rect x="7" y="25" width="16" height="1"/><rect x="8" y="27" width="14" height="1"/><rect x="24" y="16" width="3" height="1"/><rect x="26" y="17" width="1" height="5"/><rect x="24" y="22" width="3" height="1"/></g><g fill="#a63b30"><rect x="9" y="18" width="12" height="2"/></g><rect x="4" y="28" width="22" height="2" fill="#151a1d"/></svg><i class="steam s1"></i><i class="steam s2"></i><i class="steam s3"></i></div>
+      </header>
+      <div class="mb-agenda" id="mb-agenda"></div>
+      <div class="mb-news"><div class="mb-h" data-i18n="mb.news"></div><ul id="mb-news"></ul></div>
+      <div class="mb-repbox"><div class="mb-h" data-i18n="mb.rep"></div><div id="mb-rep"></div></div>
+      <button class="btn go big mb-go" id="mb-go" type="button"></button>
+    </section>
+  </div>
+
   <!-- v2.6: Locker room (who turned up today) -->
   <div class="locker-layer" id="locker-room-view" hidden>
     <section class="win lockerwin open" role="dialog" aria-modal="true" aria-labelledby="lr-title">

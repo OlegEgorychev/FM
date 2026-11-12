@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v2.7</title>
+<title>Youth Academy Manager v2.8</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1442,6 +1442,54 @@ body.fx .crt-scan{ opacity: .9; }
 .st-badge.absent{ background: #3a3f44; color: #f2d45c; }
 @media (prefers-reduced-motion: reduce){ .lk.rv::after{ animation: none; display: none; } .lk.empty.rv{ animation: none; } }
 /* =========================================================
+   v2.8 — MORNING BRIEFING (dark kitchen-table terminal) + reputation bars
+   ========================================================= */
+.briefing-layer{ position: absolute; inset: 0 0 38px 0; z-index: var(--z-phase); display: grid; place-items: center; padding: 14px;
+  background: radial-gradient(ellipse at 50% 30%, #1a2024 0%, #07090a 75%); }
+.briefing-layer[hidden]{ display: none; }
+.briefing-layer.in .mb-panel{ animation: mbIn .6s ease-out; }
+@keyframes mbIn{ from{ opacity: 0; transform: translateY(10px); filter: brightness(2); } }
+.mb-panel{ position: relative; overflow: hidden; width: min(760px, 100%); max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+  padding: 22px 26px; color: #c9d1c4; background: #0c100e; border: 2px solid #2a332e; box-shadow: 0 0 0 1px #000, 0 0 60px rgba(120,160,120,.08), inset 0 0 80px rgba(0,0,0,.8);
+  font-family: var(--mono); }
+.mb-rain{ position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+.briefing-layer[data-wx="heavyRain"] .mb-rain, .briefing-layer[data-wx="rain"] .mb-rain, .briefing-layer[data-wx="drizzle"] .mb-rain{ opacity: .35;
+  background: repeating-linear-gradient(105deg, transparent 0 14px, rgba(160,190,210,.18) 14px 15px); background-size: 100% 200%; animation: mbRain .5s linear infinite; }
+.briefing-layer[data-wx="drizzle"] .mb-rain{ opacity: .15; }
+@keyframes mbRain{ to{ background-position: 0 40px; } }
+.mb-top{ display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.mb-kicker{ font-size: 12px; letter-spacing: 3px; color: #6f8a6a; text-transform: uppercase; }
+.mb-date{ margin: 4px 0 6px; font: 34px/1 var(--mono); color: #e9efe2; text-shadow: 0 0 10px rgba(180,255,180,.15); }
+.mb-weather{ display: flex; align-items: center; gap: 8px; font-size: 18px; color: #9fb2bf; }
+.wx-ico{ width: 20px; height: 14px; border-radius: 8px; background: #6b7780; box-shadow: 6px -4px 0 -1px #808c95; position: relative; }
+.wx-ico.wx-heavyRain::after, .wx-ico.wx-rain::after, .wx-ico.wx-drizzle::after{ content: ''; position: absolute; left: 3px; top: 15px; width: 14px; height: 6px;
+  background: repeating-linear-gradient(100deg, transparent 0 3px, #8fb7d9 3px 4px); }
+.wx-ico.wx-clearCold{ background: #d9c56a; border-radius: 50%; width: 14px; height: 14px; box-shadow: 0 0 8px #d9c56a; }
+.wx-ico.wx-fog{ background: repeating-linear-gradient(#808c95 0 2px, transparent 2px 4px); border-radius: 0; box-shadow: none; }
+.wx-ico.wx-wind{ background: none; border-top: 2px solid #9fb2bf; border-bottom: 2px solid #9fb2bf; border-radius: 0 8px 8px 0; box-shadow: none; height: 8px; }
+.mb-cupbox{ position: relative; width: 84px; height: 84px; flex: none; }
+.mb-cup{ width: 84px; height: 84px; display: block; image-rendering: pixelated; }
+.steam{ position: absolute; bottom: 52px; width: 3px; height: 14px; background: rgba(220,230,220,.35); animation: steam 2.4s ease-in infinite; }
+.steam.s1{ left: 30px; } .steam.s2{ left: 40px; animation-delay: .8s; } .steam.s3{ left: 50px; animation-delay: 1.6s; }
+@keyframes steam{ 0%{ transform: translate(0, 0); opacity: 0; } 30%{ opacity: .8; } 100%{ transform: translate(4px, -26px) scaleX(2); opacity: 0; } }
+.mb-agenda{ font-size: 16px; color: #ffcf5a; border-left: 3px solid #ffcf5a; padding-left: 10px; }
+.mb-h{ font-size: 12px; letter-spacing: 3px; color: #6f8a6a; text-transform: uppercase; margin-bottom: 6px; }
+.mb-news ul{ margin: 0; padding: 10px 14px; list-style: none; background: #0f1512; border: 1px dashed #2a332e; }
+.mb-news li{ font: 17px/1.45 var(--mono); color: #d7e0cf; } .mb-news li::before{ content: '> '; color: #6f8a6a; }
+.mb-news li + li{ margin-top: 6px; }
+.rep-row{ display: grid; grid-template-columns: 110px 1fr 34px; grid-template-rows: auto auto; align-items: center; gap: 2px 10px; margin-bottom: 8px; }
+.rep-name{ font-size: 14px; color: #e9efe2; letter-spacing: 1px; text-transform: uppercase; }
+.rep-row b{ font-size: 18px; color: #e9efe2; text-align: right; }
+.rep-row small{ grid-column: 2 / 4; font: 11px/1.2 var(--ui); color: #6f7d73; }
+.rep-bar{ height: 14px; background: #050706; border: 1px solid #2a332e; padding: 2px; }
+.rep-bar i{ display: block; height: 100%; background: repeating-linear-gradient(90deg, #8fb07f 0 6px, transparent 6px 8px); }
+.rep-bar.hi i{ background: repeating-linear-gradient(90deg, #7fd36b 0 6px, transparent 6px 8px); }
+.rep-bar.lo i{ background: repeating-linear-gradient(90deg, #e0705f 0 6px, transparent 6px 8px); }
+.mb-go{ align-self: center; min-width: 300px; font-family: var(--mono) !important; letter-spacing: 1px; }
+.rep-mini span{ margin-right: 6px; white-space: nowrap; } .rep-mini b{ color: #ffcf5a; }
+@media (prefers-reduced-motion: reduce){ .mb-rain, .steam{ animation: none; } }
+.mb-date::first-letter{ text-transform: uppercase; }
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1774,6 +1822,21 @@ body.fx .crt-scan{ opacity: .9; }
     </section>
   </div>
 
+  <!-- v2.8: Morning briefing (START DAY → here → HEAD TO THE CLUB) -->
+  <div class="briefing-layer" id="morning-briefing-view" hidden>
+    <section class="mb-panel" role="dialog" aria-modal="true" aria-labelledby="mb-date">
+      <div class="mb-rain" aria-hidden="true"></div>
+      <header class="mb-top">
+        <div><div class="mb-kicker" data-i18n="mb.kicker"></div><h2 class="mb-date" id="mb-date"></h2><div class="mb-weather" id="mb-weather"></div></div>
+        <div class="mb-cupbox" aria-hidden="true"><svg class="mb-cup" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true"><g fill="#3b2a20"><rect x="7" y="14" width="16" height="12"/><rect x="8" y="26" width="14" height="2"/></g><g fill="#d9d2c0"><rect x="7" y="13" width="16" height="2"/><rect x="6" y="14" width="1" height="11"/><rect x="23" y="14" width="1" height="11"/><rect x="7" y="25" width="16" height="1"/><rect x="8" y="27" width="14" height="1"/><rect x="24" y="16" width="3" height="1"/><rect x="26" y="17" width="1" height="5"/><rect x="24" y="22" width="3" height="1"/></g><g fill="#a63b30"><rect x="9" y="18" width="12" height="2"/></g><rect x="4" y="28" width="22" height="2" fill="#151a1d"/></svg><i class="steam s1"></i><i class="steam s2"></i><i class="steam s3"></i></div>
+      </header>
+      <div class="mb-agenda" id="mb-agenda"></div>
+      <div class="mb-news"><div class="mb-h" data-i18n="mb.news"></div><ul id="mb-news"></ul></div>
+      <div class="mb-repbox"><div class="mb-h" data-i18n="mb.rep"></div><div id="mb-rep"></div></div>
+      <button class="btn go big mb-go" id="mb-go" type="button"></button>
+    </section>
+  </div>
+
   <!-- v2.6: Locker room (who turned up today) -->
   <div class="locker-layer" id="locker-room-view" hidden>
     <section class="win lockerwin open" role="dialog" aria-modal="true" aria-labelledby="lr-title">
@@ -1950,6 +2013,16 @@ const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:0
 /* v2.6 LOCKER ROOM — who turns up on training / match days.
    Absent if: condition < MIN_COND, injured / suspended / kept at home, or skips: random·20 > discipline + DISC_GRACE.
    (The brief's raw roll random·20 > discipline would leave ~half the squad at home: DISC_GRACE = 8 → discipline 10 ≈ 10%, 3 ≈ 45%, 12+ never.) */
+/* v2.8 FACTION REPUTATION (0–100, start 50) + MORNING ROUTINE */
+const REP = { START: 50,
+  BOARD_GRANT_BASE: 50, BOARD_GRANT_STEP: 4,          // 1st of the month: $50 + (board − 50) × 4 (board 100 → $250, under ~38 → nothing)
+  PARENTS_HIGH: 65, PARENTS_LOW: 30, PARENTS_HOME_DAYS: 3,   // Sundays: happy parents donate, angry parents keep a kid at home
+  SQUAD_BONUS: 25,                                    // match rolls for us: (squad − 50) / 25 → −2 … +2
+  MATCH: { W: { board: 3, squad: 2 }, D: { board: 0, squad: 0 }, L: { board: -2, squad: -2 } },
+  EXCUSE_HOME_PARENTS: 5, EXCUSE_STAY_SQUAD: -5, EXCUSE_STAY_MORALE: -10, EXCUSE_ANKLE_INJURY: 0.3, EXCUSE_ANKLE_DAYS: [3, 6] };
+const EXCUSE = { BASE: 0.04, PER_DISC: 0.006, KINDS: ['test', 'ankle', 'birthday'] };   // per present kid: 4% + (20 − discipline) × 0.6%
+const WEATHER = ['heavyRain', 'rain', 'drizzle', 'overcast', 'fog', 'wind', 'clearCold'];
+const WEATHER_W = [4, 4, 3, 4, 2, 2, 1];
 const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
@@ -2847,6 +2920,71 @@ Object.assign(I18N.ru, {
 
 Object.assign(I18N.en, { 'today.phase.matchday': 'Match day! First the locker room: who turned up?' });
 Object.assign(I18N.ru, { 'today.phase.matchday': 'День матча! Сначала раздевалка: кто пришёл?' });
+
+
+/* ---- v2.8: morning briefing, faction reputation, immediate requests ---- */
+Object.assign(I18N.en, {
+  'dash.startDay': '&#9654; START DAY', 'dash.toLocker': '&#9636; Back to the locker room', 'dash.rep': 'Reputation',
+  'today.briefReq': 'NEW MORNING', 'today.briefNote': 'START DAY: coffee, the weather, the local news — then head to the club.',
+  'mb.kicker': 'Morning briefing', 'mb.news': 'Local news', 'mb.rep': 'Reputation',
+  'mb.go': '[ HEAD TO THE CLUB ]', 'mb.goQuiet': '[ HEAD TO THE CLUB ] · quiet day',
+  'mb.agenda.training': 'Today: training. Let\'s see who turns up.', 'mb.agenda.match': 'Today: MATCH DAY vs {o}.',
+  'mb.agenda.rest': 'Today: rest day. The kids recover; the office is yours.', 'mb.agenda.off': 'No football today.',
+  'wx.heavyRain': 'Heavy rain', 'wx.rain': 'Rain', 'wx.drizzle': 'Drizzle', 'wx.overcast': 'Overcast', 'wx.fog': 'Fog', 'wx.wind': 'Strong wind', 'wx.clearCold': 'Clear and cold',
+  'rep.board': 'Board', 'rep.parents': 'Parents', 'rep.squad': 'Squad',
+  'rep.board.d': 'Academy directors & sponsors: the monthly grant (1st of the month).', 'rep.parents.d': 'Small donations on Sundays — or kids kept at home.',
+  'rep.squad.d': 'The dressing room\'s mood: a small bonus or penalty in every match.',
+  'rep.short.board': 'B', 'rep.short.parents': 'P', 'rep.short.squad': 'S',
+  'rep.boardGrant': 'The Board\'s monthly grant arrived ({m}).', 'rep.boardNone': 'The Board sent no money this month. They are not impressed.',
+  'rep.parentsGift': 'Happy parents passed the hat round after training ({m}).', 'rep.parentsAngry': 'Fed-up parents: {k} is kept at home for {d} days.',
+  'news.scouts': 'Rumours say scouts from the city are watching the under-14 league.', 'news.vandal': 'Vandalism reported at the stadium: someone sprayed the dugout again.',
+  'news.leader': '{t} top the table. "Nobody can stop us," says their coach.', 'news.garage': 'Neighbours complain: {k} kicks a ball against the garage door until midnight.',
+  'news.pothole': 'Council promises to fix the potholes on the training ground. "Next year."', 'news.mayor': 'The mayor will open the new bus stop by the stadium. The old one had no roof anyway.',
+  'news.rival': 'Rumour: {r} bought new kits. The real kind, with numbers on the back.', 'news.kitWash': 'Launderette strike: mums are washing the kits in the bathtub again.',
+  'news.derby': 'Next opponent: {o}. The local paper calls it "the match of the week".', 'news.busStrike': 'Bus drivers threaten a strike. Kids may have to walk to training.',
+  'news.chippy': 'The chip shop on Mill Road offers free chips to any kid who scores this weekend.', 'news.floodlight': 'One floodlight at the club is broken. Evening sessions will be gloomy.',
+  'news.rain': 'Forecast: more rain. Then a little more rain.',
+  'lr.toPitch': '[ HEAD TO PITCH ]',
+  'talk.roleExcuse': '#{n} · {p} · just arrived',
+  'ex.test': '{k} hovers by the door. "Coach, I have a big maths test tomorrow… can I go home and study?"',
+  'ex.ankle': '{k} limps a little. "Coach, my ankle feels weird from yesterday."',
+  'ex.birthday': '{k} looks at his feet. "Coach, it\'s my nan\'s birthday. Mum says I should be there…"',
+  'ex.home': 'Go home', 'ex.stay': 'Stay and train',
+  'ex.home.diary': '{k} was sent home this morning. The parents appreciated it.', 'ex.stay.diary': '{k} had to stay. He sulked all session; the others noticed.',
+  'ex.ankleHurt': 'It really was something: {k} is injured for {d} days.',
+  'lr.short.excused': 'sent home (request)',
+});
+Object.assign(I18N.ru, {
+  'dash.startDay': '&#9654; НАЧАТЬ ДЕНЬ', 'dash.toLocker': '&#9636; Вернуться в раздевалку', 'dash.rep': 'Репутация',
+  'today.briefReq': 'НОВОЕ УТРО', 'today.briefNote': '«Начать день»: кофе, погода, местные новости — потом в клуб.',
+  'mb.kicker': 'Утренняя сводка', 'mb.news': 'Местные новости', 'mb.rep': 'Репутация',
+  'mb.go': '[ ПОЕХАТЬ В КЛУБ ]', 'mb.goQuiet': '[ ПОЕХАТЬ В КЛУБ ] · спокойный день',
+  'mb.agenda.training': 'Сегодня тренировка. Посмотрим, кто придёт.', 'mb.agenda.match': 'Сегодня ДЕНЬ МАТЧА: {o}.',
+  'mb.agenda.rest': 'Сегодня день отдыха. Ребята восстанавливаются, кабинет в твоём распоряжении.', 'mb.agenda.off': 'Сегодня без футбола.',
+  'wx.heavyRain': 'Сильный дождь', 'wx.rain': 'Дождь', 'wx.drizzle': 'Морось', 'wx.overcast': 'Пасмурно', 'wx.fog': 'Туман', 'wx.wind': 'Сильный ветер', 'wx.clearCold': 'Ясно и холодно',
+  'rep.board': 'Правление', 'rep.parents': 'Родители', 'rep.squad': 'Команда',
+  'rep.board.d': 'Директора академии и спонсоры: ежемесячный грант (1-го числа).', 'rep.parents.d': 'Небольшие пожертвования по воскресеньям — или детей не пускают на тренировки.',
+  'rep.squad.d': 'Настроение в раздевалке: небольшой бонус или штраф в каждом матче.',
+  'rep.short.board': 'П', 'rep.short.parents': 'Р', 'rep.short.squad': 'К',
+  'rep.boardGrant': 'Пришёл ежемесячный грант правления ({m}).', 'rep.boardNone': 'В этом месяце правление денег не прислало. Они недовольны.',
+  'rep.parentsGift': 'Довольные родители скинулись после тренировки ({m}).', 'rep.parentsAngry': 'Родители недовольны: {k} сидит дома {d} дн.',
+  'news.scouts': 'Ходят слухи, что скауты из города присматриваются к детской лиге.', 'news.vandal': 'Вандализм на стадионе: кто-то снова разрисовал скамейку запасных.',
+  'news.leader': '{t} лидируют в таблице. «Нас никто не остановит», — говорит их тренер.', 'news.garage': 'Соседи жалуются: {k} до полуночи бьёт мячом в ворота гаража.',
+  'news.pothole': 'Муниципалитет обещает заделать ямы на тренировочном поле. «В следующем году».', 'news.mayor': 'Мэр откроет новую остановку у стадиона. У старой всё равно не было крыши.',
+  'news.rival': 'Слух: {r} купили новую форму. Настоящую, с номерами на спине.', 'news.kitWash': 'Прачечная бастует: мамы снова стирают форму в ванне.',
+  'news.derby': 'Следующий соперник — {o}. Местная газета называет это «матчем недели».', 'news.busStrike': 'Водители автобусов грозят забастовкой. Детям, возможно, придётся идти на тренировку пешком.',
+  'news.chippy': 'Закусочная на Милл-роуд обещает бесплатную картошку каждому, кто забьёт в выходные.', 'news.floodlight': 'В клубе сломался прожектор. Вечерние тренировки будут мрачными.',
+  'news.rain': 'Прогноз: снова дождь. Потом ещё немного дождя.',
+  'lr.toPitch': '[ НА ПОЛЕ ]',
+  'talk.roleExcuse': '№{n} · {p} · только что пришёл',
+  'ex.test': '{k} мнётся у двери. «Тренер, у меня завтра большая контрольная по математике… можно я пойду домой готовиться?»',
+  'ex.ankle': '{k} слегка прихрамывает. «Тренер, у меня со вчера что-то странное с лодыжкой».',
+  'ex.birthday': '{k} смотрит в пол. «Тренер, у бабушки день рождения. Мама говорит, я должен быть там…»',
+  'ex.home': 'Иди домой', 'ex.stay': 'Остаёшься и тренируешься',
+  'ex.home.diary': 'Отпустили игрока домой с утра. Родители оценили. Игрок: {k}.', 'ex.stay.diary': '{k} остался, но дулся всю тренировку; остальные это заметили.',
+  'ex.ankleHurt': 'Это действительно было что-то: {k} травмирован на {d} дн.',
+  'lr.short.excused': 'отпущен домой (просьба)',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -3484,6 +3622,7 @@ class GameState {
     this.clubName = CLUB_NAME;
     this.formation = '4-4-2';
     this.budget = ECONOMY.START;   // v1.9: club money ($), carried across seasons
+    this.rep = { board: REP.START, parents: REP.START, squad: REP.START };   // v2.8 faction reputation
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
@@ -3594,6 +3733,30 @@ class GameState {
     return this.today;
   }
   get ap() { return this.dayState().ap; }
+  /* ---------- v2.8 faction reputation ---------- */
+  addRep(key, delta) { if (this.rep && key in this.rep) this.rep[key] = clamp(Math.round(this.rep[key] + delta), 0, 100); }
+  /** Daily: squad rep drifts 1 toward the squad's average morale; 1st of the month: board grant; Sundays: parents. */
+  repDaily(date) {
+    const avg = this.squad.reduce((a, p) => a + p.dyn.morale, 0) / this.squad.length;
+    this.addRep('squad', Math.sign(Math.round(avg) - this.rep.squad));
+    const d = new Date(date + 'T00:00:00Z');
+    const seasonStart = isoAdd(this.calendar.events[0]?.date || date, -SEASON.FIRST_MATCH_OFFSET);
+    if (d.getUTCDate() === 1 && date > seasonStart) {   // no grant on the opening day of the season
+      const grant = Math.max(0, Math.round(REP.BOARD_GRANT_BASE + (this.rep.board - 50) * REP.BOARD_GRANT_STEP));
+      if (grant) this.addMoney(grant);
+      this.addDiary({ date, key: grant ? 'rep.boardGrant' : 'rep.boardNone', vars: { m: '$' + grant }, cls: 'ev' });
+    }
+    if (d.getUTCDay() === 0) {
+      if (this.rep.parents >= REP.PARENTS_HIGH) {
+        const gift = rnd(10, 30) + (this.rep.parents - REP.PARENTS_HIGH);
+        this.addMoney(gift);
+        this.addDiary({ date, key: 'rep.parentsGift', vars: { m: '$' + gift }, cls: 'ev' });
+      } else if (this.rep.parents <= REP.PARENTS_LOW) {
+        const kid = pick(this.squad.filter(p => p.available));
+        if (kid) { kid.awayDays = Math.max(kid.awayDays, REP.PARENTS_HOME_DAYS); this.addDiary({ date, key: 'rep.parentsAngry', vars: { k: { pid: kid.id }, d: REP.PARENTS_HOME_DAYS }, cls: 'ev' }); }
+      }
+    }
+  }
   spendAP() { const d = this.dayState(); if (d.ap < 1) return false; d.ap--; this.save(); return true; }
   setPlan(plan) { if (REGIMES[plan]) { this.dayState().plan = plan; this.save(); } }
   /** v2.5: one random skill of a group +1 (capped by potential). Returns true if something improved. */
@@ -3629,9 +3792,17 @@ class GameState {
       p.skipped_training = training && r === 'skipped';                   // feeds The Truant
       if (r) absent[p.id] = r;
     }
-    d.locker = { done: false, revealed: false, absent, checked: [] };
+    d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent) };
     this.save();
     return d.locker;
+  }
+  /** v2.8: "Immediate request" — maybe one present kid asks to go home (low discipline asks more). Rolled with the arrivals. */
+  rollExcuse(absent) {
+    if (this.excusesOff) return null;
+    for (const p of shuffle(this.squad.filter(x => !absent[x.id]))) {
+      if (Math.random() < EXCUSE.BASE + (20 - p.psych.discipline) * EXCUSE.PER_DISC) return { pid: p.id, kind: pick(EXCUSE.KINDS), done: false };
+    }
+    return null;
   }
   /** Every morning (and after a match): nobody is "absent" any more. */
   clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
@@ -3706,6 +3877,8 @@ class GameState {
   /** v1.8: after a match — sharpness from minutes (full game +12, sub +6, unused −2); morale from the result,
       goals and red cards, amplified by passion (0.6×–1.4×). */
   applyMatchDynamics(eng, result) {
+    const rm = REP.MATCH[result];   // v2.8: results move the Board and the dressing room
+    if (rm) { this.addRep('board', rm.board); this.addRep('squad', rm.squad); }
     const subIn = new Set(eng.subs.map(x => x.in));
     for (const p of this.squad) {
       const played = eng.everPlayed.has(p.id), st = eng.stats.get(p.id);
@@ -3767,7 +3940,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, today: this.today, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, today: this.today, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -3781,6 +3954,8 @@ class GameState {
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
+      const r = d.rep || {};   // v2.8 (older saves start neutral)
+      this.rep = { board: clamp(r.board ?? REP.START, 0, 100), parents: clamp(r.parents ?? REP.START, 0, 100), squad: clamp(r.squad ?? REP.START, 0, 100) };
       this.eventQueue = Array.isArray(d.eventQueue) ? d.eventQueue.filter(q => q && q.id && q.due) : [];
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
@@ -3852,7 +4027,8 @@ class MatchEngine {
     this.subs = [];
     this.paused = false;
     this.mentality = opts.mentality || 'balanced';
-    this.forceWin = !!opts.forceWin;   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
+    this.forceWin = !!opts.forceWin;
+    this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
     this.speed = opts.speed || 1;
     this.sentOff = new Set();
     this.timer = null;
@@ -3968,7 +4144,7 @@ class MatchEngine {
     return v + (p.moodBonus ?? 0);
   }
   mod(side, role) {
-    const cheat = this.forceWin ? (side === 0 ? 8 : -5) : 0;
+    const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus : 0);   // v2.8: dressing-room mood (repSquad)
     if (side !== 0 || this.mentality === 'balanced') return cheat;
     const pushing = this.mentality === 'attack';
     return cheat + ((role === 'atk') === pushing ? 3 : -3);
@@ -4403,8 +4579,21 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.8', name: { en: 'The Morning Routine', ru: 'Утро тренера' },
+    en: [
+      'Every day now starts with START DAY → the MORNING BRIEFING: date, weather, one or two local news items and your three reputations. Then [ HEAD TO THE CLUB ].',
+      'Three factions (0–100, start 50): the Board (monthly grant on the 1st — the happier they are, the bigger it is), the Parents (small donations on Sundays when happy, kids kept at home when angry) and the Squad (the dressing-room mood: a small bonus or penalty in every match). Wins and defeats move the Board and the Squad.',
+      'Training and match days continue in the Locker Room. Before you can look around, a kid who did turn up may ask to go home (a maths test, a weird ankle, nan\'s birthday…). "Go home": he leaves today\'s squad, Parents +5. "Stay and train": Squad −5 and his morale drops — and a weird ankle can turn out to be a real injury.',
+      'The Locker Room button is now [ HEAD TO PITCH ] → training plan or match prep. Rest days: briefing, then the quiet Dashboard and END DAY.',
+    ],
+    ru: [
+      'Каждый день теперь начинается с «Начать день» → УТРЕННЯЯ СВОДКА: дата, погода, одна-две местные новости и три твоих репутации. Затем [ ПОЕХАТЬ В КЛУБ ].',
+      'Три стороны (0–100, старт 50): Правление (ежемесячный грант 1-го числа — чем они довольнее, тем он больше), Родители (по воскресеньям небольшие пожертвования, если довольны, или детей не пускают, если злы) и Команда (настроение в раздевалке: небольшой бонус или штраф в каждом матче). Победы и поражения двигают Правление и Команду.',
+      'Дни тренировок и матчей продолжаются в раздевалке. Пока ты не огляделся, кто-то из пришедших может попроситься домой (контрольная по математике, странная лодыжка, день рождения бабушки…). «Иди домой»: он выбывает на сегодня, Родители +5. «Остаёшься и тренируешься»: Команда −5, его мораль падает — а «странная лодыжка» может оказаться настоящей травмой.',
+      'Кнопка в раздевалке теперь [ НА ПОЛЕ ] → план тренировки или подготовка к матчу. В дни отдыха: сводка, затем спокойный Штаб и «Завершить день».',
+    ] },
   { v: '2.7', name: { en: 'Window Order Fix', ru: 'Порядок окон' },
     en: [
       'Fixed: a player profile opened from the Locker Room was hidden behind it. Profiles (right-click or the [i] on a locker) now always open on top, with their dark backdrop between the room and the card.',
@@ -5703,6 +5892,7 @@ class DebugConsole {
       this.msg = L.t('dbg.doneMoney', { b: money(s.budget) });
     } else if (id === 'events') {
       ui.events.enabled = !ui.events.enabled;
+      s.excusesOff = !ui.events.enabled;   // v2.8: morning requests follow the same switch
       this.msg = L.t('dbg.events') + ': ' + L.t(ui.events.enabled ? 'dbg.forceOn' : 'dbg.forceOff');
     } else if (id.startsWith('fire:')) {
       if (eng || ui.events.active || ui.cal.running) { this.msg = L.t('dbg.busy'); this.render(); return; }
@@ -6017,6 +6207,41 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v2.8 IMMEDIATE REQUEST — a kid who DID turn up asks to go home (locker room, before you look around) ---------- */
+  {
+    id: 'excuse', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast, lk = s.dayState().locker, req = lk?.request, kind = req?.kind || 'test', name = L.name(kid.name);
+      const finish = () => { if (req) req.done = true; };
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleExcuse', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('ex.' + kind, { k: name }),
+        choices: [
+          { key: 'ex.home', tone: 'gray', who: kid.id,
+            run: () => {
+              finish();
+              kid.absentToday = 'excused'; kid.skipped_training = false;
+              if (lk) { lk.absent[kid.id] = 'excused'; if (!lk.checked.includes(kid.id)) lk.checked.push(kid.id); }
+              s.addRep('parents', REP.EXCUSE_HOME_PARENTS);
+              return { k: { pid: kid.id } };
+            } },
+          { key: 'ex.stay', tone: 'red', who: kid.id,
+            run: () => {
+              finish();
+              s.addRep('squad', REP.EXCUSE_STAY_SQUAD);
+              kid.dyn.morale = clamp(kid.dyn.morale + REP.EXCUSE_STAY_MORALE, 0, 100);
+              if (kind === 'ankle' && Math.random() < REP.EXCUSE_ANKLE_INJURY) {   // it really was something
+                kid.injuryDays = Math.max(kid.injuryDays, rnd(...REP.EXCUSE_ANKLE_DAYS));
+                if (lk) { lk.absent[kid.id] = 'injury'; if (!lk.checked.includes(kid.id)) lk.checked.push(kid.id); }
+                s.addDiary({ date: ctx.date, key: 'ex.ankleHurt', vars: { k: { pid: kid.id }, d: kid.injuryDays }, cls: 'ev' });
+              }
+              return { k: { pid: kid.id } };
+            } },
+        ] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',
@@ -6285,7 +6510,7 @@ class MatchSummary {
    XI, the bench and the training until the next morning. An empty locker can be investigated for 1 AP.
    ========================================================= */
 class LockerRoom {
-  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?' };
+  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?', excused: '\u2302' };
   constructor(ui) {
     this.ui = ui;
     this.layer = document.getElementById('locker-room-view');
@@ -6294,6 +6519,7 @@ class LockerRoom {
     document.getElementById('lr-proceed').addEventListener('click', () => this.proceed());
     this.grid.addEventListener('click', e => {
       if (e.target.closest('[data-info]')) return;   // v2.7: the [i] opens the profile, not the roll call
+      if (this.requestPending) return;               // v2.8: answer the kid first
       const box = e.target.closest('.lk.empty');
       if (box) this.investigate(box.dataset.pid);
     });
@@ -6310,6 +6536,7 @@ class LockerRoom {
     const s = this.state;
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (!s.dayState().briefed) { this.ui.briefing.open(); return; }   // v2.8: morning briefing first
     this.ui.modal.close();   // v2.7: an open profile may stay — it sits above the room
     const lk = s.runLocker(s.phase === 'calendar');
     const reveal = !lk.revealed;
@@ -6318,6 +6545,18 @@ class LockerRoom {
     this.render(reveal);
     this.layer.hidden = false;
     document.getElementById('lr-proceed').focus();
+    this.maybeRequest(reveal ? 1300 : 0);   // v2.8: a kid interrupts before you can look around
+  }
+  get requestPending() { const r = this.state.dayState().locker?.request; return !!(r && !r.done); }
+  maybeRequest(delay) {
+    if (!this.requestPending) return;
+    clearTimeout(this.reqTimer);
+    this.reqTimer = setTimeout(() => {
+      const r = this.state.dayState().locker?.request;
+      if (!this.isOpen || !r || r.done || this.ui.events.active) return;
+      this.ui.profile.close();
+      this.ui.events.fire('excuse', this.state.calendar.date, { cast: { kid: r.pid } });
+    }, delay);
   }
   close() { this.layer.hidden = true; this.ui.renderDash(); }
 
@@ -6351,7 +6590,7 @@ class LockerRoom {
       <span class="lr-kind ${match ? 'k-match' : 'k-training'}">${match ? L.t('lr.kindMatch', { o: esc(L.team(ctx?.opp.name || '')) }) : L.t('lr.kindTraining')}</span>
       <span class="lr-count${present < 11 ? ' low' : ''}">${L.t('lr.arrived', { n: present, t: squad.length })}</span>
       <span class="lr-ap">${L.t('ap.left')} <b>${d.ap}/${COACH.AP}</b></span>`;
-    document.getElementById('lr-proceed').innerHTML = L.t(match ? 'lr.toMatch' : 'lr.toPlan');
+    document.getElementById('lr-proceed').innerHTML = L.t('lr.toPitch');   // v2.8: [ HEAD TO PITCH ]
     document.getElementById('lr-status').textContent = L.t(present < 11 ? 'lr.statusShort' : 'lr.status');
   }
 
@@ -6371,6 +6610,7 @@ class LockerRoom {
   proceed() {
     const s = this.state, lk = s.dayState().locker;
     if (!lk || this.ui.events.active) return;
+    if (this.requestPending) { this.maybeRequest(0); return; }   // v2.8
     lk.done = true;
     for (const c of s.ensureAvailableXI()) s.addDiary({ date: s.calendar.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
     const miss = Object.keys(lk.absent).length;
@@ -6381,6 +6621,75 @@ class LockerRoom {
     this.ui.prepareMatch();
     this.ui.renderAll();
     this.ui.show(s.phase === 'matchday' ? 'match' : 'dash');
+  }
+}
+/* =========================================================
+   v2.8 — MORNING BRIEFING ("MORNING.EXE", This Is the Police style)
+   START DAY → here (date, weather, local news, the three factions) → [ HEAD TO THE CLUB ]
+   → Locker Room on training / match days, or back to the quiet Dashboard on rest days.
+   Weather and news are seeded by the date, so a reload shows the same morning.
+   ========================================================= */
+class MorningBriefing {
+  static NEWS = ['scouts', 'vandal', 'leader', 'garage', 'pothole', 'mayor', 'rival', 'kitWash', 'derby', 'busStrike', 'chippy', 'floodlight', 'rain'];
+  constructor(ui) {
+    this.ui = ui;
+    this.layer = document.getElementById('morning-briefing-view');
+    document.getElementById('mb-go').addEventListener('click', () => this.go());
+  }
+  get isOpen() { return !this.layer.hidden; }
+  get state() { return this.ui.state; }
+
+  /** Seeded weather for a date (autumn in a rainy town). */
+  static weather(date) {
+    const r = seeded('wx' + date)(), tot = WEATHER_W.reduce((a, b) => a + b, 0);
+    let x = r * tot;
+    for (let i = 0; i < WEATHER.length; i++) { if ((x -= WEATHER_W[i]) < 0) return WEATHER[i]; }
+    return WEATHER[0];
+  }
+  /** 1–2 seeded flavour headlines, filled with names from the league. */
+  news(date) {
+    const s = this.state, r = seeded('news' + date), lg = s.league;
+    const pool = MorningBriefing.NEWS.filter(id => id !== 'leader' || lg.playedMatchdays() > 0);   // no "league leaders" before a ball is kicked
+    const ids = [...pool].sort(() => r() - 0.5).slice(0, r() < 0.55 ? 1 : 2);
+    const leader = lg.table()[0]?.team, ctx = s.matchContext(), kid = s.squad[Math.floor(r() * s.squad.length)];
+    const rival = lg.teams.filter(t => !t.user)[Math.floor(r() * (lg.teams.length - 1))];
+    return ids.map(id => L.t('news.' + id, { t: L.team(leader?.name || ''), k: L.name(kid.name), o: L.team(ctx?.opp.name || rival.name), r: L.team(rival.name) }));
+  }
+
+  open() {
+    const s = this.state;
+    if (this.ui.events.active) { this.ui.events.open(); return; }
+    this.ui.modal.close(); this.ui.profile.close();
+    this.render();
+    this.layer.hidden = false;
+    this.layer.classList.remove('in'); void this.layer.offsetWidth; this.layer.classList.add('in');
+    document.getElementById('mb-go').focus();
+  }
+  close() { this.layer.hidden = true; }
+
+  render() {
+    const s = this.state, date = s.calendar.date, wx = MorningBriefing.weather(date), info = this.ui.dayInfo(date);
+    const kind = s.phase === 'matchday' ? 'match' : info.kind;
+    this.layer.dataset.wx = wx;
+    document.getElementById('mb-date').textContent = fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    document.getElementById('mb-weather').innerHTML = `<span class="wx-ico wx-${wx}"></span>${L.t('wx.' + wx)}`;
+    document.getElementById('mb-agenda').textContent = L.t('mb.agenda.' + kind, { o: L.team(s.matchContext()?.opp.name || '') });
+    document.getElementById('mb-news').innerHTML = this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
+    const bar = (k) => { const v = s.rep[k];
+      return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };
+    document.getElementById('mb-rep').innerHTML = ['board', 'parents', 'squad'].map(bar).join('');
+    document.getElementById('mb-go').innerHTML = L.t(kind === 'rest' || kind === 'off' ? 'mb.goQuiet' : 'mb.go');
+  }
+
+  /** [ HEAD TO THE CLUB ] */
+  go() {
+    const s = this.state;
+    s.dayState().briefed = true;
+    s.save();
+    this.close();
+    const kind = s.phase === 'matchday' ? 'match' : this.ui.dayInfo(s.calendar.date).kind;
+    if (kind === 'training' || kind === 'match') this.ui.locker.open();
+    else this.ui.renderAll();
   }
 }
 /* =========================================================
@@ -6414,6 +6723,7 @@ class UIController {
     this.debug = new DebugConsole(this);         // v1.8
     this.events = new EventEngine(this);         // v1.9: narrative events + locker room dialogue
     this.locker = new LockerRoom(this);          // v2.6: who turned up today
+    this.briefing = new MorningBriefing(this);   // v2.8: the morning routine
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
@@ -6444,6 +6754,7 @@ class UIController {
     // cal.registerType('dialogue', { blocking: true,  label: ev => '…', onArrive: ev => this.openDialogue(ev) });
     cal.onDay(date => {   // v2.4/2.5: Tue/Thu = training with the coach's regime (auto-sim falls back to Match Practice)
       const s = this.state, r = s.dayRoutine(date, isTrainingDay(date), s.dayState().plan || 'match');
+      s.repDaily(date);   // v2.8: faction reputation (board grant on the 1st, parents on Sundays, squad drift)
       if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
       const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
       if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
@@ -6469,6 +6780,7 @@ class UIController {
     this.renderBudget();
     if (this.debug?.isOpen) this.debug.render();   // v1.8
     if (this.locker?.isOpen) this.locker.render();   // v2.6
+    if (this.briefing?.isOpen) this.briefing.render();   // v2.8
     if (this.summary?.isOpen) this.summary.render();   // v2.1
   }
 
@@ -6595,6 +6907,7 @@ class UIController {
       { el: this.teamCard.layer, close: () => this.teamCard.close() },
       { el: this.profile.layer, close: () => this.profile.close() },
       { el: this.locker.layer, close: () => this.locker.close() },
+      { el: this.briefing.layer, close: () => this.briefing.close() },
     ];
     this.topLayer = () => {
       const z = el => parseInt(getComputedStyle(el).zIndex, 10) || 0;
@@ -6953,6 +7266,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       <dt>${L.t('dash.record')}</dt><dd>${L.t('dash.recordVal', row)}</dd>
       <dt>${L.t('dash.form')}</dt><dd>${this.formChips(row.form) || '—'}</dd>
       <dt>${L.t('dash.formation')}</dt><dd>${s.formation}</dd>
+      <dt>${L.t('dash.rep')}</dt><dd class="rep-mini">${['board', 'parents', 'squad'].map(k => `<span title="${esc(L.t('rep.' + k))}">${L.t('rep.short.' + k)} <b>${s.rep[k]}</b></span>`).join(' ')}</dd>
       <dt>${L.t('dash.budget')}</dt><dd class="money${s.budget < 0 ? " debt" : ""}">${money(s.budget)}</dd>
       <dt>${L.t('dash.energy')}</dt><dd${tired ? ' class="warn"' : ''}>${L.t('dash.energyVal', { a: avg, t: tired })}</dd>`;
 
@@ -6962,7 +7276,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     btn.disabled = this.cal.running || this.live || this.events.active || blk === 'plan';
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
-    else if (phase === 'calendar') btn.innerHTML = L.t(blk === 'locker' ? 'dash.startDay' : blk === 'plan' ? 'dash.endDayBlocked' : 'dash.endDay');
+    else if (phase === 'calendar') btn.innerHTML = L.t({ briefing: 'dash.startDay', locker: 'dash.toLocker', plan: 'dash.endDayBlocked' }[blk] || 'dash.endDay');
+    else if (phase === 'matchday' && !s.dayState().briefed) btn.innerHTML = L.t('dash.startDay');
     else if (phase === 'matchday' && !s.dayState().locker?.done) btn.innerHTML = L.t('dash.startMatchDay');
     else if (phase === 'matchday') btn.innerHTML = L.t('dash.goMatch');
     else if (phase === 'post') btn.innerHTML = L.t('dash.close');
@@ -7091,7 +7406,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return;
     }
     if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
-    if (this.dayBlockers()[0] === 'locker') { this.locker.open(); return; }   // v2.6: START DAY on a training day
+    if (this.dayBlockers()[0] === 'briefing') { this.briefing.open(); return; }   // v2.8: START DAY → morning briefing
+    if (this.dayBlockers()[0] === 'locker') { this.locker.open(); return; }   // v2.6: back to the locker room
     this.endDay();   // v2.5: one day per click
   }
 
@@ -7099,6 +7415,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** Mandatory tasks that block END DAY. */
   dayBlockers() {
     const s = this.state, out = [];
+    if (s.phase === 'calendar' && !s.dayState().briefed) { out.push('briefing'); return out; }   // v2.8: START DAY → morning briefing
     if (s.phase === 'calendar' && this.dayInfo(s.calendar.date).kind === 'training') {
       if (!s.dayState().locker?.done) out.push('locker');   // v2.6: START DAY → locker room first
       else if (!s.dayState().plan) out.push('plan');
@@ -7171,7 +7488,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const d = s.dayState(), info = this.dayInfo(s.calendar.date), live = s.phase === 'calendar';
     const pips = Array.from({ length: COACH.AP }, (_, i) => `<i class="${i < d.ap ? 'on' : ''}"></i>`).join('');
     let body = '';
-    if (live && info.kind === 'training' && !d.locker?.done) {   // v2.6: the locker room comes first
+    if (live && !d.briefed) {   // v2.8: every day starts with the morning briefing
+      body = `<div class="td-req need">${L.t('today.briefReq')}</div><div class="td-note">${L.t('today.briefNote')}</div>`;
+    } else if (live && info.kind === 'training' && !d.locker?.done) {   // v2.6: the locker room comes first
       body = `<div class="td-req need">${L.t('today.lockerReq')}</div><div class="td-note">${L.t('today.lockerNote')}</div>`;
     } else if (live && info.kind === 'training') {
       const need = !d.plan;
@@ -7590,7 +7909,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad });
     if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
