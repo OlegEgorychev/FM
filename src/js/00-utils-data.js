@@ -102,7 +102,8 @@ const REGIMES = {
 const REGIME_KEYS = Object.keys(REGIMES);
 const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14), 8, 20);   // PA 50 → 13, PA 100 → 20
 /* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
-const COACH = { AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
+const COACH = { KICK_PARENTS: -10, KICK_SQUAD: -5, MIN_SQUAD: 12,   // v2.9: kick out (keep ≥ 12 kids and ≥ 1 keeper)
+  AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
 /* v2.6 LOCKER ROOM — who turns up on training / match days.
    Absent if: condition < MIN_COND, injured / suspended / kept at home, or skips: random·20 > discipline + DISC_GRACE.

@@ -425,8 +425,30 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const of4 = await page.evaluate(() => YAM.game.ap);
     await page.evaluate(() => { YAM.ui.events.enabled = true; });
     check('Call into office: costs 1 AP, praise backfires when out of form, button disabled until the next morning (AP refilled)',
-      of0.vis && !of0.dis && of1.ap === 0 && of1.open && of1.n === 3 && /spent/.test(of1.chip) && of2.step === 'praiseBad' && of3.m === 52 && of3.dis && of3.closed && of4 === 1,
+      of0.vis && !of0.dis && of1.ap === 0 && of1.open && of1.n === 4 && /spent/.test(of1.chip) && of2.step === 'praiseBad' && of3.m === 52 && of3.dis && of3.closed && of4 === 1,
       JSON.stringify({ of0, of1, of2, of3, of4 }));
+
+    // v2.9: office buttons show the coach's lines (not the kid's reactions) + KICK OUT OF THE ACADEMY
+    const kick = await page.evaluate(() => {
+      const s = YAM.game, p = s.starters().find(x => x.position !== 'GK' && x.available);
+      s.dayState().ap = 1; s.rep.parents = 50; s.rep.squad = 50; YAM.ui.show('team'); YAM.ui.profile.open(p.id);
+      return { id: p.id, n0: s.squad.length, slot: s.lineup.indexOf(p.id) };
+    });
+    await page.click('#pinfo-office');
+    const kb = await page.evaluate(() => [...document.querySelectorAll('#talk-choices .talk-btn')].map(b => ({ t: b.querySelector('.tb-label').textContent, red: b.classList.contains('tone-red'), dis: b.disabled })));
+    await talk(3);   // kick out → confirm step
+    const kc = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step, n: document.querySelectorAll('#talk-choices .talk-btn').length }));
+    await talk(0);   // yes
+    const ka = await page.evaluate(k => {
+      const s = YAM.game;
+      return { gone: !s.player(k.id) && !s.squad.some(p => p.id === k.id), n: s.squad.length, xi: s.lineup.length === 11 && s.lineup.every(id => s.player(id)) && !s.lineup.includes(k.id),
+        rep: [s.rep.parents, s.rep.squad], closed: document.getElementById('talk-layer').hidden, row: !!document.querySelector(`#roster .r-row[data-id="${k.id}"]`),
+        saved: !JSON.parse(localStorage.getItem('yam_save_v1')).squad.some(p => p.id === k.id) };
+    }, kick);
+    check('office: 4 coach lines (no reaction text / no {k}); KICK OUT (red) asks once, then removes the kid for good: squad −1, XI refilled, Parents −10, Squad −5',
+      kb.length === 4 && kb.every(b => !/\{k\}|«|"/.test(b.t)) && kb[3].red && !kb[3].dis && kc.step === 'kickConfirm' && kc.n === 2
+      && ka.gone && ka.n === kick.n0 - 1 && ka.xi && ka.rep.join() === '40,45' && ka.closed && !ka.row && ka.saved, JSON.stringify({ kb, kc, ka }));
+    await page.evaluate(() => { YAM.game.rep.parents = 50; YAM.game.rep.squad = 50; YAM.ui.show('dash'); });
 
     // v2.4: Monday-first calendar grid + training days + The Truant
     await page.evaluate(() => { YAM.ui.calMonth = '2002-09'; YAM.ui.renderDash(); });
@@ -582,7 +604,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       score: document.getElementById('sb-score').textContent, rep: YAM.game.lastReport.gf + '-' + YAM.game.lastReport.ga }), qs0.energy);
     const after = await page.evaluate(([t, u]) => ({ showcase: t.some(id => YAM.game.player(id).hasFlag('Showcase')), sus: YAM.game.player(u).suspensionMatches,
       diary: YAM.game.diary.filter(d => /^scout\.(done|hurt)$/.test(d.key)).length }), [fv.top, ul]);
-    check('after the match: showcase cleared (+ diary per kid), suspension served (2 → 1)', !after.showcase && after.sus === 1 && after.diary === 3, JSON.stringify(after));
+    check('after the match: showcase cleared (+ diary per kid), suspension served (2 → 1)', !after.showcase && after.sus === 1 && after.diary === fv.top.filter(id => id !== ex0.kid).length, JSON.stringify(after));
     check('Quick Sim: button → result in ms, Notebook opens, stats/energy/fixtures recorded', qs0.btn && qs.ms < 250 && qs.view === 'notes' && qs.cards === 3 && qs.md2 && !qs.modal
       && qs.apps >= qs0.apps + 11 && qs.tired && qs.score.replace(/\s/g, '') === qs.rep, JSON.stringify(qs));
     await page.click('#btn-lang'); await page.click('#btn-lang');

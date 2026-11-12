@@ -2,8 +2,19 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.9', name: { en: 'Clear Your Locker', ru: 'Освободи шкафчик' },
+    en: [
+      'Fixed: in "Call into office" two buttons showed the kid\'s reply (with a raw {k}) instead of what the coach says. The four lines are now: Praise for recent form · Criticize behavior · Just checking in · Kick out of the academy.',
+      'New drastic option: KICK OUT OF THE ACADEMY (red). It asks once more, then the kid is gone for good — from the squad, the XI (the best bench kid takes his place), the locker room and every future training and match. Parents −10, Squad −5.',
+      'You can\'t go below 12 kids or kick out your last goalkeeper.',
+    ],
+    ru: [
+      'Исправлено: в «Вызвать в кабинет» на двух кнопках был ответ игрока (с сырым {k}), а не слова тренера. Теперь четыре реплики: Похвалить за игру · Отругать за поведение · Просто узнать, как дела · Выгнать из академии.',
+      'Новая крайняя мера: ВЫГНАТЬ ИЗ АКАДЕМИИ (красная кнопка). Игра переспросит один раз, а потом игрок уходит навсегда — из состава, основы (его место займёт лучший из запаса), раздевалки и всех будущих тренировок и матчей. Родители −10, Команда −5.',
+      'Нельзя оставить меньше 12 игроков или выгнать последнего вратаря.',
+    ] },
   { v: '2.8', name: { en: 'The Morning Routine', ru: 'Утро тренера' },
     en: [
       'Every day now starts with START DAY → the MORNING BRIEFING: date, weather, one or two local news items and your three reputations. Then [ HEAD TO THE CLUB ].',

@@ -263,16 +263,27 @@ const NARRATIVE_EVENTS = [
                             kid.dyn.morale = clamp(kid.dyn.morale + COACH.CRIT_MORALE, 0, 100); },
         check:      () => { kid.dyn.morale = clamp(kid.dyn.morale + COACH.CHECK_MORALE, 0, 100); },
       };
+      const s = ctx.state;
+      if (ctx.step === 'kickConfirm') {   // v2.9: the drastic option asks once more — it can't be undone
+        ctx.show({ face, name, role, text: L.t('office.react.kickConfirm', { k: name }),
+          choices: [
+            { key: 'office.btn.kickYes', tone: 'red', who: kid.id,
+              run: () => { s.expel(kid.id); s.addRep('parents', COACH.KICK_PARENTS); s.addRep('squad', COACH.KICK_SQUAD); return { n: name }; } },
+            { key: 'office.btn.kickNo', tone: 'gray', next: 'start' },
+          ] });
+        return;
+      }
       if (out[ctx.step]) {   // the kid's reaction (decided when the coach spoke; saved as the step)
-        ctx.show({ face, name, role, text: L.t('office.' + ctx.step, { k: name }),
+        ctx.show({ face, name, role, text: L.t('office.react.' + ctx.step, { k: name }),   // v2.9: reaction keys no longer clash with the button labels
           choices: [{ key: 'office.' + ctx.step + '.ok', tone: 'gray', who: kid.id, run: () => { out[ctx.step](); return { k: { pid: kid.id } }; } }] });
         return;
       }
       ctx.show({ face, name, role, text: L.t('office.text', { k: name }),
         choices: [
-          { key: 'office.praise', tone: 'green', next: () => (kid.dyn.sharpness < COACH.PRAISE_LOW || kid.energy < COACH.PRAISE_LOW ? 'praiseBad' : 'praiseGood') },
-          { key: 'office.crit', tone: 'red', next: 'crit' },
-          { key: 'office.check', tone: 'gray', next: 'check' },
+          { key: 'office.btn.praise', tone: 'green', next: () => (kid.dyn.sharpness < COACH.PRAISE_LOW || kid.energy < COACH.PRAISE_LOW ? 'praiseBad' : 'praiseGood') },
+          { key: 'office.btn.crit', tone: 'gray', next: 'crit' },
+          { key: 'office.btn.check', tone: 'gray', next: 'check' },
+          { key: 'office.btn.kick', tone: 'red', blocked: s.expelBlock(kid.id), next: 'kickConfirm' },   // v2.9: destructive
         ] });
     },
   },
@@ -443,7 +454,7 @@ class EventEngine {
   /** Applies a choice: money, effect, (next step | diary line + log), closes and resumes. */
   choose(choice) {
     const s = this.state, pe = s.pendingEvent;
-    if (!pe || (choice.cost && !s.canAfford(choice.cost))) return;
+    if (!pe || (choice.cost && !s.canAfford(choice.cost)) || choice.blocked) return;
     if (choice.cost) s.addMoney(-choice.cost);
     if (choice.gain) s.addMoney(choice.gain);
     if (choice.debt) s.addMoney(-choice.debt, true);   // v2.2: forced payment, may go below $0
@@ -501,12 +512,12 @@ class DialogueView {
     this.layer.querySelector('#talk-role').textContent = role;
     this.layer.querySelector('#talk-budget').innerHTML = L.t('talk.budget', { b: money(s.budget) });
     this.layer.querySelector('#talk-choices').innerHTML = choices.map((c, i) => {
-      const short = c.cost && !s.canAfford(c.cost);
+      const short = (c.cost && !s.canAfford(c.cost)) || !!c.blocked;   // v2.9: `blocked` = i18n key of a non-money reason
       const pay = c.cost || c.debt;   // v2.2: `debt` = forced payment, never disabled, may push the budget below $0
       const tag = pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '';
       return `<button type="button" class="talk-btn tone-${c.tone}" data-i="${i}"${short ? ' disabled aria-disabled="true"' : ''}>
         <span class="tb-label">${esc(L.t(c.key))}</span>${tag}
-        ${short ? `<small class="tb-why">${esc(L.t('talk.short', { b: money(s.budget), c: c.cost }))}</small>` : ''}</button>`;
+        ${short ? `<small class="tb-why">${esc(c.blocked ? L.t(c.blocked) : L.t('talk.short', { b: money(s.budget), c: c.cost }))}</small>` : ''}</button>`;
     }).join('');
     this.type(text);
     this.layer.hidden = false;

@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v2.8)
+# Youth Academy Manager — design notes (current: v2.9)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -142,3 +142,8 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Weather (`WEATHER`/`WEATHER_W`) and 1–2 news (`MorningBriefing.NEWS`, i18n `news.*`, filled with league names) are seeded by the date → same morning after a reload.
 - `state.rep = { board, parents, squad }` 0–100, start 50, saved; `addRep()`. `repDaily(date)` in the daily hook: squad rep drifts 1/day toward the squad's average morale; 1st of the month (not the season's opening day): board grant $50 + (board − 50) × 4 (≥ 0); Sundays: parents ≥ 65 donate $10–30 + surplus, ≤ 30 keep a random kid at home 3 days. Match results: W board +3 squad +2, L board −2 squad −2. Engine: `opts.squadRep` → `repBonus = clamp((squad − 50) / 25, −2, 2)` added to every roll of our side in `mod()`.
 - Immediate request: `runLocker()` → `rollExcuse()` (per present kid 4% + (20 − discipline) × 0.6%, one per day, kinds test / ankle / birthday, stored in `today.locker.request`, off with `state.excusesOff` / the DEBUG random-events switch). `LockerRoom.maybeRequest()` fires the manual event `excuse` ~1.3 s after the doors open; grid clicks and Proceed are blocked until answered. Go home → `absentToday = 'excused'`, Parents +5. Stay → Squad −5, morale −10; ankle: 30% injury 3–6 days.
+
+## Office fix + kick out (v2.9)
+- Bug: the office choice keys `office.crit` / `office.check` were also used for the kid's reaction texts, so the later i18n block overwrote the button labels. Buttons are now `office.btn.*`, reactions `office.react.*` (never reuse a key for two meanings).
+- Dialogue choices accept `blocked: '<i18n key>'` (disabled with that reason, like an unaffordable cost).
+- `office.btn.kick` (red) → step `kickConfirm` → `GameState.expel(id)`: removed from `squad`, his XI slot gets the best bench kid (available, same line, keeper rules), `coachNotes`, queued events that name him, today's locker entries and `lastReport.players` are cleaned, a record goes to `state.expelled`. Parents −10, Squad −5. `expelBlock(id)`: not below `COACH.MIN_SQUAD` (12) and never the last goalkeeper. His season stats stay in `seasonStats` (league totals), but he leaves the leaders list (built from the squad).

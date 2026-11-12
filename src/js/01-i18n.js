@@ -902,3 +902,30 @@ Object.assign(I18N.ru, {
   'ex.ankleHurt': 'Это действительно было что-то: {k} травмирован на {d} дн.',
   'lr.short.excused': 'отпущен домой (просьба)',
 });
+
+
+/* ---- v2.9: office buttons fixed (labels vs reactions had the same keys) + KICK OUT OF THE ACADEMY ---- */
+Object.assign(I18N.en, {
+  'office.btn.praise': 'Praise for recent form', 'office.btn.crit': 'Criticize behavior', 'office.btn.check': 'Just checking in',
+  'office.btn.kick': 'Kick out of the academy',
+  'office.react.praiseGood': '{k} lights up. "Thanks, coach! I\'ll keep working, I promise."',
+  'office.react.praiseBad': '{k} frowns. "Good form? I\'ve been rubbish and I\'m knackered. Are you making fun of me?"',
+  'office.react.crit': '{k} stares at the floor. "...Yes, coach. Understood." You can tell he is angry, but he keeps quiet.',
+  'office.react.check': '{k} relaxes a bit. "I\'m alright, coach. Thanks for asking."',
+  'office.react.kickConfirm': '{k} goes pale. "Coach… you\'re not serious?" There is no way back: he leaves the academy for good. The parents will talk, the dressing room will remember.',
+  'office.btn.kickYes': 'Yes. Clear your locker.', 'office.btn.kickNo': 'No, wait — sit down',
+  'office.btn.kickYes.diary': '{n} was kicked out of the academy. The parents are talking; the dressing room is quiet.',
+  'office.kickNo.size': 'The squad is too small: at least 12 kids must stay.', 'office.kickNo.gk': 'He is our last goalkeeper.', 'office.kickNo.gone': 'He is no longer here.',
+});
+Object.assign(I18N.ru, {
+  'office.btn.praise': 'Похвалить за игру', 'office.btn.crit': 'Отругать за поведение', 'office.btn.check': 'Просто узнать, как дела',
+  'office.btn.kick': 'Выгнать из академии',
+  'office.react.praiseGood': '{k} расцветает. «Спасибо, тренер! Буду пахать дальше, обещаю».',
+  'office.react.praiseBad': '{k} хмурится. «За игру? Я играю ужасно и еле ноги таскаю. Вы издеваетесь?»',
+  'office.react.crit': '{k} смотрит в пол. «...Да, тренер. Понял». Видно, что злится, но молчит.',
+  'office.react.check': '{k} немного расслабляется. «Нормально, тренер. Спасибо, что спросили».',
+  'office.react.kickConfirm': '{k} бледнеет. «Тренер… вы же не всерьёз?» Пути назад не будет: он уходит из академии навсегда. Родители будут судачить, раздевалка запомнит.',
+  'office.btn.kickYes': 'Да. Освобождай шкафчик.', 'office.btn.kickNo': 'Нет, подожди — садись',
+  'office.btn.kickYes.diary': 'Игрок {n} выгнан из академии. Родители судачат, в раздевалке тихо.',
+  'office.kickNo.size': 'Состав слишком мал: должно остаться не меньше 12 игроков.', 'office.kickNo.gk': 'Это наш последний вратарь.', 'office.kickNo.gone': 'Его здесь уже нет.',
+});

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v2.8</title>
+<title>Youth Academy Manager v2.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -2008,7 +2008,8 @@ const REGIMES = {
 const REGIME_KEYS = Object.keys(REGIMES);
 const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14), 8, 20);   // PA 50 → 13, PA 100 → 20
 /* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
-const COACH = { AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
+const COACH = { KICK_PARENTS: -10, KICK_SQUAD: -5, MIN_SQUAD: 12,   // v2.9: kick out (keep ≥ 12 kids and ≥ 1 keeper)
+  AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
 /* v2.6 LOCKER ROOM — who turns up on training / match days.
    Absent if: condition < MIN_COND, injured / suspended / kept at home, or skips: random·20 > discipline + DISC_GRACE.
@@ -2985,6 +2986,33 @@ Object.assign(I18N.ru, {
   'ex.ankleHurt': 'Это действительно было что-то: {k} травмирован на {d} дн.',
   'lr.short.excused': 'отпущен домой (просьба)',
 });
+
+
+/* ---- v2.9: office buttons fixed (labels vs reactions had the same keys) + KICK OUT OF THE ACADEMY ---- */
+Object.assign(I18N.en, {
+  'office.btn.praise': 'Praise for recent form', 'office.btn.crit': 'Criticize behavior', 'office.btn.check': 'Just checking in',
+  'office.btn.kick': 'Kick out of the academy',
+  'office.react.praiseGood': '{k} lights up. "Thanks, coach! I\'ll keep working, I promise."',
+  'office.react.praiseBad': '{k} frowns. "Good form? I\'ve been rubbish and I\'m knackered. Are you making fun of me?"',
+  'office.react.crit': '{k} stares at the floor. "...Yes, coach. Understood." You can tell he is angry, but he keeps quiet.',
+  'office.react.check': '{k} relaxes a bit. "I\'m alright, coach. Thanks for asking."',
+  'office.react.kickConfirm': '{k} goes pale. "Coach… you\'re not serious?" There is no way back: he leaves the academy for good. The parents will talk, the dressing room will remember.',
+  'office.btn.kickYes': 'Yes. Clear your locker.', 'office.btn.kickNo': 'No, wait — sit down',
+  'office.btn.kickYes.diary': '{n} was kicked out of the academy. The parents are talking; the dressing room is quiet.',
+  'office.kickNo.size': 'The squad is too small: at least 12 kids must stay.', 'office.kickNo.gk': 'He is our last goalkeeper.', 'office.kickNo.gone': 'He is no longer here.',
+});
+Object.assign(I18N.ru, {
+  'office.btn.praise': 'Похвалить за игру', 'office.btn.crit': 'Отругать за поведение', 'office.btn.check': 'Просто узнать, как дела',
+  'office.btn.kick': 'Выгнать из академии',
+  'office.react.praiseGood': '{k} расцветает. «Спасибо, тренер! Буду пахать дальше, обещаю».',
+  'office.react.praiseBad': '{k} хмурится. «За игру? Я играю ужасно и еле ноги таскаю. Вы издеваетесь?»',
+  'office.react.crit': '{k} смотрит в пол. «...Да, тренер. Понял». Видно, что злится, но молчит.',
+  'office.react.check': '{k} немного расслабляется. «Нормально, тренер. Спасибо, что спросили».',
+  'office.react.kickConfirm': '{k} бледнеет. «Тренер… вы же не всерьёз?» Пути назад не будет: он уходит из академии навсегда. Родители будут судачить, раздевалка запомнит.',
+  'office.btn.kickYes': 'Да. Освобождай шкафчик.', 'office.btn.kickNo': 'Нет, подожди — садись',
+  'office.btn.kickYes.diary': 'Игрок {n} выгнан из академии. Родители судачат, в раздевалке тихо.',
+  'office.kickNo.size': 'Состав слишком мал: должно остаться не меньше 12 игроков.', 'office.kickNo.gk': 'Это наш последний вратарь.', 'office.kickNo.gone': 'Его здесь уже нет.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -3796,6 +3824,38 @@ class GameState {
     this.save();
     return d.locker;
   }
+  /* ---------- v2.9 KICK OUT OF THE ACADEMY ---------- */
+  /** Why this kid can't be expelled (i18n key) — or null. Keeps ≥ COACH.MIN_SQUAD kids and at least one goalkeeper. */
+  expelBlock(id) {
+    const p = this.player(id);
+    if (!p) return 'office.kickNo.gone';
+    if (this.squad.length <= COACH.MIN_SQUAD) return 'office.kickNo.size';
+    if (p.position === 'GK' && this.squad.filter(x => x.position === 'GK').length <= 1) return 'office.kickNo.gk';
+    return null;
+  }
+  /** Permanently removes a kid: squad, XI (best bench replacement), notes, queued events, today's locker, last report. */
+  expel(id) {
+    const p = this.player(id);
+    if (!p || this.expelBlock(id)) return false;
+    const slot = this.lineup.indexOf(id);
+    this.squad = this.squad.filter(x => x !== p);
+    if (slot >= 0) {
+      const bench = this.squad.filter(x => !this.lineup.includes(x.id));
+      const want = slot === 0 ? 'GK' : LINE_POS[this.slots()[slot].line];
+      const score = b => (b.available ? 1000 : 0) + (b.position === want ? 100 : 0) - ((slot === 0) !== (b.position === 'GK') ? 500 : 0) + b.overall;
+      const best = bench.sort((a, b) => score(b) - score(a))[0];
+      this.lineup[slot] = best.id;
+    }
+    delete this.coachNotes[id];
+    this.eventQueue = this.eventQueue.filter(q => !q.cast || ![].concat(...Object.values(q.cast)).includes(id));
+    if (this.lastReport) this.lastReport.players = this.lastReport.players.filter(r => r.id !== id);
+    const lk = this.today?.locker;
+    if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; }
+    (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
+    this.save();
+    return true;
+  }
+
   /** v2.8: "Immediate request" — maybe one present kid asks to go home (low discipline asks more). Rolled with the arrivals. */
   rollExcuse(absent) {
     if (this.excusesOff) return null;
@@ -3940,7 +4000,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, today: this.today, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -3954,6 +4014,7 @@ class GameState {
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
+      this.expelled = Array.isArray(d.expelled) ? d.expelled : [];   // v2.9
       const r = d.rep || {};   // v2.8 (older saves start neutral)
       this.rep = { board: clamp(r.board ?? REP.START, 0, 100), parents: clamp(r.parents ?? REP.START, 0, 100), squad: clamp(r.squad ?? REP.START, 0, 100) };
       this.eventQueue = Array.isArray(d.eventQueue) ? d.eventQueue.filter(q => q && q.id && q.due) : [];
@@ -4579,8 +4640,19 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '2.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '2.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '2.9', name: { en: 'Clear Your Locker', ru: 'Освободи шкафчик' },
+    en: [
+      'Fixed: in "Call into office" two buttons showed the kid\'s reply (with a raw {k}) instead of what the coach says. The four lines are now: Praise for recent form · Criticize behavior · Just checking in · Kick out of the academy.',
+      'New drastic option: KICK OUT OF THE ACADEMY (red). It asks once more, then the kid is gone for good — from the squad, the XI (the best bench kid takes his place), the locker room and every future training and match. Parents −10, Squad −5.',
+      'You can\'t go below 12 kids or kick out your last goalkeeper.',
+    ],
+    ru: [
+      'Исправлено: в «Вызвать в кабинет» на двух кнопках был ответ игрока (с сырым {k}), а не слова тренера. Теперь четыре реплики: Похвалить за игру · Отругать за поведение · Просто узнать, как дела · Выгнать из академии.',
+      'Новая крайняя мера: ВЫГНАТЬ ИЗ АКАДЕМИИ (красная кнопка). Игра переспросит один раз, а потом игрок уходит навсегда — из состава, основы (его место займёт лучший из запаса), раздевалки и всех будущих тренировок и матчей. Родители −10, Команда −5.',
+      'Нельзя оставить меньше 12 игроков или выгнать последнего вратаря.',
+    ] },
   { v: '2.8', name: { en: 'The Morning Routine', ru: 'Утро тренера' },
     en: [
       'Every day now starts with START DAY → the MORNING BRIEFING: date, weather, one or two local news items and your three reputations. Then [ HEAD TO THE CLUB ].',
@@ -6171,16 +6243,27 @@ const NARRATIVE_EVENTS = [
                             kid.dyn.morale = clamp(kid.dyn.morale + COACH.CRIT_MORALE, 0, 100); },
         check:      () => { kid.dyn.morale = clamp(kid.dyn.morale + COACH.CHECK_MORALE, 0, 100); },
       };
+      const s = ctx.state;
+      if (ctx.step === 'kickConfirm') {   // v2.9: the drastic option asks once more — it can't be undone
+        ctx.show({ face, name, role, text: L.t('office.react.kickConfirm', { k: name }),
+          choices: [
+            { key: 'office.btn.kickYes', tone: 'red', who: kid.id,
+              run: () => { s.expel(kid.id); s.addRep('parents', COACH.KICK_PARENTS); s.addRep('squad', COACH.KICK_SQUAD); return { n: name }; } },
+            { key: 'office.btn.kickNo', tone: 'gray', next: 'start' },
+          ] });
+        return;
+      }
       if (out[ctx.step]) {   // the kid's reaction (decided when the coach spoke; saved as the step)
-        ctx.show({ face, name, role, text: L.t('office.' + ctx.step, { k: name }),
+        ctx.show({ face, name, role, text: L.t('office.react.' + ctx.step, { k: name }),   // v2.9: reaction keys no longer clash with the button labels
           choices: [{ key: 'office.' + ctx.step + '.ok', tone: 'gray', who: kid.id, run: () => { out[ctx.step](); return { k: { pid: kid.id } }; } }] });
         return;
       }
       ctx.show({ face, name, role, text: L.t('office.text', { k: name }),
         choices: [
-          { key: 'office.praise', tone: 'green', next: () => (kid.dyn.sharpness < COACH.PRAISE_LOW || kid.energy < COACH.PRAISE_LOW ? 'praiseBad' : 'praiseGood') },
-          { key: 'office.crit', tone: 'red', next: 'crit' },
-          { key: 'office.check', tone: 'gray', next: 'check' },
+          { key: 'office.btn.praise', tone: 'green', next: () => (kid.dyn.sharpness < COACH.PRAISE_LOW || kid.energy < COACH.PRAISE_LOW ? 'praiseBad' : 'praiseGood') },
+          { key: 'office.btn.crit', tone: 'gray', next: 'crit' },
+          { key: 'office.btn.check', tone: 'gray', next: 'check' },
+          { key: 'office.btn.kick', tone: 'red', blocked: s.expelBlock(kid.id), next: 'kickConfirm' },   // v2.9: destructive
         ] });
     },
   },
@@ -6351,7 +6434,7 @@ class EventEngine {
   /** Applies a choice: money, effect, (next step | diary line + log), closes and resumes. */
   choose(choice) {
     const s = this.state, pe = s.pendingEvent;
-    if (!pe || (choice.cost && !s.canAfford(choice.cost))) return;
+    if (!pe || (choice.cost && !s.canAfford(choice.cost)) || choice.blocked) return;
     if (choice.cost) s.addMoney(-choice.cost);
     if (choice.gain) s.addMoney(choice.gain);
     if (choice.debt) s.addMoney(-choice.debt, true);   // v2.2: forced payment, may go below $0
@@ -6409,12 +6492,12 @@ class DialogueView {
     this.layer.querySelector('#talk-role').textContent = role;
     this.layer.querySelector('#talk-budget').innerHTML = L.t('talk.budget', { b: money(s.budget) });
     this.layer.querySelector('#talk-choices').innerHTML = choices.map((c, i) => {
-      const short = c.cost && !s.canAfford(c.cost);
+      const short = (c.cost && !s.canAfford(c.cost)) || !!c.blocked;   // v2.9: `blocked` = i18n key of a non-money reason
       const pay = c.cost || c.debt;   // v2.2: `debt` = forced payment, never disabled, may push the budget below $0
       const tag = pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '';
       return `<button type="button" class="talk-btn tone-${c.tone}" data-i="${i}"${short ? ' disabled aria-disabled="true"' : ''}>
         <span class="tb-label">${esc(L.t(c.key))}</span>${tag}
-        ${short ? `<small class="tb-why">${esc(L.t('talk.short', { b: money(s.budget), c: c.cost }))}</small>` : ''}</button>`;
+        ${short ? `<small class="tb-why">${esc(c.blocked ? L.t(c.blocked) : L.t('talk.short', { b: money(s.budget), c: c.cost }))}</small>` : ''}</button>`;
     }).join('');
     this.type(text);
     this.layer.hidden = false;

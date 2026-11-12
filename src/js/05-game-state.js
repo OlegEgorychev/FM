@@ -188,6 +188,38 @@ class GameState {
     this.save();
     return d.locker;
   }
+  /* ---------- v2.9 KICK OUT OF THE ACADEMY ---------- */
+  /** Why this kid can't be expelled (i18n key) — or null. Keeps ≥ COACH.MIN_SQUAD kids and at least one goalkeeper. */
+  expelBlock(id) {
+    const p = this.player(id);
+    if (!p) return 'office.kickNo.gone';
+    if (this.squad.length <= COACH.MIN_SQUAD) return 'office.kickNo.size';
+    if (p.position === 'GK' && this.squad.filter(x => x.position === 'GK').length <= 1) return 'office.kickNo.gk';
+    return null;
+  }
+  /** Permanently removes a kid: squad, XI (best bench replacement), notes, queued events, today's locker, last report. */
+  expel(id) {
+    const p = this.player(id);
+    if (!p || this.expelBlock(id)) return false;
+    const slot = this.lineup.indexOf(id);
+    this.squad = this.squad.filter(x => x !== p);
+    if (slot >= 0) {
+      const bench = this.squad.filter(x => !this.lineup.includes(x.id));
+      const want = slot === 0 ? 'GK' : LINE_POS[this.slots()[slot].line];
+      const score = b => (b.available ? 1000 : 0) + (b.position === want ? 100 : 0) - ((slot === 0) !== (b.position === 'GK') ? 500 : 0) + b.overall;
+      const best = bench.sort((a, b) => score(b) - score(a))[0];
+      this.lineup[slot] = best.id;
+    }
+    delete this.coachNotes[id];
+    this.eventQueue = this.eventQueue.filter(q => !q.cast || ![].concat(...Object.values(q.cast)).includes(id));
+    if (this.lastReport) this.lastReport.players = this.lastReport.players.filter(r => r.id !== id);
+    const lk = this.today?.locker;
+    if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; }
+    (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
+    this.save();
+    return true;
+  }
+
   /** v2.8: "Immediate request" — maybe one present kid asks to go home (low discipline asks more). Rolled with the arrivals. */
   rollExcuse(absent) {
     if (this.excusesOff) return null;
@@ -332,7 +364,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, today: this.today, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -346,6 +378,7 @@ class GameState {
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
+      this.expelled = Array.isArray(d.expelled) ? d.expelled : [];   // v2.9
       const r = d.rep || {};   // v2.8 (older saves start neutral)
       this.rep = { board: clamp(r.board ?? REP.START, 0, 100), parents: clamp(r.parents ?? REP.START, 0, 100), squad: clamp(r.squad ?? REP.START, 0, 100) };
       this.eventQueue = Array.isArray(d.eventQueue) ? d.eventQueue.filter(q => q && q.id && q.due) : [];
