@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.3</title>
+<title>Youth Academy Manager v3.4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1866,7 +1866,7 @@ body.fx .crt-scan{ opacity: .9; }
     <section class="win pinfo msum open" role="dialog" aria-modal="true" aria-labelledby="msum-title">
       <div class="titlebar"><span class="t-ico">&#9917;</span><span class="t-txt" id="msum-title">MATCH_SUMMARY.EXE</span><button class="tb-btn" id="msum-x" data-i18n-aria="ui.close">&times;</button></div>
       <div class="win-body msum-body" id="msum-body"></div>
-      <div class="row-btns pinfo-btns"><button class="btn go ms-go" id="msum-go" type="button" data-i18n="ms.go"></button></div>
+      <div class="row-btns pinfo-btns"><button class="btn ms-log" id="msum-csv" type="button" data-i18n="ms.logCsv" data-i18n-title="ms.logTip"></button><button class="btn ms-log" id="msum-json" type="button" data-i18n="ms.logJson" data-i18n-title="ms.logTip"></button><button class="btn go ms-go" id="msum-go" type="button" data-i18n="ms.go"></button></div>
       <div class="statusbar"><span id="msum-status"></span></div>
     </section>
   </div>
@@ -2109,10 +2109,16 @@ const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_RES
    going forward than it gains at the back (the price of safety). v1.x–v3.2 used ±3 both ways (Attack ≈ 2.7× goals,
    Defense ≈ 0.3× → a free "lock the lead" button). Tuned with test/balance.js (Attack vs Defense win share 45–55%). */
 const SHOUT = { attack: { atk: 1.0, def: -1.0 }, defend: { atk: -1.05, def: 1.0 }, balanced: { atk: 0, def: 0 } };
-/* v3.3 SMOOTH FATIGUE — one continuous, monotonic curve on LIVE energy (replaces the old steps: ×0.5 when a kid
-   started under 50%, ×0.8 under 30% during the match). x = energy/100:  m = 0.5 + 0.9·x − 0.4·x²
-   100% → 1.00 · 75% → 0.95 · 50% → 0.85 · 25% → 0.70 · 0% → 0.50 (derivative 0.9 − 0.8x > 0 → always rising). */
-const fatigueMult = energy => { const x = clamp((energy ?? 100) / 100, 0, 1); return 1 - 0.5 * (1 - x) * (1 - 0.8 * x); };   // = 0.5 + 0.9x − 0.4x², exact 1.00 at full energy
+/* v3.3 SMOOTH FATIGUE, recalibrated in v3.4 — one continuous, monotonic curve on LIVE energy, x = energy/100:
+   m = 1 − K·(1 − x)², K = 0.1  →  100% 1.000 · 75% 0.994 · 50% 0.975 · 25% 0.944 · 0% 0.900.
+   The numbers look small on purpose: the duel chain (pass → dribble → shot vs keeper) multiplies every point, so ~1%
+   on all stats ≈ 0.2 goals. v3.3 (0.5 + 0.9x − 0.4x², 50% → 0.85) made a half-tired XI concede 2.4 goals more than a
+   fresh one; now (test/balance.js, live drain included): start 75% −0.25 · 60% −0.5 · 50% −0.7 · 40% −0.95 · 25% −1.35 goal difference. */
+const fatigueMult = energy => { const x = clamp((energy ?? 100) / 100, 0, 1); return 1 - FATIGUE.K * (1 - x) * (1 - x); };
+const FATIGUE = { K: 0.1 };
+/* v3.4 AI FATIGUE — AI clubs live by the same energy rules and rotate (League.matchXI). RATING: AI-vs-AI Poisson rating per
+   unit of mid-match fatigue multiplier (calibrated on the live engine). */
+const AI_FATIGUE = { ROTATE_BELOW: 60, ROTATE_GAIN: 15, DESPERATE: 40, TRAIN: -10, RATING: 350 };
 const OUT_OF_POSITION = 0.85;   // stat multiplier for a player outside his natural line
 
 /* =========================================================
@@ -2737,6 +2743,7 @@ Object.assign(I18N.en, {
   'boot.phases': ['Loading database...', 'Generating procedural faces...', 'Bribing referees...', 'Initializing Match Engine...', 'Painting club crests...',
     'Drying muddy kits...', 'Hiding attributes from the coach...', 'Counting the club budget ($)...', 'Calibrating CRT scanlines...', 'Inflating match balls...',
     'Teaching kids the offside rule...', 'Brewing the coach\'s tea...'],
+  'ms.logCsv': 'LOG .CSV', 'ms.logJson': 'LOG .JSON', 'ms.logTip': 'Download the duel-by-duel match log (every roll with all its terms). Only the last match, until you reload.',
   'ms.go': '[ Proceed to Coach\'s Notebook ]', 'ms.md': 'Matchday {n}', 'ms.ht': 'HT', 'ms.none': 'No key events', 'ms.quick': 'QUICK SIM',
   'ms.poss': 'Possession', 'ms.shots': 'Shots (on target)', 'ms.pass': 'Pass accuracy', 'ms.cards': 'Cards Y/R',
   'ms.status': 'Full time. Details for every kid are in the Coach\'s Notebook.',
@@ -2748,6 +2755,7 @@ Object.assign(I18N.ru, {
   'boot.phases': ['Загрузка базы данных...', 'Генерация процедурных лиц...', 'Подкуп судей...', 'Инициализация матчевого движка...', 'Раскраска клубных гербов...',
     'Сушка грязной формы...', 'Прячем атрибуты от тренера...', 'Пересчёт бюджета клуба ($)...', 'Калибровка развёртки ЭЛТ...', 'Накачка мячей...',
     'Объясняем детям офсайд...', 'Завариваем тренеру чай...'],
+  'ms.logCsv': 'ЛОГ .CSV', 'ms.logJson': 'ЛОГ .JSON', 'ms.logTip': 'Скачать лог матча: каждое единоборство со всеми слагаемыми броска. Только последний матч и только до перезагрузки.',
   'ms.go': '[ Перейти в Блокнот тренера ]', 'ms.md': 'Тур {n}', 'ms.ht': 'Перерыв', 'ms.none': 'Без ключевых событий', 'ms.quick': 'БЫСТРАЯ СИМУЛЯЦИЯ',
   'ms.poss': 'Владение', 'ms.shots': 'Удары (в створ)', 'ms.pass': 'Точность пасов', 'ms.cards': 'Карточки Ж/К',
   'ms.status': 'Финальный свисток. Подробности по каждому игроку — в Блокноте тренера.',
@@ -3010,7 +3018,7 @@ Object.assign(I18N.en, {
   'today.briefReq': 'NEW MORNING', 'today.briefNote': 'START DAY: coffee, the weather, the local news — then head to the club.',
   'mb.kicker': 'Morning briefing', 'mb.news': 'Local news', 'mb.rep': 'Reputation',
   'mb.go': '[ HEAD TO THE CLUB ]', 'mb.goQuiet': '[ HEAD TO THE CLUB ] · quiet day',
-  'mb.agenda.training': 'Today: training. Let\'s see who turns up.', 'mb.agenda.match': 'Today: MATCH DAY vs {o}.',
+  'mb.oppForm': 'Word is their starters average {a}% energy ({t} running on fumes).', 'mb.agenda.training': 'Today: training. Let\'s see who turns up.', 'mb.agenda.match': 'Today: MATCH DAY vs {o}.',
   'mb.agenda.rest': 'Today: rest day. The kids recover; the office is yours.', 'mb.agenda.off': 'No football today.',
   'wx.heavyRain': 'Heavy rain', 'wx.rain': 'Rain', 'wx.drizzle': 'Drizzle', 'wx.overcast': 'Overcast', 'wx.fog': 'Fog', 'wx.wind': 'Strong wind', 'wx.clearCold': 'Clear and cold',
   'rep.board': 'Board', 'rep.parents': 'Parents', 'rep.squad': 'Squad',
@@ -3041,7 +3049,7 @@ Object.assign(I18N.ru, {
   'today.briefReq': 'НОВОЕ УТРО', 'today.briefNote': '«Начать день»: кофе, погода, местные новости — потом в клуб.',
   'mb.kicker': 'Утренняя сводка', 'mb.news': 'Местные новости', 'mb.rep': 'Репутация',
   'mb.go': '[ ПОЕХАТЬ В КЛУБ ]', 'mb.goQuiet': '[ ПОЕХАТЬ В КЛУБ ] · спокойный день',
-  'mb.agenda.training': 'Сегодня тренировка. Посмотрим, кто придёт.', 'mb.agenda.match': 'Сегодня ДЕНЬ МАТЧА: {o}.',
+  'mb.oppForm': 'Говорят, у их основы в среднем {a}% энергии (выжатых: {t}).', 'mb.agenda.training': 'Сегодня тренировка. Посмотрим, кто придёт.', 'mb.agenda.match': 'Сегодня ДЕНЬ МАТЧА: {o}.',
   'mb.agenda.rest': 'Сегодня день отдыха. Ребята восстанавливаются, кабинет в твоём распоряжении.', 'mb.agenda.off': 'Сегодня без футбола.',
   'wx.heavyRain': 'Сильный дождь', 'wx.rain': 'Дождь', 'wx.drizzle': 'Морось', 'wx.overcast': 'Пасмурно', 'wx.fog': 'Туман', 'wx.wind': 'Сильный ветер', 'wx.clearCold': 'Ясно и холодно',
   'rep.board': 'Правление', 'rep.parents': 'Родители', 'rep.squad': 'Команда',
@@ -3571,8 +3579,8 @@ const emblemHTML = (team, size = 'sm') => team ? `<span class="emblem ${size}" t
 class League {
   static STRENGTHS = [3, 2, 1, 1, 0, 0, -1, -2, -3];   // spread across the 9 AI clubs
 
-  static SQUAD_SIZE = 14;
-  static LITE_POS = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'FWD'];
+  static SQUAD_SIZE = 15;   // v3.4: + a second keeper (the AI rotates tired kids now)
+  static LITE_POS = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'FWD', 'GK'];
   /* background share of goals / assists by position (weights, not %) */
   static GOAL_W   = { GK: 0,   DEF: 0.6, MID: 2.2, FWD: 5 };
   static ASSIST_W = { GK: 0.1, DEF: 1.1, MID: 3.6, FWD: 2.4 };
@@ -3584,6 +3592,15 @@ class League {
     // v1.7: every AI club carries a lightweight squad { id, name, pos, mp, goals, assists } (no attrs, no faces)
     const used = new Set([...usedSurnames, ...this.teams.flatMap(t => (t.squad || []).map(k => k.name.split(' ').pop()))]);
     for (const t of this.teams) if (!t.user && !Array.isArray(t.squad)) t.squad = League.liteSquad(t, used);
+    // v3.4: old saves — top the squad up to 15 (second keeper) and give every AI kid an energy value
+    for (const t of this.teams) if (!t.user) {
+      for (let i = t.squad.length; i < League.LITE_POS.length; i++) t.squad.push(League.liteKid(t, i, League.LITE_POS[i], used));
+      for (const k of t.squad) if (!Number.isFinite(k.en)) k.en = 100;
+    }
+  }
+  static liteKid(team, i, pos, used) {
+    let last, g = 0; do { last = pick(LAST); } while (used.has(last) && g++ < 200); used.add(last);
+    return { id: `t${team.id}_${i}`, name: `${pick(FIRST)} ${last}`, pos, mp: 0, goals: 0, assists: 0, en: 100 };
   }
 
   /** 14 kids per AI club. If a full match roster already exists (old save), its 11 names are kept. */
@@ -3592,7 +3609,7 @@ class League {
       const old = team.roster?.find(p => p.id === `t${team.id}_${i}`);
       let name = old?.name;
       if (!name) { let last, g = 0; do { last = pick(LAST); } while (used.has(last) && g++ < 200); used.add(last); name = `${pick(FIRST)} ${last}`; }
-      return { id: `t${team.id}_${i}`, name, pos: old?.position || pos, mp: 0, goals: 0, assists: 0 };
+      return { id: `t${team.id}_${i}`, name, pos: old?.position || pos, mp: 0, goals: 0, assists: 0, en: 100 };
     });
   }
 
@@ -3646,7 +3663,45 @@ class League {
         return new Player(p);   // rebuild so the portrait hash matches the final name
       });
     }
+    // v3.4: the bench (kids not in the first-choice XI) gets full Player objects too, so the AI can rotate
+    for (const kid of team.squad) if (!team.roster.some(p => p.id === kid.id)) {
+      const p = Player.generate(kid.id, kid.pos, usedSurnames, team.strength, false, team.squad.indexOf(kid) + 1);
+      p.name = kid.name; team.roster.push(new Player(p));
+    }
     return team.roster;
+  }
+
+  /* ---------- v3.4 AI FATIGUE: same energy rules as the academy + simple rotation ----------
+     Every AI kid carries `en` (0–100) in the lite squad. Day: rest +10, training day −10 (match practice).
+     Match: the XI drains like in the engine (live energy is written back after our match; AI-vs-AI uses drainOf × 90),
+     the unused kids rest +6. Rotation: a first-choice starter under AI_FATIGUE.ROTATE_BELOW is replaced by the
+     freshest bench kid of the same role who has at least ROTATE_GAIN more energy (any outfield kid if the starter
+     is under DESPERATE). */
+  matchXI(team, usedSurnames) {
+    const pool = this.roster(team, usedSurnames), en = id => this.kid(id)?.en ?? 100;
+    const xi = pool.slice(0, 11), bench = pool.slice(11);
+    for (let i = 0; i < xi.length; i++) {
+      const p = xi[i], e = en(p.id);
+      if (e >= AI_FATIGUE.ROTATE_BELOW) continue;
+      const gk = i === 0, fits = b => (gk ? b.archetype === 'GK' : b.archetype !== 'GK') && (b.archetype === p.archetype || (!gk && e < AI_FATIGUE.DESPERATE));
+      const alt = bench.filter(b => fits(b) && en(b.id) >= e + AI_FATIGUE.ROTATE_GAIN).sort((a, b) => en(b.id) - en(a.id))[0];
+      if (alt) { xi[i] = alt; bench.splice(bench.indexOf(alt), 1); }
+    }
+    for (const p of pool) p.energy = Math.round(en(p.id));
+    return xi;
+  }
+  /** Calendar day for every AI kid (called from GameState.dayRoutine). */
+  aiDay(training) {
+    for (const t of this.teams) if (!t.user) for (const k of t.squad) k.en = clamp(k.en + (training ? AI_FATIGUE.TRAIN : ENERGY.DAILY_REST), 0, 100);
+  }
+  /** After a match: XI keep their end energy (map id → energy), everybody else in the squad rests +6. */
+  aiAfterMatch(team, endEnergy) {
+    for (const k of team.squad) k.en = endEnergy.has(k.id) ? clamp(Math.round(endEnergy.get(k.id)), 0, 100) : clamp(k.en + ENERGY.BENCH_REST, 0, 100);
+  }
+  /** Opponent report for the morning briefing: average energy of the expected XI and how many of them are tired. */
+  oppCondition(team, usedSurnames) {
+    const xi = this.matchXI(team, usedSurnames), e = xi.map(p => p.energy);
+    return { avg: Math.round(e.reduce((a, b) => a + b, 0) / e.length), tired: e.filter(v => v < ENERGY.TIRED).length };
   }
 
   /* ---------- v1.7: LEAGUE STATS (matches, goals, assists) ---------- */
@@ -3660,11 +3715,11 @@ class League {
     return pool[pool.length - 1];
   }
   /** Background result → stats: 11 of 14 kids play (GK always), each goal gets a scorer and usually an assist. */
-  distributeStats(team, goals) {
+  distributeStats(team, goals, xiIds = null) {
     if (!team.squad) return;
     const gk = team.squad.filter(k => k.pos === 'GK');
     const out = shuffle(team.squad.filter(k => k.pos !== 'GK'));
-    const xi = [...gk.slice(0, 1), ...out.slice(0, 10)];
+    const xi = xiIds ? team.squad.filter(k => xiIds.includes(k.id)) : [...gk.slice(0, 1), ...out.slice(0, 10)];   // v3.4: the real XI
     for (const k of xi) k.mp++;
     for (let g = 0; g < goals; g++) {
       const scorer = League.weighted(xi, League.GOAL_W);
@@ -3697,12 +3752,20 @@ class League {
   rating(t) { return t.user ? 50 : 50 + t.strength * 4; }
   static poisson(lambda) { const l = Math.exp(-lambda); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return Math.min(k - 1, 7); }
   simulateFixture(f) {
-    const rh = this.rating(this.team(f.home)), ra = this.rating(this.team(f.away));
+    // v3.4: rotation + fatigue for AI-vs-AI too: the rating drops with the XI's mid-match fatigue (≈ the live engine:
+    // a whole XI at 50% loses ~0.6 goal against a fresh one), then the XI pays the usual drain.
+    const sides = [f.home, f.away].map(id => { const t = this.team(id), xi = this.matchXI(t, new Set());
+      const fm = xi.reduce((a, p) => a + fatigueMult(p.energy - 17), 0) / xi.length;
+      return { t, xi, r: this.rating(t) + (fm - 1) * AI_FATIGUE.RATING }; });
+    const rh = sides[0].r, ra = sides[1].r;
     // base rates tuned so AI games score like the visual engine does (~2 goals per game)
     f.hg = League.poisson(clamp(1.1 + (rh - ra) * 0.035, 0.15, 3));
     f.ag = League.poisson(clamp(0.85 + (ra - rh) * 0.035, 0.1, 2.8));
-    this.distributeStats(this.team(f.home), f.hg);
-    this.distributeStats(this.team(f.away), f.ag);
+    for (const [i, g] of [[0, f.hg], [1, f.ag]]) {
+      const { t, xi } = sides[i];
+      this.distributeStats(t, g, xi.map(p => p.id));
+      this.aiAfterMatch(t, new Map(xi.map(p => [p.id, p.energy - rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015)])));
+    }
   }
   /** Resolve every unplayed AI-vs-AI fixture of a matchday. Returns those fixtures. */
   simulateOthers(md) {
@@ -3882,7 +3945,7 @@ class GameState {
     if (!ev) return null;
     const fixture = this.league.userFixture(ev.md);
     const opp = this.league.team(fixture.home === 0 ? fixture.away : fixture.home);
-    const players = this.league.roster(opp, new Set(this.squad.map(p => p.surname)));
+    const players = this.league.matchXI(opp, new Set(this.squad.map(p => p.surname)));   // v3.4: rotation by energy
     return { ev, md: ev.md, fixture, opp, venue: fixture.home === 0 ? 'home' : 'away',
       team: { name: opp.name, players, formation: opp.formation } };
   }
@@ -4100,6 +4163,7 @@ class GameState {
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
     this.tickInjuries();
+    this.league?.aiDay(training);   // v3.4: AI clubs rest / train on the same calendar
     return { training, plan: training ? plan : null, attended, skipped, improved, hurt };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
@@ -4305,6 +4369,9 @@ class MatchEngine {
     this.energy = new Map(); this.drain = new Map();
     for (const s of this.sides) for (const e of s.entries) { this.energy.set(e.p.id, e.p.energy ?? 100); this.drain.set(e.p.id, MatchEngine.drainOf(e.p)); }
     this.everPlayed = new Set(home.players.map(p => p.id));
+    this.sentOff = new Set();   // v3.4: created BEFORE the empty shirts are added (it used to crash short-handed kick-offs)
+    this.shouts = [{ min: 0, side: 0, shout: opts.mentality || 'balanced' }, { min: 0, side: 1, shout: opts.oppMentality || 'balanced' }];
+    this.trace = [];            // v3.4 match log: every headline duel with all its terms (see rs() / tr())
     for (const id of opts.missing || []) { this.sentOff.add(id); this.everPlayed.delete(id); }   // v2.6: an empty shirt — we start short-handed
     this.subbedOff = new Set();
     this.subsUsed = 0;
@@ -4316,7 +4383,6 @@ class MatchEngine {
     this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8
     this.dutiesFn = typeof opts.duties === 'function' ? opts.duties : () => (opts.duties || {});   // v3.0: read live (changes at half-time count)   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
     this.speed = opts.speed || 1;
-    this.sentOff = new Set();
     this.timer = null;
     this.delay = 0;
     this.pendingShot = null;
@@ -4420,11 +4486,12 @@ class MatchEngine {
     for (let i = 0; i < heads.length; i++) { if ((r -= w[i]) < 0) { target = heads[i]; break; } }
     const def = pick(this.inZone(opp, 0));
     const header = ((target.bio?.height ?? 160) - 160) / SETPIECE.HEADER_HEIGHT + ((target.physical?.strength ?? 10) - 10) * 0.1;
-    const atk = (t.skill ? t.skill('crossing') : 10) + Math.random() * 10 + SETPIECE.CORNER_DELIVERY + header + this.mod(side, 'atk');
-    const dfn = this.eff(def, 'Mark') + Math.random() * 10 + this.mod(opp, 'def');
+    const A = this.rs(t, null, side, 'atk', { delivery: SETPIECE.CORNER_DELIVERY, header }, { raw: t.skill ? t.skill('crossing') : 10 });
+    const D = this.rs(def, 'Mark', opp, 'def');
     this.poss = side; this.zone = 2;
+    this.tr('corner', side, A, D, A.total >= D.total ? 'header' : 'cleared');
     this.log('', 'eng.corner', { a: t }, side);
-    if (atk >= dfn) {
+    if (A.total >= D.total) {
       this.lastPass = { p: t, side };   // a headed goal is an assist for the taker
       this.setEv({ kind: 'pass', a: t, b: target, d: def });
       this.startShot(target, false, { corner: true, bonus: Math.max(0, header) });
@@ -4468,20 +4535,45 @@ class MatchEngine {
      Tackle = 2·tackling+strength+positioning · Shoot = 2·shooting+composure · Save = 2·goalkeeping+agility+positioning.
      Global modifiers: sharpness < 50% → technical skills −2 (inside Player.skill), condition = fatigueMult(live energy) (v3.3, smooth 1.00 → 0.50),
      morale × passion → ±2.5 flat on every roll. */
-  eff(p, attr) {
-    let v = p.rating ? p.rating(attr) : 10;
-    v *= fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);   // v3.3: smooth curve, no 50% / 30% steps
+  eff(p, attr) { return this.effParts(p, attr).v; }
+  /** v3.4: eff() split into its terms for the match log. v = rating × fatigue × tag + mood. */
+  effParts(p, attr) {
+    const rating = p.rating ? p.rating(attr) : 10;
+    const fat = fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);   // v3.3: smooth curve, no 50% / 30% steps
     // v3.0: no "out of position" penalty any more — only hidden stats and biometrics decide
     const t = p.tags || [];
-    if (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) v *= 1.5;
-    if (t.includes('Playmaker') && attr === 'Pass') v *= 1.5;
-    if (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) v *= 1.5;
-    return v + (p.moodBonus ?? 0);
+    const tag = (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) || (t.includes('Playmaker') && attr === 'Pass')
+      || (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) ? 1.5 : 1;
+    const mood = p.moodBonus ?? 0;
+    return { rating, fat, tag, mood, v: rating * fat * tag + mood };
   }
-  mod(side, role) {
-    const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus + this.captainBonus() : 0);   // v2.8 mood + v3.0 captain
-    const m = side === 0 ? this.mentality : this.oppMentality;
-    return cheat + (SHOUT[m]?.[role] ?? 0);   // v3.3: asymmetric, see SHOUT in 00-utils-data.js
+  mod(side, role) { return this.modParts(side, role).v; }
+  /** Flat roll modifiers: DEBUG Force Win, squad reputation (v2.8), captain (v3.0), sideline shout (v3.3 SHOUT table). */
+  modParts(side, role) {
+    const cheat = this.forceWin ? (side === 0 ? 8 : -5) : 0;
+    const rep = side === 0 ? this.repBonus : 0, cap = side === 0 ? this.captainBonus() : 0;
+    const shout = SHOUT[side === 0 ? this.mentality : this.oppMentality]?.[role] ?? 0;
+    return { cheat, rep, cap, shout, v: cheat + rep + cap + shout };
+  }
+  /** v3.4: one side of a headline duel, every term kept: (stat × fatigue × tag + mood) + rand·10 + flat extras + modifiers.
+      attrs = composite key or [keys] (averaged); opt.raw = a raw skill instead of eff() (corner delivery, no fatigue). */
+  rs(p, attrs, side, role, flat = {}, opt = {}) {
+    let stat = 0, rating = 0, mood = 0, tag = 1;
+    const fat = opt.raw !== undefined ? 1 : fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);
+    if (opt.raw !== undefined) stat = rating = opt.raw;
+    else {
+      const keys = Array.isArray(attrs) ? attrs : [attrs];
+      for (const k of keys) { const e = this.effParts(p, k); stat += (e.v - e.mood) / keys.length; rating += e.rating / keys.length; mood += e.mood / keys.length; tag = Math.max(tag, e.tag); }
+    }
+    const m = this.modParts(side, role), rand = Math.random() * 10;
+    let fl = 0; for (const k in flat) fl += flat[k];
+    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, total: stat + mood + rand + fl + m.v };
+  }
+  /** v3.4: record a duel in the match log (A = side in possession). */
+  tr(kind, side, A, D, out) {
+    const pack = r => ({ id: r.p.id, name: r.p.name, energy: Math.round(this.energy.get(r.p.id) ?? r.p.energy ?? 100), rating: r.rating, fat: r.fat, tag: r.tag, stat: r.stat, mood: r.mood, rand: r.rand,
+      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, cheat: r.cheat, total: r.total });
+    this.trace.push({ min: this.minute, kind, side, zone: this.zone, A: pack(A), D: pack(D), margin: A.total - D.total, out });
   }
   counts(side) {
     const c = { DEF: 0, MID: 0, ATT: 0 };
@@ -4496,6 +4588,7 @@ class MatchEngine {
   setMentality(m) {
     if (m === this.mentality) return;
     this.mentality = m;
+    this.shouts.push({ min: this.minute, side: 0, shout: m });   // v3.4 match log
     if (!this.finished && this.started) this.log('coach', 'eng.shout.' + m, {}, 0);
   }
   setSpeedMode(s) { this.speed = s; if (this.started && !this.finished && !this.paused) this.updateSpeed(); }
@@ -4509,6 +4602,7 @@ class MatchEngine {
   begin() {
     if (this.started) return;
     this.started = true;
+    this.startEnergy = new Map(this.energy);   // v3.4 match log: kick-off condition of everyone on the pitch
     this.kickoff(0);
     this.log('whistle', 'eng.kickoff', { a: this.team(0) }, 0);
   }
@@ -4624,6 +4718,7 @@ class MatchEngine {
     if (!this.stats.has(inP.id)) this.stats.set(inP.id, MatchEngine.blankStats());
     this.lineOf.set(inP.id, line);
     this.energy.set(inP.id, inP.energy ?? 100);
+    this.startEnergy?.set(inP.id, inP.energy ?? 100);
     this.drain.set(inP.id, MatchEngine.drainOf(inP));
     if ((inP.energy ?? 100) < ENERGY.TIRED) this.tired.add(inP.id);
     this.everPlayed.add(inP.id);
@@ -4713,11 +4808,12 @@ class MatchEngine {
     // a forward ball into the final third leans on crossing.
     const touch = ((recv.skill?.('firstTouch') ?? 10) - 10) * 0.15;
     const cross = forward && tz === 2 ? ((c.skill?.('crossing') ?? 10) - 10) * 0.1 : 0;
-    const atk = this.eff(c, 'Pass') + Math.random() * 10 + 3 - (forward ? 2 : 0) + (this.isGK(c) ? 2 : 0) + touch + cross + this.mod(side, 'atk') + this.sup(side, tz);
-    const dfn = this.eff(def, 'Mark') + Math.random() * 10 + this.mod(opp, 'def');
+    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) });
+    const D = this.rs(def, 'Mark', opp, 'def');
     const vars = { a: c, b: recv, d: def };
+    this.tr(forward ? 'passFwd' : 'pass', side, A, D, A.total >= D.total ? 'ok' : 'intercepted');
 
-    if (atk >= dfn) {
+    if (A.total >= D.total) {
       this.st(c).passOk++;
       this.lastPass = { p: c, side };   // v1.7: the last completed pass can become an assist
       this.carrier = recv; this.zone = tz;
@@ -4735,11 +4831,12 @@ class MatchEngine {
   doDribble() {
     const c = this.carrier, side = this.poss, opp = 1 - side, z = this.zone;
     const def = pick(this.inZone(opp, 2 - z));
-    const atk = (this.eff(c, 'Dribble') + this.eff(c, 'Speed')) / 2 + Math.random() * 10 + 1 + this.mod(side, 'atk') + this.sup(side, z);
-    const dfn = this.eff(def, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def');
+    const A = this.rs(c, ['Dribble', 'Speed'], side, 'atk', { base: 1, sup: this.sup(side, z) });
+    const D = this.rs(def, 'Tackle', opp, 'def');
     const vars = { a: c, d: def };
 
-    if (atk >= dfn) {
+    if (A.total >= D.total) {
+      this.tr('dribble', side, A, D, 'ok');
       this.st(c).dribbleOk++;
       this.st(def).tacklesLost++;
       if (z < 2) this.zone++; else this.boxBonus = 3;
@@ -4747,7 +4844,9 @@ class MatchEngine {
       this.log('', 'drOk', vars, side);
       if ((def.tags || []).includes('Aggressive')) this.commitFoul(def, c, side);
     } else {
-      if (Math.random() < SETPIECE.FOUL) {   // v3.0: a mistimed tackle — our ball, maybe a penalty
+      const foul = Math.random() < SETPIECE.FOUL;
+      this.tr('dribble', side, A, D, foul ? 'foul' : 'tackled');
+      if (foul) {   // v3.0: a mistimed tackle — our ball, maybe a penalty
         if ((def.tags || []).includes('Aggressive')) { this.commitFoul(def, c, side); return; }
         this.setEv({ kind: 'foul', a: c, d: def, card: false });
         this.log('foul', 'eng.foulPlain', vars, 1 - side);
@@ -4794,14 +4893,19 @@ class MatchEngine {
   }
 
   resolveShot() {
-    const { shooter, side, long, bonus, assist, penalty, corner } = this.pendingShot;
+    const { shooter, side, long, bonus, assist, penalty, corner, freeKick } = this.pendingShot;
     this.pendingShot = null;
     const opp = 1 - side;
     const blocker = pick(this.inZone(opp, 0));
     const keeper = this.keeper(opp);
 
-    if (!penalty && Math.random() < 0.2 &&
-        this.eff(blocker, 'Mark') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
+    let blocked = false;
+    if (!penalty && Math.random() < 0.2) {
+      const B = this.rs(blocker, 'Mark', opp, 'def'), S = this.rs(shooter, 'Shoot', side, 'atk');
+      blocked = B.total > S.total;
+      this.tr('block', side, S, B, blocked ? 'blocked' : 'through');
+    }
+    if (blocked) {
       this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
       this.setEv({ kind: 'block', d: blocker });
@@ -4809,9 +4913,11 @@ class MatchEngine {
       this.turnover(blocker, 0);
       return;
     }
-    const atk = this.eff(shooter, 'Shoot') + Math.random() * 10 + bonus - (long ? 5 : 0) + this.mod(side, 'atk');
-    const dfn = this.eff(keeper, 'Save') + Math.random() * 10 + 4 + this.mod(opp, 'def');
+    const A = this.rs(shooter, 'Shoot', side, 'atk', { bonus, long: long ? -5 : 0 });
+    const D = this.rs(keeper, 'Save', opp, 'def', { keeper: 4 });
+    const atk = A.total, dfn = D.total;
     const vars = { a: shooter, k: keeper };
+    this.tr(penalty ? 'penalty' : corner ? 'header' : freeKick ? 'freekick' : long ? 'longShot' : 'shot', side, A, D, atk > dfn ? 'goal' : atk < dfn - 7 ? 'wide' : 'saved');
 
     if (atk > dfn) {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
@@ -4840,6 +4946,45 @@ class MatchEngine {
   /* ---------- reporting ---------- */
   log(type, key, vars = {}, side = -1, suffix = '') {
     this.hooks.onLog({ minute: this.minute, type, key, vars, side, suffix, r: Math.random() });
+  }
+
+  /* ---------- v3.4 MATCH LOG (export) ----------
+     trace = every headline duel (pass, forward pass, dribble, block, shot, long shot, free kick, penalty, corner, header)
+     with both sides' terms: total = stat (rating × fatigue × tag) + mood + rand·10 + flat extras + shout + rep + captain + cheat.
+     Background play (ambient) is NOT in the trace: it only feeds the player stats. */
+  static WIN_OUT = new Set(['ok', 'goal', 'header', 'through']);
+  logData(meta = {}) {
+    const r2 = v => Math.round(v * 100) / 100;
+    const side = i => {
+      const s = this.sides[i], rows = this.trace.filter(t => t.side === i), kinds = {};
+      for (const t of rows) {
+        const k = kinds[t.kind] || (kinds[t.kind] = { n: 0, won: 0, margin: 0, outcomes: {} });
+        k.n++; if (MatchEngine.WIN_OUT.has(t.out)) k.won++; k.margin += t.margin; k.outcomes[t.out] = (k.outcomes[t.out] || 0) + 1;
+      }
+      for (const k of Object.values(kinds)) { k.rate = r2(k.won / k.n); k.margin = r2(k.margin / k.n); }
+      const own = this.trace.flatMap(t => [t.A, t.D]).filter(x => s.all.some(p => p.id === x.id));
+      const avg = f => own.length ? r2(own.reduce((a, x) => a + f(x), 0) / own.length) : 0;
+      return { name: s.name, formation: s.formation, score: s.score, user: s.user, possession: r2(this.possTicks[i] / ((this.possTicks[0] + this.possTicks[1]) || 1)),
+        totals: this.teamTotals(i), duels: kinds,
+        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cheat: avg(x => x.cheat) },
+        players: s.all.map(p => ({ id: p.id, name: p.name, line: this.lineOf.get(p.id), sentOff: this.sentOff.has(p.id), subbedOff: this.subbedOff.has(p.id),
+          energyStart: Math.round(this.startEnergy?.get(p.id) ?? p.energy ?? 100), energyEnd: Math.round(this.energy.get(p.id) ?? 0),
+          fatigueStart: r2(fatigueMult(this.startEnergy?.get(p.id) ?? p.energy ?? 100)), fatigueEnd: r2(fatigueMult(this.energy.get(p.id) ?? 0)), stats: { ...this.st(p) } })) };
+    };
+    return { format: 'yam-match-log/1', version: typeof APP_VERSION === 'undefined' ? null : APP_VERSION, ...meta, minute: this.minute, finished: this.finished,
+      forceWin: this.forceWin, shouts: this.shouts, subs: this.subs, events: this.matchEvents, teams: [side(0), side(1)],
+      trace: this.trace.map(t => ({ ...t, margin: r2(t.margin), A: MatchEngine.r2obj(t.A), D: MatchEngine.r2obj(t.D) })) };
+  }
+  static r2obj(o) { const out = {}; for (const k in o) out[k] = typeof o[k] === 'number' ? Math.round(o[k] * 100) / 100 : k === 'flat' ? MatchEngine.r2obj(o[k]) : o[k]; return out; }
+  /** One CSV row per duel (comma-separated, dot decimals, UTF-8). `pre` = extra leading columns (e.g. setup / match no.). */
+  static traceCsv(trace, sides, pre = null) {
+    const f = v => (typeof v === 'number' ? String(Math.round(v * 100) / 100) : `"${String(v ?? '').replace(/"/g, '""')}"`);
+    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'cheat', 'total'];
+    const head = [...(pre ? Object.keys(pre) : []), 'minute', 'kind', 'team', 'zone', ...part.map(k => 'atk_' + k), ...part.map(k => 'def_' + k), 'margin', 'outcome'];
+    const cell = (x, k) => k === 'flat' ? f(Object.entries(x.flat || {}).filter(([, v]) => v).map(([n, v]) => `${n}:${Math.round(v * 100) / 100}`).join(' ')) : f(x[k]);
+    const rows = trace.map(t => [...(pre ? Object.values(pre).map(f) : []), t.min, f(t.kind), f(sides?.[t.side] ?? t.side), t.zone,
+      ...part.map(k => cell(t.A, k)), ...part.map(k => cell(t.D, k)), f(t.margin), f(t.out)].join(','));
+    return [head.join(','), ...rows].join('\n');
   }
 
   teamTotals(side = 0) {
@@ -4922,8 +5067,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.4', name: { en: 'Tired Legs Everywhere', ru: 'Устают все' },
+    en: [
+      'Rival clubs now get tired too: their kids train, rest and play by the same rules as yours, and a worn-out starter gets rotated. A strong club can turn up with heavy legs.',
+      'The morning briefing on match day tells you how fresh the opponent\'s starters are.',
+      'Tiredness is milder: a half-empty tank still costs you, but no longer turns a match into a rout.',
+      'Match Summary has LOG .CSV / LOG .JSON buttons: download every duel of the last match with all its numbers and check the maths yourself.',
+      'Fixed: a match where fewer than 11 kids turned up could not kick off.',
+    ],
+    ru: [
+      'Соперники тоже устают: их ребята тренируются, отдыхают и играют по тем же правилам, что и твои, а выдохшегося игрока основы меняют. Сильный клуб может приехать «на зубах».',
+      'В день матча утренняя сводка подскажет, насколько свежа основа соперника.',
+      'Усталость стала мягче: полупустой бак всё ещё стоит очков, но больше не превращает матч в разгром.',
+      'В итогах матча появились кнопки ЛОГ .CSV / ЛОГ .JSON: скачай все единоборства последнего матча со всеми цифрами и проверь расчёты сам.',
+      'Исправлено: матч, на который пришло меньше 11 ребят, не мог начаться.',
+    ] },
   { v: '3.3', name: { en: 'Touchline Balance', ru: 'Баланс на бровке' },
     en: [
       '"Attack" and "Defense" are now a real choice: Attack means more goals at both ends, Defense means a tight, low-scoring game — and it costs you a little going forward.',
@@ -6883,6 +7043,9 @@ class MatchSummary {
     this.body = document.getElementById('msum-body');
     document.getElementById('msum-x').addEventListener('click', () => this.close());
     document.getElementById('msum-go').addEventListener('click', () => { this.close(); this.ui.show('notes'); });
+    // v3.4: match log export (kept in memory for the last match only — not in the save)
+    document.getElementById('msum-csv').addEventListener('click', () => this.exportLog('csv'));
+    document.getElementById('msum-json').addEventListener('click', () => this.exportLog('json'));
     document.addEventListener('keydown', e => {
       if (!this.isOpen || e.key !== 'Escape') return;
       e.preventDefault(); e.stopImmediatePropagation(); this.close();
@@ -6899,8 +7062,17 @@ class MatchSummary {
     this.render();
     this.layer.hidden = false;
     document.getElementById('msum-go').focus();
+    for (const id of ['msum-csv', 'msum-json']) document.getElementById(id).disabled = !this.log;
   }
   close() { this.layer.hidden = true; }
+  /** v3.4: the log of THIS match, if it is still in memory (it is not saved, so a reload loses it). */
+  get log() { const g = this.ui.lastMatchLog; return g && this.rep && g.md === this.rep.md && g.opponent === this.rep.opponent ? g : null; }
+  exportLog(kind) {
+    const g = this.log; if (!g) return;
+    const base = `yam-log-md${g.md}-${String(g.opponent).replace(/[^\w]+/g, '_').toLowerCase()}`;
+    if (kind === 'json') this.ui.download(base + '.json', JSON.stringify(g, null, 1), 'application/json');
+    else this.ui.download(base + '.csv', MatchEngine.traceCsv(g.trace, g.teams.map(t => t.name)), 'text/csv');
+  }
 
   render() {
     const rep = this.rep, ui = this.ui, s = ui.state, lg = s.league;
@@ -7110,7 +7282,13 @@ class MorningBriefing {
     this.layer.dataset.wx = wx;
     document.getElementById('mb-date').textContent = fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     document.getElementById('mb-weather').innerHTML = `<span class="wx-ico wx-${wx}"></span>${L.t('wx.' + wx)}`;
-    document.getElementById('mb-agenda').textContent = L.t('mb.agenda.' + kind, { o: L.team(s.matchContext()?.opp.name || '') });
+    const ctx = s.matchContext();
+    let agenda = L.t('mb.agenda.' + kind, { o: L.team(ctx?.opp.name || '') });
+    if (kind === 'match' && ctx) {   // v3.4: the opponent lives by the same energy rules — a word from the grapevine
+      const c = s.league.oppCondition(ctx.opp, new Set(s.squad.map(p => p.surname)));
+      agenda += ' ' + L.t('mb.oppForm', { a: c.avg, t: c.tired });
+    }
+    document.getElementById('mb-agenda').textContent = agenda;
     document.getElementById('mb-news').innerHTML = this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
     const bar = (k) => { const v = s.rep[k];
       return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };
@@ -7263,6 +7441,14 @@ class UIController {
     });
   }
 
+  /** v3.4: save a text file through the browser (no native dialogs). */
+  download(name, text, mime = 'text/plain') {
+    const url = URL.createObjectURL(new Blob([text], { type: mime + ';charset=utf-8' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   renderAll() {
     if (this.state.phase === 'draft') { this.draft?.render(); this.renderBudget?.(); return; }   // v3.1: no squad yet
     this.renderLiveRoster(); this.renderAssistant(this.engine);
@@ -7289,6 +7475,7 @@ class UIController {
     this.$('app-title').innerHTML = `Youth Academy Manager <b>v${APP_VERSION}</b>`;
     document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = L.t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-aria]').forEach(el => { const v = L.t(el.dataset.i18nAria); el.setAttribute('aria-label', v); el.title = v; });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = L.t(el.dataset.i18nTitle); });   // v3.4
     this.$('fx-lbl').textContent = L.t(document.body.classList.contains('fx') ? 'ui.fxOn' : 'ui.fxOff');
     const b = this.$('btn-lang');
     b.textContent = L.code === 'ru' ? 'RU' : 'EN';
@@ -8492,6 +8679,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   onMatchEnd(eng) {
     const s = this.state, ctx = s.matchContext();
     const [a, b] = eng.sides;
+    // v3.4 match log (memory only): every duel + per-team summary, exported from the Match Summary
+    this.lastMatchLog = eng.logData({ md: ctx.md, date: s.calendar.date, opponent: ctx.opp.name, venue: ctx.venue, oppStrength: ctx.opp.strength, squadRep: s.rep.squad, captain: s.duties?.captain || null });
     const result = a.score > b.score ? 'W' : a.score === b.score ? 'D' : 'L';
     s.league.setUserResult(ctx.fixture, a.score, b.score);
     const others = s.league.simulateOthers(ctx.md);
@@ -8509,7 +8698,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       })),
     };
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
-    s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));   // v1.7: opponent kids feed the league leaders
+    s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
+    s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
     s.applyMatchDynamics(eng, result);

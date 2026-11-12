@@ -97,6 +97,10 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.evaluate(() => YAM.ui.autoSim());   // v2.5: END DAY is manual; debug auto-sim to the match
     await page.waitForFunction(() => YAM.game.phase === 'matchday', null, { timeout: 20000 });
     check('calendar stops on matchday', true, await page.evaluate(() => YAM.ui.cal.date));
+    // v3.4: the briefing tells the opponent's condition (AI clubs live by the same energy rules)
+    const opp0 = await page.evaluate(() => { YAM.ui.briefing.render(); const ctx = YAM.game.matchContext();
+      return { agenda: document.getElementById('mb-agenda').textContent, sq: ctx.opp.squad.length, xi: ctx.team.players.length, en: ctx.opp.squad.map(k => k.en), name: ctx.opp.name }; });
+    check('AI fatigue: 15-kid AI squads with energy, XI of 11, briefing scout line', opp0.sq === 15 && opp0.xi === 11 && opp0.en.every(e => e === 100) && /100%/.test(opp0.agenda), opp0.agenda);
     await shot('1-dashboard');
     await closeModal();
     await toLocker(); await page.click('#lr-proceed');   // v2.6: roll call before kick-off
@@ -152,6 +156,23 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await shot('3-fulltime');
     check('match summary: opens at full time, goals/cards = engine, timeline 2 columns', ms.goals === ms.score && ms.saved && ms.cards && ms.fields
       && `${ms.homeRows}-${ms.awayRows}` === ms.score && ms.board === ms.score, JSON.stringify(ms));
+    // v3.4: match log — every duel with its terms (they add up to the total), CSV / JSON export buttons
+    const lg = await page.evaluate(() => {
+      const g = YAM.ui.lastMatchLog, sum = x => x.stat + x.mood + x.rand + Object.values(x.flat).reduce((a, b) => a + b, 0) + x.shout + x.rep + x.cap + x.cheat;
+      const csv = MatchEngine.traceCsv(g.trace, g.teams.map(t => t.name)).split('\n');
+      return { n: g.trace.length, sums: g.trace.every(t => Math.abs(sum(t.A) - t.A.total) < 0.05 && Math.abs(sum(t.D) - t.D.total) < 0.05),
+        goals: g.trace.filter(t => t.out === 'goal').length, score: g.teams[0].score + g.teams[1].score, kinds: [...new Set(g.trace.map(t => t.kind))].length,
+        csvRows: csv.length - 1, head: csv[0].startsWith('minute,kind,team,zone,atk_name'), players: g.teams[0].players.every(p => 'energyStart' in p && 'fatigueEnd' in p),
+        btn: !document.getElementById('msum-csv').disabled && !document.getElementById('msum-json').disabled };
+    });
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#msum-csv')]);
+    const dlName = dl.suggestedFilename(), dlText = fs.readFileSync(await dl.path(), 'utf8');
+    check('match log: duels add up, goals = score, CSV header + 1 row per duel, download works', lg.n > 50 && lg.sums && lg.goals === lg.score && lg.kinds >= 4
+      && lg.csvRows === lg.n && lg.head && lg.players && lg.btn && /^yam-log-md1-.*\.csv$/.test(dlName) && dlText.split('\n').length - 1 === lg.n, JSON.stringify({ ...lg, dlName }));
+    const aiAfter = await page.evaluate(n => { const t = YAM.game.league.teams.find(x => x.name === n), e = YAM.ui.engine;
+      return t.squad.map(k => ({ en: k.en, played: e.sides[1].all.some(p => p.id === k.id), end: Math.round(e.energy.get(k.id) ?? -1) })); }, opp0.name);
+    check('AI fatigue: the opponent XI keeps its end-of-match energy, the rest +6 (capped)', aiAfter.filter(k => k.played).length === 11
+      && aiAfter.every(k => k.played ? k.en === Math.max(0, Math.min(100, k.end)) && k.en < 100 : k.en === 100), JSON.stringify(aiAfter.map(k => k.en)));
     await page.click('#msum-go');
 
     // notebook
@@ -210,11 +231,11 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const kidGoals = ai.reduce((a, t) => a + t.squad.reduce((b, k) => b + k.goals, 0), 0)
         + Object.values(YAM.game.seasonStats).reduce((a, s) => a + (s.goals || 0), 0);
       const kidAst = ai.reduce((a, t) => a + t.squad.reduce((b, k) => b + k.assists, 0), 0);
-      return { squads: ai.every(t => t.squad.length === 14), mp: ai.every(t => t.squad.filter(k => k.mp === 1).length === 11),
+      return { squads: ai.every(t => t.squad.length === League.SQUAD_SIZE), mp: ai.every(t => t.squad.filter(k => k.mp === 1).length === 11),
         fxGoals, kidGoals, ast: kidAst <= kidGoals, scorers: document.querySelectorAll('#top-scorers tbody tr').length,
         assists: document.querySelectorAll('#top-assists tbody tr').length, nav: document.querySelector('.tk[data-view="table"] .lbl').textContent };
     });
-    check('league stats: 14-kid AI squads, goals add up, leaders tables', ls.squads && ls.mp && ls.fxGoals === ls.kidGoals && ls.ast
+    check('league stats: 15-kid AI squads, goals add up, leaders tables', ls.squads && ls.mp && ls.fxGoals === ls.kidGoals && ls.ast
       && ls.scorers >= 1 && ls.assists >= 1 && /League|Лига/.test(ls.nav), JSON.stringify(ls));
     const aiRow = await page.evaluate(() => [...document.querySelectorAll('#table-body tr')].findIndex(tr => tr.dataset.team !== '0'));
     await page.click(`#table-body tr:nth-child(${aiRow + 1})`);
@@ -227,8 +248,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await shot('6-league');
     await page.keyboard.press('Escape');
     const closed = await page.evaluate(() => document.getElementById('troster-layer').hidden && YAM.ui.view === 'table');
-    check('team roster modal: click row, emblem, position, 14 rows sorted by goals, Esc closes', tr.open && /_ROSTER\.EXE$/.test(tr.title)
-      && tr.rows === 14 && tr.sorted && tr.badge && tr.place && closed, JSON.stringify({ ...tr, closed }));
+    check('team roster modal: click row, emblem, position, 15 rows sorted by goals, Esc closes', tr.open && /_ROSTER\.EXE$/.test(tr.title)
+      && tr.rows === 15 && tr.sorted && tr.badge && tr.place && closed, JSON.stringify({ ...tr, closed }));
     // v1.8: attribute structure + DEBUG.EXE (database + god mode); hidden attrs never on the Profile Card
     const at = await page.evaluate(() => {
       const sq = YAM.game.squad, G = { physical: 5, technical: 7, tactical: 3, psych: 4 };
@@ -525,6 +546,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const keep0 = s.lineup[0], sw = out ? s.swapPlayers(keep0, out.id) : 'none';
       if (out) s.lineup[0] = keep0;
       // engine: takers + captain + no out-of-position penalty
+      if ([a, b, c].includes(s.lineup[0])) { const j = s.lineup.findIndex((x, k) => k > 0 && ![a, b, c].includes(x)); [s.lineup[0], s.lineup[j]] = [s.lineup[j], s.lineup[0]]; }   // v3.4: takers must not be in goal (draft-order dependent)
       for (const id of [a, b, c]) if (!s.isStarter(id)) { const i = s.lineup.findIndex((x, k) => k > 0 && ![a, b, c].includes(x)); s.lineup[i] = id; }
       const e = new YAM.MatchEngine(YAM.ui.homeTeam(), s.matchContext() ? s.matchContext().team : { name: 'X', players: YAM.game.league.roster(YAM.game.league.teams[1], new Set()), formation: '4-4-2' },
         { onLog() {}, onUpdate() {}, onEnd() {} }, { duties: () => s.duties });
@@ -701,12 +723,27 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       && qs.apps >= qs0.apps + 11 && qs.tired && qs.score.replace(/\s/g, '') === qs.rep, JSON.stringify(qs));
     // v3.3: smooth fatigue curve + asymmetric shouts
     const fm = await page.evaluate(() => {
-      const pts = [[100, 1.00], [75, 0.95], [50, 0.85], [25, 0.70], [0, 0.50]].map(([e, t]) => ({ e, v: fatigueMult(e), ok: Math.abs(fatigueMult(e) - t) <= 0.03 }));
+      const pts = [[100, 1.00], [75, 0.994], [50, 0.975], [25, 0.944], [0, 0.90]].map(([e, t]) => ({ e, v: fatigueMult(e), ok: Math.abs(fatigueMult(e) - t) <= 0.005 }));
       let mono = true; for (let e = 1; e <= 100; e++) if (fatigueMult(e) <= fatigueMult(e - 1)) mono = false;
-      return { pts, mono, clamp: fatigueMult(-20) === 0.5 && fatigueMult(140) === 1, shout: SHOUT.attack.atk > 0 && SHOUT.attack.def < 0 && SHOUT.defend.atk < 0 && SHOUT.defend.def > 0,
+      return { pts, mono, clamp: fatigueMult(-20) === 0.9 && fatigueMult(140) === 1, shout: SHOUT.attack.atk > 0 && SHOUT.attack.def < 0 && SHOUT.defend.atk < 0 && SHOUT.defend.def > 0,
         stepGone: typeof ENERGY.EXHAUSTED_MULT === 'undefined' };
     });
-    check('fatigueMult: monotonic, hits 100/75/50/25/0 targets (±0.03), old ×0.5/×0.8 steps gone', fm.mono && fm.clamp && fm.stepGone && fm.shout && fm.pts.every(p => p.ok), JSON.stringify(fm.pts.map(p => p.e + ':' + p.v.toFixed(3))));
+    check('fatigueMult (v3.4 curve): monotonic, hits 100/75/50/25/0 targets, old ×0.5/×0.8 steps gone', fm.mono && fm.clamp && fm.stepGone && fm.shout && fm.pts.every(p => p.ok), JSON.stringify(fm.pts.map(p => p.e + ':' + p.v.toFixed(3))));
+    // v3.4: short-handed kick-off no longer crashes; AI rotation + daily rest
+    const v34 = await page.evaluate(() => {
+      const lg = YAM.game.league, t = lg.teams.find(x => !x.user), hooks = { onUpdate() {}, onEnd() {}, onLog() {} };
+      const pool = lg.roster(t, new Set()), mine = { name: 'X', formation: '4-4-2', players: YAM.game.squad.slice(0, 11) };
+      let short = 'ok';
+      try { const e = new MatchEngine(mine, { name: t.name, formation: t.formation, players: pool.slice(0, 11) }, hooks, { missing: [mine.players[3].id, mine.players[7].id] }); e.runInstant();
+        if (e.active(0).length !== 9 || !e.finished) short = 'wrong'; } catch (err) { short = err.message; }
+      const keep = t.squad.map(k => k.en);
+      t.squad.forEach(k => { k.en = 100; }); pool.slice(0, 11).forEach(p => { lg.kid(p.id).en = 30; });
+      const xi = lg.matchXI(t, new Set()), rotated = xi.filter((p, i) => p !== pool[i]).length, bench = pool.length - 11;
+      t.squad.forEach(k => { k.en = 50; }); lg.aiDay(false); const rest = t.squad.every(k => k.en === 60); lg.aiDay(true); const train = t.squad.every(k => k.en === 50);
+      t.squad.forEach((k, i) => { k.en = keep[i]; });
+      return { short, rotated, bench, rest, train, gk2: xi[0] !== pool[0] && xi[0].archetype === 'GK' };
+    });
+    check('short-handed kick-off runs (v2.6 crash fixed); AI rotates tired starters (incl. 2nd keeper); AI rest +10 / training −10', v34.short === 'ok' && v34.rotated === v34.bench && v34.gk2 && v34.rest && v34.train, JSON.stringify(v34));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

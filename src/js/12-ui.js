@@ -74,6 +74,14 @@ class UIController {
     });
   }
 
+  /** v3.4: save a text file through the browser (no native dialogs). */
+  download(name, text, mime = 'text/plain') {
+    const url = URL.createObjectURL(new Blob([text], { type: mime + ';charset=utf-8' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   renderAll() {
     if (this.state.phase === 'draft') { this.draft?.render(); this.renderBudget?.(); return; }   // v3.1: no squad yet
     this.renderLiveRoster(); this.renderAssistant(this.engine);
@@ -100,6 +108,7 @@ class UIController {
     this.$('app-title').innerHTML = `Youth Academy Manager <b>v${APP_VERSION}</b>`;
     document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = L.t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-aria]').forEach(el => { const v = L.t(el.dataset.i18nAria); el.setAttribute('aria-label', v); el.title = v; });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = L.t(el.dataset.i18nTitle); });   // v3.4
     this.$('fx-lbl').textContent = L.t(document.body.classList.contains('fx') ? 'ui.fxOn' : 'ui.fxOff');
     const b = this.$('btn-lang');
     b.textContent = L.code === 'ru' ? 'RU' : 'EN';
@@ -1303,6 +1312,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   onMatchEnd(eng) {
     const s = this.state, ctx = s.matchContext();
     const [a, b] = eng.sides;
+    // v3.4 match log (memory only): every duel + per-team summary, exported from the Match Summary
+    this.lastMatchLog = eng.logData({ md: ctx.md, date: s.calendar.date, opponent: ctx.opp.name, venue: ctx.venue, oppStrength: ctx.opp.strength, squadRep: s.rep.squad, captain: s.duties?.captain || null });
     const result = a.score > b.score ? 'W' : a.score === b.score ? 'D' : 'L';
     s.league.setUserResult(ctx.fixture, a.score, b.score);
     const others = s.league.simulateOthers(ctx.md);
@@ -1320,7 +1331,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       })),
     };
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
-    s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));   // v1.7: opponent kids feed the league leaders
+    s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
+    s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
     s.applyMatchDynamics(eng, result);

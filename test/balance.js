@@ -10,7 +10,10 @@
  *   node test/balance.js 2000 7       2000 matches, seed 7
  *   node test/balance.js --pairs 8    also average over 8 different random team pairs (robustness)
  *   node test/balance.js --json       machine-readable output
+ *   node test/balance.js --log out.csv  v3.4: also write the duel-by-duel match log (MatchEngine.traceCsv) of the
+ *                                     first 20 matches of every setup + one summary row per match (out.matches.csv)
  *
+ * Table 3 (v3.4) — fatigue: one squad starts at 75/60/50/40/25% energy against a fresh one (live drain included).
  * Table 1 — whole-match shouts.  Table 2 — game states: neutral until 60', then the team that leads by one
  *   (LEAD) or trails by one (CHASE) switches to a shout; we report how often the leader still wins / the
  *   trailer avoids defeat.
@@ -23,11 +26,13 @@ const vm = require('vm');
 
 const argv = process.argv.slice(2);
 const flag = k => { const i = argv.indexOf(k); return i < 0 ? null : argv[i + 1]; };
-const nums = argv.filter((a, i) => /^\d+$/.test(a) && !['--pairs'].includes(argv[i - 1]));
+const nums = argv.filter((a, i) => /^\d+$/.test(a) && !['--pairs', '--log'].includes(argv[i - 1]));
 const N = Math.max(4, parseInt(nums[0], 10) || 500);
 const SEED = parseInt(nums[1], 10) || 33;
 const PAIRS = parseInt(flag('--pairs'), 10) || 0;
 const JSON_OUT = argv.includes('--json');
+const LOG_FILE = flag('--log');
+const LOG = LOG_FILE ? { rows: [], matches: [] } : null;
 const TEAM_SEED = 5;   // a pair of equal-level (mod 0) 4-4-2 squads whose Neutral-vs-Neutral scoring ≈ the league average (~2.3)
 
 function mulberry32(a) {
@@ -75,6 +80,11 @@ function runSetup(E, A, B, x, y, n, seed) {
     setShout(eng, xs, MENT[x]); setShout(eng, ys, MENT[y]);
     eng.runInstant();
     const gx = eng.sides[xs].score, gy = eng.sides[ys].score, tx = eng.teamTotals(xs), ty = eng.teamTotals(ys);
+    if (LOG && E === LOG.E) {
+      const names = [`${eng.sides[0].name}:${[x, y][xs === 0 ? 0 : 1]}`, `${eng.sides[1].name}:${[x, y][xs === 1 ? 0 : 1]}`];
+      LOG.matches.push([`${x} vs ${y}`, i, names[0], names[1], eng.sides[0].score, eng.sides[1].score, eng.teamTotals(0).shots, eng.teamTotals(1).shots, eng.trace.length].join(','));
+      if (i < 20) LOG.rows.push(E.MatchEngine.traceCsv(eng.trace, names, { setup: `${x} vs ${y}`, match: i }).split('\n').slice(LOG.rows.length ? 1 : 0).join('\n'));
+    }
     r.gf += gx; r.ga += gy; r.shF += tx.shots; r.shA += ty.shots; r.otF += tx.onTarget; r.otA += ty.onTarget;
     if (gx > gy) r.w++; else if (gx === gy) r.d++; else r.l++;
   }
@@ -102,20 +112,42 @@ function runState(E, A, B, mode, shout, n, seed) {
   return r;
 }
 
-function runAll(teamSeed, n, seed) {
+/** v3.4: one squad starts every match at `energy`, the other fresh (both drain live). Mirrored: the tired squad
+    alternates A / B and home / away, so squad quality cancels out. */
+function runFatigue(E, A, B, energy, n, seed) {
+  E.reseed(seed);
+  let gf = 0, ga = 0;
+  for (let i = 0; i < n; i++) {
+    const { home, away, xs } = fixture(i, A, B), tiredTeam = xs === 0 ? home : away, fresh = xs === 0 ? away : home;
+    tiredTeam.players.forEach(p => { p.energy = energy; }); fresh.players.forEach(p => { p.energy = 100; });
+    const eng = new E.MatchEngine(home, away, HOOKS, {});
+    eng.runInstant();
+    gf += eng.sides[xs].score; ga += eng.sides[1 - xs].score;
+  }
+  [A, B].forEach(t => t.players.forEach(p => { p.energy = 100; }));
+  return { energy, gf: gf / n, ga: ga / n, diff: (gf - ga) / n };
+}
+
+function runAll(teamSeed, n, seed, main = false) {
   const E = loadEngine(teamSeed);
   const [A, B] = makeTeams(E);
+  if (main && LOG) LOG.E = E;
   const setups = SETUPS.map(([x, y], k) => runSetup(E, A, B, x, y, n, seed + k * 1000));
   const states = [];
   for (const mode of ['LEAD', 'CHASE']) for (const s of ['Neutral', 'Attack', 'Defense']) states.push(runState(E, A, B, mode, s, Math.round(n / 2), seed + 7));
-  return { setups, states, E };
+  const fatigue = main ? [75, 60, 50, 40, 25].map(en => runFatigue(E, A, B, en, n, seed + 11)) : [];
+  return { setups, states, fatigue, E };
 }
 
 const pct = v => (v * 100).toFixed(1).padStart(5) + '%';
 const per = (v, n) => (v / n).toFixed(2).padStart(5);
 const rowSetup = r => `${r.setup.padEnd(20)} | ${pct(r.w / r.n)} ${pct(r.d / r.n)} ${pct(r.l / r.n)} | ${pct(r.winShare)}   | ${per(r.gf, r.n)} ${per(r.ga, r.n)} ${per(r.gf + r.ga, r.n)} | ${per(r.shF, r.n)} ${per(r.shA, r.n)} | ${per(r.otF, r.n)} ${per(r.otA, r.n)}`;
 
-const main = runAll(TEAM_SEED, N, SEED);
+const main = runAll(TEAM_SEED, N, SEED, true);
+if (LOG) {
+  fs.writeFileSync(LOG_FILE, LOG.rows.join('\n') + '\n');
+  fs.writeFileSync(LOG_FILE.replace(/(\.csv)?$/, '.matches.csv'), ['setup,match,home,away,home_goals,away_goals,home_shots,away_shots,duels', ...LOG.matches].join('\n') + '\n');
+}
 let pairs = null;
 if (PAIRS) {
   const sum = SETUPS.map(([x, y]) => ({ setup: `${x} vs ${y}`, n: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, shF: 0, shA: 0, otF: 0, otA: 0 }));
@@ -124,7 +156,7 @@ if (PAIRS) {
   pairs = sum;
 }
 
-if (JSON_OUT) console.log(JSON.stringify({ setups: main.setups, states: main.states, pairs }, null, 1));
+if (JSON_OUT) console.log(JSON.stringify({ setups: main.setups, states: main.states, fatigue: main.fatigue, pairs }, null, 1));
 else {
   const head = 'Setup                | Win    Draw   Loss  | WinShare | GF/m  GA/m  Tot/m | ShF   ShA   | OnTgF OnTgA';
   console.log(`Balance: ${N} instant matches per setup, seed ${SEED}, team seed ${TEAM_SEED}, mirrored (first team's view)`);
@@ -132,6 +164,9 @@ else {
   console.log('\nGame state at 60\' (±1 goal), then a shout     | Win    Draw   Loss  | n');
   for (const r of main.states) console.log(`${r.state.padEnd(46)} | ${pct(r.w / r.n)} ${pct(r.d / r.n)} ${pct(r.l / r.n)} | ${r.n}`);
   if (pairs) { console.log(`\nAveraged over ${PAIRS} other random team pairs (${N} matches each)`); console.log(head); pairs.forEach(r => console.log(rowSetup(r))); }
+  console.log('\nFatigue: squad starts at X% vs a fresh squad   | GF/m  GA/m  Diff');
+  for (const r of main.fatigue) console.log(`${(r.energy + '%').padEnd(46)} | ${r.gf.toFixed(2).padStart(5)} ${r.ga.toFixed(2).padStart(5)} ${r.diff.toFixed(2).padStart(5)}`);
+  if (LOG) console.log(`\nMatch log written: ${LOG_FILE} (+ .matches.csv)`);
   if (main.E.fatigueMult) console.log('\nfatigueMult: ' + [100, 75, 50, 25, 0].map(e => `${e}%→${main.E.fatigueMult(e).toFixed(3)}`).join('  '));
 }
 const avd = main.setups.find(r => r.setup === 'Attack vs Defense');

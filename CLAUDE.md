@@ -23,4 +23,4 @@ Read `docs/DESIGN.md` first (mechanics, formulas, balance). Do NOT read whole fi
 - Styles: one file per feature in `src/css/`, `99-responsive.css` last. Layer z-index only via the `--z-*` tokens in `01-core.css`.
 
 ## Cheap workflow
-`grep -n "keyword" src -r` → edit the few lines → build → smoke test → commit. Match-engine balance: `node test/balance.js` (seeded, no deps, ~8 s). Screenshots only for visual changes (`node test/smoke.js --shots` → `test/shots/`).
+`grep -n "keyword" src -r` → edit the few lines → build → smoke test → commit. Match-engine balance: `node test/balance.js` (seeded, no deps, ~13 s; `--log out.csv` = duel-by-duel trace). In-game match log: Match Summary → LOG .CSV / .JSON. Screenshots only for visual changes (`node test/smoke.js --shots` → `test/shots/`).

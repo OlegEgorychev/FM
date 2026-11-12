@@ -140,10 +140,16 @@ const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_RES
    going forward than it gains at the back (the price of safety). v1.x–v3.2 used ±3 both ways (Attack ≈ 2.7× goals,
    Defense ≈ 0.3× → a free "lock the lead" button). Tuned with test/balance.js (Attack vs Defense win share 45–55%). */
 const SHOUT = { attack: { atk: 1.0, def: -1.0 }, defend: { atk: -1.05, def: 1.0 }, balanced: { atk: 0, def: 0 } };
-/* v3.3 SMOOTH FATIGUE — one continuous, monotonic curve on LIVE energy (replaces the old steps: ×0.5 when a kid
-   started under 50%, ×0.8 under 30% during the match). x = energy/100:  m = 0.5 + 0.9·x − 0.4·x²
-   100% → 1.00 · 75% → 0.95 · 50% → 0.85 · 25% → 0.70 · 0% → 0.50 (derivative 0.9 − 0.8x > 0 → always rising). */
-const fatigueMult = energy => { const x = clamp((energy ?? 100) / 100, 0, 1); return 1 - 0.5 * (1 - x) * (1 - 0.8 * x); };   // = 0.5 + 0.9x − 0.4x², exact 1.00 at full energy
+/* v3.3 SMOOTH FATIGUE, recalibrated in v3.4 — one continuous, monotonic curve on LIVE energy, x = energy/100:
+   m = 1 − K·(1 − x)², K = 0.1  →  100% 1.000 · 75% 0.994 · 50% 0.975 · 25% 0.944 · 0% 0.900.
+   The numbers look small on purpose: the duel chain (pass → dribble → shot vs keeper) multiplies every point, so ~1%
+   on all stats ≈ 0.2 goals. v3.3 (0.5 + 0.9x − 0.4x², 50% → 0.85) made a half-tired XI concede 2.4 goals more than a
+   fresh one; now (test/balance.js, live drain included): start 75% −0.25 · 60% −0.5 · 50% −0.7 · 40% −0.95 · 25% −1.35 goal difference. */
+const fatigueMult = energy => { const x = clamp((energy ?? 100) / 100, 0, 1); return 1 - FATIGUE.K * (1 - x) * (1 - x); };
+const FATIGUE = { K: 0.1 };
+/* v3.4 AI FATIGUE — AI clubs live by the same energy rules and rotate (League.matchXI). RATING: AI-vs-AI Poisson rating per
+   unit of mid-match fatigue multiplier (calibrated on the live engine). */
+const AI_FATIGUE = { ROTATE_BELOW: 60, ROTATE_GAIN: 15, DESPERATE: 40, TRAIN: -10, RATING: 350 };
 const OUT_OF_POSITION = 0.85;   // stat multiplier for a player outside his natural line
 
 /* =========================================================

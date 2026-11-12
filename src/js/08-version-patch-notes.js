@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.4';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.4', name: { en: 'Tired Legs Everywhere', ru: 'Устают все' },
+    en: [
+      'Rival clubs now get tired too: their kids train, rest and play by the same rules as yours, and a worn-out starter gets rotated. A strong club can turn up with heavy legs.',
+      'The morning briefing on match day tells you how fresh the opponent\'s starters are.',
+      'Tiredness is milder: a half-empty tank still costs you, but no longer turns a match into a rout.',
+      'Match Summary has LOG .CSV / LOG .JSON buttons: download every duel of the last match with all its numbers and check the maths yourself.',
+      'Fixed: a match where fewer than 11 kids turned up could not kick off.',
+    ],
+    ru: [
+      'Соперники тоже устают: их ребята тренируются, отдыхают и играют по тем же правилам, что и твои, а выдохшегося игрока основы меняют. Сильный клуб может приехать «на зубах».',
+      'В день матча утренняя сводка подскажет, насколько свежа основа соперника.',
+      'Усталость стала мягче: полупустой бак всё ещё стоит очков, но больше не превращает матч в разгром.',
+      'В итогах матча появились кнопки ЛОГ .CSV / ЛОГ .JSON: скачай все единоборства последнего матча со всеми цифрами и проверь расчёты сам.',
+      'Исправлено: матч, на который пришло меньше 11 ребят, не мог начаться.',
+    ] },
   { v: '3.3', name: { en: 'Touchline Balance', ru: 'Баланс на бровке' },
     en: [
       '"Attack" and "Defense" are now a real choice: Attack means more goals at both ends, Defense means a tight, low-scoring game — and it costs you a little going forward.',

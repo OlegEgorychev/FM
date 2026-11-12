@@ -22,6 +22,9 @@ class MatchEngine {
     this.energy = new Map(); this.drain = new Map();
     for (const s of this.sides) for (const e of s.entries) { this.energy.set(e.p.id, e.p.energy ?? 100); this.drain.set(e.p.id, MatchEngine.drainOf(e.p)); }
     this.everPlayed = new Set(home.players.map(p => p.id));
+    this.sentOff = new Set();   // v3.4: created BEFORE the empty shirts are added (it used to crash short-handed kick-offs)
+    this.shouts = [{ min: 0, side: 0, shout: opts.mentality || 'balanced' }, { min: 0, side: 1, shout: opts.oppMentality || 'balanced' }];
+    this.trace = [];            // v3.4 match log: every headline duel with all its terms (see rs() / tr())
     for (const id of opts.missing || []) { this.sentOff.add(id); this.everPlayed.delete(id); }   // v2.6: an empty shirt — we start short-handed
     this.subbedOff = new Set();
     this.subsUsed = 0;
@@ -33,7 +36,6 @@ class MatchEngine {
     this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8
     this.dutiesFn = typeof opts.duties === 'function' ? opts.duties : () => (opts.duties || {});   // v3.0: read live (changes at half-time count)   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
     this.speed = opts.speed || 1;
-    this.sentOff = new Set();
     this.timer = null;
     this.delay = 0;
     this.pendingShot = null;
@@ -137,11 +139,12 @@ class MatchEngine {
     for (let i = 0; i < heads.length; i++) { if ((r -= w[i]) < 0) { target = heads[i]; break; } }
     const def = pick(this.inZone(opp, 0));
     const header = ((target.bio?.height ?? 160) - 160) / SETPIECE.HEADER_HEIGHT + ((target.physical?.strength ?? 10) - 10) * 0.1;
-    const atk = (t.skill ? t.skill('crossing') : 10) + Math.random() * 10 + SETPIECE.CORNER_DELIVERY + header + this.mod(side, 'atk');
-    const dfn = this.eff(def, 'Mark') + Math.random() * 10 + this.mod(opp, 'def');
+    const A = this.rs(t, null, side, 'atk', { delivery: SETPIECE.CORNER_DELIVERY, header }, { raw: t.skill ? t.skill('crossing') : 10 });
+    const D = this.rs(def, 'Mark', opp, 'def');
     this.poss = side; this.zone = 2;
+    this.tr('corner', side, A, D, A.total >= D.total ? 'header' : 'cleared');
     this.log('', 'eng.corner', { a: t }, side);
-    if (atk >= dfn) {
+    if (A.total >= D.total) {
       this.lastPass = { p: t, side };   // a headed goal is an assist for the taker
       this.setEv({ kind: 'pass', a: t, b: target, d: def });
       this.startShot(target, false, { corner: true, bonus: Math.max(0, header) });
@@ -185,20 +188,45 @@ class MatchEngine {
      Tackle = 2·tackling+strength+positioning · Shoot = 2·shooting+composure · Save = 2·goalkeeping+agility+positioning.
      Global modifiers: sharpness < 50% → technical skills −2 (inside Player.skill), condition = fatigueMult(live energy) (v3.3, smooth 1.00 → 0.50),
      morale × passion → ±2.5 flat on every roll. */
-  eff(p, attr) {
-    let v = p.rating ? p.rating(attr) : 10;
-    v *= fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);   // v3.3: smooth curve, no 50% / 30% steps
+  eff(p, attr) { return this.effParts(p, attr).v; }
+  /** v3.4: eff() split into its terms for the match log. v = rating × fatigue × tag + mood. */
+  effParts(p, attr) {
+    const rating = p.rating ? p.rating(attr) : 10;
+    const fat = fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);   // v3.3: smooth curve, no 50% / 30% steps
     // v3.0: no "out of position" penalty any more — only hidden stats and biometrics decide
     const t = p.tags || [];
-    if (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) v *= 1.5;
-    if (t.includes('Playmaker') && attr === 'Pass') v *= 1.5;
-    if (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) v *= 1.5;
-    return v + (p.moodBonus ?? 0);
+    const tag = (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) || (t.includes('Playmaker') && attr === 'Pass')
+      || (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) ? 1.5 : 1;
+    const mood = p.moodBonus ?? 0;
+    return { rating, fat, tag, mood, v: rating * fat * tag + mood };
   }
-  mod(side, role) {
-    const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus + this.captainBonus() : 0);   // v2.8 mood + v3.0 captain
-    const m = side === 0 ? this.mentality : this.oppMentality;
-    return cheat + (SHOUT[m]?.[role] ?? 0);   // v3.3: asymmetric, see SHOUT in 00-utils-data.js
+  mod(side, role) { return this.modParts(side, role).v; }
+  /** Flat roll modifiers: DEBUG Force Win, squad reputation (v2.8), captain (v3.0), sideline shout (v3.3 SHOUT table). */
+  modParts(side, role) {
+    const cheat = this.forceWin ? (side === 0 ? 8 : -5) : 0;
+    const rep = side === 0 ? this.repBonus : 0, cap = side === 0 ? this.captainBonus() : 0;
+    const shout = SHOUT[side === 0 ? this.mentality : this.oppMentality]?.[role] ?? 0;
+    return { cheat, rep, cap, shout, v: cheat + rep + cap + shout };
+  }
+  /** v3.4: one side of a headline duel, every term kept: (stat × fatigue × tag + mood) + rand·10 + flat extras + modifiers.
+      attrs = composite key or [keys] (averaged); opt.raw = a raw skill instead of eff() (corner delivery, no fatigue). */
+  rs(p, attrs, side, role, flat = {}, opt = {}) {
+    let stat = 0, rating = 0, mood = 0, tag = 1;
+    const fat = opt.raw !== undefined ? 1 : fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);
+    if (opt.raw !== undefined) stat = rating = opt.raw;
+    else {
+      const keys = Array.isArray(attrs) ? attrs : [attrs];
+      for (const k of keys) { const e = this.effParts(p, k); stat += (e.v - e.mood) / keys.length; rating += e.rating / keys.length; mood += e.mood / keys.length; tag = Math.max(tag, e.tag); }
+    }
+    const m = this.modParts(side, role), rand = Math.random() * 10;
+    let fl = 0; for (const k in flat) fl += flat[k];
+    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, total: stat + mood + rand + fl + m.v };
+  }
+  /** v3.4: record a duel in the match log (A = side in possession). */
+  tr(kind, side, A, D, out) {
+    const pack = r => ({ id: r.p.id, name: r.p.name, energy: Math.round(this.energy.get(r.p.id) ?? r.p.energy ?? 100), rating: r.rating, fat: r.fat, tag: r.tag, stat: r.stat, mood: r.mood, rand: r.rand,
+      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, cheat: r.cheat, total: r.total });
+    this.trace.push({ min: this.minute, kind, side, zone: this.zone, A: pack(A), D: pack(D), margin: A.total - D.total, out });
   }
   counts(side) {
     const c = { DEF: 0, MID: 0, ATT: 0 };
@@ -213,6 +241,7 @@ class MatchEngine {
   setMentality(m) {
     if (m === this.mentality) return;
     this.mentality = m;
+    this.shouts.push({ min: this.minute, side: 0, shout: m });   // v3.4 match log
     if (!this.finished && this.started) this.log('coach', 'eng.shout.' + m, {}, 0);
   }
   setSpeedMode(s) { this.speed = s; if (this.started && !this.finished && !this.paused) this.updateSpeed(); }
@@ -226,6 +255,7 @@ class MatchEngine {
   begin() {
     if (this.started) return;
     this.started = true;
+    this.startEnergy = new Map(this.energy);   // v3.4 match log: kick-off condition of everyone on the pitch
     this.kickoff(0);
     this.log('whistle', 'eng.kickoff', { a: this.team(0) }, 0);
   }
@@ -341,6 +371,7 @@ class MatchEngine {
     if (!this.stats.has(inP.id)) this.stats.set(inP.id, MatchEngine.blankStats());
     this.lineOf.set(inP.id, line);
     this.energy.set(inP.id, inP.energy ?? 100);
+    this.startEnergy?.set(inP.id, inP.energy ?? 100);
     this.drain.set(inP.id, MatchEngine.drainOf(inP));
     if ((inP.energy ?? 100) < ENERGY.TIRED) this.tired.add(inP.id);
     this.everPlayed.add(inP.id);
@@ -430,11 +461,12 @@ class MatchEngine {
     // a forward ball into the final third leans on crossing.
     const touch = ((recv.skill?.('firstTouch') ?? 10) - 10) * 0.15;
     const cross = forward && tz === 2 ? ((c.skill?.('crossing') ?? 10) - 10) * 0.1 : 0;
-    const atk = this.eff(c, 'Pass') + Math.random() * 10 + 3 - (forward ? 2 : 0) + (this.isGK(c) ? 2 : 0) + touch + cross + this.mod(side, 'atk') + this.sup(side, tz);
-    const dfn = this.eff(def, 'Mark') + Math.random() * 10 + this.mod(opp, 'def');
+    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) });
+    const D = this.rs(def, 'Mark', opp, 'def');
     const vars = { a: c, b: recv, d: def };
+    this.tr(forward ? 'passFwd' : 'pass', side, A, D, A.total >= D.total ? 'ok' : 'intercepted');
 
-    if (atk >= dfn) {
+    if (A.total >= D.total) {
       this.st(c).passOk++;
       this.lastPass = { p: c, side };   // v1.7: the last completed pass can become an assist
       this.carrier = recv; this.zone = tz;
@@ -452,11 +484,12 @@ class MatchEngine {
   doDribble() {
     const c = this.carrier, side = this.poss, opp = 1 - side, z = this.zone;
     const def = pick(this.inZone(opp, 2 - z));
-    const atk = (this.eff(c, 'Dribble') + this.eff(c, 'Speed')) / 2 + Math.random() * 10 + 1 + this.mod(side, 'atk') + this.sup(side, z);
-    const dfn = this.eff(def, 'Tackle') + Math.random() * 10 + this.mod(opp, 'def');
+    const A = this.rs(c, ['Dribble', 'Speed'], side, 'atk', { base: 1, sup: this.sup(side, z) });
+    const D = this.rs(def, 'Tackle', opp, 'def');
     const vars = { a: c, d: def };
 
-    if (atk >= dfn) {
+    if (A.total >= D.total) {
+      this.tr('dribble', side, A, D, 'ok');
       this.st(c).dribbleOk++;
       this.st(def).tacklesLost++;
       if (z < 2) this.zone++; else this.boxBonus = 3;
@@ -464,7 +497,9 @@ class MatchEngine {
       this.log('', 'drOk', vars, side);
       if ((def.tags || []).includes('Aggressive')) this.commitFoul(def, c, side);
     } else {
-      if (Math.random() < SETPIECE.FOUL) {   // v3.0: a mistimed tackle — our ball, maybe a penalty
+      const foul = Math.random() < SETPIECE.FOUL;
+      this.tr('dribble', side, A, D, foul ? 'foul' : 'tackled');
+      if (foul) {   // v3.0: a mistimed tackle — our ball, maybe a penalty
         if ((def.tags || []).includes('Aggressive')) { this.commitFoul(def, c, side); return; }
         this.setEv({ kind: 'foul', a: c, d: def, card: false });
         this.log('foul', 'eng.foulPlain', vars, 1 - side);
@@ -511,14 +546,19 @@ class MatchEngine {
   }
 
   resolveShot() {
-    const { shooter, side, long, bonus, assist, penalty, corner } = this.pendingShot;
+    const { shooter, side, long, bonus, assist, penalty, corner, freeKick } = this.pendingShot;
     this.pendingShot = null;
     const opp = 1 - side;
     const blocker = pick(this.inZone(opp, 0));
     const keeper = this.keeper(opp);
 
-    if (!penalty && Math.random() < 0.2 &&
-        this.eff(blocker, 'Mark') + Math.random() * 10 + this.mod(opp, 'def') > this.eff(shooter, 'Shoot') + Math.random() * 10 + this.mod(side, 'atk')) {
+    let blocked = false;
+    if (!penalty && Math.random() < 0.2) {
+      const B = this.rs(blocker, 'Mark', opp, 'def'), S = this.rs(shooter, 'Shoot', side, 'atk');
+      blocked = B.total > S.total;
+      this.tr('block', side, S, B, blocked ? 'blocked' : 'through');
+    }
+    if (blocked) {
       this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
       this.setEv({ kind: 'block', d: blocker });
@@ -526,9 +566,11 @@ class MatchEngine {
       this.turnover(blocker, 0);
       return;
     }
-    const atk = this.eff(shooter, 'Shoot') + Math.random() * 10 + bonus - (long ? 5 : 0) + this.mod(side, 'atk');
-    const dfn = this.eff(keeper, 'Save') + Math.random() * 10 + 4 + this.mod(opp, 'def');
+    const A = this.rs(shooter, 'Shoot', side, 'atk', { bonus, long: long ? -5 : 0 });
+    const D = this.rs(keeper, 'Save', opp, 'def', { keeper: 4 });
+    const atk = A.total, dfn = D.total;
     const vars = { a: shooter, k: keeper };
+    this.tr(penalty ? 'penalty' : corner ? 'header' : freeKick ? 'freekick' : long ? 'longShot' : 'shot', side, A, D, atk > dfn ? 'goal' : atk < dfn - 7 ? 'wide' : 'saved');
 
     if (atk > dfn) {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
@@ -557,6 +599,45 @@ class MatchEngine {
   /* ---------- reporting ---------- */
   log(type, key, vars = {}, side = -1, suffix = '') {
     this.hooks.onLog({ minute: this.minute, type, key, vars, side, suffix, r: Math.random() });
+  }
+
+  /* ---------- v3.4 MATCH LOG (export) ----------
+     trace = every headline duel (pass, forward pass, dribble, block, shot, long shot, free kick, penalty, corner, header)
+     with both sides' terms: total = stat (rating × fatigue × tag) + mood + rand·10 + flat extras + shout + rep + captain + cheat.
+     Background play (ambient) is NOT in the trace: it only feeds the player stats. */
+  static WIN_OUT = new Set(['ok', 'goal', 'header', 'through']);
+  logData(meta = {}) {
+    const r2 = v => Math.round(v * 100) / 100;
+    const side = i => {
+      const s = this.sides[i], rows = this.trace.filter(t => t.side === i), kinds = {};
+      for (const t of rows) {
+        const k = kinds[t.kind] || (kinds[t.kind] = { n: 0, won: 0, margin: 0, outcomes: {} });
+        k.n++; if (MatchEngine.WIN_OUT.has(t.out)) k.won++; k.margin += t.margin; k.outcomes[t.out] = (k.outcomes[t.out] || 0) + 1;
+      }
+      for (const k of Object.values(kinds)) { k.rate = r2(k.won / k.n); k.margin = r2(k.margin / k.n); }
+      const own = this.trace.flatMap(t => [t.A, t.D]).filter(x => s.all.some(p => p.id === x.id));
+      const avg = f => own.length ? r2(own.reduce((a, x) => a + f(x), 0) / own.length) : 0;
+      return { name: s.name, formation: s.formation, score: s.score, user: s.user, possession: r2(this.possTicks[i] / ((this.possTicks[0] + this.possTicks[1]) || 1)),
+        totals: this.teamTotals(i), duels: kinds,
+        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cheat: avg(x => x.cheat) },
+        players: s.all.map(p => ({ id: p.id, name: p.name, line: this.lineOf.get(p.id), sentOff: this.sentOff.has(p.id), subbedOff: this.subbedOff.has(p.id),
+          energyStart: Math.round(this.startEnergy?.get(p.id) ?? p.energy ?? 100), energyEnd: Math.round(this.energy.get(p.id) ?? 0),
+          fatigueStart: r2(fatigueMult(this.startEnergy?.get(p.id) ?? p.energy ?? 100)), fatigueEnd: r2(fatigueMult(this.energy.get(p.id) ?? 0)), stats: { ...this.st(p) } })) };
+    };
+    return { format: 'yam-match-log/1', version: typeof APP_VERSION === 'undefined' ? null : APP_VERSION, ...meta, minute: this.minute, finished: this.finished,
+      forceWin: this.forceWin, shouts: this.shouts, subs: this.subs, events: this.matchEvents, teams: [side(0), side(1)],
+      trace: this.trace.map(t => ({ ...t, margin: r2(t.margin), A: MatchEngine.r2obj(t.A), D: MatchEngine.r2obj(t.D) })) };
+  }
+  static r2obj(o) { const out = {}; for (const k in o) out[k] = typeof o[k] === 'number' ? Math.round(o[k] * 100) / 100 : k === 'flat' ? MatchEngine.r2obj(o[k]) : o[k]; return out; }
+  /** One CSV row per duel (comma-separated, dot decimals, UTF-8). `pre` = extra leading columns (e.g. setup / match no.). */
+  static traceCsv(trace, sides, pre = null) {
+    const f = v => (typeof v === 'number' ? String(Math.round(v * 100) / 100) : `"${String(v ?? '').replace(/"/g, '""')}"`);
+    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'cheat', 'total'];
+    const head = [...(pre ? Object.keys(pre) : []), 'minute', 'kind', 'team', 'zone', ...part.map(k => 'atk_' + k), ...part.map(k => 'def_' + k), 'margin', 'outcome'];
+    const cell = (x, k) => k === 'flat' ? f(Object.entries(x.flat || {}).filter(([, v]) => v).map(([n, v]) => `${n}:${Math.round(v * 100) / 100}`).join(' ')) : f(x[k]);
+    const rows = trace.map(t => [...(pre ? Object.values(pre).map(f) : []), t.min, f(t.kind), f(sides?.[t.side] ?? t.side), t.zone,
+      ...part.map(k => cell(t.A, k)), ...part.map(k => cell(t.D, k)), f(t.margin), f(t.out)].join(','));
+    return [head.join(','), ...rows].join('\n');
   }
 
   teamTotals(side = 0) {

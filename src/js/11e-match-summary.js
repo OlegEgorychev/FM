@@ -12,6 +12,9 @@ class MatchSummary {
     this.body = document.getElementById('msum-body');
     document.getElementById('msum-x').addEventListener('click', () => this.close());
     document.getElementById('msum-go').addEventListener('click', () => { this.close(); this.ui.show('notes'); });
+    // v3.4: match log export (kept in memory for the last match only — not in the save)
+    document.getElementById('msum-csv').addEventListener('click', () => this.exportLog('csv'));
+    document.getElementById('msum-json').addEventListener('click', () => this.exportLog('json'));
     document.addEventListener('keydown', e => {
       if (!this.isOpen || e.key !== 'Escape') return;
       e.preventDefault(); e.stopImmediatePropagation(); this.close();
@@ -28,8 +31,17 @@ class MatchSummary {
     this.render();
     this.layer.hidden = false;
     document.getElementById('msum-go').focus();
+    for (const id of ['msum-csv', 'msum-json']) document.getElementById(id).disabled = !this.log;
   }
   close() { this.layer.hidden = true; }
+  /** v3.4: the log of THIS match, if it is still in memory (it is not saved, so a reload loses it). */
+  get log() { const g = this.ui.lastMatchLog; return g && this.rep && g.md === this.rep.md && g.opponent === this.rep.opponent ? g : null; }
+  exportLog(kind) {
+    const g = this.log; if (!g) return;
+    const base = `yam-log-md${g.md}-${String(g.opponent).replace(/[^\w]+/g, '_').toLowerCase()}`;
+    if (kind === 'json') this.ui.download(base + '.json', JSON.stringify(g, null, 1), 'application/json');
+    else this.ui.download(base + '.csv', MatchEngine.traceCsv(g.trace, g.teams.map(t => t.name)), 'text/csv');
+  }
 
   render() {
     const rep = this.rep, ui = this.ui, s = ui.state, lg = s.league;

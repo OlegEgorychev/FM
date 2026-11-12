@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v3.3)
+# Youth Academy Manager — design notes (current: v3.4)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -14,7 +14,7 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 ## Systems (00-utils-data.js, 05-game-state.js)
 - Hidden attributes: see "Attribute system (v1.8)" below — never displayed outside DEBUG.EXE.
 - Roles (one per player, set in Notebook): Aggressive (Tackle ×1.5; lost visible duel → foul + yellow, 2nd = red), Playmaker (Pass ×1.5, passes more), Selfish (Dribble/Shoot ×1.5, rarely passes).
-- Energy: in-match live drain 30–40% over 90'; every roll × `fatigueMult(live energy)` (v3.3, smooth 1.00 → 0.50, see below); half-time +4; after match players keep real energy, unused subs +6; rest day +4. Squad 16 (11 + bench GK, DEF, MID, MID, FWD).
+- Energy: in-match live drain 30–40% over 90'; every roll × `fatigueMult(live energy)` (v3.4: 1 − 0.1·(1−x)², 1.00 → 0.90, see below); half-time +4; after match players keep real energy, unused subs +6; rest day +4. Squad 16 (11 + bench GK, DEF, MID, MID, FWD).
 - Formations (10): slot lines DEF/MID/ATT decide who contests each third; `presence()` → line superiority ±4 (normalised: 4-4-2 vs 4-4-2 = 0); out of natural line ×0.85.
 - Shouts: Attack/Defend ±3 to our attacking/defending rolls.
 
@@ -37,7 +37,8 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Notebook: 3 random players who played; "ok/total (rate%) (Season Avg)", colours >75% green / <40% red, `coachNote()` hint (11-notebook-helpers.js).
 
 ## Known balance observations
-- v3.3: shouts retuned (`SHOUT`), fatigue is a smooth curve — see "Match engine balance (v3.3)".
+- v3.3: shouts retuned (`SHOUT`), fatigue is a smooth curve — see "Match engine balance (v3.3)" and v3.4.
+- Engine sensitivity: one roll point on every duel ≈ ±40% goals (the chain pass → dribble → shot vs keeper multiplies). A club +3 on every skill beats an average one ≈ 2.9–0.0; that gap amplification is NOT addressed yet.
 - Correct roles are strong (×1.5). Background duels never produce cards.
 
 ## Portraits (v1.4)
@@ -181,3 +182,10 @@ Before → after (1000 matches per setup, seed 33, team seed 5; first team's vie
 
 Shots per team ≈ 6.5 neutral (unchanged), Attack 8.3 → 7.1, Defense 5.5 → 6.1. Averaged over 5 other squad pairs (after): Attack vs Neutral 50.1%, Defense vs Neutral 48.8%, Attack vs Defense 51.4%, Neutral 51.4% (≈ ±2% noise).
 Leading by one at 60' → win%: before Neutral 80.8 / Attack 66.0 / Defense 90.4; after (fatigue curve included) 75.6 / 74.0 / 83.8.
+
+## AI fatigue, match log, softer curve (v3.4)
+- **Fatigue curve recalibrated**: `fatigueMult(e) = 1 − FATIGUE.K·(1 − x)²`, K = 0.1 → 100% 1.000 · 75% 0.994 · 50% 0.975 · 25% 0.944 · 0% 0.900 (monotonic). The v3.3 targets (50% → 0.85) were too harsh for this engine: a half-tired XI conceded ≈ 2.4 goals more than a fresh one. Now (`balance.js` table 3, live drain included, mirrored): start 75% −0.24 · 60% −0.50 · 50% −0.76 · 40% −0.98 · 25% −1.35 goal difference per match. Tried widening the duel spread (rand·13/16) instead: barely helps and inflates scoring.
+- **AI fatigue**: AI squads are 15 (`League.LITE_POS` + second GK; old saves topped up), every lite kid has `en`. `League.roster()` builds Player objects for all 15 (first 11 = slot-aligned first choice). `matchXI(team)` = first choice with rotation: starter `en < AI_FATIGUE.ROTATE_BELOW (60)` → freshest bench kid of the same archetype with ≥ +15 (any outfield kid if the starter is < 40); sets `p.energy = en`. `GameState.matchContext()` uses it. Days: `league.aiDay(training)` from `dayRoutine` (+10 rest / −10 training). After our match `aiAfterMatch(opp, engine energies)` (XI keep live end energy, others +6). AI-vs-AI: same XI pick, rating += (avg fatigueMult(en − 17) − 1)·350, XI drain rnd(30–40)×stamina, `distributeStats` credits the real XI. Season sim: AI XI pre-match ≈ 100% → 75% by md 10, ≈ 1 rotated starter per club per match.
+- **Briefing**: on match day `mb.oppForm` adds "their starters average X% energy (N running on fumes)" (`league.oppCondition()`).
+- **Match log**: `MatchEngine.rs()` builds each side of a headline duel with all terms (`rating`, `fat`, `tag`, `stat` = rating×fat×tag, `mood`, `rand`, `flat` extras {base, fwd, gk, touch, cross, sup, bonus, long, keeper, delivery, header}, `shout`, `rep`, `cap`, `cheat`, `total`); `tr()` stores {min, kind, side, zone, A, D, margin, out}. Kinds: pass, passFwd, dribble, block, shot, longShot, freekick, penalty, corner, header; outcomes ok/intercepted/tackled/foul/blocked/through/goal/saved/wide/header/cleared. Ambient play is not traced. RNG order unchanged (balance tables identical). `logData(meta)` = JSON (teams: duel stats per kind, avg terms, players with energy/fatigue start+end, shouts, subs, events, trace); `MatchEngine.traceCsv(trace, names, pre)` = CSV (comma, dot decimals). UI: `ui.lastMatchLog` (memory only, last match) → Match Summary buttons LOG .CSV / LOG .JSON (`ui.download()`). Note: the log contains hidden ratings — a deliberate developer tool exception. `node test/balance.js --log out.csv` writes the trace of 20 matches per setup + `out.matches.csv`.
+- **Fix**: `sentOff` is created before `opts.missing` is applied — short-handed kick-offs (fewer than 11 at the locker room) used to throw.

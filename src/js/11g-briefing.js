@@ -48,7 +48,13 @@ class MorningBriefing {
     this.layer.dataset.wx = wx;
     document.getElementById('mb-date').textContent = fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     document.getElementById('mb-weather').innerHTML = `<span class="wx-ico wx-${wx}"></span>${L.t('wx.' + wx)}`;
-    document.getElementById('mb-agenda').textContent = L.t('mb.agenda.' + kind, { o: L.team(s.matchContext()?.opp.name || '') });
+    const ctx = s.matchContext();
+    let agenda = L.t('mb.agenda.' + kind, { o: L.team(ctx?.opp.name || '') });
+    if (kind === 'match' && ctx) {   // v3.4: the opponent lives by the same energy rules — a word from the grapevine
+      const c = s.league.oppCondition(ctx.opp, new Set(s.squad.map(p => p.surname)));
+      agenda += ' ' + L.t('mb.oppForm', { a: c.avg, t: c.tired });
+    }
+    document.getElementById('mb-agenda').textContent = agenda;
     document.getElementById('mb-news').innerHTML = this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
     const bar = (k) => { const v = s.rep[k];
       return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };

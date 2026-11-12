@@ -94,8 +94,8 @@ const emblemHTML = (team, size = 'sm') => team ? `<span class="emblem ${size}" t
 class League {
   static STRENGTHS = [3, 2, 1, 1, 0, 0, -1, -2, -3];   // spread across the 9 AI clubs
 
-  static SQUAD_SIZE = 14;
-  static LITE_POS = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'FWD'];
+  static SQUAD_SIZE = 15;   // v3.4: + a second keeper (the AI rotates tired kids now)
+  static LITE_POS = ['GK', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'FWD', 'GK'];
   /* background share of goals / assists by position (weights, not %) */
   static GOAL_W   = { GK: 0,   DEF: 0.6, MID: 2.2, FWD: 5 };
   static ASSIST_W = { GK: 0.1, DEF: 1.1, MID: 3.6, FWD: 2.4 };
@@ -107,6 +107,15 @@ class League {
     // v1.7: every AI club carries a lightweight squad { id, name, pos, mp, goals, assists } (no attrs, no faces)
     const used = new Set([...usedSurnames, ...this.teams.flatMap(t => (t.squad || []).map(k => k.name.split(' ').pop()))]);
     for (const t of this.teams) if (!t.user && !Array.isArray(t.squad)) t.squad = League.liteSquad(t, used);
+    // v3.4: old saves — top the squad up to 15 (second keeper) and give every AI kid an energy value
+    for (const t of this.teams) if (!t.user) {
+      for (let i = t.squad.length; i < League.LITE_POS.length; i++) t.squad.push(League.liteKid(t, i, League.LITE_POS[i], used));
+      for (const k of t.squad) if (!Number.isFinite(k.en)) k.en = 100;
+    }
+  }
+  static liteKid(team, i, pos, used) {
+    let last, g = 0; do { last = pick(LAST); } while (used.has(last) && g++ < 200); used.add(last);
+    return { id: `t${team.id}_${i}`, name: `${pick(FIRST)} ${last}`, pos, mp: 0, goals: 0, assists: 0, en: 100 };
   }
 
   /** 14 kids per AI club. If a full match roster already exists (old save), its 11 names are kept. */
@@ -115,7 +124,7 @@ class League {
       const old = team.roster?.find(p => p.id === `t${team.id}_${i}`);
       let name = old?.name;
       if (!name) { let last, g = 0; do { last = pick(LAST); } while (used.has(last) && g++ < 200); used.add(last); name = `${pick(FIRST)} ${last}`; }
-      return { id: `t${team.id}_${i}`, name, pos: old?.position || pos, mp: 0, goals: 0, assists: 0 };
+      return { id: `t${team.id}_${i}`, name, pos: old?.position || pos, mp: 0, goals: 0, assists: 0, en: 100 };
     });
   }
 
@@ -169,7 +178,45 @@ class League {
         return new Player(p);   // rebuild so the portrait hash matches the final name
       });
     }
+    // v3.4: the bench (kids not in the first-choice XI) gets full Player objects too, so the AI can rotate
+    for (const kid of team.squad) if (!team.roster.some(p => p.id === kid.id)) {
+      const p = Player.generate(kid.id, kid.pos, usedSurnames, team.strength, false, team.squad.indexOf(kid) + 1);
+      p.name = kid.name; team.roster.push(new Player(p));
+    }
     return team.roster;
+  }
+
+  /* ---------- v3.4 AI FATIGUE: same energy rules as the academy + simple rotation ----------
+     Every AI kid carries `en` (0–100) in the lite squad. Day: rest +10, training day −10 (match practice).
+     Match: the XI drains like in the engine (live energy is written back after our match; AI-vs-AI uses drainOf × 90),
+     the unused kids rest +6. Rotation: a first-choice starter under AI_FATIGUE.ROTATE_BELOW is replaced by the
+     freshest bench kid of the same role who has at least ROTATE_GAIN more energy (any outfield kid if the starter
+     is under DESPERATE). */
+  matchXI(team, usedSurnames) {
+    const pool = this.roster(team, usedSurnames), en = id => this.kid(id)?.en ?? 100;
+    const xi = pool.slice(0, 11), bench = pool.slice(11);
+    for (let i = 0; i < xi.length; i++) {
+      const p = xi[i], e = en(p.id);
+      if (e >= AI_FATIGUE.ROTATE_BELOW) continue;
+      const gk = i === 0, fits = b => (gk ? b.archetype === 'GK' : b.archetype !== 'GK') && (b.archetype === p.archetype || (!gk && e < AI_FATIGUE.DESPERATE));
+      const alt = bench.filter(b => fits(b) && en(b.id) >= e + AI_FATIGUE.ROTATE_GAIN).sort((a, b) => en(b.id) - en(a.id))[0];
+      if (alt) { xi[i] = alt; bench.splice(bench.indexOf(alt), 1); }
+    }
+    for (const p of pool) p.energy = Math.round(en(p.id));
+    return xi;
+  }
+  /** Calendar day for every AI kid (called from GameState.dayRoutine). */
+  aiDay(training) {
+    for (const t of this.teams) if (!t.user) for (const k of t.squad) k.en = clamp(k.en + (training ? AI_FATIGUE.TRAIN : ENERGY.DAILY_REST), 0, 100);
+  }
+  /** After a match: XI keep their end energy (map id → energy), everybody else in the squad rests +6. */
+  aiAfterMatch(team, endEnergy) {
+    for (const k of team.squad) k.en = endEnergy.has(k.id) ? clamp(Math.round(endEnergy.get(k.id)), 0, 100) : clamp(k.en + ENERGY.BENCH_REST, 0, 100);
+  }
+  /** Opponent report for the morning briefing: average energy of the expected XI and how many of them are tired. */
+  oppCondition(team, usedSurnames) {
+    const xi = this.matchXI(team, usedSurnames), e = xi.map(p => p.energy);
+    return { avg: Math.round(e.reduce((a, b) => a + b, 0) / e.length), tired: e.filter(v => v < ENERGY.TIRED).length };
   }
 
   /* ---------- v1.7: LEAGUE STATS (matches, goals, assists) ---------- */
@@ -183,11 +230,11 @@ class League {
     return pool[pool.length - 1];
   }
   /** Background result → stats: 11 of 14 kids play (GK always), each goal gets a scorer and usually an assist. */
-  distributeStats(team, goals) {
+  distributeStats(team, goals, xiIds = null) {
     if (!team.squad) return;
     const gk = team.squad.filter(k => k.pos === 'GK');
     const out = shuffle(team.squad.filter(k => k.pos !== 'GK'));
-    const xi = [...gk.slice(0, 1), ...out.slice(0, 10)];
+    const xi = xiIds ? team.squad.filter(k => xiIds.includes(k.id)) : [...gk.slice(0, 1), ...out.slice(0, 10)];   // v3.4: the real XI
     for (const k of xi) k.mp++;
     for (let g = 0; g < goals; g++) {
       const scorer = League.weighted(xi, League.GOAL_W);
@@ -220,12 +267,20 @@ class League {
   rating(t) { return t.user ? 50 : 50 + t.strength * 4; }
   static poisson(lambda) { const l = Math.exp(-lambda); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > l); return Math.min(k - 1, 7); }
   simulateFixture(f) {
-    const rh = this.rating(this.team(f.home)), ra = this.rating(this.team(f.away));
+    // v3.4: rotation + fatigue for AI-vs-AI too: the rating drops with the XI's mid-match fatigue (≈ the live engine:
+    // a whole XI at 50% loses ~0.6 goal against a fresh one), then the XI pays the usual drain.
+    const sides = [f.home, f.away].map(id => { const t = this.team(id), xi = this.matchXI(t, new Set());
+      const fm = xi.reduce((a, p) => a + fatigueMult(p.energy - 17), 0) / xi.length;
+      return { t, xi, r: this.rating(t) + (fm - 1) * AI_FATIGUE.RATING }; });
+    const rh = sides[0].r, ra = sides[1].r;
     // base rates tuned so AI games score like the visual engine does (~2 goals per game)
     f.hg = League.poisson(clamp(1.1 + (rh - ra) * 0.035, 0.15, 3));
     f.ag = League.poisson(clamp(0.85 + (ra - rh) * 0.035, 0.1, 2.8));
-    this.distributeStats(this.team(f.home), f.hg);
-    this.distributeStats(this.team(f.away), f.ag);
+    for (const [i, g] of [[0, f.hg], [1, f.ag]]) {
+      const { t, xi } = sides[i];
+      this.distributeStats(t, g, xi.map(p => p.id));
+      this.aiAfterMatch(t, new Map(xi.map(p => [p.id, p.energy - rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015)])));
+    }
   }
   /** Resolve every unplayed AI-vs-AI fixture of a matchday. Returns those fixtures. */
   simulateOthers(md) {

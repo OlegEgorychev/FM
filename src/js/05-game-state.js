@@ -93,7 +93,7 @@ class GameState {
     if (!ev) return null;
     const fixture = this.league.userFixture(ev.md);
     const opp = this.league.team(fixture.home === 0 ? fixture.away : fixture.home);
-    const players = this.league.roster(opp, new Set(this.squad.map(p => p.surname)));
+    const players = this.league.matchXI(opp, new Set(this.squad.map(p => p.surname)));   // v3.4: rotation by energy
     return { ev, md: ev.md, fixture, opp, venue: fixture.home === 0 ? 'home' : 'away',
       team: { name: opp.name, players, formation: opp.formation } };
   }
@@ -311,6 +311,7 @@ class GameState {
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
     this.tickInjuries();
+    this.league?.aiDay(training);   // v3.4: AI clubs rest / train on the same calendar
     return { training, plan: training ? plan : null, attended, skipped, improved, hurt };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
