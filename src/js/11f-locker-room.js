@@ -44,15 +44,27 @@ class LockerRoom {
     document.getElementById('lr-proceed').focus();
     this.maybeRequest(reveal ? 1300 : 0);   // v2.8: a kid interrupts before you can look around
   }
-  get requestPending() { const r = this.state.dayState().locker?.request; return !!(r && !r.done); }
+  /** v2.8 excuse first, then v3.6 the out-of-position request (dropped if that kid is no longer here). */
+  get pendingRequest() {
+    const lk = this.state.dayState().locker;
+    if (!lk) return null;
+    if (lk.request && !lk.request.done) return { id: 'excuse', r: lk.request };
+    const pr = lk.posRequest;
+    if (pr && !pr.done) {
+      if (!lk.absent[pr.pid] && this.state.player(pr.pid)) return { id: 'posreq', r: pr };
+      pr.done = true;
+    }
+    return null;
+  }
+  get requestPending() { return !!this.pendingRequest; }
   maybeRequest(delay) {
     if (!this.requestPending) return;
     clearTimeout(this.reqTimer);
     this.reqTimer = setTimeout(() => {
-      const r = this.state.dayState().locker?.request;
-      if (!this.isOpen || !r || r.done || this.ui.events.active) return;
+      const q = this.pendingRequest;
+      if (!this.isOpen || !q || this.ui.events.active) return;
       this.ui.profile.close();
-      this.ui.events.fire('excuse', this.state.calendar.date, { cast: { kid: r.pid } });
+      this.ui.events.fire(q.id, this.state.calendar.date, { cast: { kid: q.r.pid } });
     }, delay);
   }
   close() { this.layer.hidden = true; this.ui.renderDash(); }

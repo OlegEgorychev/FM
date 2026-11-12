@@ -2,8 +2,22 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.5';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.6', name: { en: 'Finding Their Spot', ru: 'Своё место' },
+    en: [
+      'Match Practice is now a scouting session: before END DAY you can mark up to 2 kids "Under observation" (free, 0 AP). Nobody marked? You will watch 1–2 random kids.',
+      'The diary tells you how they looked: at home in their role — or drifting somewhere else (back to tackle, into midfield, towards goal, to the posts). Words only, never numbers.',
+      'Kids remember where they actually play. After 3 or more league matches in a row out of their natural line, one may stop you in the locker room and ask to play elsewhere — the longer it goes on, the likelier he asks.',
+      'Your answer matters: let him try (new position, morale up), ask him to wait a week, or tell him he plays where you say (discipline up, morale down).',
+    ],
+    ru: [
+      'Игровая практика стала просмотром: до КОНЦА ДНЯ можно отметить до 2 ребят «На просмотре» (бесплатно, 0 ОД). Никого не отметил — посмотришь на 1–2 случайных.',
+      'В дневнике появится, как они выглядели: как дома на своей позиции — или их тянет в другое место (назад в отбор, в центр, к воротам соперника, к штангам). Только слова, никаких цифр.',
+      'Ребята помнят, где на самом деле играют. После 3 и более матчей подряд не на своей линии кто-то может подойти к тебе в раздевалке и попроситься на другую позицию — чем дольше это длится, тем вероятнее.',
+      'Ответ важен: дать попробовать (новая позиция, мораль растёт), попросить подождать неделю или сказать, что играет там, где скажешь ты (дисциплина растёт, мораль падает).',
+    ],
+  },
   { v: '3.5', name: { en: 'Coach\'s Word', ru: 'Слово тренера' },
     en: [
       'After every match the Match Summary asks for your Coach\'s Word: praise the squad, give them some tough love, or blame the ref and the mud.',

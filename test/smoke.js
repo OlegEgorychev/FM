@@ -800,6 +800,95 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       return { short, rotated, bench, rest, train, gk2: xi[0] !== pool[0] && xi[0].archetype === 'GK' };
     });
     check('short-handed kick-off runs (v2.6 crash fixed); AI rotates tired starters (incl. 2nd keeper); AI rest +10 / training −10', v34.short === 'ok' && v34.rotated === v34.bench && v34.gk2 && v34.rest && v34.train, JSON.stringify(v34));
+    // v3.6: position discovery — Practice Match observations, out-of-position streak + reset, seeded locker request, dialogue choices
+    const v36 = await page.evaluate(() => {
+      const s = YAM.game, sq = s.squad, date = s.calendar.date, out = {};
+      // save migration: old kids get 0 / 0, values survive a JSON round trip
+      const raw = JSON.parse(JSON.stringify(sq[0])); delete raw.outOfPositionMatches; delete raw.positionHintCooldown;
+      const old = new Player({ ...raw, tags: [] });
+      const rt = new Player({ ...JSON.parse(JSON.stringify(Object.assign(sq[0], { outOfPositionMatches: 4, positionHintCooldown: 1 }))), tags: [] });
+      out.migrate = old.outOfPositionMatches === 0 && old.positionHintCooldown === 0 && rt.outOfPositionMatches === 4 && rt.positionHintCooldown === 1;
+      sq[0].outOfPositionMatches = 0; sq[0].positionHintCooldown = 0;
+      // helper: slots / lines / tags → archetypes
+      // (squad mix depends on the draft: pick two outfield kids with different hidden archetypes)
+      const mid = sq.find(p => p.archetype !== 'GK'), def = sq.find(p => p.archetype !== 'GK' && p.archetype !== mid.archetype);
+      const lineOfA = { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'ATT' }, other = ['DEF', 'MID', 'FWD'].find(a => a !== mid.archetype);
+      out.helper = isPlayingNaturalPosition(mid, mid.archetype) && isPlayingNaturalPosition(mid, { line: lineOfA[mid.archetype] }) && !isPlayingNaturalPosition(mid, lineOfA[other])
+        && !isPlayingNaturalPosition(mid, null) && isPlayingNaturalPosition({ archetype: 'FWD' }, 'ATT') && !isPlayingNaturalPosition({ archetype: 'GK' }, 'MID');
+      // Feature A: Practice Match observations (tag vs hidden archetype; words only)
+      const keepTags = sq.map(p => p.tag);
+      mid.tag = mid.archetype; def.tag = def.archetype === 'FWD' ? 'DEF' : 'FWD';
+      const obs = s.practiceObservations(date, sq, [mid.id, def.id]);
+      const rnd1 = s.practiceObservations(date, sq, []), rnd2 = s.practiceObservations(date, sq, []);
+      out.obs = obs.length === 2 && /^obs\.ok\.[01]$/.test(obs[0].key) && obs[0].ok && obs[1].key.startsWith('obs.hint.' + def.archetype + '.') && !obs[1].ok
+        && rnd1.length >= 1 && rnd1.length <= 2 && JSON.stringify(rnd1) === JSON.stringify(rnd2)
+        && !/\d/.test(L.t(obs[1].key, { k: 'X' })) && I18N.ru[obs[1].key] && I18N.ru[obs[0].key];
+      // marking: max 2, only present kids
+      s.dayState().observe = [];
+      const fit = sq.filter(p => p.available);
+      out.mark = s.toggleObserve(fit[0].id) && s.toggleObserve(fit[1].id) && !s.toggleObserve(fit[2].id) && s.dayState().observe.length === 2
+        && (YAM.ui.observeHTML(s.dayState()).match(/data-observe=/g) || []).length === fit.length;
+      // dayRoutine with Match Practice returns the observed kids (training regime effects unchanged)
+      const before = fit[0].energy;
+      s.dayState().locker = null;
+      sq.forEach(p => { p.psych.discipline = 20; if (p.energy < 40) p.energy = 80; });
+      const e0 = fit[0].energy, r = s.dayRoutine(date, true, 'match');
+      out.routine = r.observed.length === 2 && r.observed.map(o => o.pid).sort().join() === [fit[0].id, fit[1].id].sort().join()
+        && (fit[0].injuryDays > 0 || fit[0].energy === Math.max(0, e0 - 10));
+      s.dayState().observe = [];
+      sq.forEach((p, i) => { p.tag = keepTags[i]; });
+      // Feature B: streak counter — mismatch +1, natural line resets to 0, cooldown ticks down
+      const gk = sq.find(p => ![mid, def].includes(p));   // only used for the cooldown tick
+      const IDX = { GK: 0, DEF: 1, MID: 5, FWD: 9 }, slotA = i => LINE_POS[formationSlots('4-4-2')[i].line];
+      const wrongIdx = [1, 5, 9].find(i => slotA(i) !== mid.archetype && i !== IDX[def.archetype]);
+      const xi = Array(11).fill(null); xi[IDX[def.archetype]] = def; xi[wrongIdx] = mid;   // def: natural line, mid: out of position
+      const rest = sq.filter(p => p !== mid && p !== def);
+      for (let i = 0; i < 11; i++) if (!xi[i]) xi[i] = rest.shift();
+      out.wrongA = slotA(wrongIdx); out.defA = def.archetype;
+      mid.outOfPositionMatches = 2; def.outOfPositionMatches = 5; gk.positionHintCooldown = 2;
+      const lg = s.league, t = lg.teams.find(x => !x.user), hooks = { onUpdate() {}, onEnd() {}, onLog() {} };
+      const eng = new MatchEngine({ name: 'X', formation: '4-4-2', players: xi }, { name: t.name, formation: t.formation, players: lg.roster(t, new Set()).slice(0, 11) }, hooks, {});
+      eng.runInstant();
+      const benchKid = sq.find(p => !xi.includes(p) && !eng.everPlayed.has(p.id));
+      const benchOop = benchKid ? benchKid.outOfPositionMatches : 0;
+      s.trackPositions(eng);
+      out.streak = { mid: mid.outOfPositionMatches, def: def.outOfPositionMatches, cd: gk.positionHintCooldown, bench: benchKid ? benchKid.outOfPositionMatches === benchOop : true,
+        slotMid: eng.slotArchetypes().get(mid.id), slotDef: eng.slotArchetypes().get(def.id) };
+      // request: chance curve, seeded per date + id (same day → same answer), cooldown blocks it
+      out.curve = [2, 3, 4, 5, 6, 7, 12].map(positionRequestChance).join();
+      const keepEx = s.excusesOff; s.excusesOff = false;
+      sq.forEach(p => { p.outOfPositionMatches = 0; p.positionHintCooldown = 0; });
+      mid.outOfPositionMatches = 12;
+      let day = date, hit = null;
+      for (let i = 0; i < 30 && !hit; i++) { day = isoAdd(date, i); hit = s.rollPositionRequest({}, day); }
+      out.roll = !!hit && hit.pid === mid.id && JSON.stringify(s.rollPositionRequest({}, day)) === JSON.stringify(hit)
+        && s.rollPositionRequest({ [mid.id]: 'skipped' }, day) === null;
+      mid.positionHintCooldown = 1; out.cooldown = s.rollPositionRequest({}, day) === null; mid.positionHintCooldown = 0;
+      s.excusesOff = keepEx;
+      window.__v36 = { mid: mid.id, morale: mid.dyn.morale, disc: mid.psych.discipline };
+      mid.tag = mid.archetype === 'FWD' ? 'DEF' : 'FWD';
+      mid.dyn.morale = 50; mid.psych.discipline = 10;
+      return out;
+    });
+    await page.evaluate(() => YAM.ui.events.fire('posreq', YAM.game.calendar.date, { cast: { kid: window.__v36.mid } }));
+    const v36d = await page.evaluate(() => ({ open: !document.getElementById('talk-layer').hidden, n: document.querySelectorAll('#talk-choices .talk-btn').length,
+      tones: [...document.querySelectorAll('#talk-choices .talk-btn')].map(b => b.className.match(/tone-(\w+)/)[1]).join() }));
+    await page.click('#talk-choices .talk-btn.tone-green');
+    Object.assign(v36d, await page.evaluate(() => { const p = YAM.game.player(window.__v36.mid);
+      return { yesTag: p.tag === p.archetype, yesOop: p.outOfPositionMatches, yesMorale: p.dyn.morale, diary: YAM.game.diary.slice(-6).some(d => d.key === 'pr.yes.diary') ? 'pr.yes.diary' : YAM.game.diary.slice(-1)[0].key }; }));
+    await page.evaluate(() => { const p = YAM.game.player(window.__v36.mid); p.outOfPositionMatches = 4; YAM.ui.events.fire('posreq', YAM.game.calendar.date, { cast: { kid: p.id } }); });
+    await page.click('#talk-choices .talk-btn.tone-red');
+    Object.assign(v36d, await page.evaluate(() => { const p = YAM.game.player(window.__v36.mid);
+      const r = { ordMorale: p.dyn.morale, ordDisc: p.psych.discipline, ordCd: p.positionHintCooldown, ordDiary: YAM.game.diary.slice(-6).some(d => d.key === 'pr.order.diary') ? 'pr.order.diary' : '', closed: document.getElementById('talk-layer').hidden };
+      p.dyn.morale = window.__v36.morale; p.psych.discipline = window.__v36.disc; p.outOfPositionMatches = 0; p.positionHintCooldown = 0; return r; }));
+    check('v3.6 practice scouting: save migration 0/0, slot/tag helper, observation lines (ok vs archetype hint, seeded, no numbers, EN+RU), mark ≤ 2, dayRoutine observes the marked kids',
+      v36.migrate && v36.helper && v36.obs && v36.mark && v36.routine, JSON.stringify(v36));
+    check('v3.6 out of position: streak +1 out of line, reset in natural line, cooldown −1, chance curve 25/40/55/75 → cap 85, seeded locker request, cooldown blocks',
+      v36.streak.mid === 3 && v36.streak.def === 0 && v36.streak.cd === 1 && v36.streak.bench && v36.streak.slotMid === v36.wrongA && v36.streak.slotDef === v36.defA
+      && v36.curve === '0,0.25,0.4,0.55,0.75,0.8,0.85' && v36.roll && v36.cooldown, JSON.stringify(v36.streak) + ' ' + v36.curve);
+    check('v3.6 request dialogue: 3 choices (green/gray/red); yes = tag → archetype, streak 0, morale +5, diary; order = discipline +1, morale −8, cooldown 2',
+      v36d.open && v36d.n === 3 && v36d.tones === 'green,gray,red' && v36d.yesTag && v36d.yesOop === 0 && v36d.yesMorale === 55 && v36d.diary === 'pr.yes.diary'
+      && v36d.ordMorale === 47 && v36d.ordDisc === 11 && v36d.ordCd === 2 && v36d.ordDiary === 'pr.order.diary' && v36d.closed, JSON.stringify(v36d));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

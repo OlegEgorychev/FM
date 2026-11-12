@@ -105,6 +105,17 @@ const AttrGen = {
   validGroup(o, g) { return o && typeof o === 'object' && ATTR_GROUPS[g].every(k => Number.isFinite(o[k])); },
 };
 
+/** v3.6: the archetype a formation slot / line / position tag stands for ('GK'|'DEF'|'MID'|'FWD'), or null. */
+function slotArchetype(slotOrTag) {
+  const v = slotOrTag && typeof slotOrTag === 'object' ? (slotOrTag.line ?? slotOrTag.tag) : slotOrTag;
+  return LINE_POS[v] || (POS_ORDER[v] !== undefined ? v : null);
+}
+/** v3.6: does this slot / tag match his HIDDEN archetype? No tag / unknown slot = out of position. */
+function isPlayingNaturalPosition(player, slotOrTag) {
+  const a = slotArchetype(slotOrTag);
+  return !!a && !!player && a === player.archetype;
+}
+
 class Player {
   constructor(o) {
     const { id, name, tags, number, face } = o;
@@ -124,6 +135,8 @@ class Player {
       this.promiseBy = o.promiseBy || null;
       this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
       this.absentToday = o.absentToday || null;
+      this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
+      this.positionHintCooldown = Math.max(0, Math.round(o.positionHintCooldown || 0));   // v3.6: matches before he may ask again
       this.teamId = o.teamId || 'player_team';   // v3.1: 'player_team' | 'free_agent' | 'rival_N'   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);

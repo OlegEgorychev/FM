@@ -127,6 +127,13 @@ const EXCUSE = { BASE: 0.04, PER_DISC: 0.006, KINDS: ['test', 'ankle', 'birthday
 const WEATHER = ['heavyRain', 'rain', 'drizzle', 'overcast', 'fog', 'wind', 'clearCold'];
 const WEATHER_W = [4, 4, 3, 4, 2, 2, 1];
 const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
+/* v3.6 POSITION DISCOVERY — Practice Match observations + the escalating "out of position" locker request.
+   OBSERVE_MAX: kids the coach may mark "Under Observation" (0 AP); unmarked → 1–2 random present kids.
+   Request: eligible after MIN straight league matches outside his hidden archetype's line (cooldown 0, at the club);
+   chance by streak 3 → 25 %, 4 → 40 %, 5 → 55 %, 6 → 75 %, then +5 % per match, capped at 85 %. One per day, seeded by date + id. */
+const POS_HINT = { OBSERVE_MAX: 2, MIN: 3, CHANCE: { 3: 0.25, 4: 0.40, 5: 0.55, 6: 0.75 }, STEP: 0.05, CAP: 0.85,
+  COOLDOWN: 2, YES_MORALE: 5, ORDER_MORALE: -8, ORDER_DISC: 1 };
+const positionRequestChance = n => n < POS_HINT.MIN ? 0 : POS_HINT.CHANCE[n] ?? Math.min(POS_HINT.CAP, POS_HINT.CHANCE[6] + (n - 6) * POS_HINT.STEP);
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };

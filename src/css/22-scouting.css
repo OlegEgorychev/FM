@@ -1,0 +1,12 @@
+/* v3.6 POSITION DISCOVERY — Practice Match "Under Observation" picker (TODAY widget) */
+.obs-box{ margin-top: 6px; padding: 5px 6px; background: #12171b; border: 2px solid; border-color: #0a0d0f #4a5660 #4a5660 #0a0d0f; }
+.obs-head{ font: bold 11px/1.3 var(--mono); letter-spacing: 1px; text-transform: uppercase; color: #9fc6e0; cursor: help; }
+.obs-head b{ color: #ffcf5a; }
+.obs-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 3px; margin-top: 4px; max-height: 132px; overflow-y: auto; }
+.obs-btn{ display: flex; align-items: center; gap: 4px; min-width: 0; padding: 3px 5px; font-size: 11px; text-align: left; cursor: pointer; border-radius: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #1a2026; color: var(--text);
+  border: 2px solid; border-color: #4a5660 #0a0d0f #0a0d0f #4a5660; }
+.obs-btn:hover:not([disabled]){ background: #222a32; }
+.obs-btn.on{ background: #10283a; border-color: #0a0d0f #6fb7e8 #6fb7e8 #0a0d0f; box-shadow: inset 0 0 0 1px #6fb7e8; color: #cfe8f8; }
+.obs-btn[disabled]{ opacity: .45; cursor: not-allowed; }
+.obs-btn .pos{ flex: none; }

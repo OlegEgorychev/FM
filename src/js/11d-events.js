@@ -345,6 +345,40 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v3.6 "WRONG SPOT" — after 3+ straight matches outside his hidden line, a kid asks to play elsewhere (locker room) ---------- */
+  {
+    id: 'posreq', when: 'manual',
+    trigger: () => false,
+    cast: () => null,   // rolled with the arrivals (GameState.rollPositionRequest), fired by LockerRoom.maybeRequest
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast, name = L.name(kid.name), req = s.dayState().locker?.posRequest;
+      const now = LINE_POS[s.slotLine(kid.id)] || kid.position, want = kid.archetype;
+      const finish = () => { if (req && req.pid === kid.id) req.done = true; };
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.rolePosReq', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('pr.text', { k: name, now: L.t('pr.where.' + (now || 'none')), want: L.t('pr.want.' + want) }),
+        choices: [
+          { key: 'pr.yes', tone: 'green', who: kid.id,
+            run: () => {
+              finish();
+              kid.tag = want; kid.refreshPortrait();
+              kid.outOfPositionMatches = 0;
+              kid.dyn.morale = clamp(kid.dyn.morale + POS_HINT.YES_MORALE, 0, 100);
+              return { k: { pid: kid.id }, p: { pos: want } };
+            } },
+          { key: 'pr.wait', tone: 'gray', who: kid.id,
+            run: () => { finish(); kid.positionHintCooldown = POS_HINT.COOLDOWN; return { k: { pid: kid.id } }; } },
+          { key: 'pr.order', tone: 'red', who: kid.id,
+            run: () => {
+              finish();
+              kid.psych.discipline = clamp(kid.psych.discipline + POS_HINT.ORDER_DISC, 1, 20);
+              kid.dyn.morale = clamp(kid.dyn.morale + POS_HINT.ORDER_MORALE, 0, 100);
+              kid.positionHintCooldown = POS_HINT.COOLDOWN;
+              return { k: { pid: kid.id } };
+            } },
+        ] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',

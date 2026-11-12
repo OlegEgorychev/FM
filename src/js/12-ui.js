@@ -68,6 +68,7 @@ class UIController {
       const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
       if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
       if (r.hurt.length) s.addDiary({ date, key: 'tr.hurt', vars: { s: ids(r.hurt) }, cls: 'ev' });
+      for (const o of r.observed || []) s.addDiary({ date, key: o.key, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.6 practice scouting
       const plan = { p: { plan: r.plan } };
       return r.skipped.length
         ? { key: 'cal.training', vars: { ...plan, a: r.attended, s: ids(r.skipped) }, cls: 'tr' }
@@ -135,6 +136,7 @@ class UIController {
     if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
     if (x && typeof x === 'object' && 'talk' in x) return L.t('tt.name.' + x.talk);  // v3.5 diary
     if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
+    if (x && typeof x === 'object' && 'pos' in x) return L.pos(x.pos);   // v3.6 diary
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
     if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
@@ -200,6 +202,8 @@ class UIController {
     this.$('today-box').addEventListener('click', e => {   // v2.5: training plan
       const b = e.target.closest('[data-plan]');
       if (b) { this.state.setPlan(b.dataset.plan); this.renderDash(); }
+      const o = e.target.closest('[data-observe]');   // v3.6: Practice Match — "Under Observation"
+      if (o && !o.disabled) { this.state.toggleObserve(o.dataset.observe); this.renderDash(); }
     });
     // v1.6 calendar: month navigation + clickable day cells (info in the status bar)
     this.$('cal-prev').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), -1); this.renderCalendar(); });
@@ -789,7 +793,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.renderAll();
   }
   /** v2.6: after a coach-initiated dialogue (office / roll call) the same day simply goes on. */
-  afterManualEvent() { this.renderAll(); this.profile.tick(); }
+  afterManualEvent() { this.renderAll(); this.profile.tick(); if (this.locker?.isOpen) this.locker.maybeRequest(500); }   // v3.6: the next locker request waits its turn
   /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
   autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
 
@@ -851,12 +855,25 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       const need = !d.plan;
       body = `<div class="td-req${need ? ' need' : ''}">${L.t(need ? 'today.planReq' : 'today.planSet')}</div><div class="plan-grid">`
         + REGIME_KEYS.map(k => `<button type="button" class="plan-btn${d.plan === k ? ' on' : ''}" data-plan="${k}" aria-pressed="${d.plan === k}">
-            <b>${L.t('plan.' + k)}</b><small>${L.t('plan.' + k + '.d')}</small></button>`).join('') + '</div>';
+            <b>${L.t('plan.' + k)}</b><small>${L.t('plan.' + k + '.d')}</small></button>`).join('') + '</div>'
+        + (d.plan === 'match' ? this.observeHTML(d) : '');
     } else if (live) body = `<div class="td-note">${L.t(info.kind === 'rest' ? 'today.rest' : 'today.off', { n: ENERGY.DAILY_REST })}</div>`;
     else body = `<div class="td-note">${L.t('today.phase.' + s.phase)}</div>`;
     box.innerHTML = `<div class="td-head"><b>${fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' })}</b>
         <span class="td-kind k-${info.kind}">${L.t('today.kind.' + info.kind)}</span></div>
       <div class="td-ap" title="${esc(L.t('ap.tip'))}">${L.t('ap.left')} <span class="ap-pips">${pips}</span> <b>${d.ap}/${COACH.AP}</b></div>${body}`;
+  }
+
+  /** v3.6: Practice Match — mark up to POS_HINT.OBSERVE_MAX present kids "Under Observation" (0 AP). */
+  observeHTML(d) {
+    const s = this.state, on = (d.observe || []).filter(id => s.player(id)), full = on.length >= POS_HINT.OBSERVE_MAX;
+    const kids = s.squad.filter(p => p.available).sort((a, b) => a.number - b.number);
+    return `<div class="obs-box"><div class="obs-head" title="${esc(L.t('obs.tip'))}">${L.t('obs.title')} <b>${on.length}/${POS_HINT.OBSERVE_MAX}</b></div>
+      <div class="td-note">${L.t(on.length ? 'obs.picked' : 'obs.none')}</div><div class="obs-grid">`
+      + kids.map(p => { const sel = on.includes(p.id);
+        return `<button type="button" class="obs-btn${sel ? ' on' : ''}" data-observe="${p.id}" aria-pressed="${sel}"${!sel && full ? ' disabled' : ''}>
+          <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span> ${p.number}. ${esc(L.name(p.surname))}</button>`; }).join('')
+      + '</div></div>';
   }
 
   /** v1.9: club budget in the taskbar header (+ a short green/red flash when it changes). */
@@ -1362,6 +1379,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
     s.applyMatchDynamics(eng, result);
+    s.trackPositions(eng);   // v3.6: out-of-position streaks (live + Quick Sim)
     this.applyAvailabilityAfterMatch(eng, ctx);   // v2.2
     if (s.cheats?.forceWin) s.cheats.forceWin = false;   // v1.8: one-shot debug cheat
     this.debug?.render();

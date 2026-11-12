@@ -352,6 +352,12 @@ class MatchEngine {
 
   /* ---------- live substitution (v1.1): incoming player takes the same formation slot ---------- */
   static MAX_SUBS = 5;   // youth football: up to five changes
+  /** v3.6: our kids who took part → the archetype of the slot (line) they played; subs inherit the slot they filled. */
+  slotArchetypes() {
+    const out = new Map();
+    for (const p of this.sides[0].all) if (p && this.everPlayed.has(p.id)) out.set(p.id, LINE_POS[this.lineOf.get(p.id)] || null);
+    return out;
+  }
   substitute(outId, inP) {
     if (this.finished) return 'over';
     const side = this.sides[0];

@@ -204,6 +204,54 @@ class GameState {
   }
   spendAP() { const d = this.dayState(); if (d.ap < 1) return false; d.ap--; this.save(); return true; }
   setPlan(plan) { if (REGIMES[plan]) { this.dayState().plan = plan; this.save(); } }
+  /* ---------- v3.6 POSITION DISCOVERY ---------- */
+  /** Practice Match: mark / unmark a present kid "Under Observation" (0 AP, at most POS_HINT.OBSERVE_MAX). Returns true if changed. */
+  toggleObserve(id) {
+    const d = this.dayState(), p = this.player(id);
+    const list = d.observe = (d.observe || []).filter(x => this.player(x));
+    const i = list.indexOf(id);
+    if (i >= 0) list.splice(i, 1);
+    else if (!p || !p.available || list.length >= POS_HINT.OBSERVE_MAX) return false;
+    else list.push(id);
+    this.save();
+    return true;
+  }
+  /** Practice Match scouting: qualitative diary lines about the observed kids (or 1–2 random trainees).
+      Compares the coach's tag with the HIDDEN archetype; never shows numbers. Seeded (no Math.random: RNG order stays). */
+  practiceObservations(date, trained, chosen = []) {
+    if (!trained.length) return [];
+    const r = seeded(date + '#obs');
+    let who = chosen.map(id => trained.find(p => p.id === id)).filter(Boolean);
+    if (!who.length) {
+      const pool = [...trained].sort((a, b) => a.id.localeCompare(b.id));
+      const n = Math.min(pool.length, r() < 0.5 ? 1 : 2);
+      while (who.length < n) who.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
+    }
+    return who.map(p => {
+      const ok = isPlayingNaturalPosition(p, p.tag), v = Math.floor(seeded(date + '#obs#' + p.id)() * 2);
+      return { pid: p.id, ok, key: (ok ? 'obs.ok.' : 'obs.hint.' + p.archetype + '.') + v };
+    });
+  }
+  /** After every league match (live and Quick Sim): straight matches outside the hidden archetype's line.
+      Played in his natural line → reset to 0. Every kid's request cooldown ticks down by one match. */
+  trackPositions(eng) {
+    const played = eng.slotArchetypes(), changed = [];
+    for (const p of this.squad) {
+      if (p.positionHintCooldown > 0) p.positionHintCooldown--;
+      if (!played.has(p.id)) continue;
+      if (isPlayingNaturalPosition(p, played.get(p.id))) p.outOfPositionMatches = 0;
+      else { p.outOfPositionMatches++; changed.push(p); }
+    }
+    return changed;
+  }
+  /** Locker room: maybe one present kid asks to play elsewhere (one per day, seeded by date + id: reload-proof). */
+  rollPositionRequest(absent, date = this.calendar.date) {
+    if (this.excusesOff) return null;
+    const cands = this.squad.filter(p => !absent[p.id] && p.outOfPositionMatches >= POS_HINT.MIN && !p.positionHintCooldown)
+      .sort((a, b) => b.outOfPositionMatches - a.outOfPositionMatches || a.id.localeCompare(b.id));
+    for (const p of cands) if (seeded(date + '#posreq#' + p.id)() < positionRequestChance(p.outOfPositionMatches)) return { pid: p.id, done: false };
+    return null;
+  }
   /** v2.5: one random skill of a group +1 (capped by potential). Returns true if something improved. */
   growSkill(p, g) {
     let keys = g.keys || ATTR_GROUPS[g.group];
@@ -237,7 +285,7 @@ class GameState {
       p.skipped_training = training && r === 'skipped';                   // feeds The Truant
       if (r) absent[p.id] = r;
     }
-    d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent) };
+    d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent), posRequest: this.rollPositionRequest(absent) };   // v3.6
     this.save();
     return d.locker;
   }
@@ -267,7 +315,7 @@ class GameState {
     this.eventQueue = this.eventQueue.filter(q => !q.cast || ![].concat(...Object.values(q.cast)).includes(id));
     if (this.lastReport) this.lastReport.players = this.lastReport.players.filter(r => r.id !== id);
     const lk = this.today?.locker;
-    if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; }
+    if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null; }
     p.teamId = 'free_agent';   // v3.1: he stays in the world database (future transfers)
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
     this.save();
@@ -286,7 +334,7 @@ class GameState {
   clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
 
   dayRoutine(date, training = !!date && isTrainingDay(date), plan = 'match') {
-    const skipped = [], improved = [], hurt = [], R = REGIMES[plan] || REGIMES.match;
+    const skipped = [], improved = [], hurt = [], trained = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
     if (training) { const lk = this.runLocker(true); lk.done = true; }   // auto-sim: arrivals are rolled without the view
     else this.clearDayStatus();
@@ -298,7 +346,7 @@ class GameState {
       const trains = present && !walkOut;
       if (training && p.skipped_training) { /* skipped: no tiredness, no sharpness (exhausted / injured kids rest) */ }
       else if (trains) {   // v2.5: the coach's regime
-        attended++;
+        attended++; trained.push(p);
         p.energy = clamp(p.energy + R.cond, 0, 100);
         p.dyn.sharpness = clamp(p.dyn.sharpness + R.sharp, 0, 100);
         if (R.morale) p.dyn.morale = clamp(p.dyn.morale + R.morale, 0, 100);
@@ -312,7 +360,10 @@ class GameState {
     }
     this.tickInjuries();
     this.league?.aiDay(training);   // v3.4: AI clubs rest / train on the same calendar
-    return { training, plan: training ? plan : null, attended, skipped, improved, hurt };
+    // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
+    const observed = training && plan === 'match'
+      ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
+    return { training, plan: training ? plan : null, attended, skipped, improved, hurt, observed };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
   tickInjuries() {
