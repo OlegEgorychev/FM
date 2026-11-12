@@ -16,7 +16,7 @@ class MatchEngine {
     this.stats = new Map();
     this.lineOf = new Map();
     for (const s of this.sides) for (const e of s.entries) { this.stats.set(e.p.id, MatchEngine.blankStats()); this.lineOf.set(e.p.id, e.line); }
-    // Energy is checked once, at kick-off: under 50% => every hidden stat x0.5 for the whole match
+    // v3.3: `tired` is only a report flag now (started under 50%); the maths uses fatigueMult(live energy) in eff()
     this.tired = new Set(home.players.filter(p => (p.energy ?? 100) < ENERGY.TIRED).map(p => p.id));
     // LIVE energy (v1.1): every player drains 30–40% over 90 minutes; subs come on with their own energy
     this.energy = new Map(); this.drain = new Map();
@@ -28,6 +28,7 @@ class MatchEngine {
     this.subs = [];
     this.paused = false;
     this.mentality = opts.mentality || 'balanced';
+    this.oppMentality = opts.oppMentality || 'balanced';   // v3.3: the away side's shout (AI stays balanced; test/balance.js mirrors setups)
     this.forceWin = !!opts.forceWin;
     this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8
     this.dutiesFn = typeof opts.duties === 'function' ? opts.duties : () => (opts.duties || {});   // v3.0: read live (changes at half-time count)   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
@@ -182,13 +183,11 @@ class MatchEngine {
      v1.8: `attr` is a COMPOSITE key (00-utils-data.js) built from the raw 1–20 skills:
      Pass = passing+vision · Mark = positioning+2·tackling · Dribble = dribbling+agility+firstTouch · Speed = acceleration+speed
      Tackle = 2·tackling+strength+positioning · Shoot = 2·shooting+composure · Save = 2·goalkeeping+agility+positioning.
-     Global modifiers: sharpness < 50% → technical skills −2 (inside Player.skill), condition = live energy (×0.5 / ×0.8),
+     Global modifiers: sharpness < 50% → technical skills −2 (inside Player.skill), condition = fatigueMult(live energy) (v3.3, smooth 1.00 → 0.50),
      morale × passion → ±2.5 flat on every roll. */
   eff(p, attr) {
     let v = p.rating ? p.rating(attr) : 10;
-    if (this.tired.has(p.id)) v *= 0.5;
-    const en = this.energy?.get(p.id);
-    if (en !== undefined && en < ENERGY.EXHAUSTED) v *= ENERGY.EXHAUSTED_MULT;
+    v *= fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);   // v3.3: smooth curve, no 50% / 30% steps
     // v3.0: no "out of position" penalty any more — only hidden stats and biometrics decide
     const t = p.tags || [];
     if (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) v *= 1.5;
@@ -198,9 +197,8 @@ class MatchEngine {
   }
   mod(side, role) {
     const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus + this.captainBonus() : 0);   // v2.8 mood + v3.0 captain
-    if (side !== 0 || this.mentality === 'balanced') return cheat;
-    const pushing = this.mentality === 'attack';
-    return cheat + ((role === 'atk') === pushing ? 3 : -3);
+    const m = side === 0 ? this.mentality : this.oppMentality;
+    return cheat + (SHOUT[m]?.[role] ?? 0);   // v3.3: asymmetric, see SHOUT in 00-utils-data.js
   }
   counts(side) {
     const c = { DEF: 0, MID: 0, ATT: 0 };

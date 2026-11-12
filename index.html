@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.2</title>
+<title>Youth Academy Manager v3.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -2101,8 +2101,18 @@ const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
 const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 10,   // v2.4: rest days +10 (training days cost 10)
-  EXHAUSTED: 30, EXHAUSTED_MULT: 0.8,   // live: under 30% during the match → stats ×0.8 (v1.1)
+  EXHAUSTED: 30,                        // assistant warning threshold (live energy)
   HT_REST: 4 };                         // half-time rest for everyone on the pitch   // bench +6 on matchday, +4 every rest day
+/* v3.3 SIDELINE SHOUTS — flat bonus on OUR attacking rolls (atk: pass, dribble, shot, corner delivery) and on OUR
+   defending rolls (def: interception, tackle, block, save). Every duel is "our atk vs their def", so a shout moves the
+   goal rate of BOTH teams: Attack = more goals for and against; Defense = fewer of both, and it gives away a little more
+   going forward than it gains at the back (the price of safety). v1.x–v3.2 used ±3 both ways (Attack ≈ 2.7× goals,
+   Defense ≈ 0.3× → a free "lock the lead" button). Tuned with test/balance.js (Attack vs Defense win share 45–55%). */
+const SHOUT = { attack: { atk: 1.0, def: -1.0 }, defend: { atk: -1.05, def: 1.0 }, balanced: { atk: 0, def: 0 } };
+/* v3.3 SMOOTH FATIGUE — one continuous, monotonic curve on LIVE energy (replaces the old steps: ×0.5 when a kid
+   started under 50%, ×0.8 under 30% during the match). x = energy/100:  m = 0.5 + 0.9·x − 0.4·x²
+   100% → 1.00 · 75% → 0.95 · 50% → 0.85 · 25% → 0.70 · 0% → 0.50 (derivative 0.9 − 0.8x > 0 → always rising). */
+const fatigueMult = energy => { const x = clamp((energy ?? 100) / 100, 0, 1); return 1 - 0.5 * (1 - x) * (1 - 0.8 * x); };   // = 0.5 + 0.9x − 0.4x², exact 1.00 at full energy
 const OUT_OF_POSITION = 0.85;   // stat multiplier for a player outside his natural line
 
 /* =========================================================
@@ -2202,7 +2212,7 @@ const I18N = {
     'squad.xi': 'STARTING XI', 'squad.bench': 'BENCH',
     'squad.out': 'Sub Out ↓', 'squad.in': 'Sub In ↑', 'squad.swap': '⇄ Swap', 'squad.cancel': 'Cancel',
     'squad.none': '— no role —', 'squad.hidden': 'Ratings: hidden', 'squad.remove': 'Remove role', 'squad.oop': 'plays {l} (−15%)',
-    'squad.status': '{n} tired in the XI (stats ×0.5)', 'squad.pick': '{name} selected. Now pick a player from the other group.',
+    'squad.status': '{n} tired in the XI (under 50%: stats ×0.85 and fading)', 'squad.pick': '{name} selected. Now pick a player from the other group.',
     'squad.locked': 'Lineup is locked during the match.',
     'squad.err.gk': 'The starting XI needs exactly one goalkeeper.',
     'tac.title': 'TACTICS.EXE — Tactics Board', 'tac.formation': 'Formation', 'tac.auto': 'Auto-arrange players',
@@ -2214,7 +2224,7 @@ const I18N = {
     'match.title': 'MATCHDAY.EXE — Fixture #{n}', 'match.home': 'Home: {c}',
     'match.intro': '{a} vs {b}. Kick-off in the rain. Press Start when the kids are ready.',
     'match.hintShouts': 'Tip: shouts and speed can be changed at any time during the match.',
-    'match.tiredWarn': 'Tired legs in the XI: {n}. Their stats are halved. Rotate on the Squad screen?',
+    'match.tiredWarn': 'Tired legs in the XI: {n}. They start below their level and will fade further. Rotate on the Squad screen?',
     'match.oopWarn': 'Out of position: {n} (−15%).',
     'match.start': '&#9654; Start Match', 'match.inProgress': 'Match in progress…', 'match.next': 'Next Fixture &#9656;',
     'match.ready': 'READY', 'match.slow': '● HIGHLIGHT: SHOT!', 'match.run': '▶ {x}× speed', 'match.ft': 'FULL-TIME',
@@ -2265,7 +2275,7 @@ const I18N = {
     'squad.xi': 'ОСНОВНОЙ СОСТАВ', 'squad.bench': 'ЗАПАС',
     'squad.out': 'Убрать ↓', 'squad.in': 'Выпустить ↑', 'squad.swap': '⇄ Заменить', 'squad.cancel': 'Отмена',
     'squad.none': '— без роли —', 'squad.hidden': 'Рейтинги: скрыты', 'squad.remove': 'Убрать роль', 'squad.oop': 'играет {l} (−15%)',
-    'squad.status': 'Уставших в основе: {n} (параметры ×0.5)', 'squad.pick': 'Выбран {name}. Теперь выберите игрока из другой группы.',
+    'squad.status': 'Уставших в основе: {n} (ниже 50%: параметры ×0.85 и ниже)', 'squad.pick': 'Выбран {name}. Теперь выберите игрока из другой группы.',
     'squad.locked': 'Во время матча состав заблокирован.',
     'squad.err.gk': 'В основе должен быть ровно один вратарь.',
     'tac.title': 'TACTICS.EXE — Тактическая доска', 'tac.formation': 'Схема', 'tac.auto': 'Расставить автоматически',
@@ -2277,7 +2287,7 @@ const I18N = {
     'match.title': 'MATCHDAY.EXE — Матч №{n}', 'match.home': 'Хозяева: {c}',
     'match.intro': '{a} — {b}. Стартовый свисток под дождём. Жми «Начать», когда ребята готовы.',
     'match.hintShouts': 'Подсказка: настрой и скорость можно менять в любой момент матча.',
-    'match.tiredWarn': 'Уставшие в основе: {n}. Их параметры урезаны вдвое. Может, ротация в Составе?',
+    'match.tiredWarn': 'Уставшие в основе: {n}. Они начнут ниже своего уровня и будут садиться дальше. Может, ротация в Составе?',
     'match.oopWarn': 'Не на своей позиции: {n} (−15%).',
     'match.start': '&#9654; Начать матч', 'match.inProgress': 'Идёт матч…', 'match.next': 'Следующий матч &#9656;',
     'match.ready': 'ГОТОВО', 'match.slow': '● МОМЕНТ: УДАР!', 'match.run': '▶ скорость {x}×', 'match.ft': 'МАТЧ ОКОНЧЕН',
@@ -4289,7 +4299,7 @@ class MatchEngine {
     this.stats = new Map();
     this.lineOf = new Map();
     for (const s of this.sides) for (const e of s.entries) { this.stats.set(e.p.id, MatchEngine.blankStats()); this.lineOf.set(e.p.id, e.line); }
-    // Energy is checked once, at kick-off: under 50% => every hidden stat x0.5 for the whole match
+    // v3.3: `tired` is only a report flag now (started under 50%); the maths uses fatigueMult(live energy) in eff()
     this.tired = new Set(home.players.filter(p => (p.energy ?? 100) < ENERGY.TIRED).map(p => p.id));
     // LIVE energy (v1.1): every player drains 30–40% over 90 minutes; subs come on with their own energy
     this.energy = new Map(); this.drain = new Map();
@@ -4301,6 +4311,7 @@ class MatchEngine {
     this.subs = [];
     this.paused = false;
     this.mentality = opts.mentality || 'balanced';
+    this.oppMentality = opts.oppMentality || 'balanced';   // v3.3: the away side's shout (AI stays balanced; test/balance.js mirrors setups)
     this.forceWin = !!opts.forceWin;
     this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8
     this.dutiesFn = typeof opts.duties === 'function' ? opts.duties : () => (opts.duties || {});   // v3.0: read live (changes at half-time count)   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
@@ -4455,13 +4466,11 @@ class MatchEngine {
      v1.8: `attr` is a COMPOSITE key (00-utils-data.js) built from the raw 1–20 skills:
      Pass = passing+vision · Mark = positioning+2·tackling · Dribble = dribbling+agility+firstTouch · Speed = acceleration+speed
      Tackle = 2·tackling+strength+positioning · Shoot = 2·shooting+composure · Save = 2·goalkeeping+agility+positioning.
-     Global modifiers: sharpness < 50% → technical skills −2 (inside Player.skill), condition = live energy (×0.5 / ×0.8),
+     Global modifiers: sharpness < 50% → technical skills −2 (inside Player.skill), condition = fatigueMult(live energy) (v3.3, smooth 1.00 → 0.50),
      morale × passion → ±2.5 flat on every roll. */
   eff(p, attr) {
     let v = p.rating ? p.rating(attr) : 10;
-    if (this.tired.has(p.id)) v *= 0.5;
-    const en = this.energy?.get(p.id);
-    if (en !== undefined && en < ENERGY.EXHAUSTED) v *= ENERGY.EXHAUSTED_MULT;
+    v *= fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);   // v3.3: smooth curve, no 50% / 30% steps
     // v3.0: no "out of position" penalty any more — only hidden stats and biometrics decide
     const t = p.tags || [];
     if (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) v *= 1.5;
@@ -4471,9 +4480,8 @@ class MatchEngine {
   }
   mod(side, role) {
     const cheat = (this.forceWin ? (side === 0 ? 8 : -5) : 0) + (side === 0 ? this.repBonus + this.captainBonus() : 0);   // v2.8 mood + v3.0 captain
-    if (side !== 0 || this.mentality === 'balanced') return cheat;
-    const pushing = this.mentality === 'attack';
-    return cheat + ((role === 'atk') === pushing ? 3 : -3);
+    const m = side === 0 ? this.mentality : this.oppMentality;
+    return cheat + (SHOUT[m]?.[role] ?? 0);   // v3.3: asymmetric, see SHOUT in 00-utils-data.js
   }
   counts(side) {
     const c = { DEF: 0, MID: 0, ATT: 0 };
@@ -4914,8 +4922,21 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.2';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.3', name: { en: 'Touchline Balance', ru: 'Баланс на бровке' },
+    en: [
+      '"Attack" and "Defense" are now a real choice: Attack means more goals at both ends, Defense means a tight, low-scoring game — and it costs you a little going forward.',
+      'Both shouts are calmer: "Attack" no longer turns a match into a 6-goal shoot-out, and "Defense" no longer kills the game (about 1.5 goals instead of 0.7).',
+      'Tiredness now creeps in gradually: a kid at 75% energy is barely slower, at 50% he plays at about 85%, and only an empty tank halves his level. No more sudden cliff at 50%.',
+      'Energy bars show the current fatigue multiplier for tired kids (e.g. ×0.83).',
+    ],
+    ru: [
+      '«Атака» и «Оборона» — теперь настоящий выбор: атака — больше голов в обе стороны, оборона — плотная игра с малым счётом, но и сам впереди теряешь чуть больше.',
+      'Обе команды с бровки стали мягче: «Атака» больше не превращает матч в перестрелку на 6 голов, а «Оборона» не убивает игру (около 1,5 гола вместо 0,7).',
+      'Усталость нарастает постепенно: при 75% энергии игрок почти не теряет, при 50% играет примерно на 85%, и только на нуле — вполовину. Резкого обрыва на 50% больше нет.',
+      'На шкале энергии у уставших теперь виден текущий множитель (например, ×0.83).',
+    ] },
   { v: '3.2', name: { en: 'Office Hours', ru: 'Часы приёма' },
     en: [
       '"Call into office" now makes sense: you can only talk to a kid who is actually at the club — on the day before training (Monday or Wednesday, after the morning briefing) or in the locker room if he turned up.',
@@ -6058,7 +6079,7 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
       </div>
       <div class="pi-right">
         <fieldset><legend>${L.t('pi.energy')}</legend>
-          <div class="energy ${ui.energyClass(energy)}"><i style="width:${energy}%"></i><span>${energy}%${tired ? ' ×0.5' : ''}</span></div>
+          <div class="energy ${ui.energyClass(energy)}"><i style="width:${energy}%"></i><span>${energy}%${tired ? ' ×' + fatigueMult(energy).toFixed(2) : ''}</span></div>
         </fieldset>
         ${own ? `<fieldset><legend>${L.t('pi.morale')}</legend>
           <div class="energy morale ${ui.energyClass(Math.round(p.dyn.morale))}"><i style="width:${Math.round(p.dyn.morale)}%"></i><span>${Math.round(p.dyn.morale)}%</span></div>
@@ -8172,7 +8193,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
           role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
         <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
-        <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×0.5' : ''}</span></div>
+        <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×' + fatigueMult(e).toFixed(2) : ''}</span></div>
         <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
     };

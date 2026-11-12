@@ -699,6 +699,16 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('after the match: showcase cleared (+ diary per kid), suspension served (2 → 1)', !after.showcase && after.sus === 1 && after.diary === fv.top.filter(id => id !== ex0.kid).length, JSON.stringify(after));
     check('Quick Sim: button → result in ms, Notebook opens, stats/energy/fixtures recorded', qs0.btn && qs.ms < 250 && qs.view === 'notes' && qs.cards === 3 && qs.md2 && !qs.modal
       && qs.apps >= qs0.apps + 11 && qs.tired && qs.score.replace(/\s/g, '') === qs.rep, JSON.stringify(qs));
+    // v3.3: smooth fatigue curve + asymmetric shouts
+    const fm = await page.evaluate(() => {
+      const pts = [[100, 1.00], [75, 0.95], [50, 0.85], [25, 0.70], [0, 0.50]].map(([e, t]) => ({ e, v: fatigueMult(e), ok: Math.abs(fatigueMult(e) - t) <= 0.03 }));
+      let mono = true; for (let e = 1; e <= 100; e++) if (fatigueMult(e) <= fatigueMult(e - 1)) mono = false;
+      return { pts, mono, clamp: fatigueMult(-20) === 0.5 && fatigueMult(140) === 1, shout: SHOUT.attack.atk > 0 && SHOUT.attack.def < 0 && SHOUT.defend.atk < 0 && SHOUT.defend.def > 0,
+        stepGone: typeof ENERGY.EXHAUSTED_MULT === 'undefined' };
+    });
+    check('fatigueMult: monotonic, hits 100/75/50/25/0 targets (±0.03), old ×0.5/×0.8 steps gone', fm.mono && fm.clamp && fm.stepGone && fm.shout && fm.pts.every(p => p.ok), JSON.stringify(fm.pts.map(p => p.e + ':' + p.v.toFixed(3))));
+    const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
+    check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');
     check('frame loop cost < 2 ms', await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0) < 2), (await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0).toFixed(2))) + ' ms');
   } catch (e) {

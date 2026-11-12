@@ -132,8 +132,18 @@ const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?
 const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 /* Energy economy: matchday drain/rest + daily recovery from the calendar. */
 const ENERGY = { TIRED: 50, PLAY_MIN: 30, PLAY_MAX: 40, BENCH_REST: 6, DAILY_REST: 10,   // v2.4: rest days +10 (training days cost 10)
-  EXHAUSTED: 30, EXHAUSTED_MULT: 0.8,   // live: under 30% during the match → stats ×0.8 (v1.1)
+  EXHAUSTED: 30,                        // assistant warning threshold (live energy)
   HT_REST: 4 };                         // half-time rest for everyone on the pitch   // bench +6 on matchday, +4 every rest day
+/* v3.3 SIDELINE SHOUTS — flat bonus on OUR attacking rolls (atk: pass, dribble, shot, corner delivery) and on OUR
+   defending rolls (def: interception, tackle, block, save). Every duel is "our atk vs their def", so a shout moves the
+   goal rate of BOTH teams: Attack = more goals for and against; Defense = fewer of both, and it gives away a little more
+   going forward than it gains at the back (the price of safety). v1.x–v3.2 used ±3 both ways (Attack ≈ 2.7× goals,
+   Defense ≈ 0.3× → a free "lock the lead" button). Tuned with test/balance.js (Attack vs Defense win share 45–55%). */
+const SHOUT = { attack: { atk: 1.0, def: -1.0 }, defend: { atk: -1.05, def: 1.0 }, balanced: { atk: 0, def: 0 } };
+/* v3.3 SMOOTH FATIGUE — one continuous, monotonic curve on LIVE energy (replaces the old steps: ×0.5 when a kid
+   started under 50%, ×0.8 under 30% during the match). x = energy/100:  m = 0.5 + 0.9·x − 0.4·x²
+   100% → 1.00 · 75% → 0.95 · 50% → 0.85 · 25% → 0.70 · 0% → 0.50 (derivative 0.9 − 0.8x > 0 → always rising). */
+const fatigueMult = energy => { const x = clamp((energy ?? 100) / 100, 0, 1); return 1 - 0.5 * (1 - x) * (1 - 0.8 * x); };   // = 0.5 + 0.9x − 0.4x², exact 1.00 at full energy
 const OUT_OF_POSITION = 0.85;   // stat multiplier for a player outside his natural line
 
 /* =========================================================

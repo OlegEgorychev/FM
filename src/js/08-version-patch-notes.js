@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.2';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.3';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.3', name: { en: 'Touchline Balance', ru: 'Баланс на бровке' },
+    en: [
+      '"Attack" and "Defense" are now a real choice: Attack means more goals at both ends, Defense means a tight, low-scoring game — and it costs you a little going forward.',
+      'Both shouts are calmer: "Attack" no longer turns a match into a 6-goal shoot-out, and "Defense" no longer kills the game (about 1.5 goals instead of 0.7).',
+      'Tiredness now creeps in gradually: a kid at 75% energy is barely slower, at 50% he plays at about 85%, and only an empty tank halves his level. No more sudden cliff at 50%.',
+      'Energy bars show the current fatigue multiplier for tired kids (e.g. ×0.83).',
+    ],
+    ru: [
+      '«Атака» и «Оборона» — теперь настоящий выбор: атака — больше голов в обе стороны, оборона — плотная игра с малым счётом, но и сам впереди теряешь чуть больше.',
+      'Обе команды с бровки стали мягче: «Атака» больше не превращает матч в перестрелку на 6 голов, а «Оборона» не убивает игру (около 1,5 гола вместо 0,7).',
+      'Усталость нарастает постепенно: при 75% энергии игрок почти не теряет, при 50% играет примерно на 85%, и только на нуле — вполовину. Резкого обрыва на 50% больше нет.',
+      'На шкале энергии у уставших теперь виден текущий множитель (например, ×0.83).',
+    ] },
   { v: '3.2', name: { en: 'Office Hours', ru: 'Часы приёма' },
     en: [
       '"Call into office" now makes sense: you can only talk to a kid who is actually at the club — on the day before training (Monday or Wednesday, after the morning briefing) or in the locker room if he turned up.',

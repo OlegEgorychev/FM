@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v3.2)
+# Youth Academy Manager — design notes (current: v3.3)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -14,7 +14,7 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 ## Systems (00-utils-data.js, 05-game-state.js)
 - Hidden attributes: see "Attribute system (v1.8)" below — never displayed outside DEBUG.EXE.
 - Roles (one per player, set in Notebook): Aggressive (Tackle ×1.5; lost visible duel → foul + yellow, 2nd = red), Playmaker (Pass ×1.5, passes more), Selfish (Dribble/Shoot ×1.5, rarely passes).
-- Energy: in-match live drain 30–40% over 90'; under 30% → ×0.8; starting/subbed on under 50% → ×0.5; half-time +4; after match players keep real energy, unused subs +6; rest day +4. Squad 16 (11 + bench GK, DEF, MID, MID, FWD).
+- Energy: in-match live drain 30–40% over 90'; every roll × `fatigueMult(live energy)` (v3.3, smooth 1.00 → 0.50, see below); half-time +4; after match players keep real energy, unused subs +6; rest day +4. Squad 16 (11 + bench GK, DEF, MID, MID, FWD).
 - Formations (10): slot lines DEF/MID/ATT decide who contests each third; `presence()` → line superiority ±4 (normalised: 4-4-2 vs 4-4-2 = 0); out of natural line ×0.85.
 - Shouts: Attack/Defend ±3 to our attacking/defending rolls.
 
@@ -37,8 +37,7 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - Notebook: 3 random players who played; "ok/total (rate%) (Season Avg)", colours >75% green / <40% red, `coachNote()` hint (11-notebook-helpers.js).
 
 ## Known balance observations
-- Defend shout slightly better net than Attack.
-- Fatigue ×0.5 is harsh: no rotation → bottom of the table.
+- v3.3: shouts retuned (`SHOUT`), fatigue is a smooth curve — see "Match engine balance (v3.3)".
 - Correct roles are strong (×1.5). Background duels never produce cards.
 
 ## Portraits (v1.4)
@@ -70,7 +69,7 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 - `Player` (03-player.js) carries nested groups: `bio` {age 13–15, height, weight, strongFoot L/R, weakFoot 1–5} (position stays `p.position`), `physical` {acceleration, speed, agility, strength, baseStamina}, `technical` {firstTouch, dribbling, passing, crossing, shooting, tackling, goalkeeping*}, `tactical` {positioning, vision, decisions}, `psych` {passion, discipline, composure, potential 1–100}, `dyn` {condition, sharpness, morale 0–100}. *`goalkeeping` was added on top of the brief so keepers have their own skill.
 - `p.energy` is a getter/setter for `dyn.condition`; `p.age` reads `bio.age`. Old `attrs` are gone; `AttrGen.fromLegacy()` derives stable values from pre-v1.8 saves (seeded by id+name). Ranges per position: `PROFILES` in 00-utils-data.js; AI clubs add `team.strength` to every skill.
 - Engine composites (`COMPOSITE`, `p.rating(key)`): Pass = passing+vision · Mark = positioning+2·tackling (reads passes, blocks shots) · Dribble = dribbling+agility+firstTouch · Speed = acceleration+speed · Tackle = 2·tackling+strength+positioning · Shoot = 2·shooting+composure · Save = 2·goalkeeping+agility+positioning.
-- Global modifiers: sharpness < 50 → every technical skill −2 (`p.skill()`); condition = live energy (×0.5 / ×0.8 as before); `moodBonus` = (morale−50)/25 × (0.55+passion/20), capped ±2.5, added to every roll. Pass also gets receiver firstTouch ±1.5 and crossing ±1 for balls into the final third. Decisions ≤7 → extra long shots from midfield, ≥15 → more passing. Drain × (1.15 − baseStamina·0.015).
+- Global modifiers: sharpness < 50 → every technical skill −2 (`p.skill()`); condition = `fatigueMult(live energy)` (v3.3; was ×0.5 / ×0.8 steps); `moodBonus` = (morale−50)/25 × (0.55+passion/20), capped ±2.5, added to every roll. Pass also gets receiver firstTouch ±1.5 and crossing ±1 for balls into the final third. Decisions ≤7 → extra long shots from midfield, ≥15 → more passing. Drain × (1.15 − baseStamina·0.015).
 - Dynamics: rest day −1 sharpness (floor 20), morale drifts 1 toward 60. After a match (`applyMatchDynamics`): sharpness full game +12, sub +6, unused −2; morale W +8 / D +1 / L −6, +5 per goal, −10 red, unused −2, × (0.6 + passion/25). Discipline is stored but not yet used.
 - Balance check (600 sims, 6 random squads): win% 34 vs 36 in v1.7, pass % 68 vs 70, goals similar.
 
@@ -163,3 +162,22 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 ## Office hours (v3.2)
 - `UIController.officeBlock(id)` → i18n key or null; `canCallIn` = !officeBlock. Allowed only (A) the day before a training day (rest-kind day, i.e. Mon / Wed), phase calendar, after the briefing, not inside the briefing/locker overlays — any normal club screen counts as "the Dashboard" (the squad list lives on the Team screen); or (B) the Locker Room is open and the kid is not in `today.locker.absent`. Then ≥ 1 AP. Order: not at the club → no AP. Button text = `<key>.btn` ("[ PLAYER NOT AT FACILITY ]", "[ NO ACTION POINTS LEFT ]"), tooltip = the reason.
 - Kick out from the locker: the dialogue closes, `afterManualEvent()` → `renderAll()` re-renders the Team list and the open Locker Room (slot gone).
+
+## Match engine balance (v3.3)
+- **Harness**: `node test/balance.js [N=500] [seed=33] [--pairs K] [--json]` — loads the real engine in a `vm` context (00-utils-data, 03-player, 06-match-engine), two fixed equal 4-4-2 squads (team seed 5, Neutral scoring ≈ league average), seeded `Math.random`, `runInstant()`. Mirrored: squads and home/away alternate. Table 1 = whole-match shouts; table 2 = neutral to 60', then the side ±1 goal shouts; `--pairs` averages over other random squads. Exit 1 if Attack-vs-Defense win share (W/(W+L)) leaves 45–55%. The smoke test runs it.
+- **Engine**: `opts.oppMentality` = the away side's shout (AI stays `balanced`; only the harness uses it). `mod(side, role)` adds `SHOUT[m][role]`.
+- **Why Defense "won"**: every duel is *our atk vs their def*, so the old shout (+3 own atk, −3 own def) shifted the attacking rolls of **both** teams by the same 3 points — it never tilted the match, it only scaled goal volume (Attack ×2.7 → 6.1 goals, Defense ×0.3 → 0.7). Defense therefore froze the score for free: a team leading by one at 60' won 90% with Defense vs 81% neutral and 66% with Attack; Attack was pure chaos. (Proof: in table 2 "leader shouts X" and "trailer shouts X" give identical results.)
+- **Shouts now** (`SHOUT` in 00-utils-data.js): Attack `atk +1.0 / def −1.0`, Defense `atk −1.05 / def +1.0` (a small price for safety), Neutral 0. Attack ≈ +45% goals both ways, Defense ≈ −30%, Attack vs Defense ≈ 50%. The dial is still symmetric by construction; a real situational edge (e.g. Attack costs stamina) would be a separate design step.
+- **Fatigue**: `fatigueMult(e) = 1 − 0.5·(1 − x)·(1 − 0.8x)`, x = e/100 clamped = 0.5 + 0.9x − 0.4x² → 100% 1.00 · 75% 0.95 · 50% 0.85 · 25% 0.70 · 0% 0.50, monotonic. Applied in `eff()` to LIVE energy (replaces "started < 50% → ×0.5" and "live < 30% → ×0.8"; `ENERGY.EXHAUSTED_MULT` removed). `eng.tired` stays only as a report flag (Notebook note). UI energy bars show `×fatigueMult` under 50%.
+
+Before → after (1000 matches per setup, seed 33, team seed 5; first team's view):
+
+| Setup | W / D / L before | Win share | Goals F–A /m | W / D / L after | Win share | Goals F–A /m |
+|---|---|---|---|---|---|---|
+| Attack vs Neutral | 39.6 / 17.3 / 43.1 | 47.9% | 3.00–3.11 (6.11) | 40.3 / 20.9 / 38.8 | 50.9% | 1.64–1.61 (3.25) |
+| Defense vs Neutral | 22.5 / 57.4 / 20.1 | 52.8% | 0.37–0.33 (0.70) | 31.3 / 32.1 / 36.6 | 46.1% | 0.77–0.80 (1.57) |
+| Attack vs Defense | 37.1 / 28.3 / 34.6 | 51.7% | 1.20–1.11 (2.31) | 36.4 / 27.3 / 36.3 | 50.1% | 1.14–1.13 (2.27) |
+| Neutral vs Neutral | 36.7 / 26.9 / 36.4 | 50.2% | 1.15–1.10 (2.25) | 33.4 / 28.5 / 38.1 | 46.7% | 1.12–1.20 (2.33) |
+
+Shots per team ≈ 6.5 neutral (unchanged), Attack 8.3 → 7.1, Defense 5.5 → 6.1. Averaged over 5 other squad pairs (after): Attack vs Neutral 50.1%, Defense vs Neutral 48.8%, Attack vs Defense 51.4%, Neutral 51.4% (≈ ±2% noise).
+Leading by one at 60' → win%: before Neutral 80.8 / Attack 66.0 / Defense 90.4; after (fatigue curve included) 75.6 / 74.0 / 83.8.

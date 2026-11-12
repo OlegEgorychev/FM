@@ -124,7 +124,7 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
       </div>
       <div class="pi-right">
         <fieldset><legend>${L.t('pi.energy')}</legend>
-          <div class="energy ${ui.energyClass(energy)}"><i style="width:${energy}%"></i><span>${energy}%${tired ? ' ×0.5' : ''}</span></div>
+          <div class="energy ${ui.energyClass(energy)}"><i style="width:${energy}%"></i><span>${energy}%${tired ? ' ×' + fatigueMult(energy).toFixed(2) : ''}</span></div>
         </fieldset>
         ${own ? `<fieldset><legend>${L.t('pi.morale')}</legend>
           <div class="energy morale ${ui.energyClass(Math.round(p.dyn.morale))}"><i style="width:${Math.round(p.dyn.morale)}%"></i><span>${Math.round(p.dyn.morale)}%</span></div>
