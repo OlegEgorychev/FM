@@ -103,8 +103,15 @@
 /* v3.5 MODAL LOCK — Match Summary blocks the desktop: dark backdrop over everything (taskbar included),
    locked navigation shown greyed out. The DOM behind is `inert` (12-ui.js setModalLock). */
 #msum-layer{ inset: 0; padding-bottom: 50px; }
-body.modal-lock #taskbar, body.modal-lock .icons{ filter: grayscale(1) brightness(.7); cursor: not-allowed; }
+body.modal-lock #taskbar, body.modal-lock .icons{ filter: saturate(.25); cursor: not-allowed; }
 body.modal-lock #taskbar *, body.modal-lock .icons *{ pointer-events: none; }
+/* v3.9: Win98 "disabled" look on every locked taskbar / tray / desktop-icon control (grey etched text) */
+body.modal-lock #taskbar .tk, body.modal-lock #taskbar .tray button, body.modal-lock .icons .icon span{ color: #7c807a !important; text-shadow: 1px 1px 0 #f2f2f2; }
+body.modal-lock .icons{ opacity: .55; }
+/* v3.9: transparent strip over the taskbar: hover = tooltip explaining the lock, small padlock note in the middle */
+.msum-lockbar{ position: absolute; left: 0; right: 0; bottom: 0; height: 38px; display: flex; align-items: center; justify-content: center; cursor: not-allowed; }
+.msum-lockbar::before{ content: '\1F512'; margin-right: 6px; font-size: 12px; }
+.msum-lockbar{ font: bold 12px/1 var(--mono); letter-spacing: .5px; color: #ffcf5a; text-shadow: 1px 1px 0 #000; }
 body.modal-lock #startmenu{ display: none; }
 #msum-x:disabled{ opacity: .45; cursor: not-allowed; }
 .ms-go:disabled{ color: var(--shadow) !important; text-shadow: 1px 1px 0 #fff; cursor: not-allowed; }
@@ -127,3 +134,7 @@ body.modal-lock #startmenu{ display: none; }
 @keyframes msTalkNudge{ 50%{ background: #f1d27a; } }
 @media (max-width: 640px){ .ms-talk-btns{ grid-template-columns: 1fr; } .ms-talk-btn{ min-height: 0; } }
 @media (prefers-reduced-motion: reduce){ .ms-talk.nudge{ animation: none; } }
+
+/* v3.9: Notebook reminder + [ MATCH SUMMARY ] button (Quick Sim opens the summary only on request) */
+.nb-talk{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 8px; font-size: 13px; }
+.nb-talk.pending{ font-weight: bold; color: #6b1d1d; }

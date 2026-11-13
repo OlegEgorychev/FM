@@ -71,13 +71,14 @@ class MatchSummary {
   }
   talkHTML(rep) {
     if (rep.talk === undefined) return '';   // pre-v3.5 report: no talk owed
-    const out = talkOutcome(rep), chosen = rep.talk;
+    const out = talkOutcome(rep), chosen = rep.talk, say = out === 'heavy' ? 'L' : out;   // v3.9: lines per W / D / L
     const btns = TEAM_TALK.KEYS.map(k => {
       const fx = talkEffects(k, rep);
       return `<button class="btn ms-talk-btn${chosen === k ? ' chosen' : ''}" type="button" data-talk="${k}" ${chosen ? 'disabled' : ''} title="${esc(L.t('tt.tip.' + k))}">
-        <b>${L.t('tt.name.' + k)}</b><span class="q">${L.t('tt.say.' + k)}</span><span class="fx">${MatchSummary.fxTags(fx)}</span></button>`;
+        <b>${L.t('tt.name.' + k)}</b><span class="q">${L.t('tt.say.' + k + '.' + say)}</span><span class="fx">${MatchSummary.fxTags(fx)}</span></button>`;
     }).join('');
-    const react = chosen ? `<div class="ms-talk-react">&#9658; ${L.t('tt.react.' + chosen + '.' + out)}</div>` : `<div class="ms-talk-react wait">${L.t('tt.prompt.' + out)}</div>`;
+    const react = chosen === 'none' ? `<div class="ms-talk-react wait">${L.t('tt.react.none')}</div>`   // v3.9: Quick Sim day closed without a word
+      : chosen ? `<div class="ms-talk-react">&#9658; ${L.t('tt.react.' + chosen + '.' + out)}</div>` : `<div class="ms-talk-react wait">${L.t('tt.prompt.' + out)}</div>`;
     return `<div class="ms-talk${chosen ? ' done' : ''}"><h4>${L.t('tt.title')}</h4><div class="ms-talk-btns">${btns}</div>${react}</div>`;
   }
   /** v3.4: the log of THIS match, if it is still in memory (it is not saved, so a reload loses it). */
@@ -127,5 +128,7 @@ class MatchSummary {
     document.getElementById('msum-status').textContent = L.t(pending ? 'tt.needed' : 'ms.status');
     document.getElementById('msum-go').disabled = pending;   // v3.5
     document.getElementById('msum-x').disabled = pending;
+    const lb = document.getElementById('msum-lockbar');   // v3.9: what the locked taskbar says on hover
+    lb.textContent = L.t('lock.bar'); lb.title = L.t(pending ? 'lock.tipTalk' : 'lock.tip');
   }
 }

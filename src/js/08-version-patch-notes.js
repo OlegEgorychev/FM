@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.9', name: { en: 'Words for Every Result', ru: 'Слова на любой счёт' },
+    en: [
+      'Coach\'s Word now fits the result: each of the three talks has its own line after a win, a draw and a defeat.',
+      'The club diary records both your words and how the dressing room took them.',
+      'While the Match Summary is open the taskbar shows its buttons greyed out, Windows-style, with a "Navigation locked" note — hover it to see what to do next. ReadMe and DEBUG.EXE stay shut too.',
+      'Quick Sim no longer throws the Match Summary in your face: you land in the Coach\'s Notebook, and a [ MATCH SUMMARY ] button there opens the scoreboard and the talk when you want them.',
+      'Skipped the talk after a Quick Sim? Closing the matchday is never blocked — the kids just go home without a word (no effects either way).',
+    ],
+    ru: [
+      '«Слово тренера» теперь под счёт: у каждого из трёх вариантов свои слова после победы, ничьей и поражения.',
+      'В дневник клуба записываются и твои слова, и то, как их приняла раздевалка.',
+      'Пока открыты итоги матча, кнопки панели задач серые, как в Windows, а на панели надпись «Навигация заблокирована» — наведи курсор, и подсказка объяснит, что делать. ReadMe и DEBUG.EXE тоже не открываются.',
+      'Быстрая симуляция больше не открывает итоги матча сама: ты сразу попадаешь в Блокнот тренера, а кнопка [ ИТОГИ МАТЧА ] там откроет табло и разговор, когда захочешь.',
+      'Не сказал слово после быстрой симуляции? Закрыть игровой день можно всегда — ребята просто разойдутся молча (без последствий).',
+    ] },
   { v: '3.8', name: { en: 'The Captain\'s Voice', ru: 'Голос капитана' },
     en: [
       'Handing out the armband is now a conversation: the kid answers in his own words — proud, surprised or plainly scared. A scared one can be reassured, or you can pick someone else.',

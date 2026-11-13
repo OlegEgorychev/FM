@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.8</title>
+<title>Youth Academy Manager v3.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1406,8 +1406,15 @@ body.fx .crt-scan{ opacity: .9; }
 /* v3.5 MODAL LOCK — Match Summary blocks the desktop: dark backdrop over everything (taskbar included),
    locked navigation shown greyed out. The DOM behind is `inert` (12-ui.js setModalLock). */
 #msum-layer{ inset: 0; padding-bottom: 50px; }
-body.modal-lock #taskbar, body.modal-lock .icons{ filter: grayscale(1) brightness(.7); cursor: not-allowed; }
+body.modal-lock #taskbar, body.modal-lock .icons{ filter: saturate(.25); cursor: not-allowed; }
 body.modal-lock #taskbar *, body.modal-lock .icons *{ pointer-events: none; }
+/* v3.9: Win98 "disabled" look on every locked taskbar / tray / desktop-icon control (grey etched text) */
+body.modal-lock #taskbar .tk, body.modal-lock #taskbar .tray button, body.modal-lock .icons .icon span{ color: #7c807a !important; text-shadow: 1px 1px 0 #f2f2f2; }
+body.modal-lock .icons{ opacity: .55; }
+/* v3.9: transparent strip over the taskbar: hover = tooltip explaining the lock, small padlock note in the middle */
+.msum-lockbar{ position: absolute; left: 0; right: 0; bottom: 0; height: 38px; display: flex; align-items: center; justify-content: center; cursor: not-allowed; }
+.msum-lockbar::before{ content: '\1F512'; margin-right: 6px; font-size: 12px; }
+.msum-lockbar{ font: bold 12px/1 var(--mono); letter-spacing: .5px; color: #ffcf5a; text-shadow: 1px 1px 0 #000; }
 body.modal-lock #startmenu{ display: none; }
 #msum-x:disabled{ opacity: .45; cursor: not-allowed; }
 .ms-go:disabled{ color: var(--shadow) !important; text-shadow: 1px 1px 0 #fff; cursor: not-allowed; }
@@ -1430,6 +1437,10 @@ body.modal-lock #startmenu{ display: none; }
 @keyframes msTalkNudge{ 50%{ background: #f1d27a; } }
 @media (max-width: 640px){ .ms-talk-btns{ grid-template-columns: 1fr; } .ms-talk-btn{ min-height: 0; } }
 @media (prefers-reduced-motion: reduce){ .ms-talk.nudge{ animation: none; } }
+
+/* v3.9: Notebook reminder + [ MATCH SUMMARY ] button (Quick Sim opens the summary only on request) */
+.nb-talk{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 8px; font-size: 13px; }
+.nb-talk.pending{ font-weight: bold; color: #6b1d1d; }
 /* =========================================================
    v2.6 — LOCKER ROOM (row of metal lockers; doors swing open one by one)
    ========================================================= */
@@ -1913,6 +1924,7 @@ body.modal-lock #startmenu{ display: none; }
       <div class="row-btns pinfo-btns"><button class="btn ms-log" id="msum-csv" type="button" data-i18n="ms.logCsv" data-i18n-title="ms.logTip"></button><button class="btn ms-log" id="msum-json" type="button" data-i18n="ms.logJson" data-i18n-title="ms.logTip"></button><button class="btn go ms-go" id="msum-go" type="button" data-i18n="ms.go"></button></div>
       <div class="statusbar"><span id="msum-status"></span></div>
     </section>
+    <div class="msum-lockbar" id="msum-lockbar" role="note"></div>
   </div>
 
   <!-- v3.1: Intro — the Yard Match draft (new academies start here) -->
@@ -3264,8 +3276,12 @@ Object.assign(I18N.en, {
   'tt.prompt.W': 'They won. A row of muddy faces looks up at you.', 'tt.prompt.D': 'A draw. Nobody is sure whether to smile.',
   'tt.prompt.L': 'A defeat. Heads down, boots still on.', 'tt.prompt.heavy': 'A heavy defeat. Silence, apart from one kid sniffing.',
   'tt.name.praise': 'Praise the squad', 'tt.name.tough': 'Tough love', 'tt.name.excuse': 'Blame the ref and the mud',
-  'tt.say.praise': '"Good effort, lads — you fought to the end!"', 'tt.say.tough': '"Not good enough. Too lazy. We\'ll fix it at training."',
-  'tt.say.excuse': '"The ref and that swamp ruined the game."',
+  'tt.say.praise.W': '"Good effort, lads — you earned that one!"', 'tt.say.praise.D': '"Good effort, lads — you fought to the end!"',
+  'tt.say.praise.L': '"Good effort, lads. Heads up — you never gave up."',
+  'tt.say.tough.W': '"We won, but that was lazy. Not good enough."', 'tt.say.tough.D': '"Not good enough. Too lazy. We\'ll fix it at training."',
+  'tt.say.tough.L': '"You switched off. Tomorrow at training you\'ll work it off."',
+  'tt.say.excuse.W': '"We won despite that ref and that bog of a pitch."', 'tt.say.excuse.D': '"The ref and that swamp cost us the win."',
+  'tt.say.excuse.L': '"The ref and the mud ruined it — not you."',
   'tt.tip.praise': 'Morale up and the dressing room likes you. The Board frowns at praise after a heavy defeat.',
   'tt.tip.tough': 'Discipline up and the Board approves, but morale drops. After a win the parents think you are too harsh.',
   'tt.tip.excuse': 'Shields morale after a draw or a loss and the parents agree, but the Board sees excuses.',
@@ -3282,7 +3298,13 @@ Object.assign(I18N.en, {
   'tt.react.excuse.D': '"Yeah, that ref!" The mood lifts, the parents nod along.',
   'tt.react.excuse.L': 'The blame moves off their shoulders. The parents agree loudly.',
   'tt.react.excuse.heavy': 'It softens the blow for the kids — but the Board hears excuses.',
-  'tt.diary': 'Coach\'s word after {o}: {t}.',
+  'tt.diary': 'Coach\'s word after {o}: {t}. {r}',
+  'tt.skipped': 'After {o} the coach left the dressing room without a word.',
+  'tt.react.none': 'No word was given after this match.',
+  'tt.nbPending': 'The kids are still waiting for your Coach\'s Word.', 'tt.nbDone': 'Score, timeline and your Coach\'s Word:', 'tt.nbOpen': '[ MATCH SUMMARY ]',
+  'lock.bar': 'NAVIGATION LOCKED — FINISH MATCH_SUMMARY.EXE',
+  'lock.tipTalk': 'Locked while the Match Summary is open. Give your Coach\'s Word, then proceed to the Notebook.',
+  'lock.tip': 'Locked while the Match Summary is open. Proceed to the Notebook or close the summary.',
 });
 Object.assign(I18N.ru, {
   'tt.title': 'Слово тренера',
@@ -3290,8 +3312,12 @@ Object.assign(I18N.ru, {
   'tt.prompt.W': 'Победа. Ряд чумазых лиц смотрит на тебя.', 'tt.prompt.D': 'Ничья. Никто не знает, улыбаться или нет.',
   'tt.prompt.L': 'Поражение. Головы опущены, бутсы ещё на ногах.', 'tt.prompt.heavy': 'Разгром. Тишина, только кто-то шмыгает носом.',
   'tt.name.praise': 'Похвалить команду', 'tt.name.tough': 'Жёсткий разбор', 'tt.name.excuse': 'Свалить на судью и грязь',
-  'tt.say.praise': '«Молодцы, бились до конца!»', 'tt.say.tough': '«Расслабились. На тренировке отработаете.»',
-  'tt.say.excuse': '«Судья и болото испортили игру.»',
+  'tt.say.praise.W': '«Молодцы, эту победу вы заслужили!»', 'tt.say.praise.D': '«Молодцы, бились до конца!»',
+  'tt.say.praise.L': '«Молодцы, головы выше — вы не сдавались.»',
+  'tt.say.tough.W': '«Выиграли, но расслабились. Так не пойдёт.»', 'tt.say.tough.D': '«Расслабились. На тренировке отработаете.»',
+  'tt.say.tough.L': '«Вы выключились из игры. Завтра на тренировке отработаете.»',
+  'tt.say.excuse.W': '«Победили назло такому судье и этому болоту.»', 'tt.say.excuse.D': '«Судья и болото отняли у нас победу.»',
+  'tt.say.excuse.L': '«Судья и болото испортили игру — вы ни при чём.»',
   'tt.tip.praise': 'Мораль растёт, раздевалка за тебя. Правлению не нравится хвалить после разгрома.',
   'tt.tip.tough': 'Дисциплина растёт, Правление довольно, но мораль падает. После победы родители сочтут тебя слишком строгим.',
   'tt.tip.excuse': 'Защищает мораль после ничьей или поражения, родители согласны, но Правление видит отговорки.',
@@ -3308,7 +3334,13 @@ Object.assign(I18N.ru, {
   'tt.react.excuse.D': '«Да, судья тот ещё!» Настроение поднимается, родители кивают.',
   'tt.react.excuse.L': 'Вина уходит с их плеч. Родители громко соглашаются.',
   'tt.react.excuse.heavy': 'Удар для ребят смягчён — но Правление слышит отговорки.',
-  'tt.diary': 'Слово тренера после матча ({o}): {t}.',
+  'tt.diary': 'Слово тренера после матча ({o}): {t}. {r}',
+  'tt.skipped': 'После матча ({o}) тренер ушёл из раздевалки молча.',
+  'tt.react.none': 'После этого матча слова тренера не было.',
+  'tt.nbPending': 'Ребята всё ещё ждут твоего «Слова тренера».', 'tt.nbDone': 'Счёт, ход матча и твоё «Слово тренера»:', 'tt.nbOpen': '[ ИТОГИ МАТЧА ]',
+  'lock.bar': 'НАВИГАЦИЯ ЗАБЛОКИРОВАНА — ЗАВЕРШИ MATCH_SUMMARY.EXE',
+  'lock.tipTalk': 'Заблокировано, пока открыты итоги матча. Скажи «Слово тренера» и переходи в Блокнот.',
+  'lock.tip': 'Заблокировано, пока открыты итоги матча. Перейди в Блокнот или закрой итоги.',
 });
 /* v3.6 POSITION DISCOVERY — Practice Match scouting + the "wrong spot" locker request */
 Object.assign(I18N.en, {
@@ -4770,9 +4802,16 @@ class GameState {
     }
     for (const k of ['board', 'parents', 'squad']) if (fx[k]) this.addRep(k, fx[k]);
     rep.talk = key;
-    this.addDiary({ date: this.calendar.date, key: 'tt.diary', vars: { o: { team: rep.opponent }, t: { talk: key } }, cls: 'ev' });
+    this.addDiary({ date: this.calendar.date, key: 'tt.diary', vars: { o: { team: rep.opponent }, t: { talk: key }, r: { talkReact: key + '.' + talkOutcome(rep) } }, cls: 'ev' });   // v3.9: + the dressing-room reaction
     this.save();
     return fx;
+  }
+  /** v3.9: a Quick Sim matchday closed without opening the Match Summary — no talk, no effects (never a soft-lock). */
+  skipTeamTalk() {
+    if (!this.talkPending) return;
+    this.lastReport.talk = 'none';
+    this.addDiary({ date: this.calendar.date, key: 'tt.skipped', vars: { o: { team: this.lastReport.opponent } }, cls: 'ev' });
+    this.save();
   }
   /** v1.1: players who played keep their LIVE end-of-match energy; unused subs rest. */
   applyLiveFatigue(eng) {
@@ -5702,8 +5741,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.9', name: { en: 'Words for Every Result', ru: 'Слова на любой счёт' },
+    en: [
+      'Coach\'s Word now fits the result: each of the three talks has its own line after a win, a draw and a defeat.',
+      'The club diary records both your words and how the dressing room took them.',
+      'While the Match Summary is open the taskbar shows its buttons greyed out, Windows-style, with a "Navigation locked" note — hover it to see what to do next. ReadMe and DEBUG.EXE stay shut too.',
+      'Quick Sim no longer throws the Match Summary in your face: you land in the Coach\'s Notebook, and a [ MATCH SUMMARY ] button there opens the scoreboard and the talk when you want them.',
+      'Skipped the talk after a Quick Sim? Closing the matchday is never blocked — the kids just go home without a word (no effects either way).',
+    ],
+    ru: [
+      '«Слово тренера» теперь под счёт: у каждого из трёх вариантов свои слова после победы, ничьей и поражения.',
+      'В дневник клуба записываются и твои слова, и то, как их приняла раздевалка.',
+      'Пока открыты итоги матча, кнопки панели задач серые, как в Windows, а на панели надпись «Навигация заблокирована» — наведи курсор, и подсказка объяснит, что делать. ReadMe и DEBUG.EXE тоже не открываются.',
+      'Быстрая симуляция больше не открывает итоги матча сама: ты сразу попадаешь в Блокнот тренера, а кнопка [ ИТОГИ МАТЧА ] там откроет табло и разговор, когда захочешь.',
+      'Не сказал слово после быстрой симуляции? Закрыть игровой день можно всегда — ребята просто разойдутся молча (без последствий).',
+    ] },
   { v: '3.8', name: { en: 'The Captain\'s Voice', ru: 'Голос капитана' },
     en: [
       'Handing out the armband is now a conversation: the kid answers in his own words — proud, surprised or plainly scared. A scared one can be reassured, or you can pick someone else.',
@@ -7966,13 +8020,14 @@ class MatchSummary {
   }
   talkHTML(rep) {
     if (rep.talk === undefined) return '';   // pre-v3.5 report: no talk owed
-    const out = talkOutcome(rep), chosen = rep.talk;
+    const out = talkOutcome(rep), chosen = rep.talk, say = out === 'heavy' ? 'L' : out;   // v3.9: lines per W / D / L
     const btns = TEAM_TALK.KEYS.map(k => {
       const fx = talkEffects(k, rep);
       return `<button class="btn ms-talk-btn${chosen === k ? ' chosen' : ''}" type="button" data-talk="${k}" ${chosen ? 'disabled' : ''} title="${esc(L.t('tt.tip.' + k))}">
-        <b>${L.t('tt.name.' + k)}</b><span class="q">${L.t('tt.say.' + k)}</span><span class="fx">${MatchSummary.fxTags(fx)}</span></button>`;
+        <b>${L.t('tt.name.' + k)}</b><span class="q">${L.t('tt.say.' + k + '.' + say)}</span><span class="fx">${MatchSummary.fxTags(fx)}</span></button>`;
     }).join('');
-    const react = chosen ? `<div class="ms-talk-react">&#9658; ${L.t('tt.react.' + chosen + '.' + out)}</div>` : `<div class="ms-talk-react wait">${L.t('tt.prompt.' + out)}</div>`;
+    const react = chosen === 'none' ? `<div class="ms-talk-react wait">${L.t('tt.react.none')}</div>`   // v3.9: Quick Sim day closed without a word
+      : chosen ? `<div class="ms-talk-react">&#9658; ${L.t('tt.react.' + chosen + '.' + out)}</div>` : `<div class="ms-talk-react wait">${L.t('tt.prompt.' + out)}</div>`;
     return `<div class="ms-talk${chosen ? ' done' : ''}"><h4>${L.t('tt.title')}</h4><div class="ms-talk-btns">${btns}</div>${react}</div>`;
   }
   /** v3.4: the log of THIS match, if it is still in memory (it is not saved, so a reload loses it). */
@@ -8022,6 +8077,8 @@ class MatchSummary {
     document.getElementById('msum-status').textContent = L.t(pending ? 'tt.needed' : 'ms.status');
     document.getElementById('msum-go').disabled = pending;   // v3.5
     document.getElementById('msum-x').disabled = pending;
+    const lb = document.getElementById('msum-lockbar');   // v3.9: what the locked taskbar says on hover
+    lb.textContent = L.t('lock.bar'); lb.title = L.t(pending ? 'lock.tipTalk' : 'lock.tip');
   }
 }
 /* =========================================================
@@ -8343,7 +8400,7 @@ class UIController {
     this.show('dash');
     if (this.state.phase === 'draft') this.draft.open();   // v3.1: a new academy starts at the Yard Match
     if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
-    else if (this.state.talkPending) this.summary.open(this.state.lastReport);   // v3.5: reload before the team talk → back to the Match Summary
+    else if (this.state.talkPending && !this.state.lastReport.instant) this.summary.open(this.state.lastReport);   // v3.5: reload before the team talk → back to the Match Summary (v3.9: not for Quick Sim)
     this.checkUpdateNotice();
   }
 
@@ -8439,6 +8496,7 @@ class UIController {
     if (x instanceof Player) return L.name(x.surname);
     if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
     if (x && typeof x === 'object' && 'talk' in x) return L.t('tt.name.' + x.talk);  // v3.5 diary
+    if (x && typeof x === 'object' && 'talkReact' in x) return L.t('tt.react.' + x.talkReact);  // v3.9 diary
     if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pos' in x) return L.pos(x.pos);   // v3.6 diary
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
@@ -8642,6 +8700,7 @@ class UIController {
 
     this.$('notes-body').addEventListener('click', e => {
       if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
+      if (e.target.closest('#btn-nb-msum')) { this.summary.open(this.state.lastReport); return; }   // v3.9
       const b = e.target.closest('[data-tag]'); if (!b || b.disabled) return;
       this.state.setTag(b.dataset.id, b.dataset.tag);
       this.renderNotebook(); this.renderTeam(); this.renderDash();
@@ -9287,7 +9346,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   closeMatchday() {
     const s = this.state;
     if (s.phase !== 'post') { this.show('dash'); return; }
-    if (s.talkPending) { this.summary.open(s.lastReport); return; }   // v3.5: no closing the matchday before the team talk
+    if (s.talkPending) {   // v3.5: no closing a live matchday before the team talk; v3.9: a Quick Sim may skip it
+      if (!s.lastReport.instant) { this.summary.open(s.lastReport); return; }
+      s.skipTeamTalk();
+    }
     const ev = s.nextMatchEvent();
     const rep = s.lastReport;
     this.cal.completeEvent(ev.id);
@@ -9711,7 +9773,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (eng.instant) {   // v2.0 Quick Sim
       this.renderLive(eng);
       this.appendLog({ minute: 90, type: 'coach', key: 'match.instantDone', vars: {}, side: -1, r: 0 });
-      this.summary.open(s.lastReport);
+      this.show('notes');   // v3.9: Quick Sim → straight to the Notebook; the Match Summary (+ team talk) opens only on request
       return;
     }
     // v2.1: full time → MATCH SUMMARY scoreboard first (a short beat so the final whistle lands on the pitch)
@@ -9776,6 +9838,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <h2>${L.t('notes.head', { n: rep.md, o: esc(L.team(rep.opponent)) })}</h2>
         <span class="res ${rep.result}">${L.t('res.' + rep.result)} &nbsp;${rep.gf} - ${rep.ga}</span>
       </div>
+      ${this.state.phase === 'post' ? `<p class="nb-talk${this.state.talkPending ? ' pending' : ''}">${L.t(this.state.talkPending ? 'tt.nbPending' : 'tt.nbDone')} <button class="btn" id="btn-nb-msum" type="button">${L.t('tt.nbOpen')}</button></p>` : ''}
       <p class="nb-hint">${L.t('notes.hint')}</p>
       <p class="nb-legend"><span style="${rateStyle(80)}">■ &gt; 75%</span> · <span style="${rateStyle(30)}">■ &lt; 40%</span> · ${L.t('nb.legend')}</p>
       ${this.captainNoteHTML(rep)}<div class="cards">${cards}</div>${back}`;

@@ -42,7 +42,7 @@ class UIController {
     this.show('dash');
     if (this.state.phase === 'draft') this.draft.open();   // v3.1: a new academy starts at the Yard Match
     if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
-    else if (this.state.talkPending) this.summary.open(this.state.lastReport);   // v3.5: reload before the team talk → back to the Match Summary
+    else if (this.state.talkPending && !this.state.lastReport.instant) this.summary.open(this.state.lastReport);   // v3.5: reload before the team talk → back to the Match Summary (v3.9: not for Quick Sim)
     this.checkUpdateNotice();
   }
 
@@ -138,6 +138,7 @@ class UIController {
     if (x instanceof Player) return L.name(x.surname);
     if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
     if (x && typeof x === 'object' && 'talk' in x) return L.t('tt.name.' + x.talk);  // v3.5 diary
+    if (x && typeof x === 'object' && 'talkReact' in x) return L.t('tt.react.' + x.talkReact);  // v3.9 diary
     if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pos' in x) return L.pos(x.pos);   // v3.6 diary
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
@@ -341,6 +342,7 @@ class UIController {
 
     this.$('notes-body').addEventListener('click', e => {
       if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
+      if (e.target.closest('#btn-nb-msum')) { this.summary.open(this.state.lastReport); return; }   // v3.9
       const b = e.target.closest('[data-tag]'); if (!b || b.disabled) return;
       this.state.setTag(b.dataset.id, b.dataset.tag);
       this.renderNotebook(); this.renderTeam(); this.renderDash();
@@ -986,7 +988,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   closeMatchday() {
     const s = this.state;
     if (s.phase !== 'post') { this.show('dash'); return; }
-    if (s.talkPending) { this.summary.open(s.lastReport); return; }   // v3.5: no closing the matchday before the team talk
+    if (s.talkPending) {   // v3.5: no closing a live matchday before the team talk; v3.9: a Quick Sim may skip it
+      if (!s.lastReport.instant) { this.summary.open(s.lastReport); return; }
+      s.skipTeamTalk();
+    }
     const ev = s.nextMatchEvent();
     const rep = s.lastReport;
     this.cal.completeEvent(ev.id);
@@ -1410,7 +1415,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (eng.instant) {   // v2.0 Quick Sim
       this.renderLive(eng);
       this.appendLog({ minute: 90, type: 'coach', key: 'match.instantDone', vars: {}, side: -1, r: 0 });
-      this.summary.open(s.lastReport);
+      this.show('notes');   // v3.9: Quick Sim → straight to the Notebook; the Match Summary (+ team talk) opens only on request
       return;
     }
     // v2.1: full time → MATCH SUMMARY scoreboard first (a short beat so the final whistle lands on the pitch)
@@ -1475,6 +1480,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <h2>${L.t('notes.head', { n: rep.md, o: esc(L.team(rep.opponent)) })}</h2>
         <span class="res ${rep.result}">${L.t('res.' + rep.result)} &nbsp;${rep.gf} - ${rep.ga}</span>
       </div>
+      ${this.state.phase === 'post' ? `<p class="nb-talk${this.state.talkPending ? ' pending' : ''}">${L.t(this.state.talkPending ? 'tt.nbPending' : 'tt.nbDone')} <button class="btn" id="btn-nb-msum" type="button">${L.t('tt.nbOpen')}</button></p>` : ''}
       <p class="nb-hint">${L.t('notes.hint')}</p>
       <p class="nb-legend"><span style="${rateStyle(80)}">■ &gt; 75%</span> · <span style="${rateStyle(30)}">■ &lt; 40%</span> · ${L.t('nb.legend')}</p>
       ${this.captainNoteHTML(rep)}<div class="cards">${cards}</div>${back}`;

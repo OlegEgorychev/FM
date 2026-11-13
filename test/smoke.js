@@ -179,6 +179,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       document.querySelector('.tk[data-view=table]').click();
       document.getElementById('btn-startmenu').click();
       ui.show('team'); ui.profile.open(id); ui.teamCard.open(1); ui.debug.open(); ui.locker.open();
+      document.getElementById('btn-ver').click(); document.getElementById('btn-debug').click();   // v3.9: ReadMe + DEBUG from the tray
       document.querySelector('#roster .r-row')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       document.getElementById('msum-go').click(); document.getElementById('msum-x').click();
@@ -190,7 +191,11 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         goOff: document.getElementById('msum-go').disabled && document.getElementById('msum-x').disabled,
         btns: document.querySelectorAll('#msum-body .ms-talk-btn:not([disabled])').length,
         tags: [...document.querySelectorAll('#msum-body .ms-talk-btn')].every(b => b.querySelector('.fx i')),
-        pending: YAM.game.lastReport.talk === null && /"talk":null/.test(localStorage.getItem('yam_save_v1')) };
+        pending: YAM.game.lastReport.talk === null && /"talk":null/.test(localStorage.getItem('yam_save_v1')),
+        readme: !document.getElementById('win-readme').classList.contains('open'),
+        lockTip: (() => { const b = document.getElementById('msum-lockbar'), r = b.getBoundingClientRect(), t = document.getElementById('taskbar').getBoundingClientRect();
+          return b.title === L.t('lock.tipTalk') && !!b.textContent && Math.abs(r.bottom - t.bottom) < 2 && r.height >= t.height - 2; })(),
+        greyTk: getComputedStyle(document.querySelector('.tk[data-view=table]')).color === 'rgb(124, 128, 122)' };
     });
     await page.keyboard.press('Escape');
     lock.escKept = await page.evaluate(() => !document.getElementById('msum-layer').hidden);
@@ -205,6 +210,9 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         morale: s.squad.every((p, i) => p.dyn.morale === cl(b.m[i] + fx.morale)),
         rep: ['board', 'parents', 'squad'].every(k => s.rep[k] === cl(b.rep[k] + (fx[k] || 0))),
         diary: s.diary.length === Math.min(80, b.d + 1) && s.diary[s.diary.length - 1].key === 'tt.diary',
+        diaryReact: (d => d.vars.r.talkReact === 'praise.' + talkOutcome(s.lastReport) && YAM.ui.entryText({ ...d, r: 0 }).includes(L.t('tt.react.' + d.vars.r.talkReact))
+          && YAM.ui.entryText({ ...d, r: 0 }).includes(L.t('tt.name.praise')))(s.diary[s.diary.length - 1]),
+        sayByResult: document.querySelector('#msum-body [data-talk="praise"] .q').textContent === L.t('tt.say.praise.' + (s.lastReport.result)),
         react: !!document.querySelector('#msum-body .ms-talk-react:not(.wait)'),
         locked: document.querySelectorAll('#msum-body .ms-talk-btn:not([disabled])').length === 0 && !!document.querySelector('#msum-body .ms-talk-btn.chosen'),
         go: !document.getElementById('msum-go').disabled, stillLocked: YAM.ui.modalLock };
@@ -749,11 +757,17 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       energy: YAM.game.starters().map(p => p.energy) }));
     await page.click('#btn-instant');
     await page.waitForFunction(() => YAM.game.phase === 'post', null, { timeout: 5000 });
+    // v3.9: Quick Sim no longer forces the modal — Notebook first, the Match Summary (+ talk) opens from the Notebook on request
+    const qsum0 = await page.evaluate(() => ({ closed: document.getElementById('msum-layer').hidden, free: !YAM.ui.modalLock && !document.getElementById('taskbar').inert,
+      notes: YAM.ui.view === 'notes', pending: YAM.game.talkPending, nbBtn: !!document.querySelector('#notes-body #btn-nb-msum'), nbHint: !!document.querySelector('#notes-body .nb-talk.pending') }));
+    await page.click('#btn-nb-msum');
     const qsum = await page.evaluate(() => ({ open: !document.getElementById('msum-layer').hidden, quick: /QUICK|БЫСТР/.test(document.getElementById('msum-body').textContent),
-      goals: document.querySelectorAll('#msum-body .ms-ev.goal').length, total: YAM.game.lastReport.gf + YAM.game.lastReport.ga }));
+      goals: document.querySelectorAll('#msum-body .ms-ev.goal').length, total: YAM.game.lastReport.gf + YAM.game.lastReport.ga,
+      lock: YAM.ui.modalLock && document.getElementById('msum-go').disabled }));
     await page.click('#msum-body [data-talk="excuse"]');
     await page.click('#msum-go');
-    check('Quick Sim → Match Summary first (same event list), then Notebook', qsum.open && qsum.quick && qsum.goals === qsum.total, JSON.stringify(qsum));
+    check('Quick Sim → Notebook directly (no forced modal); [ MATCH SUMMARY ] opens it on request (same event list), locked until the talk',
+      Object.values(qsum0).every(Boolean) && qsum.open && qsum.quick && qsum.goals === qsum.total && qsum.lock, JSON.stringify({ qsum0, qsum }));
     const qs = await page.evaluate(e0 => ({ ms: YAM.ui.lastSimMs, view: YAM.ui.view, cards: document.querySelectorAll('#notes-body .card').length,
       md2: YAM.game.league.fixturesOf(2).every(f => f.hg !== null), modal: !document.getElementById('modal-layer').hidden,
       apps: Object.values(YAM.game.seasonStats).reduce((a, s) => a + s.apps, 0), tired: YAM.game.lastReport && YAM.game.starters().some((p, i) => p.energy < e0[i]),
@@ -764,7 +778,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('Quick Sim: button → result in ms, Notebook opens, stats/energy/fixtures recorded', qs0.btn && qs.ms < 250 && qs.view === 'notes' && qs.cards === 3 && qs.md2 && !qs.modal
       && qs.apps >= qs0.apps + 11 && qs.tired && qs.score.replace(/\s/g, '') === qs.rep, JSON.stringify(qs));
     // v3.5: reload before the team talk → straight back to the locked Match Summary; tough love = discipline + Board, Parents −3 after a win
-    await page.evaluate(() => { const s = YAM.game; s.lastReport.talk = null; s.lastReport.result = 'W'; s.lastReport.gf = Math.max(s.lastReport.gf, s.lastReport.ga + 1);
+    await page.evaluate(() => { const s = YAM.game; s.lastReport.talk = null; s.lastReport.instant = false; s.lastReport.result = 'W'; s.lastReport.gf = Math.max(s.lastReport.gf, s.lastReport.ga + 1);
       s.squad.forEach(p => { p.dyn.morale = 50; p.psych.discipline = Math.min(p.psych.discipline, 10); }); s.rep.board = 50; s.rep.parents = 50; s.save(); });
     await page.reload();
     await page.waitForFunction(() => window.YAM && window.YAM.ui);
@@ -898,7 +912,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const raw = JSON.parse(JSON.stringify(k)); delete raw.captainTrait;
       const keep = new Player({ ...raw, captainTrait: 'leader', tags: [] }); delete raw.leadership;   // v3.8: leadership wins over a stored trait
       out.migrate = new Player({ ...raw, tags: [] }).captainTrait === k.captainTrait && new Player({ ...raw, captainTrait: 'boss', tags: [] }).captainTrait === k.captainTrait
-        && keep.captainTrait === 'leader' && T.includes(k.captainTrait) && JSON.parse(localStorage.getItem('yam_save_v1') || '{}').squad?.every(p => T.includes(p.captainTrait));
+        && keep.captainTrait === k.captainTrait && T.includes(k.captainTrait) && JSON.parse(localStorage.getItem('yam_save_v1') || '{}').squad?.every(p => T.includes(p.captainTrait));
       out.world = [...sq, ...(s.globalPlayers || []), ...s.league.teams.filter(t => !t.user).flatMap(t => s.league.roster(t, new Set()))].every(p => T.includes(p.captainTrait));
       out.det = Player.rollCaptainTrait('id7', 'Tommy Smith', k.psych) === Player.rollCaptainTrait('id7', 'Tommy Smith', k.psych);
       const share = (ps, t) => { let n = 0; for (let i = 0; i < 400; i++) n += Player.rollCaptainTrait('t' + i, 'N' + i, ps) === t; return n / 400; };
@@ -1088,6 +1102,18 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       && v38d.obsDlg.tones === 'green,gray,red' && v38d.obsTag && v38d.obsOop === 0 && v38d.obsMor === '53,53' && v38d.obsCd
       && v38d.benchDlg.tones === 'green,gray,red' && v38d.promised && v38d.fired && v38d.midDlg.tones === 'green' && v38d.midCap && v38d.midMor === 52
       && v38d.lowDlg.tones === 'green,gray' && v38d.lowCap && v38d.lowMor === 50 && v38d.closed, JSON.stringify(v38d));
+    // v3.9: a Quick Sim talk still owed survives a reload WITHOUT a forced modal, and closing the matchday skips it (no effects, no soft-lock)
+    await page.evaluate(() => { const s = YAM.game; s.lastReport.talk = null; s.lastReport.instant = true; s.save(); });
+    await page.reload();
+    await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    await page.evaluate(() => { YAM.game.excusesOff = true; });
+    const sk0 = await page.evaluate(() => ({ closed: document.getElementById('msum-layer').hidden, free: !YAM.ui.modalLock, pending: YAM.game.talkPending,
+      rep: JSON.stringify([YAM.game.rep.board, YAM.game.rep.parents]), m: YAM.game.squad.map(p => p.dyn.morale).join() }));
+    await page.evaluate(() => YAM.ui.closeMatchday());
+    const sk = await page.evaluate(k => ({ talk: YAM.game.lastReport.talk === 'none' || YAM.game.phase !== 'post', phase: YAM.game.phase !== 'post',
+      closed: document.getElementById('msum-layer').hidden, diary: YAM.game.diary.some(d => d.key === 'tt.skipped'), rep: JSON.stringify([YAM.game.rep.board, YAM.game.rep.parents]) === k.rep }), sk0);
+    check('v3.9 Quick Sim talk: reload keeps it pending without a modal; closing the matchday skips it (diary line, no effects) → next matchday',
+      sk0.closed && sk0.free && sk0.pending && Object.values(sk).every(Boolean), JSON.stringify({ sk0, sk }));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

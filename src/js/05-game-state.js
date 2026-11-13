@@ -533,9 +533,16 @@ class GameState {
     }
     for (const k of ['board', 'parents', 'squad']) if (fx[k]) this.addRep(k, fx[k]);
     rep.talk = key;
-    this.addDiary({ date: this.calendar.date, key: 'tt.diary', vars: { o: { team: rep.opponent }, t: { talk: key } }, cls: 'ev' });
+    this.addDiary({ date: this.calendar.date, key: 'tt.diary', vars: { o: { team: rep.opponent }, t: { talk: key }, r: { talkReact: key + '.' + talkOutcome(rep) } }, cls: 'ev' });   // v3.9: + the dressing-room reaction
     this.save();
     return fx;
+  }
+  /** v3.9: a Quick Sim matchday closed without opening the Match Summary — no talk, no effects (never a soft-lock). */
+  skipTeamTalk() {
+    if (!this.talkPending) return;
+    this.lastReport.talk = 'none';
+    this.addDiary({ date: this.calendar.date, key: 'tt.skipped', vars: { o: { team: this.lastReport.opponent } }, cls: 'ev' });
+    this.save();
   }
   /** v1.1: players who played keep their LIVE end-of-match energy; unused subs rest. */
   applyLiveFatigue(eng) {

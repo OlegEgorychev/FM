@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v3.6)
+# Youth Academy Manager — design notes (current: v3.9)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -234,3 +234,10 @@ Two fog-of-war-friendly ways to learn a kid's hidden `archetype` — words only,
   - B "give him minutes" (captain ≥ 14, checked first): a present, available kid with `benchStreak ≥ 2` and morale < 55, chance 0.30 + (L−14)·0.05. Green: `promisedPitchTime`. After the next league match (`trackCaptaincy`, live + Quick Sim): played ≥ 1 minute (`everPlayed`) → +6 and squad +2, unused → −10 and squad −3 (diary `cb.kept / cb.broken`). Grey: +1 to the kid. Red: discipline +1 both, kid −5, captain −2.
   - A "he looks lost there" (captain ≥ 8): a present kid with `outOfPositionMatches ≥ 2`, chance 0.15 + (L−8)·0.04. Green: tag → hidden archetype, streak 0, +3 captain and kid. Grey: only the cooldown. Red: captain discipline +1, −3, advice paused 14 days.
 - `trackCaptaincy(eng, result, capRep)` runs after `trackPositions` and before bans / injuries tick: tenure +1, shock, `hold−1`, bench streaks (played → 0, available but unused → +1, unavailable → unchanged), promise resolution, `capPressure` cleared.
+
+## Coach's Word polish: lines per result, locked-UI hints, Quick Sim without a forced modal (v3.9)
+- **Speech lines** depend on the result: `tt.say.<praise|tough|excuse>.<W|D|L>` (a heavy loss uses the L line; the effects still use the `heavy` row of `TEAM_TALK`).
+- **Diary**: `tt.diary` carries `{o}` (opponent), `{t}` (talk name) and `{r}` = `{ talkReact: '<key>.<outcome>' }` → the same dressing-room reaction line the summary shows. v3.5 entries without `r` just end after the talk name.
+- **Locked-UI look**: under `body.modal-lock` taskbar / tray / desktop-icon labels get the Win98 disabled colour (#7c807a + white etch). `#msum-lockbar` (inside `#msum-layer`, a 38 px strip exactly over the taskbar) shows a padlock note `lock.bar` and a hover tooltip: `lock.tipTalk` while the talk is owed, `lock.tip` after it. ReadMe (`btn-ver` → `show('readme')`) and the tray DEBUG button are blocked like every other opener.
+- **Quick Sim**: `onMatchEnd` for an instant match no longer opens the summary — it goes straight to the Notebook (`show('notes')`). The Notebook shows a `.nb-talk` line (bold while the talk is owed) with a `[ MATCH SUMMARY ]` button (`#btn-nb-msum`) that opens the normal locked summary. A reload re-opens the summary only for a visual match (`!lastReport.instant`).
+- **No soft-lock**: `closeMatchday()` with a talk still owed re-opens the summary for a visual match; for a Quick Sim it calls `GameState.skipTeamTalk()` → `lastReport.talk = 'none'`, diary `tt.skipped`, no effects, and the matchday closes. The summary renders `'none'` as `tt.react.none` with the buttons disabled.
