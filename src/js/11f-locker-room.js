@@ -54,6 +54,13 @@ class LockerRoom {
       if (!lk.absent[pr.pid] && this.state.player(pr.pid)) return { id: 'posreq', r: pr };
       pr.done = true;
     }
+    const cr = lk.capRequest, s = this.state;   // v3.8 captain's word (initiatives / resignation), only while he still wears the armband
+    if (cr && !cr.done) {
+      const here = id => id && !lk.absent[id] && s.player(id);
+      if (s.duties.captain === cr.pid && here(cr.pid) && (cr.kind === 'resign' || here(cr.mate)))
+        return { id: 'cap' + cr.kind, r: cr, cast: cr.kind === 'resign' ? { kid: cr.pid, ...(here(cr.hint) ? { hint: cr.hint } : {}) } : { kid: cr.pid, mate: cr.mate } };
+      cr.done = true;
+    }
     return null;
   }
   get requestPending() { return !!this.pendingRequest; }
@@ -64,7 +71,7 @@ class LockerRoom {
       const q = this.pendingRequest;
       if (!this.isOpen || !q || this.ui.events.active) return;
       this.ui.profile.close();
-      this.ui.events.fire(q.id, this.state.calendar.date, { cast: { kid: q.r.pid } });
+      this.ui.events.fire(q.id, this.state.calendar.date, { cast: q.cast || { kid: q.r.pid } });
     }, delay);
   }
   close() { this.layer.hidden = true; this.ui.renderDash(); }

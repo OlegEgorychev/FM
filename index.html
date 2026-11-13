@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.7</title>
+<title>Youth Academy Manager v3.8</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -2128,6 +2128,22 @@ const CAPTAIN_TRAITS = ['leader', 'anxious', 'normal'];
 const CAPTAIN = { LEAD_BASE: 0.12, LEAD_COMP: 0.045, LEAD_DRIVE: 0.03, ANX_BASE: 0.12, ANX_COMP: 0.06, TRAIT_MIN: 0.03, TRAIT_MAX: 0.75,
   RALLY: 1, RALLY_MIN: 10, POST_MORALE: 3, CHEER: 0.25,
   STRESS: 1.5, STRESS_COMP: 0.1, BREAK_MISTAKE: 0.08, BREAK_CONCEDE: 0.2, BREAK_TRAIL: 0.006, BREAK_MORALE: 20, NERVES: 0.35, CLUE: 0.4, PRACTICE_CLUE: 0.3 };
+/* v3.8 HIDDEN LEADERSHIP (1–20) — the single source of truth for the captain trait:
+   ≥ LEADER → 'leader', ≤ ANXIOUS → 'anxious', otherwise 'normal'. Never shown outside DEBUG.EXE.
+   Armband reactions (dialogue on assignment) give morale once per REACT_CD days per kid (anti-farming).
+   Captain initiatives (locker room, after excuses / position requests): shared INIT_CD-day cooldown, seeded by date + ids.
+   Low-leadership captains may ask to hand the armband back (RESIGN_CHANCE by matches worn, +1 step after a loss / breakdown). */
+const LEADERSHIP = { LEADER: 14, ANXIOUS: 7,
+  REACT_CD: 14, HIGH_MORALE: 5, MID_MORALE: 2, LOW_KEEP_MORALE: -2, STRIP_LEADER: -3, STRIP_ANXIOUS: 2,
+  INIT_CD: 7, ADVICE_PAUSE: 14,
+  OBS_LEAD: 8, OBS_MIN: 2, OBS_BASE: 0.15, OBS_STEP: 0.04, OBS_MORALE: 3, OBS_RED_DISC: 1, OBS_RED_MORALE: -3,
+  BENCH_MIN: 2, BENCH_MORALE: 55, BENCH_BASE: 0.3, BENCH_STEP: 0.05,
+  PROMISE_KEPT: 6, PROMISE_KEPT_SQUAD: 2, PROMISE_BROKEN: -10, PROMISE_BROKEN_SQUAD: -3,
+  BENCH_WAIT_MORALE: 1, BENCH_RED_DISC: 1, BENCH_RED_KID: -5, BENCH_RED_CAP: -2,
+  RESIGN_MIN: 2, RESIGN_CHANCE: [0.25, 0.45, 0.65], RESIGN_YES: 8, RESIGN_HOLD: 2, RESIGN_HOLD_MORALE: -3,
+  RESIGN_NO_DISC: 1, RESIGN_NO_MORALE: -10, RESIGN_NO_HOLD: 1, PRESSURE_MULT: 1.5 };
+const leadershipTrait = l => l >= LEADERSHIP.LEADER ? 'leader' : l <= LEADERSHIP.ANXIOUS ? 'anxious' : 'normal';
+const LEADERSHIP_RANGE = { leader: [14, 20], normal: [8, 13], anxious: [1, 7] };
 const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25, CORNER_BLOCK: 0.3, CORNER_DELIVERY: 3, HEADER_HEIGHT: 6,
   CAPTAIN: 0.5 };   // captain on the pitch: + (0.5 + passion/20) on all our rolls (≈ +0.55 … +1.5)
 /* v3.1 SANDBOX WORLD — 100 kids; 40 at rival clubs, 60 free agents; 30 of them play the Yard Match; you sign 15
@@ -3401,6 +3417,96 @@ Object.assign(I18N.ru, {
   'obs.cap.anxious.1': 'Игровая практика: {k} растерялся после одной ошибки и какое-то время прятался от мяча.',
   'dbg.cap.leader': 'лидер', 'dbg.cap.anxious': 'тревожный', 'dbg.cap.normal': 'обычный',
 });
+/* v3.8 HIDDEN LEADERSHIP — armband reactions, captain initiatives, resignation.
+   Words only: leadership is never named or shown as a number outside DEBUG.EXE. RU: player names stay in the nominative case. */
+Object.assign(I18N.en, {
+  'talk.roleArmband': '#{n} · {p} · the armband', 'talk.roleCaptain': '#{n} · {p} · captain, wants a word',
+  'ca.high.0': '{k} pulls the armband on straight away. "Thank you, coach, I won\'t let you down — I\'ll keep the lads focused on every ball."',
+  'ca.high.1': '{k} nods, serious. "Got it. Nobody hides on my watch — we win together, we lose together."',
+  'ca.high.2': '{k} grins and taps the armband. "I\'ll talk to the quiet ones before kick-off. Everyone pulls the same way."',
+  'ca.high.3': '{k} straightens up. "You can count on me, coach. When it gets tough, I\'ll be the loudest one out there."',
+  'ca.mid.0': '{k} blinks. "Whoa… alright, coach, I\'ll do my best to guide the lads."',
+  'ca.mid.1': '{k} turns the armband over in his hands. "Me? Okay… I\'ll try. Tell me if I\'m doing it wrong."',
+  'ca.mid.2': '{k} smiles a little nervously. "Cool! I\'ve never done this before, but I\'ll give it a go."',
+  'ca.mid.3': '{k} shrugs, then nods. "Alright. I\'ll keep an eye on everyone. I think I can manage."',
+  'ca.low.0': '{k} goes pale. "Me? Coach, maybe someone louder? I\'m scared I\'ll mess things up when it counts."',
+  'ca.low.1': '{k} stares at the armband. "I… I don\'t think the others will listen to me. What if we lose because of me?"',
+  'ca.low.2': '{k} fidgets. "Coach, I get really nervous when everyone looks at me. Can\'t somebody else do it?"',
+  'ca.low.3': '{k} barely whispers. "I\'ll try… but my stomach already hurts just thinking about it."',
+  'ca.ok.high': 'Good. The armband is yours', 'ca.ok.mid': 'You\'ll be fine. It\'s yours',
+  'ca.trust': 'You can handle it, I trust you', 'ca.other': 'Alright, I\'ll pick someone else',
+  'ca.ok.high.diary': '{k} was given the armband — took it like he was born for it.',
+  'ca.ok.mid.diary': '{k} was given the armband — surprised, but keen to try.',
+  'ca.trust.diary': '{k} was given the armband despite his doubts: "I trust you." He looked worried.',
+  'ca.other.diary': '{k} did not feel ready for the armband. The coach will choose someone else.',
+  'ca.strip.high': '{k} lost the armband and took it hard — he barely said a word at training.',
+  'ca.strip.low': '{k} handed the armband back and looked visibly relieved.',
+  'co.text.0': '{k} hangs back after everyone leaves. "Coach, can I say something? {t} looks lost {now}. I think he\'d be much better {want} — that\'s where he plays in the yard."',
+  'co.text.1': '{k} lowers his voice. "It\'s about {t}. Out there {now} he doesn\'t know where to run. Try him {want}, coach — I reckon he\'d fly."',
+  'co.yes': 'Good eye, I\'ll move him', 'co.watch': 'Thanks, I\'ll keep an eye on him in training', 'co.no': 'I decide the lineup',
+  'co.yes.diary': 'Captain {k} spotted that {t} was out of place — new assignment: {p}. Both left the room smiling.',
+  'co.watch.diary': 'Captain {k} spoke up about {t}\'s position. The coach will watch him in training.',
+  'co.no.diary': 'Captain {k} tried to talk about {t}\'s position. "I decide the lineup." He went quiet.',
+  'cb.text.0': '{k} steps into the office. "Coach, {t} hasn\'t played in {n} matches. He\'s really down. Could you give him a few minutes next game? Even off the bench."',
+  'cb.text.1': '{k} looks you in the eye. "{t} is sitting in the corner again, coach. He trains hard. Just some pitch time next match — the lads would notice."',
+  'cb.yes': 'Okay, I\'ll get him on the pitch next match', 'cb.wait': 'We\'ll see how the match goes', 'cb.no': 'Only the best make the pitch',
+  'cb.yes.diary': 'Captain {k} asked for minutes for {t}. Promise: he plays next match.',
+  'cb.wait.diary': 'Captain {k} asked for minutes for {t}. "We\'ll see how the match goes."',
+  'cb.no.diary': 'Captain {k} asked for minutes for {t}. "Only the best make the pitch." Two long faces.',
+  'cb.kept': 'Promise kept: {k} got his minutes. The dressing room noticed.',
+  'cb.broken': 'Promise broken: {k} never left the bench. The lads noticed that too.',
+  'cr.text.0': '{k} holds out the armband with both hands. "Coach… can I give this back? I can\'t sleep before matches. I keep thinking I\'ll let everyone down."',
+  'cr.text.1': '{k} stares at his boots. "I\'m not a captain, coach. When they shout at me I just freeze. Please — let someone else do it."',
+  'cr.text.hint': '{k} fiddles with the armband. "Coach… on the pitch everybody listens to {h} anyway, not me. Maybe… maybe I could just play?"',
+  'cr.yes': 'Alright, I\'ll take the pressure off you', 'cr.hold': 'Hold on for two more matches', 'cr.no': 'A captain never quits',
+  'cr.yes.diary': '{k} handed the armband back. He smiled for the first time in weeks.',
+  'cr.hold.diary': '{k} asked to give up the armband. "Two more matches." He nodded without looking up.',
+  'cr.no.diary': '{k} asked to give up the armband. "A captain never quits." His hands were shaking.',
+});
+Object.assign(I18N.ru, {
+  'talk.roleArmband': '№{n} · {p} · капитанская повязка', 'talk.roleCaptain': '№{n} · {p} · капитан, хочет поговорить',
+  'ca.high.0': '{k} сразу натягивает повязку. «Спасибо, тренер, я не подведу — буду держать ребят в тонусе в каждом эпизоде».',
+  'ca.high.1': '{k} серьёзно кивает. «Понял. Со мной никто не спрячется — выигрываем вместе, проигрываем вместе».',
+  'ca.high.2': '{k} улыбается и хлопает по повязке. «Перед игрой поговорю с тихими. Все тянут в одну сторону».',
+  'ca.high.3': '{k} расправляет плечи. «Можете на меня рассчитывать, тренер. Когда станет тяжело, я буду громче всех».',
+  'ca.mid.0': '{k} моргает. «Ого… ладно, тренер, постараюсь вести ребят за собой».',
+  'ca.mid.1': '{k} вертит повязку в руках. «Я? Хорошо… попробую. Скажете, если что-то не так».',
+  'ca.mid.2': '{k} немного нервно улыбается. «Класс! Никогда такого не делал, но попробую».',
+  'ca.mid.3': '{k} пожимает плечами, потом кивает. «Ладно. Буду за всеми приглядывать. Думаю, справлюсь».',
+  'ca.low.0': '{k} бледнеет. «Я? Тренер, может, кого-нибудь погромче? Боюсь, я всё испорчу в самый важный момент».',
+  'ca.low.1': '{k} смотрит на повязку. «Я… не думаю, что меня будут слушать. А если мы проиграем из-за меня?»',
+  'ca.low.2': '{k} переминается с ноги на ногу. «Тренер, я очень волнуюсь, когда все на меня смотрят. Может, кто-то другой?»',
+  'ca.low.3': '{k} говорит почти шёпотом. «Я попробую… но у меня уже живот болит, как только об этом думаю».',
+  'ca.ok.high': 'Отлично. Повязка твоя', 'ca.ok.mid': 'Справишься. Повязка твоя',
+  'ca.trust': 'Ты справишься, я тебе доверяю', 'ca.other': 'Хорошо, выберу кого-нибудь другого',
+  'ca.ok.high.diary': '{k} получил капитанскую повязку — принял её так, будто для этого и родился.',
+  'ca.ok.mid.diary': '{k} получил капитанскую повязку — удивился, но готов попробовать.',
+  'ca.trust.diary': '{k} получил повязку, несмотря на сомнения: «Я тебе доверяю». Выглядел встревоженным.',
+  'ca.other.diary': '{k} не чувствует себя готовым к повязке. Тренер выберет другого.',
+  'ca.strip.high': '{k} лишился повязки и тяжело это переживает — на тренировке почти не разговаривал.',
+  'ca.strip.low': '{k} вернул повязку и заметно выдохнул.',
+  'co.text.0': '{k} задерживается, когда все уходят. «Тренер, можно скажу? {t} — он {now} совсем потерялся. Мне кажется, ему было бы гораздо лучше {want} — во дворе он всегда там играет».',
+  'co.text.1': '{k} говорит тише. «Тут такое дело. {t} {now} не понимает, куда бежать. Попробуйте его {want}, тренер, — по-моему, он там раскроется».',
+  'co.yes': 'Глаз-алмаз, переставлю его', 'co.watch': 'Спасибо, посмотрю на него на тренировке', 'co.no': 'Состав решаю я',
+  'co.yes.diary': 'Капитан {k} заметил, что {t} играет не на своём месте, — новое назначение: {p}. Оба ушли довольные.',
+  'co.watch.diary': 'Капитан {k} заговорил о позиции партнёра ({t}). Тренер присмотрится к нему на тренировке.',
+  'co.no.diary': 'Капитан {k} хотел обсудить позицию партнёра ({t}). «Состав решаю я». Капитан замолчал.',
+  'cb.text.0': '{k} заходит в кабинет. «Тренер, {t} уже несколько матчей подряд сидит на скамейке. Он совсем раскис. Может, дадите ему пару минут в следующей игре? Хоть со скамейки».',
+  'cb.text.1': '{k} смотрит прямо в глаза. «Тренер, {t} опять сидит в углу. Он ведь пашет на тренировках. Хоть немного игрового времени в следующем матче — ребята это оценят».',
+  'cb.yes': 'Хорошо, в следующем матче он выйдет', 'cb.wait': 'Посмотрим по ходу матча', 'cb.no': 'На поле выходят только лучшие',
+  'cb.yes.diary': 'Капитан {k} попросил игрового времени для партнёра ({t}). Обещание: тот сыграет в следующем матче.',
+  'cb.wait.diary': 'Капитан {k} попросил игрового времени для партнёра ({t}). «Посмотрим по ходу матча».',
+  'cb.no.diary': 'Капитан {k} попросил игрового времени для партнёра ({t}). «На поле выходят только лучшие». Два хмурых лица.',
+  'cb.kept': 'Обещание выполнено: {k} получил свои минуты. В раздевалке это заметили.',
+  'cb.broken': 'Обещание нарушено: {k} так и не встал со скамейки. В раздевалке заметили и это.',
+  'cr.text.0': '{k} протягивает повязку обеими руками. «Тренер… можно я её верну? Я не сплю перед матчами. Всё время думаю, что всех подведу».',
+  'cr.text.1': '{k} смотрит себе под ноги. «Я не капитан, тренер. Когда на меня кричат, я просто замираю. Пожалуйста, пусть кто-нибудь другой».',
+  'cr.text.hint': '{k} теребит повязку. «Тренер… {h} — вот кого на поле все и так слушают, а не меня. Может, я просто буду играть?»',
+  'cr.yes': 'Хорошо, сниму с тебя этот груз', 'cr.hold': 'Потерпи ещё два матча', 'cr.no': 'Капитан никогда не сдаётся',
+  'cr.yes.diary': '{k} вернул капитанскую повязку. Впервые за несколько недель улыбнулся.',
+  'cr.hold.diary': '{k} попросил снять с него повязку. «Ещё два матча». Кивнул, не поднимая глаз.',
+  'cr.no.diary': '{k} попросил снять с него повязку. «Капитан никогда не сдаётся». У него дрожали руки.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -3683,7 +3789,16 @@ class Player {
     this.bio = { ...b };
     // v3.7: HIDDEN captain trait ('leader' | 'anxious' | 'normal') — seeded from id + name + psych, so old saves,
     // AI rosters and the free-agent pool all migrate to the same value on every load (never Math.random)
-    this.captainTrait = CAPTAIN_TRAITS.includes(o.captainTrait) ? o.captainTrait : Player.rollCaptainTrait(id, name, this.psych);
+    // v3.8: HIDDEN leadership 1–20 is the source of truth (captainTrait is derived). Saves without it get a seeded value
+    // inside the range of their stored v3.7 trait (or of a freshly rolled one), so every trait stays what it was.
+    this.leadership = Number.isFinite(o.leadership) ? clamp(Math.round(o.leadership), 1, 20)
+      : Player.rollLeadership(id, name, CAPTAIN_TRAITS.includes(o.captainTrait) ? o.captainTrait : Player.rollCaptainTrait(id, name, this.psych));
+    if (tags) {
+      this.captainReactionCooldown = Math.max(0, Math.round(o.captainReactionCooldown || 0));   // v3.8: days before an armband change moves his morale again
+      this.benchStreak = Math.max(0, Math.round(o.benchStreak || 0));                           // v3.8: straight league matches fit but unused
+      this.promisedPitchTime = !!o.promisedPitchTime;                                            // v3.8: the coach promised the captain he plays next match
+      this.capPressure = Math.max(0, Math.round(o.capPressure || 0));                            // v3.8: "a captain never quits" — higher breakdown risk next match
+    }
     const d = o.dyn || {};
     const r = seeded(id + name + '#dyn');
     this.dyn = { condition: clamp(Math.round(d.condition ?? o.energy ?? 100), 0, 100),
@@ -3724,7 +3839,15 @@ class Player {
   /** Morale swing on every roll: ±2 at the extremes, amplified by passion (0.6×–1.5×). */
   get moodBonus() { return clamp((this.dyn.morale - 50) / 25 * (0.55 + this.psych.passion / 20), -2.5, 2.5); }
   /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */
-  toJSON() { const { portraitSvg, ...o } = this; return o; }
+  toJSON() { const { portraitSvg, ...o } = this; return { ...o, captainTrait: this.captainTrait }; }   // v3.8: trait kept for older readers
+  /** v3.8: the captain trait is derived from hidden leadership (≥ 14 leader, ≤ 7 anxious). Setting a trait moves leadership into its range. */
+  get captainTrait() { return leadershipTrait(this.leadership); }
+  set captainTrait(t) { if (CAPTAIN_TRAITS.includes(t) && t !== this.captainTrait) this.leadership = Player.rollLeadership(this.id, this.name, t); }
+  /** v3.8: deterministic leadership inside the trait's band (seeded by id + name, never Math.random). */
+  static rollLeadership(id, name, trait = 'normal') {
+    const [lo, hi] = LEADERSHIP_RANGE[trait] || LEADERSHIP_RANGE.normal;
+    return lo + Math.floor(seeded(String(id) + '|' + String(name) + '#lead')() * (hi - lo + 1));
+  }
 
   /** v3.7: deterministic hidden captain trait, loosely tied to psychology (see CAPTAIN in 00-utils-data.js).
       High composure + passion/discipline → leader more likely; low composure → anxious more likely; the rest normal. */
@@ -4130,6 +4253,7 @@ class GameState {
     this.budget = ECONOMY.START;   // v1.9: club money ($), carried across seasons
     this.rep = { board: REP.START, parents: REP.START, squad: REP.START };   // v2.8 faction reputation
     this.duties = { captain: null, penalty: null, corner: null };            // v3.0 exclusive team duties (player ids)
+    this.captaincy = GameState.freshCaptaincy();                               // v3.8 armband tenure + captain initiative cooldowns
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
@@ -4273,11 +4397,104 @@ class GameState {
     p.refreshPortrait();
     this.save();
   }
-  /** Exclusive: assigning a duty takes it away from whoever had it. Clicking the holder again clears it. */
+  /** Exclusive: assigning a duty takes it away from whoever had it. Clicking the holder again clears it.
+      v3.8: a captain who loses the armband reacts (leader −3 / anxious +2 relief, once per REACT_CD days). Returns that diary line or null. */
   setDuty(duty, id) {
-    if (!(duty in DUTIES)) return;
-    this.duties[duty] = this.duties[duty] === id ? null : id;
+    if (!(duty in DUTIES)) return null;
+    const prev = this.duties[duty], next = prev === id ? null : id;
+    this.duties[duty] = next;
+    let line = null;
+    if (duty === 'captain' && prev && prev !== next) line = this.relieveCaptain(this.player(prev));
     this.save();
+    return line;
+  }
+
+  /* ---------- v3.8 HIDDEN LEADERSHIP: armband reactions, captain initiatives, resignation ---------- */
+  static freshCaptaincy(o = {}) {
+    return { id: o.id || null, matches: Math.max(0, Math.round(o.matches || 0)), shock: !!o.shock, hold: Math.max(0, Math.round(o.hold || 0)),
+      initUntil: o.initUntil || null, pauseUntil: o.pauseUntil || null, assigns: Math.max(0, Math.round(o.assigns || 0)) };
+  }
+  /** Armband tenure of the CURRENT captain (resets lazily whenever the armband changes hands; cooldown dates survive). */
+  get capt() {
+    const c = this.captaincy || (this.captaincy = GameState.freshCaptaincy()), id = this.duties?.captain || null;
+    if (c.id !== id) Object.assign(c, { id, matches: 0, shock: false, hold: 0 });
+    return c;
+  }
+  captainTier(p) { return p.leadership >= LEADERSHIP.LEADER ? 'high' : p.leadership <= LEADERSHIP.ANXIOUS ? 'low' : 'mid'; }
+  /** Morale from an armband change — skipped while his reaction cooldown runs (no farming by toggling the armband). Returns the applied delta. */
+  captainReaction(p, delta) {
+    if (!p || !delta || p.captainReactionCooldown > 0) return 0;
+    p.dyn.morale = clamp(Math.round(p.dyn.morale + delta), 0, 100);
+    p.captainReactionCooldown = LEADERSHIP.REACT_CD;
+    return delta;
+  }
+  /** The armband is taken off him: a real leader is hurt, an anxious kid is relieved. */
+  relieveCaptain(p) {
+    if (!p?.tags) return null;
+    const t = this.captainTier(p), d = t === 'high' ? LEADERSHIP.STRIP_LEADER : t === 'low' ? LEADERSHIP.STRIP_ANXIOUS : 0;
+    if (!this.captainReaction(p, d)) return null;
+    const key = 'ca.strip.' + t;
+    this.addDiary({ date: this.calendar.date, key, vars: { k: { pid: p.id } }, cls: 'ev' });
+    return key;
+  }
+  /** Coach confirmed the armband in the assignment dialogue. keep=false (low tier) → nothing changes. Returns the applied morale delta. */
+  confirmCaptain(id, keep = true) {
+    const p = this.player(id);
+    if (!p || !keep) return 0;
+    if (this.duties.captain !== id) this.setDuty('captain', id);
+    const t = this.captainTier(p);
+    const d = this.captainReaction(p, t === 'high' ? LEADERSHIP.HIGH_MORALE : t === 'mid' ? LEADERSHIP.MID_MORALE : LEADERSHIP.LOW_KEEP_MORALE);
+    this.capt.assigns++;
+    this.save();
+    return d;
+  }
+  /** Seeded index (0–3) of the reaction line: same dialogue after a reload, a new line for every new assignment. */
+  captainLine(id, date = this.calendar.date) { return Math.floor(seeded(date + '#ca#' + id + '#' + this.capt.assigns)() * 4); }
+  /** Daily: reaction cooldowns tick down. */
+  captainDaily() { for (const p of this.squad) if (p.captainReactionCooldown > 0) p.captainReactionCooldown--; }
+  /** Locker room (rolled with the arrivals, AFTER excuses and position requests): the captain may come to the coach.
+      ≤ ANXIOUS → asks to hand back the armband; ≥ LEADER → asks to play a benched teammate; ≥ OBS_LEAD → spots a kid out of position. */
+  rollCaptainRequest(absent, date = this.calendar.date) {
+    if (this.excusesOff) return null;
+    const c = this.player(this.duties?.captain), k = this.capt, Ld = LEADERSHIP;
+    if (!c || absent[c.id]) return null;
+    const here = this.squad.filter(p => p !== c && !absent[p.id]);
+    if (c.leadership <= Ld.ANXIOUS) {
+      if (k.hold > 0 || (k.matches < Ld.RESIGN_MIN && !k.shock)) return null;
+      const step = clamp(k.matches - Ld.RESIGN_MIN + (k.shock ? 1 : 0), 0, Ld.RESIGN_CHANCE.length - 1);
+      if (seeded(date + '#capresign#' + c.id)() >= Ld.RESIGN_CHANCE[step]) return null;
+      const hint = here.filter(p => p.leadership >= Ld.LEADER).sort((a, b) => b.leadership - a.leadership || a.id.localeCompare(b.id))[0];
+      return { kind: 'resign', pid: c.id, hint: hint ? hint.id : null, done: false };
+    }
+    if ((k.initUntil && date < k.initUntil) || (k.pauseUntil && date < k.pauseUntil)) return null;
+    if (c.leadership >= Ld.LEADER) {
+      const m = here.filter(p => p.available && p.benchStreak >= Ld.BENCH_MIN && p.dyn.morale < Ld.BENCH_MORALE && !p.promisedPitchTime)
+        .sort((a, b) => b.benchStreak - a.benchStreak || a.dyn.morale - b.dyn.morale || a.id.localeCompare(b.id))[0];
+      if (m && seeded(date + '#capbench#' + c.id + '#' + m.id)() < Ld.BENCH_BASE + (c.leadership - Ld.LEADER) * Ld.BENCH_STEP) return { kind: 'bench', pid: c.id, mate: m.id, done: false };
+    }
+    if (c.leadership >= Ld.OBS_LEAD) {
+      const m = here.filter(p => p.outOfPositionMatches >= Ld.OBS_MIN && p.archetype)
+        .sort((a, b) => b.outOfPositionMatches - a.outOfPositionMatches || a.id.localeCompare(b.id))[0];
+      if (m && seeded(date + '#capobs#' + c.id + '#' + m.id)() < Ld.OBS_BASE + (c.leadership - Ld.OBS_LEAD) * Ld.OBS_STEP) return { kind: 'obs', pid: c.id, mate: m.id, done: false };
+    }
+    return null;
+  }
+  /** After every league match (live + Quick Sim), BEFORE suspensions / injuries tick: armband tenure, bench streaks, promised pitch time. */
+  trackCaptaincy(eng, result, cap = null) {
+    const k = this.capt, Ld = LEADERSHIP, date = this.calendar.date;
+    if (k.id) { k.matches++; k.shock = result === 'L' || (cap?.id === k.id && cap.breakdown != null); if (k.hold > 0) k.hold--; }
+    for (const p of this.squad) {
+      const played = eng.everPlayed.has(p.id);
+      if (played) p.benchStreak = 0; else if (p.available) p.benchStreak++;
+      if (p.promisedPitchTime) {
+        p.promisedPitchTime = false;
+        const ok = played;
+        p.dyn.morale = clamp(p.dyn.morale + (ok ? Ld.PROMISE_KEPT : Ld.PROMISE_BROKEN), 0, 100);
+        this.addRep('squad', ok ? Ld.PROMISE_KEPT_SQUAD : Ld.PROMISE_BROKEN_SQUAD);
+        this.addDiary({ date, key: ok ? 'cb.kept' : 'cb.broken', vars: { k: { pid: p.id } }, cls: 'ev' });
+      }
+      p.capPressure = 0;
+    }
   }
   dutiesOf(id) { return Object.keys(DUTIES).filter(d => this.duties?.[d] === id); }
   setTag(id, tag) { const p = this.player(id); if (p && TAGS[tag]) { p.tags = [tag]; this.save(); } }
@@ -4296,6 +4513,7 @@ class GameState {
   addRep(key, delta) { if (this.rep && key in this.rep) this.rep[key] = clamp(Math.round(this.rep[key] + delta), 0, 100); }
   /** Daily: squad rep drifts 1 toward the squad's average morale; 1st of the month: board grant; Sundays: parents. */
   repDaily(date) {
+    this.captainDaily();   // v3.8
     const avg = this.squad.reduce((a, p) => a + p.dyn.morale, 0) / this.squad.length;
     this.addRep('squad', Math.sign(Math.round(avg) - this.rep.squad));
     const d = new Date(date + 'T00:00:00Z');
@@ -4404,6 +4622,7 @@ class GameState {
       if (r) absent[p.id] = r;
     }
     d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent), posRequest: this.rollPositionRequest(absent) };   // v3.6
+    d.locker.capRequest = d.locker.request || d.locker.posRequest ? null : this.rollCaptainRequest(absent);   // v3.8: urgent kid requests come first
     this.save();
     return d.locker;
   }
@@ -4433,7 +4652,8 @@ class GameState {
     this.eventQueue = this.eventQueue.filter(q => !q.cast || ![].concat(...Object.values(q.cast)).includes(id));
     if (this.lastReport) this.lastReport.players = this.lastReport.players.filter(r => r.id !== id);
     const lk = this.today?.locker;
-    if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null; }
+    if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null;
+      if ([lk.capRequest?.pid, lk.capRequest?.mate, lk.capRequest?.hint].includes(id)) lk.capRequest = null; }   // v3.8
     p.teamId = 'free_agent';   // v3.1: he stays in the world database (future transfers)
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
     this.save();
@@ -4606,7 +4826,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -4642,6 +4862,7 @@ class GameState {
       this.draft = null;
       const du = d.duties || {};   // v3.0 (after the squad: duties point at kids)
       this.duties = Object.fromEntries(Object.keys(DUTIES).map(k => [k, du[k] && this.player(du[k]) ? du[k] : null]));
+      this.captaincy = GameState.freshCaptaincy(d.captaincy && typeof d.captaincy === 'object' ? d.captaincy : { id: this.duties.captain });   // v3.8 (older saves: tenure 0)
       if (this.squad.length === 11) {
         const used = new Set(this.squad.map(p => p.surname));
         SQUAD_POS.slice(11).forEach((pos, i) => this.squad.push(Player.generate(`a${11 + i}`, pos, used, 0, true)));
@@ -4841,7 +5062,8 @@ class MatchEngine {
       return;
     }
     if (c.captainTrait !== 'anxious' || k.broken === c.id || kind === 'lost') return;
-    const ch = kind === 'mistake' ? CAPTAIN.BREAK_MISTAKE : kind === 'concede' ? CAPTAIN.BREAK_CONCEDE : CAPTAIN.BREAK_TRAIL;
+    const ch = (kind === 'mistake' ? CAPTAIN.BREAK_MISTAKE : kind === 'concede' ? CAPTAIN.BREAK_CONCEDE : CAPTAIN.BREAK_TRAIL)
+      * (c.capPressure ? LEADERSHIP.PRESSURE_MULT : 1);   // v3.8: refused his resignation ("a captain never quits")
     if (this.capRng() < ch) {
       k.broken = c.id; k.breakdown = this.minute;
       c.dyn.morale = clamp(Math.round(c.dyn.morale - CAPTAIN.BREAK_MORALE), 0, 100);
@@ -5480,8 +5702,22 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.8', name: { en: 'The Captain\'s Voice', ru: 'Голос капитана' },
+    en: [
+      'Handing out the armband is now a conversation: the kid answers in his own words — proud, surprised or plainly scared. A scared one can be reassured, or you can pick someone else.',
+      'The armband touches morale: a natural leader is thrilled to get it and hurt to lose it, a nervous kid is relieved to give it back. Swapping it back and forth will not farm morale.',
+      'Captains speak up in the locker room: a good one may point out a teammate playing in the wrong line, and a real leader may ask you to give a benched, unhappy kid some minutes. Promise — and keep it, or the dressing room will remember.',
+      'A captain who cannot carry it may ask to hand the armband back after a few matches or a bad day. Let him go, ask for two more matches, or tell him a captain never quits — at a price.',
+    ],
+    ru: [
+      'Вручение повязки — теперь разговор: ребёнок отвечает своими словами — гордо, удивлённо или откровенно испуганно. Испуганного можно подбодрить, а можно выбрать другого.',
+      'Повязка влияет на настроение: прирождённый лидер рад её получить и расстроится, если её снять, а нервный — с облегчением вернёт. Перекидывать повязку туда-сюда ради настроения не выйдет.',
+      'Капитаны подают голос в раздевалке: толковый может подсказать, что партнёр играет не в своей линии, а настоящий лидер — попросить дать минуты загрустившему запасному. Пообещал — выполняй, иначе раздевалка запомнит.',
+      'Капитан, которому повязка не по силам, может попросить её снять — после нескольких матчей или тяжёлого дня. Отпусти его, попроси потерпеть ещё два матча или скажи, что капитан не сдаётся, — но это будет стоить дорого.',
+    ],
+  },
   { v: '3.7', name: { en: 'Who Wears the Armband', ru: 'Кому носить повязку' },
     en: [
       'Not every kid is born to be captain. Some are natural leaders, some crumble under the armband, most just get on with it — and you will not be told which is which.',
@@ -6617,7 +6853,7 @@ class ProfileCard {
       if (!t && !d) return;
       const s = this.ui.state;
       if (t) s.setPosTag(this.id, t.dataset.postag);
-      else s.setDuty(d.dataset.duty, this.id);
+      else if (this.ui.assignDuty(d.dataset.duty, this.id)) return;   // v3.8: the armband opens a dialogue (profile closes)
       this.lastSig = '';
       this.ui.renderAll();
       this.render();
@@ -6838,6 +7074,7 @@ class DebugConsole {
       for (const k of ATTR_GROUPS[g]) add(g.toUpperCase(), short[k], p => p[g][k], 20, k);
     add('PSYCH', 'PA', p => p.psych.potential, 100, 'potential ability 1-100');
     add('PSYCH', 'CAPT', p => L.t('dbg.cap.' + (p.captainTrait || 'normal')), null, 'v3.7 hidden captain trait: leader (rally +morale) / anxious (stress, may break down) / normal');
+    add('PSYCH', 'LDR', p => p.leadership, 20, 'v3.8 hidden leadership 1-20 (≥14 leader, ≤7 anxious): armband reactions, captain initiatives, resignation');
     add('DYNAMIC', 'CON', p => Math.round(p.dyn.condition), 100, 'condition (energy)');
     add('DYNAMIC', 'SHP', p => Math.round(p.dyn.sharpness), 100, 'sharpness (match tone); < 50 → technical −2');
     add('DYNAMIC', 'MOR', p => Math.round(p.dyn.morale), 100, 'morale');
@@ -7356,6 +7593,115 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v3.8 ARMBAND ASSIGNMENT — the kid reacts by his HIDDEN leadership (fired by UIController.assignDuty) ---------- */
+  {
+    id: 'capassign', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast, name = L.name(kid.name), tier = s.captainTier(kid), v = s.captainLine(kid.id, ctx.date);
+      const ok = key => ({ key, tone: 'green', who: kid.id, run: () => { s.confirmCaptain(kid.id, true); return { k: { pid: kid.id } }; } });
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleArmband', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('ca.' + tier + '.' + v, { k: name }),
+        choices: tier === 'low'
+          ? [ok('ca.trust'), { key: 'ca.other', tone: 'gray', who: kid.id, run: () => ({ k: { pid: kid.id } }) }]
+          : [ok('ca.ok.' + tier)] });
+    },
+  },
+
+  /* ---------- v3.8 CAPTAIN INITIATIVE A — "he looks lost there" (captain leadership ≥ 8, teammate 2+ matches out of his line) ---------- */
+  {
+    id: 'capobs', when: 'manual',
+    trigger: () => false,
+    cast: () => null,   // rolled with the arrivals (GameState.rollCaptainRequest), fired by LockerRoom.maybeRequest
+    execute(ctx) {
+      const s = ctx.state, { kid, mate } = ctx.cast, Ld = LEADERSHIP, name = L.name(kid.name), t = L.name(mate.name);
+      const now = LINE_POS[s.slotLine(mate.id)] || mate.position, want = mate.archetype;
+      const finish = () => { const r = s.dayState().locker?.capRequest; if (r && r.pid === kid.id) r.done = true; s.capt.initUntil = isoAdd(ctx.date, Ld.INIT_CD); };
+      const vars = () => ({ k: { pid: kid.id }, t: { pid: mate.id } });
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleCaptain', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('co.text.' + Math.floor(seeded(ctx.date + '#cotext#' + mate.id)() * 2), { k: name, t, now: L.t('pr.where.' + (now || 'none')), want: L.t('pr.where.' + want) }),
+        choices: [
+          { key: 'co.yes', tone: 'green', who: kid.id,
+            run: () => {
+              finish();
+              mate.tag = want; mate.refreshPortrait(); mate.outOfPositionMatches = 0;
+              for (const p of [kid, mate]) p.dyn.morale = clamp(p.dyn.morale + Ld.OBS_MORALE, 0, 100);
+              return { ...vars(), p: { pos: want } };
+            } },
+          { key: 'co.watch', tone: 'gray', who: kid.id, run: () => { finish(); return vars(); } },
+          { key: 'co.no', tone: 'red', who: kid.id,
+            run: () => {
+              finish();
+              kid.psych.discipline = clamp(kid.psych.discipline + Ld.OBS_RED_DISC, 1, 20);
+              kid.dyn.morale = clamp(kid.dyn.morale + Ld.OBS_RED_MORALE, 0, 100);
+              s.capt.pauseUntil = isoAdd(ctx.date, Ld.ADVICE_PAUSE);
+              return vars();
+            } },
+        ] });
+    },
+  },
+
+  /* ---------- v3.8 CAPTAIN INITIATIVE B — "give him some minutes" (captain leadership ≥ 14, teammate benched 2+ matches, low morale) ---------- */
+  {
+    id: 'capbench', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid, mate } = ctx.cast, Ld = LEADERSHIP, name = L.name(kid.name), t = L.name(mate.name);
+      const finish = () => { const r = s.dayState().locker?.capRequest; if (r && r.pid === kid.id) r.done = true; s.capt.initUntil = isoAdd(ctx.date, Ld.INIT_CD); };
+      const vars = () => ({ k: { pid: kid.id }, t: { pid: mate.id } });
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleCaptain', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('cb.text.' + Math.floor(seeded(ctx.date + '#cbtext#' + mate.id)() * 2), { k: name, t, n: mate.benchStreak }),
+        choices: [
+          { key: 'cb.yes', tone: 'green', who: kid.id, run: () => { finish(); mate.promisedPitchTime = true; return vars(); } },
+          { key: 'cb.wait', tone: 'gray', who: kid.id,
+            run: () => { finish(); mate.dyn.morale = clamp(mate.dyn.morale + Ld.BENCH_WAIT_MORALE, 0, 100); return vars(); } },
+          { key: 'cb.no', tone: 'red', who: kid.id,
+            run: () => {
+              finish();
+              for (const p of [kid, mate]) p.psych.discipline = clamp(p.psych.discipline + Ld.BENCH_RED_DISC, 1, 20);
+              mate.dyn.morale = clamp(mate.dyn.morale + Ld.BENCH_RED_KID, 0, 100);
+              kid.dyn.morale = clamp(kid.dyn.morale + Ld.BENCH_RED_CAP, 0, 100);
+              return vars();
+            } },
+        ] });
+    },
+  },
+
+  /* ---------- v3.8 "CAN I GIVE IT BACK?" — a low-leadership captain asks to hand back the armband ---------- */
+  {
+    id: 'capresign', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid, hint } = ctx.cast, Ld = LEADERSHIP, name = L.name(kid.name);
+      const finish = () => { const r = s.dayState().locker?.capRequest; if (r && r.pid === kid.id) r.done = true; };
+      const text = hint ? L.t('cr.text.hint', { k: name, h: L.name(hint.name) }) : L.t('cr.text.' + Math.floor(seeded(ctx.date + '#crtext#' + kid.id)() * 2), { k: name });
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleCaptain', { n: kid.number, p: L.pos(kid.position) }), text,
+        choices: [
+          { key: 'cr.yes', tone: 'green', who: kid.id,
+            run: () => {
+              finish();
+              if (s.duties.captain === kid.id) s.duties.captain = null;   // no "stripped" reaction: he asked for it
+              kid.dyn.morale = clamp(kid.dyn.morale + Ld.RESIGN_YES, 0, 100);
+              return { k: { pid: kid.id } };
+            } },
+          { key: 'cr.hold', tone: 'gray', who: kid.id,
+            run: () => { finish(); s.capt.hold = Ld.RESIGN_HOLD; kid.dyn.morale = clamp(kid.dyn.morale + Ld.RESIGN_HOLD_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+          { key: 'cr.no', tone: 'red', who: kid.id,
+            run: () => {
+              finish();
+              kid.psych.discipline = clamp(kid.psych.discipline + Ld.RESIGN_NO_DISC, 1, 20);
+              kid.dyn.morale = clamp(kid.dyn.morale + Ld.RESIGN_NO_MORALE, 0, 100);
+              kid.capPressure = 1;               // breakdown risk ×1.5 in the next match
+              s.capt.hold = Ld.RESIGN_NO_HOLD;   // he won't ask again before that match
+              return { k: { pid: kid.id } };
+            } },
+        ] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',
@@ -7734,6 +8080,13 @@ class LockerRoom {
       if (!lk.absent[pr.pid] && this.state.player(pr.pid)) return { id: 'posreq', r: pr };
       pr.done = true;
     }
+    const cr = lk.capRequest, s = this.state;   // v3.8 captain's word (initiatives / resignation), only while he still wears the armband
+    if (cr && !cr.done) {
+      const here = id => id && !lk.absent[id] && s.player(id);
+      if (s.duties.captain === cr.pid && here(cr.pid) && (cr.kind === 'resign' || here(cr.mate)))
+        return { id: 'cap' + cr.kind, r: cr, cast: cr.kind === 'resign' ? { kid: cr.pid, ...(here(cr.hint) ? { hint: cr.hint } : {}) } : { kid: cr.pid, mate: cr.mate } };
+      cr.done = true;
+    }
     return null;
   }
   get requestPending() { return !!this.pendingRequest; }
@@ -7744,7 +8097,7 @@ class LockerRoom {
       const q = this.pendingRequest;
       if (!this.isOpen || !q || this.ui.events.active) return;
       this.ui.profile.close();
-      this.ui.events.fire(q.id, this.state.calendar.date, { cast: { kid: q.r.pid } });
+      this.ui.events.fire(q.id, this.state.calendar.date, { cast: q.cast || { kid: q.r.pid } });
     }, delay);
   }
   close() { this.layer.hidden = true; this.ui.renderDash(); }
@@ -8765,6 +9118,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     return null;
   }
   canCallIn(id) { return !this.officeBlock(id); }
+  /** v3.0 duties from PLAYER_INFO.EXE. v3.8: giving someone the armband opens the reaction dialogue (his hidden leadership);
+      the duty only changes once the coach confirms. Busy (event / live match) → applied at once without a dialogue.
+      Returns true when a dialogue took over. */
+  assignDuty(duty, id) {
+    const s = this.state;
+    if (duty !== 'captain' || s.duties.captain === id || !s.player(id)) { s.setDuty(duty, id); return false; }
+    if (this.events.active || (this.engine && !this.engine.finished)) { s.confirmCaptain(id, true); return false; }
+    this.profile.close();
+    return this.events.fire('capassign', s.calendar.date, { cast: { kid: id } });
+  }
   callIntoOffice(id) {
     if (!this.canCallIn(id) || !this.state.spendAP()) return;
     this.profile.close();
@@ -9335,6 +9698,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.applyLiveFatigue(eng);
     s.applyMatchDynamics(eng, result, capRep);
     s.trackPositions(eng);   // v3.6: out-of-position streaks (live + Quick Sim)
+    s.trackCaptaincy(eng, result, capRep);   // v3.8: armband tenure, bench streaks, promised pitch time (before bans tick down)
     this.applyAvailabilityAfterMatch(eng, ctx);   // v2.2
     if (s.cheats?.forceWin) s.cheats.forceWin = false;   // v1.8: one-shot debug cheat
     this.debug?.render();

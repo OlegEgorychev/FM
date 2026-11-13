@@ -379,6 +379,115 @@ const NARRATIVE_EVENTS = [
     },
   },
 
+  /* ---------- v3.8 ARMBAND ASSIGNMENT — the kid reacts by his HIDDEN leadership (fired by UIController.assignDuty) ---------- */
+  {
+    id: 'capassign', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast, name = L.name(kid.name), tier = s.captainTier(kid), v = s.captainLine(kid.id, ctx.date);
+      const ok = key => ({ key, tone: 'green', who: kid.id, run: () => { s.confirmCaptain(kid.id, true); return { k: { pid: kid.id } }; } });
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleArmband', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('ca.' + tier + '.' + v, { k: name }),
+        choices: tier === 'low'
+          ? [ok('ca.trust'), { key: 'ca.other', tone: 'gray', who: kid.id, run: () => ({ k: { pid: kid.id } }) }]
+          : [ok('ca.ok.' + tier)] });
+    },
+  },
+
+  /* ---------- v3.8 CAPTAIN INITIATIVE A — "he looks lost there" (captain leadership ≥ 8, teammate 2+ matches out of his line) ---------- */
+  {
+    id: 'capobs', when: 'manual',
+    trigger: () => false,
+    cast: () => null,   // rolled with the arrivals (GameState.rollCaptainRequest), fired by LockerRoom.maybeRequest
+    execute(ctx) {
+      const s = ctx.state, { kid, mate } = ctx.cast, Ld = LEADERSHIP, name = L.name(kid.name), t = L.name(mate.name);
+      const now = LINE_POS[s.slotLine(mate.id)] || mate.position, want = mate.archetype;
+      const finish = () => { const r = s.dayState().locker?.capRequest; if (r && r.pid === kid.id) r.done = true; s.capt.initUntil = isoAdd(ctx.date, Ld.INIT_CD); };
+      const vars = () => ({ k: { pid: kid.id }, t: { pid: mate.id } });
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleCaptain', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('co.text.' + Math.floor(seeded(ctx.date + '#cotext#' + mate.id)() * 2), { k: name, t, now: L.t('pr.where.' + (now || 'none')), want: L.t('pr.where.' + want) }),
+        choices: [
+          { key: 'co.yes', tone: 'green', who: kid.id,
+            run: () => {
+              finish();
+              mate.tag = want; mate.refreshPortrait(); mate.outOfPositionMatches = 0;
+              for (const p of [kid, mate]) p.dyn.morale = clamp(p.dyn.morale + Ld.OBS_MORALE, 0, 100);
+              return { ...vars(), p: { pos: want } };
+            } },
+          { key: 'co.watch', tone: 'gray', who: kid.id, run: () => { finish(); return vars(); } },
+          { key: 'co.no', tone: 'red', who: kid.id,
+            run: () => {
+              finish();
+              kid.psych.discipline = clamp(kid.psych.discipline + Ld.OBS_RED_DISC, 1, 20);
+              kid.dyn.morale = clamp(kid.dyn.morale + Ld.OBS_RED_MORALE, 0, 100);
+              s.capt.pauseUntil = isoAdd(ctx.date, Ld.ADVICE_PAUSE);
+              return vars();
+            } },
+        ] });
+    },
+  },
+
+  /* ---------- v3.8 CAPTAIN INITIATIVE B — "give him some minutes" (captain leadership ≥ 14, teammate benched 2+ matches, low morale) ---------- */
+  {
+    id: 'capbench', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid, mate } = ctx.cast, Ld = LEADERSHIP, name = L.name(kid.name), t = L.name(mate.name);
+      const finish = () => { const r = s.dayState().locker?.capRequest; if (r && r.pid === kid.id) r.done = true; s.capt.initUntil = isoAdd(ctx.date, Ld.INIT_CD); };
+      const vars = () => ({ k: { pid: kid.id }, t: { pid: mate.id } });
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleCaptain', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('cb.text.' + Math.floor(seeded(ctx.date + '#cbtext#' + mate.id)() * 2), { k: name, t, n: mate.benchStreak }),
+        choices: [
+          { key: 'cb.yes', tone: 'green', who: kid.id, run: () => { finish(); mate.promisedPitchTime = true; return vars(); } },
+          { key: 'cb.wait', tone: 'gray', who: kid.id,
+            run: () => { finish(); mate.dyn.morale = clamp(mate.dyn.morale + Ld.BENCH_WAIT_MORALE, 0, 100); return vars(); } },
+          { key: 'cb.no', tone: 'red', who: kid.id,
+            run: () => {
+              finish();
+              for (const p of [kid, mate]) p.psych.discipline = clamp(p.psych.discipline + Ld.BENCH_RED_DISC, 1, 20);
+              mate.dyn.morale = clamp(mate.dyn.morale + Ld.BENCH_RED_KID, 0, 100);
+              kid.dyn.morale = clamp(kid.dyn.morale + Ld.BENCH_RED_CAP, 0, 100);
+              return vars();
+            } },
+        ] });
+    },
+  },
+
+  /* ---------- v3.8 "CAN I GIVE IT BACK?" — a low-leadership captain asks to hand back the armband ---------- */
+  {
+    id: 'capresign', when: 'manual',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid, hint } = ctx.cast, Ld = LEADERSHIP, name = L.name(kid.name);
+      const finish = () => { const r = s.dayState().locker?.capRequest; if (r && r.pid === kid.id) r.done = true; };
+      const text = hint ? L.t('cr.text.hint', { k: name, h: L.name(hint.name) }) : L.t('cr.text.' + Math.floor(seeded(ctx.date + '#crtext#' + kid.id)() * 2), { k: name });
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleCaptain', { n: kid.number, p: L.pos(kid.position) }), text,
+        choices: [
+          { key: 'cr.yes', tone: 'green', who: kid.id,
+            run: () => {
+              finish();
+              if (s.duties.captain === kid.id) s.duties.captain = null;   // no "stripped" reaction: he asked for it
+              kid.dyn.morale = clamp(kid.dyn.morale + Ld.RESIGN_YES, 0, 100);
+              return { k: { pid: kid.id } };
+            } },
+          { key: 'cr.hold', tone: 'gray', who: kid.id,
+            run: () => { finish(); s.capt.hold = Ld.RESIGN_HOLD; kid.dyn.morale = clamp(kid.dyn.morale + Ld.RESIGN_HOLD_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+          { key: 'cr.no', tone: 'red', who: kid.id,
+            run: () => {
+              finish();
+              kid.psych.discipline = clamp(kid.psych.discipline + Ld.RESIGN_NO_DISC, 1, 20);
+              kid.dyn.morale = clamp(kid.dyn.morale + Ld.RESIGN_NO_MORALE, 0, 100);
+              kid.capPressure = 1;               // breakdown risk ×1.5 in the next match
+              s.capt.hold = Ld.RESIGN_NO_HOLD;   // he won't ask again before that match
+              return { k: { pid: kid.id } };
+            } },
+        ] });
+    },
+  },
+
   /* ---------- 7. THE ULTIMATUM — two-step disciplinary dialogue ---------- */
   {
     id: 'ulti', when: 'day',

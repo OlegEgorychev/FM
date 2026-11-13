@@ -160,7 +160,8 @@ class MatchEngine {
       return;
     }
     if (c.captainTrait !== 'anxious' || k.broken === c.id || kind === 'lost') return;
-    const ch = kind === 'mistake' ? CAPTAIN.BREAK_MISTAKE : kind === 'concede' ? CAPTAIN.BREAK_CONCEDE : CAPTAIN.BREAK_TRAIL;
+    const ch = (kind === 'mistake' ? CAPTAIN.BREAK_MISTAKE : kind === 'concede' ? CAPTAIN.BREAK_CONCEDE : CAPTAIN.BREAK_TRAIL)
+      * (c.capPressure ? LEADERSHIP.PRESSURE_MULT : 1);   // v3.8: refused his resignation ("a captain never quits")
     if (this.capRng() < ch) {
       k.broken = c.id; k.breakdown = this.minute;
       c.dyn.morale = clamp(Math.round(c.dyn.morale - CAPTAIN.BREAK_MORALE), 0, 100);

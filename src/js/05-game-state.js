@@ -16,6 +16,7 @@ class GameState {
     this.budget = ECONOMY.START;   // v1.9: club money ($), carried across seasons
     this.rep = { board: REP.START, parents: REP.START, squad: REP.START };   // v2.8 faction reputation
     this.duties = { captain: null, penalty: null, corner: null };            // v3.0 exclusive team duties (player ids)
+    this.captaincy = GameState.freshCaptaincy();                               // v3.8 armband tenure + captain initiative cooldowns
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
@@ -159,11 +160,104 @@ class GameState {
     p.refreshPortrait();
     this.save();
   }
-  /** Exclusive: assigning a duty takes it away from whoever had it. Clicking the holder again clears it. */
+  /** Exclusive: assigning a duty takes it away from whoever had it. Clicking the holder again clears it.
+      v3.8: a captain who loses the armband reacts (leader −3 / anxious +2 relief, once per REACT_CD days). Returns that diary line or null. */
   setDuty(duty, id) {
-    if (!(duty in DUTIES)) return;
-    this.duties[duty] = this.duties[duty] === id ? null : id;
+    if (!(duty in DUTIES)) return null;
+    const prev = this.duties[duty], next = prev === id ? null : id;
+    this.duties[duty] = next;
+    let line = null;
+    if (duty === 'captain' && prev && prev !== next) line = this.relieveCaptain(this.player(prev));
     this.save();
+    return line;
+  }
+
+  /* ---------- v3.8 HIDDEN LEADERSHIP: armband reactions, captain initiatives, resignation ---------- */
+  static freshCaptaincy(o = {}) {
+    return { id: o.id || null, matches: Math.max(0, Math.round(o.matches || 0)), shock: !!o.shock, hold: Math.max(0, Math.round(o.hold || 0)),
+      initUntil: o.initUntil || null, pauseUntil: o.pauseUntil || null, assigns: Math.max(0, Math.round(o.assigns || 0)) };
+  }
+  /** Armband tenure of the CURRENT captain (resets lazily whenever the armband changes hands; cooldown dates survive). */
+  get capt() {
+    const c = this.captaincy || (this.captaincy = GameState.freshCaptaincy()), id = this.duties?.captain || null;
+    if (c.id !== id) Object.assign(c, { id, matches: 0, shock: false, hold: 0 });
+    return c;
+  }
+  captainTier(p) { return p.leadership >= LEADERSHIP.LEADER ? 'high' : p.leadership <= LEADERSHIP.ANXIOUS ? 'low' : 'mid'; }
+  /** Morale from an armband change — skipped while his reaction cooldown runs (no farming by toggling the armband). Returns the applied delta. */
+  captainReaction(p, delta) {
+    if (!p || !delta || p.captainReactionCooldown > 0) return 0;
+    p.dyn.morale = clamp(Math.round(p.dyn.morale + delta), 0, 100);
+    p.captainReactionCooldown = LEADERSHIP.REACT_CD;
+    return delta;
+  }
+  /** The armband is taken off him: a real leader is hurt, an anxious kid is relieved. */
+  relieveCaptain(p) {
+    if (!p?.tags) return null;
+    const t = this.captainTier(p), d = t === 'high' ? LEADERSHIP.STRIP_LEADER : t === 'low' ? LEADERSHIP.STRIP_ANXIOUS : 0;
+    if (!this.captainReaction(p, d)) return null;
+    const key = 'ca.strip.' + t;
+    this.addDiary({ date: this.calendar.date, key, vars: { k: { pid: p.id } }, cls: 'ev' });
+    return key;
+  }
+  /** Coach confirmed the armband in the assignment dialogue. keep=false (low tier) → nothing changes. Returns the applied morale delta. */
+  confirmCaptain(id, keep = true) {
+    const p = this.player(id);
+    if (!p || !keep) return 0;
+    if (this.duties.captain !== id) this.setDuty('captain', id);
+    const t = this.captainTier(p);
+    const d = this.captainReaction(p, t === 'high' ? LEADERSHIP.HIGH_MORALE : t === 'mid' ? LEADERSHIP.MID_MORALE : LEADERSHIP.LOW_KEEP_MORALE);
+    this.capt.assigns++;
+    this.save();
+    return d;
+  }
+  /** Seeded index (0–3) of the reaction line: same dialogue after a reload, a new line for every new assignment. */
+  captainLine(id, date = this.calendar.date) { return Math.floor(seeded(date + '#ca#' + id + '#' + this.capt.assigns)() * 4); }
+  /** Daily: reaction cooldowns tick down. */
+  captainDaily() { for (const p of this.squad) if (p.captainReactionCooldown > 0) p.captainReactionCooldown--; }
+  /** Locker room (rolled with the arrivals, AFTER excuses and position requests): the captain may come to the coach.
+      ≤ ANXIOUS → asks to hand back the armband; ≥ LEADER → asks to play a benched teammate; ≥ OBS_LEAD → spots a kid out of position. */
+  rollCaptainRequest(absent, date = this.calendar.date) {
+    if (this.excusesOff) return null;
+    const c = this.player(this.duties?.captain), k = this.capt, Ld = LEADERSHIP;
+    if (!c || absent[c.id]) return null;
+    const here = this.squad.filter(p => p !== c && !absent[p.id]);
+    if (c.leadership <= Ld.ANXIOUS) {
+      if (k.hold > 0 || (k.matches < Ld.RESIGN_MIN && !k.shock)) return null;
+      const step = clamp(k.matches - Ld.RESIGN_MIN + (k.shock ? 1 : 0), 0, Ld.RESIGN_CHANCE.length - 1);
+      if (seeded(date + '#capresign#' + c.id)() >= Ld.RESIGN_CHANCE[step]) return null;
+      const hint = here.filter(p => p.leadership >= Ld.LEADER).sort((a, b) => b.leadership - a.leadership || a.id.localeCompare(b.id))[0];
+      return { kind: 'resign', pid: c.id, hint: hint ? hint.id : null, done: false };
+    }
+    if ((k.initUntil && date < k.initUntil) || (k.pauseUntil && date < k.pauseUntil)) return null;
+    if (c.leadership >= Ld.LEADER) {
+      const m = here.filter(p => p.available && p.benchStreak >= Ld.BENCH_MIN && p.dyn.morale < Ld.BENCH_MORALE && !p.promisedPitchTime)
+        .sort((a, b) => b.benchStreak - a.benchStreak || a.dyn.morale - b.dyn.morale || a.id.localeCompare(b.id))[0];
+      if (m && seeded(date + '#capbench#' + c.id + '#' + m.id)() < Ld.BENCH_BASE + (c.leadership - Ld.LEADER) * Ld.BENCH_STEP) return { kind: 'bench', pid: c.id, mate: m.id, done: false };
+    }
+    if (c.leadership >= Ld.OBS_LEAD) {
+      const m = here.filter(p => p.outOfPositionMatches >= Ld.OBS_MIN && p.archetype)
+        .sort((a, b) => b.outOfPositionMatches - a.outOfPositionMatches || a.id.localeCompare(b.id))[0];
+      if (m && seeded(date + '#capobs#' + c.id + '#' + m.id)() < Ld.OBS_BASE + (c.leadership - Ld.OBS_LEAD) * Ld.OBS_STEP) return { kind: 'obs', pid: c.id, mate: m.id, done: false };
+    }
+    return null;
+  }
+  /** After every league match (live + Quick Sim), BEFORE suspensions / injuries tick: armband tenure, bench streaks, promised pitch time. */
+  trackCaptaincy(eng, result, cap = null) {
+    const k = this.capt, Ld = LEADERSHIP, date = this.calendar.date;
+    if (k.id) { k.matches++; k.shock = result === 'L' || (cap?.id === k.id && cap.breakdown != null); if (k.hold > 0) k.hold--; }
+    for (const p of this.squad) {
+      const played = eng.everPlayed.has(p.id);
+      if (played) p.benchStreak = 0; else if (p.available) p.benchStreak++;
+      if (p.promisedPitchTime) {
+        p.promisedPitchTime = false;
+        const ok = played;
+        p.dyn.morale = clamp(p.dyn.morale + (ok ? Ld.PROMISE_KEPT : Ld.PROMISE_BROKEN), 0, 100);
+        this.addRep('squad', ok ? Ld.PROMISE_KEPT_SQUAD : Ld.PROMISE_BROKEN_SQUAD);
+        this.addDiary({ date, key: ok ? 'cb.kept' : 'cb.broken', vars: { k: { pid: p.id } }, cls: 'ev' });
+      }
+      p.capPressure = 0;
+    }
   }
   dutiesOf(id) { return Object.keys(DUTIES).filter(d => this.duties?.[d] === id); }
   setTag(id, tag) { const p = this.player(id); if (p && TAGS[tag]) { p.tags = [tag]; this.save(); } }
@@ -182,6 +276,7 @@ class GameState {
   addRep(key, delta) { if (this.rep && key in this.rep) this.rep[key] = clamp(Math.round(this.rep[key] + delta), 0, 100); }
   /** Daily: squad rep drifts 1 toward the squad's average morale; 1st of the month: board grant; Sundays: parents. */
   repDaily(date) {
+    this.captainDaily();   // v3.8
     const avg = this.squad.reduce((a, p) => a + p.dyn.morale, 0) / this.squad.length;
     this.addRep('squad', Math.sign(Math.round(avg) - this.rep.squad));
     const d = new Date(date + 'T00:00:00Z');
@@ -290,6 +385,7 @@ class GameState {
       if (r) absent[p.id] = r;
     }
     d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent), posRequest: this.rollPositionRequest(absent) };   // v3.6
+    d.locker.capRequest = d.locker.request || d.locker.posRequest ? null : this.rollCaptainRequest(absent);   // v3.8: urgent kid requests come first
     this.save();
     return d.locker;
   }
@@ -319,7 +415,8 @@ class GameState {
     this.eventQueue = this.eventQueue.filter(q => !q.cast || ![].concat(...Object.values(q.cast)).includes(id));
     if (this.lastReport) this.lastReport.players = this.lastReport.players.filter(r => r.id !== id);
     const lk = this.today?.locker;
-    if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null; }
+    if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null;
+      if ([lk.capRequest?.pid, lk.capRequest?.mate, lk.capRequest?.hint].includes(id)) lk.capRequest = null; }   // v3.8
     p.teamId = 'free_agent';   // v3.1: he stays in the world database (future transfers)
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
     this.save();
@@ -492,7 +589,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -528,6 +625,7 @@ class GameState {
       this.draft = null;
       const du = d.duties || {};   // v3.0 (after the squad: duties point at kids)
       this.duties = Object.fromEntries(Object.keys(DUTIES).map(k => [k, du[k] && this.player(du[k]) ? du[k] : null]));
+      this.captaincy = GameState.freshCaptaincy(d.captaincy && typeof d.captaincy === 'object' ? d.captaincy : { id: this.duties.captain });   // v3.8 (older saves: tenure 0)
       if (this.squad.length === 11) {
         const used = new Set(this.squad.map(p => p.surname));
         SQUAD_POS.slice(11).forEach((pos, i) => this.squad.push(Player.generate(`a${11 + i}`, pos, used, 0, true)));

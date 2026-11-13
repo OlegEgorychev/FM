@@ -572,6 +572,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     });
     await page.click('#pinfo-body [data-postag="FWD"]');
     await page.click('#pinfo-body [data-duty="captain"]');
+    await page.waitForSelector('#talk-layer:not([hidden]) .talk-btn');   // v3.8: the armband opens the reaction dialogue
+    await page.click('#talk-choices .talk-btn.tone-green');
     const fg1 = await page.evaluate(k => ({ tag: YAM.game.player(k).tag, cap: YAM.game.duties.captain, rowChip: document.querySelector(`#roster .r-row[data-id="${k}"] .pos`)?.textContent,
       badge: !!document.querySelector(`#roster .r-row[data-id="${k}"] .duty-badge.d-captain`) }), fg.a);
     await page.keyboard.press('Escape');
@@ -894,7 +896,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const s = YAM.game, sq = s.squad, out = {}, T = ['leader', 'anxious', 'normal'];
       const k = sq.find(p => p.available) || sq[0];
       const raw = JSON.parse(JSON.stringify(k)); delete raw.captainTrait;
-      const keep = new Player({ ...JSON.parse(JSON.stringify(k)), captainTrait: 'leader', tags: [] });
+      const keep = new Player({ ...raw, captainTrait: 'leader', tags: [] }); delete raw.leadership;   // v3.8: leadership wins over a stored trait
       out.migrate = new Player({ ...raw, tags: [] }).captainTrait === k.captainTrait && new Player({ ...raw, captainTrait: 'boss', tags: [] }).captainTrait === k.captainTrait
         && keep.captainTrait === 'leader' && T.includes(k.captainTrait) && JSON.parse(localStorage.getItem('yam_save_v1') || '{}').squad?.every(p => T.includes(p.captainTrait));
       out.world = [...sq, ...(s.globalPlayers || []), ...s.league.teams.filter(t => !t.user).flatMap(t => s.league.roster(t, new Set()))].every(p => T.includes(p.captainTrait));
@@ -959,6 +961,133 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       v37.normal && v37.leader && v37.anxious && v37.seeded && v37.full && v37.post, JSON.stringify(v37));
     check('v3.7 fog of war: armband Notebook line + sampled-kid / practice clues are words only (EN + RU), seeded, trait-consistent',
       v37.words && v37.nb && v37.clue && v37.practice, v37.keys);
+    // v3.8: hidden leadership — generation + migration, armband reactions + cooldown, captain initiatives, promise to play, resignation
+    const v38 = await page.evaluate(() => {
+      const s = YAM.game, sq = s.squad, out = {}, Ld = LEADERSHIP, T = { leader: [14, 20], normal: [8, 13], anxious: [1, 7] };
+      const world = [...sq, ...(s.globalPlayers || []), ...s.league.teams.filter(t => !t.user).flatMap(t => s.league.roster(t, new Set()))];
+      out.gen = world.every(p => Number.isInteger(p.leadership) && p.leadership >= 1 && p.leadership <= 20 && p.captainTrait === leadershipTrait(p.leadership));
+      const k = sq[0], raw = JSON.parse(JSON.stringify(k)); delete raw.leadership;
+      const mig = t => new Player({ ...raw, captainTrait: t, tags: [] }).leadership;
+      out.migrate = Object.keys(T).every(t => mig(t) >= T[t][0] && mig(t) <= T[t][1] && mig(t) === mig(t))
+        && (() => { const r2 = { ...raw }; delete r2.captainTrait; const a = new Player({ ...r2, tags: [] }), b = new Player({ ...r2, tags: [] });
+          return a.leadership === b.leadership && a.captainTrait === Player.rollCaptainTrait(r2.id, r2.name, a.psych); })()
+        && new Player({ ...raw, leadership: 17, tags: [] }).captainTrait === 'leader' && new Player({ ...JSON.parse(JSON.stringify(k)), tags: [] }).leadership === k.leadership
+        && JSON.parse(localStorage.getItem('yam_save_v1') || '{}').squad?.every(p => Number.isInteger(p.leadership) && p.captainTrait === leadershipTrait(p.leadership))
+        && k.captainReactionCooldown >= 0 && k.benchStreak >= 0 && k.promisedPitchTime === false;
+      out.debug = DebugConsole.COLS.some(c => c.h === 'LDR' && c.g === 'PSYCH' && c.v(k) === k.leadership);
+      // armband reactions (state level) + anti-farming cooldown
+      const keep = sq.map(p => ({ id: p.id, l: p.leadership, m: p.dyn.morale, d: p.psych.discipline, cd: p.captainReactionCooldown, tag: p.tag, oop: p.outOfPositionMatches, bs: p.benchStreak }));
+      const keepCap = s.duties.captain, keepRep = s.rep.squad, keepEx = s.excusesOff;
+      const av = sq.filter(p => p.available), [a, b, c, k4] = av.slice(1, 5);
+      s.duties.captain = null; [a, b, c].forEach(p => { p.captainReactionCooldown = 0; p.dyn.morale = 50; });
+      a.leadership = 16; b.leadership = 5; c.leadership = 10;
+      const r = [];
+      r.push(s.confirmCaptain(a.id), a.dyn.morale, a.captainReactionCooldown, s.duties.captain === a.id);   // +5, cd 14
+      s.setDuty('captain', a.id); r.push(a.dyn.morale, s.duties.captain);                                   // strip within cooldown → no −3
+      for (let i = 0; i < 14; i++) s.captainDaily();
+      r.push(a.captainReactionCooldown);
+      s.duties.captain = a.id; s.setDuty('captain', a.id); r.push(a.dyn.morale);                           // strip → −3
+      r.push(s.confirmCaptain(b.id, false), s.duties.captain);                                             // "pick someone else": nothing
+      r.push(s.confirmCaptain(b.id, true), b.dyn.morale);                                                  // keep: −2
+      b.captainReactionCooldown = 0; s.setDuty('captain', c.id); r.push(b.dyn.morale, s.duties.captain === c.id);   // relieve anxious +2, armband moves
+      out.react = JSON.stringify(r);
+      out.reactOk = JSON.stringify(r) === JSON.stringify([5, 55, 14, true, 55, null, 0, 52, 0, null, -2, 48, 50, true]);
+      // tiers / lines
+      out.tiers = [s.captainTier(a), s.captainTier(b), s.captainTier(c)].join() === 'high,low,mid' && s.captainLine(a.id) === s.captainLine(a.id)
+        && ['high', 'mid', 'low'].every(t => [0, 1, 2, 3].every(i => I18N.en['ca.' + t + '.' + i] && I18N.ru['ca.' + t + '.' + i] && !/\d|leader|leadership|лидерств/i.test(I18N.en['ca.' + t + '.' + i] + I18N.ru['ca.' + t + '.' + i])));
+      // promise to play + bench streak (live and Quick Sim share trackCaptaincy)
+      s.duties.captain = a.id; s.captaincy.id = null;
+      a.promisedPitchTime = true; c.promisedPitchTime = true; a.dyn.morale = 50; c.dyn.morale = 50; s.rep.squad = 50;
+      const bench = av.find(p => ![a, b, c].includes(p)); bench.benchStreak = 1;
+      s.trackCaptaincy({ everPlayed: new Set([a.id]) }, 'L', null);
+      out.promise = [a.dyn.morale, c.dyn.morale, s.rep.squad, a.promisedPitchTime, c.promisedPitchTime, bench.benchStreak, a.benchStreak, s.capt.matches, s.capt.shock].join();
+      out.promiseOk = out.promise === '56,40,49,false,false,2,0,1,true' && s.diary.slice(-3).some(d => d.key === 'cb.kept') && s.diary.slice(-3).some(d => d.key === 'cb.broken');
+      // locker rolls (seeded, reload-proof), priorities and cooldowns
+      s.excusesOff = false;
+      const date = s.calendar.date, find = (want, n = 60) => { for (let i = 0; i < n; i++) { const d = isoAdd(date, i), q = s.rollCaptainRequest({}, d); if (q && q.kind === want) return { d, q }; } return null; };
+      sq.forEach(p => { p.outOfPositionMatches = 0; p.benchStreak = 0; p.promisedPitchTime = false; if (p !== b) p.leadership = 10; });
+      s.duties.captain = b.id; s.capt.matches = 0; s.capt.shock = false;
+      out.resignWait = find('resign') === null;                                       // < 2 matches, no shock → never
+      s.capt.matches = 2; const rs = find('resign');
+      a.leadership = 18; const rh = find('resign');
+      out.resign = !!rs && !rs.q.hint && !!rh && rh.q.hint === a.id && JSON.stringify(s.rollCaptainRequest({}, rh.d)) === JSON.stringify(rh.q)
+        && s.rollCaptainRequest({ [a.id]: 'skipped' }, rh.d)?.hint === null;
+      s.capt.hold = 1; out.hold = find('resign') === null; s.capt.hold = 0;
+      out.curve = [0, 1, 2, 3].map(m => { s.capt.matches = 2 + m; let n = 0; for (let i = 0; i < 400; i++) n += !!s.rollCaptainRequest({}, isoAdd(date, i)); return +(n / 400).toFixed(2); });
+      s.duties.captain = a.id; c.benchStreak = 2; c.dyn.morale = 40;
+      const rb = find('bench'); out.bench = !!rb && rb.q.mate === c.id;
+      s.capt.initUntil = isoAdd(date, 400); out.initCd = find('bench') === null; s.capt.initUntil = null;
+      c.benchStreak = 0; c.dyn.morale = 50; s.duties.captain = k4.id; k4.leadership = 9; b.outOfPositionMatches = 3;
+      const ro = find('obs'); out.obs = !!ro && ro.q.mate === b.id;
+      k4.leadership = 7; out.obsLow = find('obs') === null;
+      k4.leadership = 9; s.capt.pauseUntil = isoAdd(date, 400); out.pause = find('obs') === null; s.capt.pauseUntil = null;
+      s.excusesOff = true; out.off = find('obs') === null;
+      // engine: refused resignation → breakdown ×1.5 next match
+      const lg = s.league, t = lg.teams.find(x => !x.user), xi = [b, ...sq.filter(p => p !== b).slice(0, 10)];
+      const mk = () => { const e = new MatchEngine({ name: 'X', formation: '4-4-2', players: xi }, { name: t.name, formation: t.formation, players: lg.roster(t, new Set()).slice(0, 11) },
+        { onUpdate() {}, onEnd() {}, onLog() {} }, { duties: { captain: b.id }, md: 3 }); e.started = true; e.minute = 30; e.capRng = () => 0.1; return e; };
+      b.capPressure = 0; let e = mk(); e.captainMoment('mistake'); const calm = e.cap.broken;
+      b.capPressure = 1; e = mk(); e.captainMoment('mistake'); const press = e.cap.broken;
+      out.pressure = calm === null && press === b.id;
+      window.__v38 = { keep, keepCap, keepRep, keepEx, a: a.id, b: b.id, c: c.id, k4: k4.id }; out.aName = L.name(a.name);
+      b.capPressure = 0; b.dyn.morale = 50; b.psych.discipline = 10; s.duties.captain = b.id;
+      return out;
+    });
+    // dialogues: resignation (green / red), initiative A (green), initiative B (green), armband assignment via the UI (mid tier, low tier → other)
+    const v38d = {};
+    const talk38 = () => page.evaluate(() => (YAM.ui.events.view.finishTyping(), { open: !document.getElementById('talk-layer').hidden, tones: [...document.querySelectorAll('#talk-choices .talk-btn')].map(b => b.className.match(/tone-(\w+)/)[1]).join(),
+      text: document.getElementById('talk-text').textContent }));
+    await page.evaluate(() => YAM.ui.events.fire('capresign', YAM.game.calendar.date, { cast: { kid: window.__v38.b, hint: window.__v38.a } }));
+    v38d.resign = await talk38();
+    await page.click('#talk-choices .talk-btn.tone-green');
+    Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, b = s.player(window.__v38.b);
+      const r = { yesCap: s.duties.captain, yesMor: b.dyn.morale, yesDiary: s.diary.slice(-4).some(d => d.key === 'cr.yes.diary') };
+      s.duties.captain = b.id; b.dyn.morale = 50; YAM.ui.events.fire('capresign', s.calendar.date, { cast: { kid: b.id } }); return r; }));
+    await page.click('#talk-choices .talk-btn.tone-red');
+    Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, b = s.player(window.__v38.b);
+      const r = { noCap: s.duties.captain === b.id, noMor: b.dyn.morale, noDisc: b.psych.discipline, noPress: b.capPressure, noHold: s.capt.hold };
+      const a = s.player(window.__v38.a), m = s.player(window.__v38.k4);   // initiative A: captain k4 (leadership 9) about b
+      s.duties.captain = m.id; m.dyn.morale = 50; b.dyn.morale = 50; b.outOfPositionMatches = 3; b.tag = b.archetype === 'FWD' ? 'DEF' : 'FWD';
+      YAM.ui.events.fire('capobs', s.calendar.date, { cast: { kid: m.id, mate: b.id } }); return r; }));
+    v38d.obsDlg = await talk38();
+    await page.click('#talk-choices .talk-btn.tone-green');
+    Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, b = s.player(window.__v38.b), m = s.player(window.__v38.k4), a = s.player(window.__v38.a), c = s.player(window.__v38.c);
+      const r = { obsTag: b.tag === b.archetype, obsOop: b.outOfPositionMatches, obsMor: [m.dyn.morale, b.dyn.morale].join(), obsCd: s.capt.initUntil === isoAdd(s.calendar.date, 7) };
+      s.duties.captain = a.id; YAM.ui.events.fire('capbench', s.calendar.date, { cast: { kid: a.id, mate: c.id } }); return r; }));
+    v38d.benchDlg = await talk38();
+    await page.click('#talk-choices .talk-btn.tone-green');
+    Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, c = s.player(window.__v38.c);
+      const r = { promised: c.promisedPitchTime === true }; c.promisedPitchTime = false;
+      c.leadership = 10; c.captainReactionCooldown = 0; c.dyn.morale = 50; s.duties.captain = null;
+      r.fired = YAM.ui.assignDuty('captain', c.id); return r; }));
+    v38d.midDlg = await talk38();
+    await page.click('#talk-choices .talk-btn.tone-green');
+    Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, c = s.player(window.__v38.c), b = s.player(window.__v38.b);
+      const r = { midCap: s.duties.captain === c.id, midMor: c.dyn.morale };
+      b.leadership = 4; b.captainReactionCooldown = 0; b.dyn.morale = 50; YAM.ui.assignDuty('captain', b.id); return r; }));
+    v38d.lowDlg = await talk38();
+    await page.click('#talk-choices .talk-btn.tone-gray');
+    Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, w = window.__v38, b = s.player(w.b);
+      const r = { lowCap: s.duties.captain === w.c, lowMor: b.dyn.morale, closed: document.getElementById('talk-layer').hidden };
+      for (const k of w.keep) { const p = s.player(k.id); Object.assign(p, { leadership: k.l, captainReactionCooldown: k.cd, tag: k.tag, outOfPositionMatches: k.oop, benchStreak: k.bs, capPressure: 0, promisedPitchTime: false });
+        p.dyn.morale = k.m; p.psych.discipline = k.d; p.refreshPortrait(); }
+      s.duties.captain = w.keepCap; s.rep.squad = w.keepRep; s.excusesOff = w.keepEx; Object.assign(s.captaincy, { hold: 0, initUntil: null, pauseUntil: null }); s.save();
+      return r; }));
+    check('v3.8 leadership: seeded 1–20 for the whole world, trait derived (≥14 leader, ≤7 anxious), save migration inside the stored trait\'s band, DEBUG column LDR',
+      v38.gen && v38.migrate && v38.debug, JSON.stringify({ g: v38.gen, m: v38.migrate, d: v38.debug }));
+    check('v3.8 armband reactions: +5 / +2 / −2 (keep) / 0 (pick another), strip leader −3, relieve anxious +2, 14-day cooldown blocks farming, 4 lines per tier (EN + RU, words only)',
+      v38.reactOk && v38.tiers, v38.react);
+    check('v3.8 promise to play + bench streak: played → +6 & squad +2, unused → −10 & squad −3, flag cleared, armband tenure / loss shock',
+      v38.promiseOk, v38.promise);
+    check('v3.8 captain requests: resignation after 2 matches (25/45/65 % curve, hint at a present leader, hold blocks), bench ask (leader), position tip (≥ 8), 7-day + advice-pause cooldowns, seeded; refusal → breakdown ×1.5',
+      v38.resignWait && v38.resign && v38.hold && v38.curve[0] > 0.15 && v38.curve[0] < 0.35 && v38.curve[1] > 0.35 && v38.curve[2] > 0.55 && v38.curve[3] > 0.55
+      && v38.bench && v38.initCd && v38.obs && v38.obsLow && v38.pause && v38.off && v38.pressure, JSON.stringify(v38));
+    check('v3.8 dialogues: resignation (hint names the leader; yes = armband off +8; no = disc +1, −10, pressure), captain tip (tag → archetype, +3 both, 7-day cooldown), bench promise, armband via PLAYER_INFO (mid +2; low → pick another keeps the old captain)',
+      v38d.resign.open && v38d.resign.tones === 'green,gray,red' && v38d.resign.text.includes(v38.aName) && v38d.yesCap === null && v38d.yesMor === 58 && v38d.yesDiary
+      && v38d.noCap && v38d.noMor === 40 && v38d.noDisc === 11 && v38d.noPress === 1 && v38d.noHold === 1
+      && v38d.obsDlg.tones === 'green,gray,red' && v38d.obsTag && v38d.obsOop === 0 && v38d.obsMor === '53,53' && v38d.obsCd
+      && v38d.benchDlg.tones === 'green,gray,red' && v38d.promised && v38d.fired && v38d.midDlg.tones === 'green' && v38d.midCap && v38d.midMor === 52
+      && v38d.lowDlg.tones === 'green,gray' && v38d.lowCap && v38d.lowMor === 50 && v38d.closed, JSON.stringify(v38d));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

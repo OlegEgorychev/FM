@@ -115,6 +115,22 @@ const CAPTAIN_TRAITS = ['leader', 'anxious', 'normal'];
 const CAPTAIN = { LEAD_BASE: 0.12, LEAD_COMP: 0.045, LEAD_DRIVE: 0.03, ANX_BASE: 0.12, ANX_COMP: 0.06, TRAIT_MIN: 0.03, TRAIT_MAX: 0.75,
   RALLY: 1, RALLY_MIN: 10, POST_MORALE: 3, CHEER: 0.25,
   STRESS: 1.5, STRESS_COMP: 0.1, BREAK_MISTAKE: 0.08, BREAK_CONCEDE: 0.2, BREAK_TRAIL: 0.006, BREAK_MORALE: 20, NERVES: 0.35, CLUE: 0.4, PRACTICE_CLUE: 0.3 };
+/* v3.8 HIDDEN LEADERSHIP (1–20) — the single source of truth for the captain trait:
+   ≥ LEADER → 'leader', ≤ ANXIOUS → 'anxious', otherwise 'normal'. Never shown outside DEBUG.EXE.
+   Armband reactions (dialogue on assignment) give morale once per REACT_CD days per kid (anti-farming).
+   Captain initiatives (locker room, after excuses / position requests): shared INIT_CD-day cooldown, seeded by date + ids.
+   Low-leadership captains may ask to hand the armband back (RESIGN_CHANCE by matches worn, +1 step after a loss / breakdown). */
+const LEADERSHIP = { LEADER: 14, ANXIOUS: 7,
+  REACT_CD: 14, HIGH_MORALE: 5, MID_MORALE: 2, LOW_KEEP_MORALE: -2, STRIP_LEADER: -3, STRIP_ANXIOUS: 2,
+  INIT_CD: 7, ADVICE_PAUSE: 14,
+  OBS_LEAD: 8, OBS_MIN: 2, OBS_BASE: 0.15, OBS_STEP: 0.04, OBS_MORALE: 3, OBS_RED_DISC: 1, OBS_RED_MORALE: -3,
+  BENCH_MIN: 2, BENCH_MORALE: 55, BENCH_BASE: 0.3, BENCH_STEP: 0.05,
+  PROMISE_KEPT: 6, PROMISE_KEPT_SQUAD: 2, PROMISE_BROKEN: -10, PROMISE_BROKEN_SQUAD: -3,
+  BENCH_WAIT_MORALE: 1, BENCH_RED_DISC: 1, BENCH_RED_KID: -5, BENCH_RED_CAP: -2,
+  RESIGN_MIN: 2, RESIGN_CHANCE: [0.25, 0.45, 0.65], RESIGN_YES: 8, RESIGN_HOLD: 2, RESIGN_HOLD_MORALE: -3,
+  RESIGN_NO_DISC: 1, RESIGN_NO_MORALE: -10, RESIGN_NO_HOLD: 1, PRESSURE_MULT: 1.5 };
+const leadershipTrait = l => l >= LEADERSHIP.LEADER ? 'leader' : l <= LEADERSHIP.ANXIOUS ? 'anxious' : 'normal';
+const LEADERSHIP_RANGE = { leader: [14, 20], normal: [8, 13], anxious: [1, 7] };
 const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25, CORNER_BLOCK: 0.3, CORNER_DELIVERY: 3, HEADER_HEIGHT: 6,
   CAPTAIN: 0.5 };   // captain on the pitch: + (0.5 + passion/20) on all our rolls (≈ +0.55 … +1.5)
 /* v3.1 SANDBOX WORLD — 100 kids; 40 at rival clubs, 60 free agents; 30 of them play the Yard Match; you sign 15

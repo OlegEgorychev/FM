@@ -19,6 +19,7 @@ class DebugConsole {
       for (const k of ATTR_GROUPS[g]) add(g.toUpperCase(), short[k], p => p[g][k], 20, k);
     add('PSYCH', 'PA', p => p.psych.potential, 100, 'potential ability 1-100');
     add('PSYCH', 'CAPT', p => L.t('dbg.cap.' + (p.captainTrait || 'normal')), null, 'v3.7 hidden captain trait: leader (rally +morale) / anxious (stress, may break down) / normal');
+    add('PSYCH', 'LDR', p => p.leadership, 20, 'v3.8 hidden leadership 1-20 (≥14 leader, ≤7 anxious): armband reactions, captain initiatives, resignation');
     add('DYNAMIC', 'CON', p => Math.round(p.dyn.condition), 100, 'condition (energy)');
     add('DYNAMIC', 'SHP', p => Math.round(p.dyn.sharpness), 100, 'sharpness (match tone); < 50 → technical −2');
     add('DYNAMIC', 'MOR', p => Math.round(p.dyn.morale), 100, 'morale');

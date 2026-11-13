@@ -2,8 +2,22 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.8';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.8', name: { en: 'The Captain\'s Voice', ru: 'Голос капитана' },
+    en: [
+      'Handing out the armband is now a conversation: the kid answers in his own words — proud, surprised or plainly scared. A scared one can be reassured, or you can pick someone else.',
+      'The armband touches morale: a natural leader is thrilled to get it and hurt to lose it, a nervous kid is relieved to give it back. Swapping it back and forth will not farm morale.',
+      'Captains speak up in the locker room: a good one may point out a teammate playing in the wrong line, and a real leader may ask you to give a benched, unhappy kid some minutes. Promise — and keep it, or the dressing room will remember.',
+      'A captain who cannot carry it may ask to hand the armband back after a few matches or a bad day. Let him go, ask for two more matches, or tell him a captain never quits — at a price.',
+    ],
+    ru: [
+      'Вручение повязки — теперь разговор: ребёнок отвечает своими словами — гордо, удивлённо или откровенно испуганно. Испуганного можно подбодрить, а можно выбрать другого.',
+      'Повязка влияет на настроение: прирождённый лидер рад её получить и расстроится, если её снять, а нервный — с облегчением вернёт. Перекидывать повязку туда-сюда ради настроения не выйдет.',
+      'Капитаны подают голос в раздевалке: толковый может подсказать, что партнёр играет не в своей линии, а настоящий лидер — попросить дать минуты загрустившему запасному. Пообещал — выполняй, иначе раздевалка запомнит.',
+      'Капитан, которому повязка не по силам, может попросить её снять — после нескольких матчей или тяжёлого дня. Отпусти его, попроси потерпеть ещё два матча или скажи, что капитан не сдаётся, — но это будет стоить дорого.',
+    ],
+  },
   { v: '3.7', name: { en: 'Who Wears the Armband', ru: 'Кому носить повязку' },
     en: [
       'Not every kid is born to be captain. Some are natural leaders, some crumble under the armband, most just get on with it — and you will not be told which is which.',

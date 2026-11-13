@@ -151,7 +151,16 @@ class Player {
     this.bio = { ...b };
     // v3.7: HIDDEN captain trait ('leader' | 'anxious' | 'normal') — seeded from id + name + psych, so old saves,
     // AI rosters and the free-agent pool all migrate to the same value on every load (never Math.random)
-    this.captainTrait = CAPTAIN_TRAITS.includes(o.captainTrait) ? o.captainTrait : Player.rollCaptainTrait(id, name, this.psych);
+    // v3.8: HIDDEN leadership 1–20 is the source of truth (captainTrait is derived). Saves without it get a seeded value
+    // inside the range of their stored v3.7 trait (or of a freshly rolled one), so every trait stays what it was.
+    this.leadership = Number.isFinite(o.leadership) ? clamp(Math.round(o.leadership), 1, 20)
+      : Player.rollLeadership(id, name, CAPTAIN_TRAITS.includes(o.captainTrait) ? o.captainTrait : Player.rollCaptainTrait(id, name, this.psych));
+    if (tags) {
+      this.captainReactionCooldown = Math.max(0, Math.round(o.captainReactionCooldown || 0));   // v3.8: days before an armband change moves his morale again
+      this.benchStreak = Math.max(0, Math.round(o.benchStreak || 0));                           // v3.8: straight league matches fit but unused
+      this.promisedPitchTime = !!o.promisedPitchTime;                                            // v3.8: the coach promised the captain he plays next match
+      this.capPressure = Math.max(0, Math.round(o.capPressure || 0));                            // v3.8: "a captain never quits" — higher breakdown risk next match
+    }
     const d = o.dyn || {};
     const r = seeded(id + name + '#dyn');
     this.dyn = { condition: clamp(Math.round(d.condition ?? o.energy ?? 100), 0, 100),
@@ -192,7 +201,15 @@ class Player {
   /** Morale swing on every roll: ±2 at the extremes, amplified by passion (0.6×–1.5×). */
   get moodBonus() { return clamp((this.dyn.morale - 50) / 25 * (0.55 + this.psych.passion / 20), -2.5, 2.5); }
   /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */
-  toJSON() { const { portraitSvg, ...o } = this; return o; }
+  toJSON() { const { portraitSvg, ...o } = this; return { ...o, captainTrait: this.captainTrait }; }   // v3.8: trait kept for older readers
+  /** v3.8: the captain trait is derived from hidden leadership (≥ 14 leader, ≤ 7 anxious). Setting a trait moves leadership into its range. */
+  get captainTrait() { return leadershipTrait(this.leadership); }
+  set captainTrait(t) { if (CAPTAIN_TRAITS.includes(t) && t !== this.captainTrait) this.leadership = Player.rollLeadership(this.id, this.name, t); }
+  /** v3.8: deterministic leadership inside the trait's band (seeded by id + name, never Math.random). */
+  static rollLeadership(id, name, trait = 'normal') {
+    const [lo, hi] = LEADERSHIP_RANGE[trait] || LEADERSHIP_RANGE.normal;
+    return lo + Math.floor(seeded(String(id) + '|' + String(name) + '#lead')() * (hi - lo + 1));
+  }
 
   /** v3.7: deterministic hidden captain trait, loosely tied to psychology (see CAPTAIN in 00-utils-data.js).
       High composure + passion/discipline → leader more likely; low composure → anxious more likely; the rest normal. */

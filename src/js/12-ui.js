@@ -817,6 +817,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     return null;
   }
   canCallIn(id) { return !this.officeBlock(id); }
+  /** v3.0 duties from PLAYER_INFO.EXE. v3.8: giving someone the armband opens the reaction dialogue (his hidden leadership);
+      the duty only changes once the coach confirms. Busy (event / live match) → applied at once without a dialogue.
+      Returns true when a dialogue took over. */
+  assignDuty(duty, id) {
+    const s = this.state;
+    if (duty !== 'captain' || s.duties.captain === id || !s.player(id)) { s.setDuty(duty, id); return false; }
+    if (this.events.active || (this.engine && !this.engine.finished)) { s.confirmCaptain(id, true); return false; }
+    this.profile.close();
+    return this.events.fire('capassign', s.calendar.date, { cast: { kid: id } });
+  }
   callIntoOffice(id) {
     if (!this.canCallIn(id) || !this.state.spendAP()) return;
     this.profile.close();
@@ -1387,6 +1397,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.applyLiveFatigue(eng);
     s.applyMatchDynamics(eng, result, capRep);
     s.trackPositions(eng);   // v3.6: out-of-position streaks (live + Quick Sim)
+    s.trackCaptaincy(eng, result, capRep);   // v3.8: armband tenure, bench streaks, promised pitch time (before bans tick down)
     this.applyAvailabilityAfterMatch(eng, ctx);   // v2.2
     if (s.cheats?.forceWin) s.cheats.forceWin = false;   // v1.8: one-shot debug cheat
     this.debug?.render();

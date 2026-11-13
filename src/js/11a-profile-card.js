@@ -19,7 +19,7 @@ class ProfileCard {
       if (!t && !d) return;
       const s = this.ui.state;
       if (t) s.setPosTag(this.id, t.dataset.postag);
-      else s.setDuty(d.dataset.duty, this.id);
+      else if (this.ui.assignDuty(d.dataset.duty, this.id)) return;   // v3.8: the armband opens a dialogue (profile closes)
       this.lastSig = '';
       this.ui.renderAll();
       this.render();
