@@ -318,20 +318,38 @@ class UIController {
       const row = e.target.closest('.r-row'); if (!row || this.live) return;
       e.dataTransfer.setData('text/plain', row.dataset.id); e.dataTransfer.effectAllowed = 'move';
       row.classList.add('dragging');
+      this.swapDragId = row.dataset.id;   // v3.10: hover-target sync during drag
     });
-    roster.addEventListener('dragend', e => { e.target.closest('.r-row')?.classList.remove('dragging'); });
+    roster.addEventListener('dragend', e => { e.target.closest('.r-row')?.classList.remove('dragging'); this.endSwapDrag(); });
     roster.addEventListener('dragover', e => {
       const row = e.target.closest('.r-row'); if (!row) return;
       e.preventDefault();
       roster.querySelectorAll('.drop-over').forEach(r => r !== row && r.classList.remove('drop-over'));
       row.classList.add('drop-over');
+      this.setSwapHover(row.dataset.id);
     });
-    roster.addEventListener('dragleave', e => { e.target.closest('.r-row')?.classList.remove('drop-over'); });
+    roster.addEventListener('dragleave', e => {
+      e.target.closest('.r-row')?.classList.remove('drop-over');
+      if (!roster.contains(e.relatedTarget)) this.setSwapHover(null);
+    });
     roster.addEventListener('drop', e => {
       const row = e.target.closest('.r-row'); if (!row) return;
       e.preventDefault(); row.classList.remove('drop-over');
+      this.endSwapDrag();
       this.onDropSwap(row.dataset.id, e.dataTransfer.getData('text/plain'));
     });
+    /* v3.10: HOVER-TARGET SYNC — with a player selected (or dragged), hovering another kid in the list or on the
+       tactics board marks him in BOTH places (.swap-hover-target), toggled in place: no re-render, Smart Swap classes untouched. */
+    const board = this.$('tac-board');
+    roster.addEventListener('mouseover', e => { const row = e.target.closest('.r-row'); if (row) this.setSwapHover(row.dataset.id); });
+    roster.addEventListener('mouseleave', () => this.setSwapHover(null));
+    board.addEventListener('mouseover', e => { const d = e.target.closest('.pl[data-pid]'); this.setSwapHover(d ? d.dataset.pid : null); });
+    board.addEventListener('mouseleave', () => this.setSwapHover(null));
+    board.addEventListener('dragstart', e => { const d = e.target.closest('.pl[data-pid]'); if (d && !this.live) this.swapDragId = d.dataset.pid; });
+    board.addEventListener('dragend', () => this.endSwapDrag());
+    board.addEventListener('dragover', e => { const d = e.target.closest('.pl[data-pid]'); if (d) this.setSwapHover(d.dataset.pid); });
+    board.addEventListener('dragleave', e => { if (!board.contains(e.relatedTarget)) this.setSwapHover(null); });
+    board.addEventListener('drop', () => this.endSwapDrag(), true);   // capture: before RadarView's drop → onDropSwap → renderTeam
     this.$('md-prev').addEventListener('click', () => { this.tableMd = Math.max(1, this.tableMd - 1); this.renderTable(); });
     const openTeam = e => { const tr = e.target.closest('tr[data-team]'); if (tr) this.teamCard.open(+tr.dataset.team); };
     this.$('table-body').addEventListener('click', openTeam);
@@ -511,6 +529,7 @@ class UIController {
   get notesOpen() { return this.state.phase === 'post' && this.state.notebookUnlocked && !!this.state.lastReport; }
 
   show(view) {
+    if (this.swapHoverId) { this.swapHoverId = null; this.applySwapHover(); }   // v3.10: switching screens clears the swap hover
     if (this.modalLock) return;   // v3.5: the Match Summary decides where we go next
     if (view === 'notes' && !this.notesOpen) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'), 'warn'); return; }
     if (view === 'match' && !this.matchOpen) { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
@@ -1104,6 +1123,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     // board: the starting XI exactly as the match engine will read it (state.lineup, slot order)
     this.board.setup([{ entries: slots.map((sl, i) => ({ ...sl, p: s.player(s.lineup[i]) })) }], { board: true });
     this.board.highlight(this.selected, id => this.swapClass(s.player(id)));
+    this.setSwapHover(this.swapHoverId);   // v3.10: re-apply (or drop, if nothing is selected any more) after the re-render
     const boardEl = this.$('tac-board');
     boardEl.classList.toggle('locked', live);
     boardEl.classList.toggle('armed', !!this.selected);
@@ -1114,6 +1134,25 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.$('team-status').textContent = live ? L.t('squad.locked') : this.selected ? L.t('team.help.sel', { n: who, p: selPos }) : L.t('team.help.idle');
     this.$('team-msg').textContent = this.teamMsg;
   }
+
+  /** v3.10: the kid the pointer (or a drag) is over while another one is selected/dragged. Classes are toggled in place
+      on #roster .r-row[data-id] and #tac-board .pl[data-pid]; the selected/dragged kid himself is never a target. */
+  setSwapHover(id) {
+    const src = this.selected || this.swapDragId || null;
+    if (!src || this.live || id === src || (id && !this.state.player(id))) id = null;
+    this.swapHoverId = id;
+    this.applySwapHover();
+  }
+  applySwapHover() {
+    const id = this.swapHoverId, q = sel => document.querySelectorAll(sel);
+    q('#roster .swap-hover-target, #tac-board .swap-hover-target').forEach(el => {
+      if ((el.dataset.id || el.dataset.pid) !== id) el.classList.remove('swap-hover-target');
+    });
+    if (!id) return;
+    this.$('roster').querySelector(`.r-row[data-id="${id}"]`)?.classList.add('swap-hover-target');
+    this.$('tac-board').querySelector(`.pl[data-pid="${id}"]`)?.classList.add('swap-hover-target');   // bench kids have no dot: list only
+  }
+  endSwapDrag() { this.swapDragId = null; this.setSwapHover(null); }
 
   /** Smart swap highlighting: same natural position as the selected player = suggested, anything else = dimmed
       (still clickable — out-of-position swaps are allowed, just not recommended). */

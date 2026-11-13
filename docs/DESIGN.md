@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v3.9)
+# Youth Academy Manager — design notes (current: v3.10)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -241,3 +241,8 @@ Two fog-of-war-friendly ways to learn a kid's hidden `archetype` — words only,
 - **Locked-UI look**: under `body.modal-lock` taskbar / tray / desktop-icon labels get the Win98 disabled colour (#7c807a + white etch). `#msum-lockbar` (inside `#msum-layer`, a 38 px strip exactly over the taskbar) shows a padlock note `lock.bar` and a hover tooltip: `lock.tipTalk` while the talk is owed, `lock.tip` after it. ReadMe (`btn-ver` → `show('readme')`) and the tray DEBUG button are blocked like every other opener.
 - **Quick Sim**: `onMatchEnd` for an instant match no longer opens the summary — it goes straight to the Notebook (`show('notes')`). The Notebook shows a `.nb-talk` line (bold while the talk is owed) with a `[ MATCH SUMMARY ]` button (`#btn-nb-msum`) that opens the normal locked summary. A reload re-opens the summary only for a visual match (`!lastReport.instant`).
 - **No soft-lock**: `closeMatchday()` with a talk still owed re-opens the summary for a visual match; for a Quick Sim it calls `GameState.skipTeamTalk()` → `lastReport.talk = 'none'`, diary `tt.skipped`, no effects, and the matchday closes. The summary renders `'none'` as `tt.react.none` with the buttons disabled.
+
+## Swap hover target (v3.10)
+- Team Management: `ui.swapHoverId` (transient, never saved). With a source kid — `ui.selected` (click-swap) or `ui.swapDragId` (set on dragstart in `#roster` or on a `#tac-board` dot) — `setSwapHover(id)` marks the hovered kid with `.swap-hover-target` on `#roster .r-row[data-id]` AND `#tac-board .pl[data-pid]` (bench kids: row only). The source kid himself, an unknown id or a live match → no target.
+- Delegated listeners on the two containers (`mouseover` / `mouseleave`, `dragover` / `dragleave` with `relatedTarget` outside, `dragend`, `drop` in capture so it runs before RadarView's drop). Classes are toggled in place (`applySwapHover()`), no re-render; `renderTeam()` re-applies the id after its own re-render and drops it when nothing is selected any more (swap done / cancelled / Esc). `show()` clears it on any screen change.
+- CSS (08-smart-swap.css): rows = inset white/black double ring via box-shadow (the suggested row animates its outline), dots = solid white outline + scale 1.12 + `⇄` badge + inverted name label (the suggested dot animates its box-shadow). `opacity: 1; filter: none` lifts a dimmed (other-position) kid while targeted. Smart Swap classes (`suggested-swap` / `dimmed-swap`) and `.sel` are never touched.

@@ -28,3 +28,14 @@
 .pl-pos.GK{ color: #e2b85a; } .pl-pos.DEF{ color: #8fb4d6; } .pl-pos.MID{ color: #9cc58a; } .pl-pos.FWD{ color: #e08b7f; }
 @media (prefers-reduced-motion: reduce){ .r-row.suggested-swap, .pitch.board .pl.suggested-swap{ animation: none; } }
 
+
+/* v3.10: SWAP HOVER TARGET — the kid you are about to swap with (pointer or drag over him), shown in the list AND on the board.
+   Win98-style crisp white/black double ring; layered ON TOP of Smart Swap (suggested / dimmed classes stay on the element).
+   List rows use box-shadow (the suggested row animates its outline); board dots use outline (the suggested dot animates its box-shadow). */
+.r-row.swap-hover-target{ opacity: 1; filter: none; background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #000; }
+.r-row.swap-hover-target .r-line b{ color: #fff; }
+.pitch.board .pl.swap-hover-target{ opacity: 1; filter: none; z-index: 6; outline: 3px solid #fff; outline-offset: 2px;
+  transform: translate(-50%, -50%) scale(1.12); }
+.pitch.board .pl.swap-hover-target::after{ content: '\21C4'; position: absolute; top: -9px; right: -12px; width: 15px; height: 15px; display: grid; place-items: center;
+  font: bold 11px/1 var(--mono); color: #000; background: #fff; border: 1px solid #000; box-shadow: 1px 1px 0 #000; }
+.pitch.board .pl.swap-hover-target .pl-nm{ color: #000; background: #fff; text-shadow: none; }

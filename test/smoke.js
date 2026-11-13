@@ -1114,6 +1114,52 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       closed: document.getElementById('msum-layer').hidden, diary: YAM.game.diary.some(d => d.key === 'tt.skipped'), rep: JSON.stringify([YAM.game.rep.board, YAM.game.rep.parents]) === k.rep }), sk0);
     check('v3.9 Quick Sim talk: reload keeps it pending without a modal; closing the matchday skips it (diary line, no effects) → next matchday',
       sk0.closed && sk0.free && sk0.pending && Object.values(sk).every(Boolean), JSON.stringify({ sk0, sk }));
+    // v3.10: swap hover target — list ↔ board sync, bench = list only, self ignored, Smart Swap kept, cleared on leave / Esc / swap / screen change; drag-over too
+    await page.evaluate(() => { YAM.ui.selected = null; YAM.ui.show('team'); YAM.ui.renderTeam(); });
+    await page.waitForTimeout(150);
+    const ids = await page.evaluate(() => ({ xi: YAM.game.lineup.filter(Boolean).filter(id => YAM.game.player(id)), bench: YAM.game.bench().filter(p => p.available).map(p => p.id) }));
+    const [a, c, d] = ids.xi, b = ids.bench[0];
+    const hv = {};
+    const hl = () => page.evaluate(() => ({ rows: [...document.querySelectorAll('#roster .r-row.swap-hover-target')].map(r => r.dataset.id),
+      dots: [...document.querySelectorAll('#tac-board .pl.swap-hover-target')].map(x => x.dataset.pid) }));
+    await page.hover(`#roster .r-row[data-id="${c}"]`);
+    hv.idle = JSON.stringify(await hl()) === '{"rows":[],"dots":[]}';                    // nothing selected → no target
+    await page.click(`#roster .r-row[data-id="${a}"]`);
+    hv.selected = await page.evaluate(x => YAM.ui.selected === x, a);
+    await page.hover(`#roster .r-row[data-id="${c}"]`);
+    let h = await hl(); hv.rowToDot = h.rows.join() === c && h.dots.join() === c;
+    await shot('12-swap-hover');
+    hv.smart = await page.evaluate(x => { const r = document.querySelector(`#roster .r-row[data-id="${x}"]`), dd = document.querySelector(`#tac-board .pl[data-pid="${x}"]`);
+      const cls = YAM.ui.swapClass(YAM.game.player(x)); return !!cls && r.classList.contains(cls) && dd.classList.contains(cls)
+        && document.querySelector(`#tac-board .pl[data-pid="${YAM.ui.selected}"]`).classList.contains('sel'); }, c);
+    hv.rowEl = await page.evaluate(x => document.querySelector(`#roster .r-row[data-id="${x}"]`) === window.__hvRow || (window.__hvRow = document.querySelector(`#roster .r-row[data-id="${x}"]`), true), c);
+    if (b) { await page.hover(`#roster .r-row[data-id="${b}"]`); h = await hl(); hv.bench = h.rows.join() === b && h.dots.length === 0; } else hv.bench = true;
+    await page.hover(`#roster .r-row[data-id="${a}"]`); h = await hl(); hv.self = !h.rows.length && !h.dots.length;
+    await page.hover(`#tac-board .pl[data-pid="${d}"]`); h = await hl(); hv.dotToRow = h.rows.join() === d && h.dots.join() === d;
+    hv.noRerender = await page.evaluate(x => document.querySelector(`#roster .r-row[data-id="${x}"]`) === window.__hvRow, c);   // hovering never rebuilt the list
+    await page.mouse.move(2, 2); h = await hl(); hv.leave = !h.rows.length && !h.dots.length;
+    await page.hover(`#roster .r-row[data-id="${c}"]`);
+    await page.keyboard.press('Escape'); h = await hl(); hv.esc = !h.rows.length && !h.dots.length && await page.evaluate(() => !YAM.ui.selected);
+    await page.click(`#roster .r-row[data-id="${a}"]`); await page.hover(`#tac-board .pl[data-pid="${c}"]`);
+    await page.evaluate(() => YAM.ui.show('dash')); h = await hl(); hv.screen = !h.rows.length && !h.dots.length;
+    await page.evaluate(() => YAM.ui.show('team'));
+    // click swap still works and leaves no target behind
+    await page.click(`#tac-board .pl[data-pid="${c}"]`);
+    h = await hl(); hv.clickSwap = await page.evaluate(([x, y]) => YAM.game.lineup.indexOf(x) !== -1 && YAM.game.lineup.indexOf(y) !== -1 && !YAM.ui.selected, [a, c]) && !h.rows.length && !h.dots.length;
+    // drag: dragstart on a list row, dragover a dot → target on, drop → swap + cleared
+    const pos0 = await page.evaluate(([x, y]) => [YAM.game.lineup.indexOf(x), YAM.game.lineup.indexOf(y)], [a, d]);
+    hv.drag = await page.evaluate(([x, y]) => {
+      const dt = new DataTransfer(), row = document.querySelector(`#roster .r-row[data-id="${x}"]`), dot = document.querySelector(`#tac-board .pl[data-pid="${y}"]`);
+      row.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+      dot.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      const on = dot.classList.contains('swap-hover-target') && document.querySelector(`#roster .r-row[data-id="${y}"]`).classList.contains('swap-hover-target');
+      dot.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      return on && !document.querySelector('.swap-hover-target') && !YAM.ui.swapDragId;
+    }, [a, d]);
+    hv.dragSwap = await page.evaluate(([x, y, p]) => YAM.game.lineup.indexOf(x) === p[1] && YAM.game.lineup.indexOf(y) === p[0], [a, d, pos0]);
+    check('v3.10 swap hover: list ↔ board target sync (bench = list only, self ignored), Smart Swap + selection kept, no re-render; cleared on leave / Esc / screen / click swap; drag-over target + drop swap',
+      Object.values(hv).every(Boolean), JSON.stringify(hv));
+    await page.evaluate(() => YAM.ui.show('dash'));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

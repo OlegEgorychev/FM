@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.9';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.10';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.10', name: { en: 'Who Am I Swapping?', ru: 'С кем меняю?' },
+    en: [
+      'Team Management: with a kid selected, hover another kid in the list or on the tactics board and he lights up in BOTH places — a bright white frame and a \u21C4 badge on his dot show exactly who you are about to swap with.',
+      'Bench kids light up in the list only (they have no dot on the pitch yet).',
+      'Works while dragging too: drag a kid over a row or a dot and the same target highlight follows the pointer.',
+      'The green Smart Swap hints stay visible underneath; the highlight clears when you move away, finish or cancel the swap, press Esc or switch screens.',
+    ],
+    ru: [
+      'Управление командой: выбери игрока, наведи курсор на другого в списке или на тактической схеме — он подсветится в ОБОИХ местах: яркая белая рамка и значок \u21C4 на кружке сразу показывают, с кем ты сейчас поменяешь.',
+      'Запасные подсвечиваются только в списке (на поле у них пока нет кружка).',
+      'Работает и при перетаскивании: тащишь игрока над строкой или кружком — подсветка цели идёт за курсором.',
+      'Зелёные подсказки умной замены остаются видны; подсветка гаснет, когда уводишь курсор, завершаешь или отменяешь замену, жмёшь Esc или переключаешь экран.',
+    ] },
   { v: '3.9', name: { en: 'Words for Every Result', ru: 'Слова на любой счёт' },
     en: [
       'Coach\'s Word now fits the result: each of the three talks has its own line after a win, a draw and a defeat.',
