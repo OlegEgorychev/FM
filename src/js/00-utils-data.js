@@ -105,6 +105,16 @@ const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14
 /* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
 /* v3.0 EXCLUSIVE TEAM DUTIES + SET PIECES */
 const DUTIES = { captain: 'C', penalty: 'PK', corner: 'CK' };
+/* v3.7 HIDDEN CAPTAIN TRAITS (only DEBUG.EXE shows them; the coach reads them from the Notebook / diary).
+   Trait roll (seeded): P(leader) = 0.12 + (composure−10)·0.045 + ((passion+discipline)/2 − 10)·0.03, P(anxious) = 0.12 + (10−composure)·0.06, both 0.03–0.75.
+   leader : on top of the armband bonus — after we concede, +RALLY on all our rolls for RALLY_MIN minutes; +POST_MORALE for everyone who played.
+   anxious: −STRESS (−composure term) on his OWN rolls while he wears C; after his mistake / a conceded goal / every minute we trail
+            a chance to break down in tears (once): −BREAK_MORALE morale, armband bonus lost for the rest of the match.
+   normal : the plain v3.0 armband bonus. */
+const CAPTAIN_TRAITS = ['leader', 'anxious', 'normal'];
+const CAPTAIN = { LEAD_BASE: 0.12, LEAD_COMP: 0.045, LEAD_DRIVE: 0.03, ANX_BASE: 0.12, ANX_COMP: 0.06, TRAIT_MIN: 0.03, TRAIT_MAX: 0.75,
+  RALLY: 1, RALLY_MIN: 10, POST_MORALE: 3, CHEER: 0.25,
+  STRESS: 1.5, STRESS_COMP: 0.1, BREAK_MISTAKE: 0.08, BREAK_CONCEDE: 0.2, BREAK_TRAIL: 0.006, BREAK_MORALE: 20, NERVES: 0.35, CLUE: 0.4, PRACTICE_CLUE: 0.3 };
 const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25, CORNER_BLOCK: 0.3, CORNER_DELIVERY: 3, HEADER_HEIGHT: 6,
   CAPTAIN: 0.5 };   // captain on the pitch: + (0.5 + passion/20) on all our rolls (≈ +0.55 … +1.5)
 /* v3.1 SANDBOX WORLD — 100 kids; 40 at rival clubs, 60 free agents; 30 of them play the Yard Match; you sign 15

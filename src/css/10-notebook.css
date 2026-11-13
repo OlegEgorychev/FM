@@ -14,3 +14,7 @@
 .nb-legend span{ background: #e9e4d3; padding: 0 4px; }
 @media (max-width: 820px){ .app-title{ display: none; } }
 
+/* v3.7 hidden captain traits: one handwritten line about the armband (paper slip, Win98 bevel) */
+.nb-captain{ margin: 0 0 12px; padding: 6px 10px; background: #f3eedc; color: #2b2618; font-size: 13px; line-height: 1.45;
+  border: 2px solid; border-color: #fff #8a8470 #8a8470 #fff; }
+.nb-captain .duty-badge{ vertical-align: 1px; }

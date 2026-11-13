@@ -2,8 +2,22 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.6';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.7';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.7', name: { en: 'Who Wears the Armband', ru: 'Кому носить повязку' },
+    en: [
+      'Not every kid is born to be captain. Some are natural leaders, some crumble under the armband, most just get on with it — and you will not be told which is which.',
+      'A real leader lifts the team: after you concede he rallies everyone (the team plays a bit better for a while), and the whole squad leaves the pitch in a better mood.',
+      'A nervous captain feels the weight: his own game suffers while he wears C, and after a mistake, a conceded goal or while you are losing he may break down in tears — and the armband stops helping for the rest of the match.',
+      'Watch for the signs: the Coach\'s Notebook now has a line about the armband, and both the Notebook and Match Practice may catch a kid organising the others — or freezing under pressure.',
+    ],
+    ru: [
+      'Не каждый рождён капитаном. Кто-то прирождённый лидер, кого-то повязка ломает, а большинство просто делают своё дело — и никто не скажет тебе, кто есть кто.',
+      'Настоящий лидер поднимает команду: после пропущенного гола он всех собирает (какое-то время команда играет чуть лучше), а после матча настроение у всей команды выше.',
+      'Нервному капитану повязка давит на плечи: его собственная игра страдает, а после ошибки, пропущенного гола или пока вы проигрываете он может расплакаться — и до конца матча повязка уже не помогает.',
+      'Следи за знаками: в Блокноте тренера появилась строка о повязке, а Блокнот и игровая практика могут заметить, как кто-то руководит остальными — или замирает под давлением.',
+    ],
+  },
   { v: '3.6', name: { en: 'Finding Their Spot', ru: 'Своё место' },
     en: [
       'Match Practice is now a scouting session: before END DAY you can mark up to 2 kids "Under observation" (free, 0 AP). Nobody marked? You will watch 1–2 random kids.',

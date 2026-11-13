@@ -34,7 +34,30 @@ function coachNote(p, s, flags = {}) {
     }
   }
   if (flags.oop) out.push('note.oop');
+  if (flags.psy) out.push(flags.psy);   // v3.7 a subtle captain-trait clue (vocal leader / nerves)
   if (flags.role) out.push('note.role');
   return out;
 }
 
+
+/* =========================================================
+   v3.7 HIDDEN CAPTAIN TRAITS — qualitative clues only (i18n keys; seeded by matchday + id, never Math.random)
+   ========================================================= */
+/** The armband line for the Notebook from MatchEngine.captainReport(): rallied / organised (leader),
+    overwhelmed / tears (anxious), did the job (normal). Returns { pid, key } or null. */
+function captainObservation(rep, md) {
+  if (!rep) return null;
+  const v = Math.floor(seeded(md + '#capobs#' + rep.id)() * 2);
+  let key;
+  if (rep.trait === 'leader') key = rep.rallies ? 'cap.obs.rally.' : 'cap.obs.lead.';
+  else if (rep.trait === 'anxious') key = rep.breakdown != null ? 'cap.obs.tears.' : rep.nerves || rep.mistakes ? 'cap.obs.nerves.' : 'cap.obs.tense.';
+  else key = 'cap.obs.steady.';
+  return { pid: rep.id, key: key + v };
+}
+/** A sampled kid (not wearing the armband) may show natural vocal leadership or visible nerves. */
+function psychClue(p, md, captainId) {
+  if (!p || p.id === captainId || p.captainTrait === 'normal' || !p.captainTrait) return null;
+  const r = seeded(md + '#psy#' + p.id);
+  if (r() >= CAPTAIN.CLUE) return null;
+  return (p.captainTrait === 'leader' ? 'note.vocal.' : 'note.nervy.') + Math.floor(r() * 2);
+}

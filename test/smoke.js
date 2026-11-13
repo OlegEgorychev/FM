@@ -889,6 +889,76 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('v3.6 request dialogue: 3 choices (green/gray/red); yes = tag → archetype, streak 0, morale +5, diary; order = discipline +1, morale −8, cooldown 2',
       v36d.open && v36d.n === 3 && v36d.tones === 'green,gray,red' && v36d.yesTag && v36d.yesOop === 0 && v36d.yesMorale === 55 && v36d.diary === 'pr.yes.diary'
       && v36d.ordMorale === 47 && v36d.ordDisc === 11 && v36d.ordCd === 2 && v36d.ordDiary === 'pr.order.diary' && v36d.closed, JSON.stringify(v36d));
+    // v3.7: hidden captain traits — seeded generation + save migration, engine modifiers, Notebook / diary clues, DEBUG column
+    const v37 = await page.evaluate(() => {
+      const s = YAM.game, sq = s.squad, out = {}, T = ['leader', 'anxious', 'normal'];
+      const k = sq.find(p => p.available) || sq[0];
+      const raw = JSON.parse(JSON.stringify(k)); delete raw.captainTrait;
+      const keep = new Player({ ...JSON.parse(JSON.stringify(k)), captainTrait: 'leader', tags: [] });
+      out.migrate = new Player({ ...raw, tags: [] }).captainTrait === k.captainTrait && new Player({ ...raw, captainTrait: 'boss', tags: [] }).captainTrait === k.captainTrait
+        && keep.captainTrait === 'leader' && T.includes(k.captainTrait) && JSON.parse(localStorage.getItem('yam_save_v1') || '{}').squad?.every(p => T.includes(p.captainTrait));
+      out.world = [...sq, ...(s.globalPlayers || []), ...s.league.teams.filter(t => !t.user).flatMap(t => s.league.roster(t, new Set()))].every(p => T.includes(p.captainTrait));
+      out.det = Player.rollCaptainTrait('id7', 'Tommy Smith', k.psych) === Player.rollCaptainTrait('id7', 'Tommy Smith', k.psych);
+      const share = (ps, t) => { let n = 0; for (let i = 0; i < 400; i++) n += Player.rollCaptainTrait('t' + i, 'N' + i, ps) === t; return n / 400; };
+      const hi = { composure: 18, passion: 17, discipline: 17 }, lo = { composure: 3, passion: 8, discipline: 8 };
+      out.psych = [share(hi, 'leader'), share(lo, 'leader'), share(hi, 'anxious'), share(lo, 'anxious')].map(v => +v.toFixed(2));
+      // engine: captain bonus / rally / stress / breakdown (forced roll), normal = plain bonus
+      const keepTrait = k.captainTrait, keepMor = k.dyn.morale, keepCap = s.duties.captain;
+      const lg = s.league, t = lg.teams.find(x => !x.user), logs = [];
+      const xi = [k, ...sq.filter(p => p !== k).slice(0, 10)];
+      const mk = trait => { k.captainTrait = trait; const e = new MatchEngine({ name: 'X', formation: '4-4-2', players: xi }, { name: t.name, formation: t.formation, players: lg.roster(t, new Set()).slice(0, 11) },
+        { onUpdate() {}, onEnd() {}, onLog(x) { logs.push(x.key); } }, { duties: { captain: k.id }, md: 3 }); e.started = true; e.minute = 30; return e; };
+      const base = 0.5 + k.psych.passion / 20, eq = (a, b) => Math.abs(a - b) < 1e-9;
+      let e = mk('normal'); e.capRng = () => 0;
+      e.captainMoment('concede'); e.captainMoment('mistake');
+      out.normal = eq(e.captainBonus(), base) && e.captainStress(k) === 0 && e.cap.broken === null && !logs.length;
+      e = mk('leader'); const b0 = e.captainBonus(); e.captainMoment('concede');
+      out.leader = eq(b0, base) && eq(e.captainBonus(), base + 1) && logs.includes('cap.rally') && e.capBarks.length === 1 && e.captainStress(k) === 0
+        && (e.minute = 41, eq(e.captainBonus(), base)) && e.captainReport().rallies === 1;
+      e = mk('anxious'); const st = e.captainStress(k), other = e.captainStress(xi[3]);
+      const r1 = e.rs(k, 'Pass', 0, 'atk');
+      e.capRng = () => 0; k.dyn.morale = 60; e.captainMoment('mistake');
+      out.anxious = st <= -1.5 && other === 0 && r1.flat.stress === st && eq(e.cap.breakdown, 30) && e.captainBonus() === 0 && e.captainStress(k) === 0
+        && k.dyn.morale === 40 && logs.includes('cap.breakdown') && e.captainReport().breakdown === 30;
+      // determinism: same match twice (visual & Quick Sim share tick()) → same captain stream
+      const d1 = mk('anxious'); d1.started = false; d1.minute = 0; const r = [];
+      for (let i = 0; i < 2; i++) { const m = mk('anxious'); r.push([m.capRng(), m.capRng()].join()); }
+      out.seeded = r[0] === r[1];
+      // a full Quick Sim with a captain runs and post-match leader morale +3
+      k.captainTrait = 'leader'; k.dyn.morale = keepMor;
+      const full = mk('leader'); full.started = false; full.minute = 0; full.runInstant();
+      const rep = full.captainReport(), before = xi.map(p => p.dyn.morale);
+      out.full = full.finished && rep && rep.id === k.id && rep.trait === 'leader' && rep.minutes > 0;
+      // Notebook / diary clues: words only (no trait names, no numbers), EN + RU
+      const keys = [captainObservation({ ...rep, rallies: 1 }, 3).key, captainObservation({ ...rep, trait: 'anxious', breakdown: 50 }, 3).key, captainObservation({ ...rep, trait: 'anxious', breakdown: null, nerves: 0, mistakes: 0 }, 3).key,
+        captainObservation({ ...rep, trait: 'normal' }, 3).key, 'note.vocal.0', 'note.nervy.1', 'obs.cap.leader.0', 'obs.cap.anxious.1'];
+      out.keys = keys.join();
+      out.words = /^cap\.obs\.rally\.[01],cap\.obs\.tears\.[01],cap\.obs\.tense\.[01],cap\.obs\.steady\.[01]/.test(out.keys)
+        && keys.every(x => I18N.en[x] && I18N.ru[x] && !/\d|leader|anxious|лидер|тревожн/i.test(I18N.en[x] + I18N.ru[x]));
+      const html = YAM.ui.captainNoteHTML({ capObs: { pid: k.id, key: keys[0] } });
+      out.nb = html.includes('nb-captain') && html.includes(L.name(k.name)) && !/leader|anxious/.test(html);
+      const pc = sq.map(p => psychClue(p, 4, null)), pc2 = sq.map(p => psychClue(p, 4, null));
+      out.clue = JSON.stringify(pc) === JSON.stringify(pc2) && sq.every((p, i) => !pc[i] || (p.captainTrait === 'leader' ? /^note\.vocal/ : /^note\.nervy/).test(pc[i]))
+        && sq.filter(p => p.captainTrait === 'normal').every(p => psychClue(p, 4, null) === null) && psychClue(k, 4, k.id) === null;
+      const obs = s.practiceObservations(s.calendar.date, sq, sq.slice(0, 2).map(p => p.id));
+      out.practice = obs.length === 2 && obs.every(o => !o.capKey || o.capKey.startsWith('obs.cap.' + s.player(o.pid).captainTrait + '.'));
+      // post-match morale: leader +3 on top of the result
+      s.duties.captain = k.id;
+      const m0 = xi.map(p => p.dyn.morale); s.applyMatchDynamics(full, 'D', { trait: 'leader' }); const mL = xi.map(p => p.dyn.morale);
+      xi.forEach((p, i) => { p.dyn.morale = m0[i]; }); s.applyMatchDynamics(full, 'D', { trait: 'normal' }); const mN = xi.map(p => p.dyn.morale);
+      out.post = xi.every((p, i) => mL[i] - mN[i] === (mN[i] + 3 > 100 ? 100 - mN[i] : 3) || mN[i] === 100);
+      xi.forEach((p, i) => { p.dyn.morale = before[i]; });
+      // DEBUG.EXE column
+      out.debug = DebugConsole.COLS.some(c => c.h === 'CAPT' && c.g === 'PSYCH') && /dbg|лидер|leader|anxious|normal|обычный|тревожный/.test(DebugConsole.COLS.find(c => c.h === 'CAPT').v(k));
+      k.captainTrait = keepTrait; k.dyn.morale = keepMor; s.duties.captain = keepCap; s.save();
+      return out;
+    });
+    check('v3.7 captain traits: seeded trait + save migration (whole world), psychology bias, DEBUG column',
+      v37.migrate && v37.world && v37.det && v37.psych[0] > v37.psych[1] && v37.psych[3] > v37.psych[2] && v37.debug, JSON.stringify({ m: v37.migrate, w: v37.world, d: v37.det, p: v37.psych, dbg: v37.debug }));
+    check('v3.7 captain in the engine: normal = plain bonus; leader rally +1 for 10 min after a goal against + post-match +3 morale; anxious stress on his own rolls, breakdown = −20 morale + no bonus; seeded stream; Quick Sim',
+      v37.normal && v37.leader && v37.anxious && v37.seeded && v37.full && v37.post, JSON.stringify(v37));
+    check('v3.7 fog of war: armband Notebook line + sampled-kid / practice clues are words only (EN + RU), seeded, trait-consistent',
+      v37.words && v37.nb && v37.clue && v37.practice, v37.keys);
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

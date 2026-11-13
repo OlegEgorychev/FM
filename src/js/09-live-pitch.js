@@ -36,7 +36,7 @@ class PitchModel {
     this.shotY = 50;
     this.fx = [];          // effects for the renderer: barks, shake, flash (DATA → RENDER hand-off)
     this.zoomHint = 1;     // camera push-in request (1 = normal)
-    this.sentCount = 0;
+    this.sentCount = 0; this.capBarkCount = 0;
     this.resetBall();
   }
   resetBall() {
@@ -50,7 +50,7 @@ class PitchModel {
     this.prevKind = null;
     this.fx = [];
     this.zoomHint = 1;
-    this.sentCount = 0;
+    this.sentCount = 0; this.capBarkCount = 0;
     this.resetBall();
     sides.forEach((side, si) => side.entries.forEach((e, idx) => {
       const base = si === 0 ? { x: e.x, y: e.y } : { x: 100 - e.x, y: 100 - e.y };
@@ -129,6 +129,10 @@ class PitchModel {
       this.fx.push({ type: 'shake' }, { type: 'flash', tone: 'red' });
       this.sentCount = eng.sentOff.size;
     }
+    // v3.7: the captain's own speech bubbles (rally / cheer / nerves / tears) — queued by the engine
+    const cb = eng.capBarks || [];
+    for (let i = this.capBarkCount; i < cb.length; i++) this.fx.push({ type: 'bark', ...cb[i] });
+    this.capBarkCount = cb.length;
     this.lastSeq = eng.seq;
     const ev = eng.ev || {};
     this.zoomHint = ['aim', 'strike', 'goal', 'save', 'wide', 'block'].includes(ev.kind) ? 1.16 : 1;

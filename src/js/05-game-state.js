@@ -229,7 +229,11 @@ class GameState {
     }
     return who.map(p => {
       const ok = isPlayingNaturalPosition(p, p.tag), v = Math.floor(seeded(date + '#obs#' + p.id)() * 2);
-      return { pid: p.id, ok, key: (ok ? 'obs.ok.' : 'obs.hint.' + p.archetype + '.') + v };
+      const o = { pid: p.id, ok, key: (ok ? 'obs.ok.' : 'obs.hint.' + p.archetype + '.') + v };
+      // v3.7: sometimes a natural vocal leader / a kid who freezes under pressure shows it (even without the armband)
+      const c = seeded(date + '#obscap#' + p.id);
+      if (p.captainTrait && p.captainTrait !== 'normal' && c() < CAPTAIN.PRACTICE_CLUE) o.capKey = 'obs.cap.' + p.captainTrait + '.' + Math.floor(c() * 2);
+      return o;
     });
   }
   /** After every league match (live and Quick Sim): straight matches outside the hidden archetype's line.
@@ -406,7 +410,7 @@ class GameState {
   }
   /** v1.8: after a match — sharpness from minutes (full game +12, sub +6, unused −2); morale from the result,
       goals and red cards, amplified by passion (0.6×–1.4×). */
-  applyMatchDynamics(eng, result) {
+  applyMatchDynamics(eng, result, cap = eng.captainReport?.()) {
     const rm = REP.MATCH[result];   // v2.8: results move the Board and the dressing room
     if (rm) { this.addRep('board', rm.board); this.addRep('squad', rm.squad); }
     const subIn = new Set(eng.subs.map(x => x.in));
@@ -417,6 +421,7 @@ class GameState {
       let m = MORALE[result] + (st ? st.goals * MORALE.GOAL + st.red * MORALE.RED : 0);
       if (!played) m -= 2;
       p.dyn.morale = clamp(Math.round(p.dyn.morale + m * (0.6 + p.psych.passion / 25)), 0, 100);
+      if (played && cap?.trait === 'leader') p.dyn.morale = clamp(p.dyn.morale + CAPTAIN.POST_MORALE, 0, 100);   // v3.7: a real leader lifts the dressing room
     }
   }
   /** v3.5: the post-match team talk is still owed (lastReport.talk === null; older saves have no field = done). */

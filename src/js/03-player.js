@@ -149,6 +149,9 @@ class Player {
     this.psych.potential = clamp(Math.round(src.psych.potential ?? 50), 1, 100);
     const b = o.bio && Number.isInteger(o.bio.age) ? o.bio : (fresh?.bio || AttrGen.bio(position, seeded(id + name + '#bio'), o.age, this.physical));
     this.bio = { ...b };
+    // v3.7: HIDDEN captain trait ('leader' | 'anxious' | 'normal') — seeded from id + name + psych, so old saves,
+    // AI rosters and the free-agent pool all migrate to the same value on every load (never Math.random)
+    this.captainTrait = CAPTAIN_TRAITS.includes(o.captainTrait) ? o.captainTrait : Player.rollCaptainTrait(id, name, this.psych);
     const d = o.dyn || {};
     const r = seeded(id + name + '#dyn');
     this.dyn = { condition: clamp(Math.round(d.condition ?? o.energy ?? 100), 0, 100),
@@ -190,6 +193,16 @@ class Player {
   get moodBonus() { return clamp((this.dyn.morale - 50) / 25 * (0.55 + this.psych.passion / 20), -2.5, 2.5); }
   /** The SVG is rebuilt from `face` on load, so saves only keep the 7 indices. */
   toJSON() { const { portraitSvg, ...o } = this; return o; }
+
+  /** v3.7: deterministic hidden captain trait, loosely tied to psychology (see CAPTAIN in 00-utils-data.js).
+      High composure + passion/discipline → leader more likely; low composure → anxious more likely; the rest normal. */
+  static rollCaptainTrait(id, name, psych = {}) {
+    const C = CAPTAIN, comp = psych.composure ?? 10, drive = ((psych.passion ?? 10) + (psych.discipline ?? 10)) / 2;
+    const lead = clamp(C.LEAD_BASE + (comp - 10) * C.LEAD_COMP + (drive - 10) * C.LEAD_DRIVE, C.TRAIT_MIN, C.TRAIT_MAX);
+    const anx = clamp(C.ANX_BASE + (10 - comp) * C.ANX_COMP, C.TRAIT_MIN, C.TRAIT_MAX);
+    const u = seeded(String(id) + '|' + String(name) + '#cap')();
+    return u < lead ? 'leader' : u < Math.min(0.97, lead + anx) ? 'anxious' : 'normal';
+  }
 
   static generate(id, position, usedSurnames, mod = 0, withTags = false, number = 0) {
     let last; let guard = 0;

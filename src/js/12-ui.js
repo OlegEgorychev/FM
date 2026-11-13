@@ -68,7 +68,10 @@ class UIController {
       const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
       if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
       if (r.hurt.length) s.addDiary({ date, key: 'tr.hurt', vars: { s: ids(r.hurt) }, cls: 'ev' });
-      for (const o of r.observed || []) s.addDiary({ date, key: o.key, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.6 practice scouting
+      for (const o of r.observed || []) {
+        s.addDiary({ date, key: o.key, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.6 practice scouting
+        if (o.capKey) s.addDiary({ date, key: o.capKey, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.7 vocal leader / nerves
+      }
       const plan = { p: { plan: r.plan } };
       return r.skipped.length
         ? { key: 'cal.training', vars: { ...plan, a: r.attended, s: ids(r.skipped) }, cls: 'tr' }
@@ -1285,7 +1288,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties, md: ctx.md });
     if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
@@ -1373,12 +1376,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         tired: eng.tired.has(p.id), oop: false, gk: eng.lineOf.get(p.id) === 'GK', role: (p.tags || [])[0] || null,   // v3.0
       })),
     };
+    // v3.7 hidden captain traits: what the coach SAW of the armband + subtle clues about the 3 sampled kids (words only, seeded)
+    const capRep = eng.captainReport();
+    s.lastReport.capObs = captainObservation(capRep, ctx.md);
+    for (const pr of s.lastReport.players) { const k = psychClue(s.player(pr.id), ctx.md, capRep?.id); if (k) pr.psy = k; }
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);
     s.applyLiveFatigue(eng);
-    s.applyMatchDynamics(eng, result);
+    s.applyMatchDynamics(eng, result, capRep);
     s.trackPositions(eng);   // v3.6: out-of-position streaks (live + Quick Sim)
     this.applyAvailabilityAfterMatch(eng, ctx);   // v2.2
     if (s.cheats?.forceWin) s.cheats.forceWin = false;   // v1.8: one-shot debug cheat
@@ -1400,6 +1407,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   }
 
   /* ---------- NOTEBOOK ---------- */
+  /** v3.7: one qualitative line about the kid who wore the armband (never the trait, never numbers). */
+  captainNoteHTML(rep) {
+    const o = rep.capObs, p = o && this.state.player(o.pid);
+    if (!p) return '';
+    return `<p class="nb-captain"><span class="duty-badge d-captain">C</span> <b>${L.t('nb.armband')}:</b> ${esc(L.t(o.key, { k: L.name(p.name) }))}</p>`;
+  }
   renderNotebook() {
     const body = this.$('notes-body');
     const rep = this.state.lastReport;
@@ -1453,7 +1466,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       </div>
       <p class="nb-hint">${L.t('notes.hint')}</p>
       <p class="nb-legend"><span style="${rateStyle(80)}">■ &gt; 75%</span> · <span style="${rateStyle(30)}">■ &lt; 40%</span> · ${L.t('nb.legend')}</p>
-      <div class="cards">${cards}</div>${back}`;
+      ${this.captainNoteHTML(rep)}<div class="cards">${cards}</div>${back}`;
     this.$('notes-status').textContent = L.t('notes.status', { n: rep.md });
   }
 }

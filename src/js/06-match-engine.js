@@ -34,6 +34,11 @@ class MatchEngine {
     this.oppMentality = opts.oppMentality || 'balanced';   // v3.3: the away side's shout (AI stays balanced; test/balance.js mirrors setups)
     this.forceWin = !!opts.forceWin;
     this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8
+    // v3.7 hidden captain trait state + its OWN seeded stream (never Math.random → the match RNG order is untouched;
+    // visual and Quick Sim run the same tick(), so the same match gives the same captain moments)
+    this.capRng = seeded('cap|' + home.name + '|' + away.name + '|' + (opts.md ?? ''));
+    this.cap = { id: null, trait: null, rallies: 0, cheers: 0, nerves: 0, mistakes: 0, rallyUntil: -1, breakdown: null, broken: null, minutes: 0 };
+    this.capBarks = [];   // v3.7: speech bubbles for the live pitch (PitchModel reads new entries)
     this.dutiesFn = typeof opts.duties === 'function' ? opts.duties : () => (opts.duties || {});   // v3.0: read live (changes at half-time count)   // v1.8 DEBUG.EXE cheat: heavily tilts every roll to the user
     this.speed = opts.speed || 1;
     this.timer = null;
@@ -110,12 +115,67 @@ class MatchEngine {
     if (side === 0) { const id = this.dutiesFn()[duty]; const p = act.find(x => x.id === id); if (p) return p; }
     return pick(act.length ? act : this.active(side));
   }
-  /** Captain on the pitch → small boost on all our rolls (0.5 + passion/20). */
+  /** Captain on the pitch → small boost on all our rolls (0.5 + passion/20).
+      v3.7: a leader adds +RALLY for a while after we concede; an anxious captain who broke down gives nothing. */
   captainBonus() {
+    const p = this.captain();
+    if (!p) return 0;
+    if (p.captainTrait === 'anxious' && this.cap.broken === p.id) return 0;
+    const rally = p.captainTrait === 'leader' && this.minute <= this.cap.rallyUntil ? CAPTAIN.RALLY : 0;
+    return SETPIECE.CAPTAIN + (p.psych?.passion ?? 10) / 20 + rally;
+  }
+  /* ---------- v3.7 HIDDEN CAPTAIN TRAITS ---------- */
+  /** Our captain if he is on the pitch right now (subbed off / sent off / not picked → null). */
+  captain() {
     const id = this.dutiesFn().captain;
-    if (!id || this.sentOff.has(id)) return 0;
-    const p = this.sides[0].players.find(x => x.id === id);
-    return p ? SETPIECE.CAPTAIN + (p.psych?.passion ?? 10) / 20 : 0;
+    if (!id || this.sentOff.has(id)) return null;
+    return this.sides[0].players.find(x => x.id === id) || null;
+  }
+  /** Stress on an anxious captain's OWN rolls while he wears the armband (gone once he has broken down). */
+  captainStress(p) {
+    const c = this.captain();
+    if (!c || c !== p || p.captainTrait !== 'anxious' || this.cap.broken === p.id) return 0;
+    return -(CAPTAIN.STRESS + Math.max(0, 10 - (p.psych?.composure ?? 10)) * CAPTAIN.STRESS_COMP);
+  }
+  /** Log line + speech bubble that never touch Math.random (r comes from the captain's own stream). */
+  capLog(type, key, p, cls = '', bark = null) {
+    this.hooks.onLog({ minute: this.minute, type, key, vars: { a: p }, side: 0, suffix: '', r: this.capRng() });
+    if (bark) this.capBarks.push({ id: p.id, key: bark, cls, imp: true });
+  }
+  /** Something stressful just happened to us: 'mistake' (by the captain), 'concede', 'trail' (every minute behind), 'lost' (a teammate lost the ball). */
+  captainMoment(kind) {
+    const c = this.captain();
+    if (!c || this.finished) return;
+    const k = this.cap;
+    if (k.id !== c.id) Object.assign(k, { id: c.id, trait: c.captainTrait });
+    if (kind === 'mistake') k.mistakes++;
+    if (c.captainTrait === 'leader') {
+      if (kind === 'concede') {
+        k.rallies++; k.rallyUntil = this.minute + CAPTAIN.RALLY_MIN;
+        this.capLog('coach', 'cap.rally', c, 'good', 'bark.cap.rally');
+      } else if ((kind === 'lost' || kind === 'mistake') && this.capRng() < CAPTAIN.CHEER * (kind === 'lost' ? 0.3 : 1)) {
+        k.cheers++;
+        this.capLog('', 'cap.cheer', c, 'good', 'bark.cap.cheer');
+      }
+      return;
+    }
+    if (c.captainTrait !== 'anxious' || k.broken === c.id || kind === 'lost') return;
+    const ch = kind === 'mistake' ? CAPTAIN.BREAK_MISTAKE : kind === 'concede' ? CAPTAIN.BREAK_CONCEDE : CAPTAIN.BREAK_TRAIL;
+    if (this.capRng() < ch) {
+      k.broken = c.id; k.breakdown = this.minute;
+      c.dyn.morale = clamp(Math.round(c.dyn.morale - CAPTAIN.BREAK_MORALE), 0, 100);
+      this.capLog('turn', 'cap.breakdown', c, 'bad', 'bark.cap.tears');
+    } else if (kind !== 'trail' && this.capRng() < CAPTAIN.NERVES) {
+      k.nerves++;
+      this.capLog('', 'cap.nerves', c, 'bad', kind === 'concede' ? null : 'bark.cap.nerves');
+    }
+  }
+  /** v3.7: what the coach could have SEEN of the captain (Notebook). Never the trait name itself in the UI. */
+  captainReport() {
+    const k = this.cap, id = k.id || this.dutiesFn().captain;
+    const p = id && this.sides[0].all.find(x => x.id === id);
+    if (!p || !this.everPlayed.has(p.id)) return null;
+    return { id: p.id, trait: p.captainTrait, rallies: k.rallies, cheers: k.cheers, nerves: k.nerves, mistakes: k.mistakes, breakdown: k.breakdown, minutes: k.minutes };
   }
   /** A foul in the box may be a penalty; elsewhere in the final third a free kick at goal. */
   setPiece(victim, side) {
@@ -219,6 +279,8 @@ class MatchEngine {
       for (const k of keys) { const e = this.effParts(p, k); stat += (e.v - e.mood) / keys.length; rating += e.rating / keys.length; mood += e.mood / keys.length; tag = Math.max(tag, e.tag); }
     }
     const m = this.modParts(side, role), rand = Math.random() * 10;
+    const stress = side === 0 ? this.captainStress(p) : 0;   // v3.7: anxious captain under the armband
+    if (stress) flat = { ...flat, stress };
     let fl = 0; for (const k in flat) fl += flat[k];
     return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, total: stat + mood + rand + fl + m.v };
   }
@@ -317,6 +379,10 @@ class MatchEngine {
     }
     this.act();
     this.ambient();
+    if (this.captain()) {   // v3.7: minutes in the armband + the weight of trailing
+      this.cap.minutes++;
+      if (this.sides[0].score < this.sides[1].score) this.captainMoment('trail');
+    }
     this.afterAction();
   }
 
@@ -484,6 +550,7 @@ class MatchEngine {
       this.log('turn', 'passFail', vars, side);
       this.turnover(def, 2 - tz);
       this.setEv({ kind: 'intercept', a: c, b: recv, d: def });
+      if (side === 0) this.captainMoment(c === this.captain() ? 'mistake' : 'lost');   // v3.7
     }
   }
 
@@ -501,6 +568,7 @@ class MatchEngine {
       if (z < 2) this.zone++; else this.boxBonus = 3;
       this.setEv({ kind: 'dribble', a: c, d: def });
       this.log('', 'drOk', vars, side);
+      if (side === 1 && def === this.captain()) this.captainMoment('mistake');   // v3.7: our captain beaten in a duel
       if ((def.tags || []).includes('Aggressive')) this.commitFoul(def, c, side);
     } else {
       const foul = Math.random() < SETPIECE.FOUL;
@@ -518,6 +586,7 @@ class MatchEngine {
       this.maybeInjure(c, side);
       this.turnover(def, 2 - z);
       this.setEv({ kind: 'tackle', a: c, d: def });
+      if (side === 0) this.captainMoment(c === this.captain() ? 'mistake' : 'lost');   // v3.7
     }
   }
 
@@ -568,6 +637,7 @@ class MatchEngine {
       this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
       this.setEv({ kind: 'block', d: blocker });
+      if (side === 0 && shooter === this.captain()) this.captainMoment('mistake');   // v3.7
       if (Math.random() < SETPIECE.CORNER_BLOCK) { this.corner(side); return; }   // v3.0: deflected out → corner
       this.turnover(blocker, 0);
       return;
@@ -588,15 +658,18 @@ class MatchEngine {
       this.kickoff(opp);
       this.hold = 1;   // celebration beat
       this.setEv({ kind: 'goal', side, a: shooter });
+      if (side === 1) this.captainMoment('concede');   // v3.7
     } else if (atk < dfn - 7) {
       this.log('', 'wide', vars, side);
       this.turnover(keeper, 0);
       this.setEv({ kind: 'wide', side, a: shooter });
+      if (side === 0 && shooter === this.captain()) this.captainMoment('mistake');   // v3.7
     } else {
       this.st(shooter).onTarget++;
       this.st(keeper).saves++;
       this.log('', 'save', vars, opp);
       this.setEv({ kind: 'save', k: keeper });
+      if (side === 0 && shooter === this.captain()) this.captainMoment('mistake');   // v3.7
       if (!penalty && Math.random() < SETPIECE.CORNER_SAVE) this.corner(side);   // v3.0: tipped over → corner
       else this.turnover(keeper, 0);
     }
