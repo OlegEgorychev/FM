@@ -2,8 +2,25 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.16';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.17';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.17', name: { en: 'Silence', ru: 'Тишина' },
+    en: [
+      'Fewer windows: the morning briefing only opens when there is something new. A rest day, a normal training or news you already read two weeks ago no longer stop you; everything is still in the diary.',
+      '"While you were away": important things on top (injuries, events, money, reputation, hints), the routine folded into one "[+] Routine" line.',
+      'The training report opens right after the session, not the next morning: who came, who didn\'t and why, who improved, fees paid.',
+      'Monday is one window: the news, this month\'s cash desk and the weekly plan all in PLANNER.EXE, with a single [ CONFIRM WEEK ].',
+      'Dialogue buttons wake up once the text is fully typed (click the text, Space or Enter to finish it). In the Locker Room: [ Remind everyone ] about the fee.',
+      'Fixes: the injury event shows the injured kid; no "Stay and train" on a match day; namesakes in the match log get initials; a kid with 23 interceptions no longer gets "nothing stood out"; [ START MATCH ] visible on narrow screens; the assistant\'s truancy report got the [1 AP] family visit.',
+    ],
+    ru: [
+      'Меньше окон: утренняя сводка открывается, только когда есть что-то новое. День отдыха, обычная тренировка или новость, которую ты уже читал в последние две недели, больше не останавливают игру; всё по-прежнему есть в дневнике.',
+      '«Пока вас не было»: важное наверху (травмы, события, деньги, репутация, подсказки), рутина свёрнута в одну строку «[+] Рутина».',
+      'Итог тренировки показывается сразу после занятия, а не на следующее утро: кто пришёл, кто нет и почему, кто прибавил, кто сдал взнос.',
+      'Понедельник — одно окно: новости, касса месяца и план недели вместе в PLANNER.EXE, одна кнопка [ ПОДТВЕРДИТЬ НЕДЕЛЮ ].',
+      'Кнопки в диалогах оживают, когда текст допечатан (щелчок по тексту, Пробел или Enter допечатывают сразу). В раздевалке — кнопка «Напомнить всем» о взносе.',
+      'Исправлено: в событии с травмой теперь показан сам травмированный; в день матча нет «Остаёшься и тренируешься»; однофамильцы в логе матча различаются по инициалам; за 23 перехвата больше не пишут «ничего не выделялось»; кнопка «Начать матч» видна на узком экране; в докладе ассистента о прогуле появился вариант «зайти к семье» за 1 ОД.',
+    ] },
   { v: '3.16', name: { en: 'One on One', ru: 'Один на один' },
     en: [
       'Individual lessons: in PLANNER.EXE every weekday evening without a team training can hold a one-on-one with one kid — fitness, technique or tactics. It costs 1 action point, booked at once; cancel a future lesson and you get it back.',

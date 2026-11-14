@@ -21,7 +21,7 @@ class GameState {
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
     this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)
-    this.worldSalt = null; this.ledger = {}; this.fees = null;   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
+    this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {};   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
     this.globalPlayers = GameState.buildWorld(used);
@@ -869,6 +869,27 @@ class GameState {
   }
   /** Locker Room [ Remind ] (free): consumed by this kid's next roll. */
   remindFee(id) { const f = this.fees; if (f && this.feeOwes(id)) { f.reminded[id] = true; this.save(); return true; } return false; }
+  /** v3.17: [ Remind everyone ] — every kid whose status is plain `owed` (not paid / waived / half) and not reminded yet. */
+  remindable(id) { const f = this.fees; return !!f && this.feeOwes(id) && f.status[id] === 'owed' && !f.reminded[id]; }
+  remindAllFees() {
+    const ids = this.squad.map(p => p.id).filter(id => this.remindable(id));
+    for (const id of ids) this.fees.reminded[id] = true;
+    if (ids.length) this.save();
+    return ids.length;
+  }
+  /* ---------- v3.17 "SILENCE": muted repeats (NEWS) ---------- */
+  /** Show this diary line in the briefing / "While you were away"? No if the same news was shown < NEWS.COOLDOWN days ago. */
+  newsFresh(e, date = this.calendar.date) {
+    if (newsMatch(e.key, NEWS.NEVER_MUTE)) return true;
+    const seen = this.newsSeen?.[newsKey(e)];
+    return !seen || isoDays(seen, date) >= NEWS.COOLDOWN;
+  }
+  /** The coach has seen these lines today (old marks are pruned so the save stays small). */
+  markNews(list, date = this.calendar.date) {
+    const m = this.newsSeen || (this.newsSeen = {});
+    for (const e of list || []) m[newsKey(e)] = date;
+    for (const k in m) if (isoDays(m[k], date) > NEWS.COOLDOWN * 2) delete m[k];
+  }
   /** Office talk about the fee: the reason is fixed per month (poor → nomoney; discipline ≤ 7 → spent 50 %; else forgot). */
   feeReason(id) {
     const f = this.fees, p = this.player(id);
@@ -890,7 +911,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -912,6 +933,7 @@ class GameState {
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
       this.away = Array.isArray(d.away) ? d.away : null;   // v3.13 "while you were away"
+      this.newsSeen = d.newsSeen && typeof d.newsSeen === 'object' ? d.newsSeen : {};   // v3.17 muted repeats (lazy migration)
       this.worldEvent = d.worldEvent && typeof d.worldEvent === 'object' && Array.isArray(d.worldEvent.playerIds) && Array.isArray(d.worldEvent.days) ? d.worldEvent : null;   // v3.14 (missing → none this week)
       this.worldLast = typeof d.worldLast === 'string' ? d.worldLast : null;
       this.worldSalt = typeof d.worldSalt === 'string' ? d.worldSalt : null;   // v3.15 (old saves: set on the next Monday roll)

@@ -109,3 +109,10 @@
 .pa-btn.duty.on{ background: #10243a; color: #9fd3ff; border-color: #0a0d0f #9fd3ff #9fd3ff #0a0d0f; }
 .energy.morale i{ background: linear-gradient(#c9a2e0, #7a4fa0) !important; }
 .win.pinfo{ overflow-y: auto; }
+
+/* v3.17: while the line is still typing the choices are plain Win98-grey (not the striped "can't afford" look) */
+.talk-typing .talk-btn[disabled]:not([data-short]){ cursor: wait; color: #8a8984; background: #c8c7c0; border-color: #e6e5df #8f8e88 #8f8e88 #e6e5df;
+  text-shadow: 1px 1px 0 #fff; }
+.talk-typing .talk-btn[disabled]:not([data-short]) .tb-money{ color: #8a8984; background: transparent; text-decoration: none; }
+.talk-typing .talk-text{ cursor: pointer; }
+.talk-text:focus{ outline: none; }

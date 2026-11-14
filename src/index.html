@@ -309,7 +309,7 @@
         <span class="portrait talk-face" id="talk-face"></span>
         <div class="talk-who"><b id="talk-name"></b><small id="talk-role"></small></div>
       </div>
-      <p class="talk-text" id="talk-text"></p>
+      <p class="talk-text" id="talk-text" tabindex="-1"></p>
       <div class="talk-choices" id="talk-choices"></div>
     </section>
   </div>
@@ -370,8 +370,14 @@
   <div class="planner-layer" id="planner-view" hidden>
     <section class="win plannerwin open" role="dialog" aria-modal="true" aria-labelledby="pl-title">
       <div class="titlebar"><span class="t-ico">&#9638;</span><span class="t-txt" id="pl-title">PLANNER.EXE</span><button class="tb-btn" id="pl-x" data-i18n-aria="ui.close">&times;</button></div>
-      <div class="pl-head" id="pl-head"></div>
-      <div class="pl-grid" id="pl-grid"></div>
+      <div class="pl-scroll">
+        <div class="pl-top">
+          <div class="pl-brief" id="pl-brief" hidden></div>
+          <details class="pl-sec pl-kassa" id="pl-kassa" hidden open><summary id="pl-kassa-h"></summary><div class="ks-body"><div class="ks-report" id="pl-ks-report"></div><div class="ks-levels" id="pl-ks-levels" role="radiogroup"></div></div></details>
+        </div>
+        <div class="pl-head" id="pl-head"></div>
+        <div class="pl-grid" id="pl-grid"></div>
+      </div>
       <div class="pl-foot"><span class="pl-sum" id="pl-sum"></span><button class="btn go big" id="pl-confirm" type="button"></button></div>
       <div class="statusbar"><span id="pl-status"></span></div>
     </section>

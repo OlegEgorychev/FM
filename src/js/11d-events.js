@@ -103,9 +103,9 @@ const NARRATIVE_EVENTS = [
     },
     execute(ctx) {
       const { kid, snitch } = ctx.cast;
-      ctx.show({
-        face: snitch.portraitSvg, name: L.name(snitch.name), role: L.t('talk.roleSnitch', { n: snitch.number, p: L.pos(snitch.position) }),
-        text: L.t('ev.knock.text', { k: L.name(kid.name) }),
+      ctx.show({   // v3.17: the window shows the injured kid himself (it showed the teammate while the text was about the kid)
+        face: kid.portraitSvg, name: L.name(kid.name), role: L.t('talk.roleKnock', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('ev.knock.text', { k: L.name(kid.name) }) + (snitch ? ' ' + L.t('ev.knock.helper', { s: L.name(snitch.name) }) : ''),
         choices: [
           { key: 'ev.knock.a', tone: 'red', cost: EVENTS_CFG.CLINIC_COST, who: kid.id,
             run: () => { kid.injuryDays = EVENTS_CFG.CLINIC_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.CLINIC_DAYS }; } },
@@ -359,7 +359,7 @@ const NARRATIVE_EVENTS = [
               s.addRep('parents', REP.EXCUSE_HOME_PARENTS);
               return { k: { pid: kid.id } };
             } },
-          { key: 'ex.stay', tone: 'red', who: kid.id,
+          { key: s.phase === 'matchday' ? 'ex.stayMatch' : 'ex.stay', tone: 'red', who: kid.id,   // v3.17: match-day wording
             run: () => {
               finish();
               s.addRep('squad', REP.EXCUSE_STAY_SQUAD);
@@ -547,6 +547,9 @@ const NARRATIVE_EVENTS = [
           { key: 'ev.ulti.a', tone: 'green', gain: EVENTS_CFG.ULTI_FINE, who: kid.id,
             run: () => { kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.ULTI_FINE_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
           { key: 'ev.ulti.b', tone: 'gray', next: 'office' },
+          { key: 'ev.ulti.e', tone: 'green', ap: 1, who: kid.id,   // v3.17: the same [1 AP] family visit as The Truant (v3.16)
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
+              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
         ] });
     },
   },
@@ -664,6 +667,7 @@ class DialogueView {
     document.addEventListener('keydown', e => {
       if (this.layer.hidden) return;
       if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); }
+      if (this.typer && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopImmediatePropagation(); this.finishTyping(); return; }   // v3.17: skip, never choose
       if (e.key === 'Tab') {
         const f = [...this.layer.querySelectorAll('button:not([disabled])')], i = f.indexOf(document.activeElement);
         e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus();
@@ -671,6 +675,7 @@ class DialogueView {
     }, true);
     this.layer.addEventListener('click', e => {
       const b = e.target.closest('.talk-btn');
+      if (this.typer) { if (e.target.closest('.talk-text')) this.finishTyping(); return; }   // v3.17: no choice until the line is fully typed
       if (b && !b.disabled && this.choices) this.engine.choose(this.choices[+b.dataset.i]);
       else if (e.target.closest('.talk-text')) this.finishTyping();
     });
@@ -692,24 +697,36 @@ class DialogueView {
       const tag = (c.ap ? `<span class="tb-ap" title="${esc(L.t('talk.apTip'))}">${L.t('talk.apTag', { n: c.ap })}</span>` : '')
         + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '');
       const why = c.blocked ? L.t(c.blocked) : broke ? L.t('talk.short', { b: money(s.budget), c: c.cost }) : noAp ? L.t('talk.noAp') : '';
-      return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` disabled aria-disabled="true" title="${esc(why)}"` : ''}>
+      return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` data-short="1" disabled aria-disabled="true" title="${esc(why)}"` : ''}>
         <span class="tb-label">${esc(L.t(c.key))}</span>${tag}
         ${short ? `<small class="tb-why">${esc(why)}</small>` : ''}</button>`;
     }).join('');
-    this.type(text);
     this.layer.hidden = false;
-    this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
+    this.type(text);
+    if (!this.typer) this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
+  }
+  /** v3.17: while the line is typing every choice is disabled (Win98 grey); `data-short` keeps the money / AP / blocked reasons. */
+  setWaiting(on) {
+    this.layer.classList.toggle('talk-typing', on);
+    for (const b of this.layer.querySelectorAll('.talk-btn')) b.disabled = on || b.dataset.short === '1';
+    if (on) this.layer.querySelector('#talk-text').focus?.();
+    else if (!this.layer.hidden) this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
   }
   /** Typewriter for the narrative line (click the text to skip; instant with reduced motion). */
   type(text) {
     const el = this.layer.querySelector('#talk-text');
     clearInterval(this.typer);
     this.full = text;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = text; return; }
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || !text) { el.textContent = text; this.typer = null; this.setWaiting(false); return; }
     let n = 0;
     el.textContent = '';
     this.typer = setInterval(() => { n += 2; el.textContent = text.slice(0, n); if (n >= text.length) this.finishTyping(); }, 16);
+    this.setWaiting(true);
   }
-  finishTyping() { clearInterval(this.typer); this.typer = null; this.layer.querySelector('#talk-text').textContent = this.full || ''; }
+  finishTyping() {
+    const was = !!this.typer;
+    clearInterval(this.typer); this.typer = null; this.layer.querySelector('#talk-text').textContent = this.full || '';
+    if (was || this.layer.classList.contains('talk-typing')) this.setWaiting(false);
+  }
   close() { this.finishTyping(); this.layer.hidden = true; this.choices = null; }
 }

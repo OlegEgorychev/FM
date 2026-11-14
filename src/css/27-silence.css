@@ -1,0 +1,70 @@
+/* =========================================================
+   v3.17 "SILENCE" — routine collapsed (Win98 tree), Monday in one window (PLANNER.EXE), training report, Remind everyone
+   ========================================================= */
+/* "[+] Routine (N)" — a Win98 tree node inside any away list */
+.mb-away li.mb-routine{ list-style: none; margin-top: 4px; }
+.mb-routine summary, .pl-sec > summary{ cursor: pointer; list-style: none; user-select: none; }
+.mb-routine summary::-webkit-details-marker, .pl-sec > summary::-webkit-details-marker{ display: none; }
+.mb-routine summary::before, .pl-sec > summary::before{ content: "[+]"; display: inline-block; width: 2.4em; font-family: var(--mono); }
+.mb-routine details[open] > summary::before, .pl-sec[open] > summary::before{ content: "[\2212]"; }
+.mb-routine summary{ color: #6f8a6a; }
+.mb-routine ul{ margin: 2px 0 0 1.2em; padding: 0; list-style: none; border-left: 1px dotted #45524a; padding-left: 8px; }
+.mb-routine li{ color: #8c9787; }
+
+/* training report = the briefing panel in "report" mode */
+.briefing-layer.mb-report .mb-cupbox, .briefing-layer.mb-report .mb-news, .briefing-layer.mb-report .mb-repbox,
+.briefing-layer.mb-report .mb-weather, .briefing-layer.mb-report .mb-ap{ display: none; }
+.briefing-layer.mb-report .mb-away ul{ max-height: 46vh; }
+.mb-away li.trr{ color: #e3e8dc; }
+
+/* PLANNER.EXE: Monday's briefing + cash blocks above the plan; the window scrolls, the plan never collapses */
+.win.plannerwin .pl-scroll{ flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+/* the briefing + cash blocks shrink and scroll on a short screen; the plan below is always shown in full */
+.pl-top{ flex: 0 1 auto; min-height: 72px; overflow-y: auto; }
+.pl-top:empty, .pl-top:not(:has(> :not([hidden]))){ display: none; }
+.pl-scroll > .pl-head, .pl-scroll > .pl-grid{ flex: none; }
+.pl-top > .pl-kassa:last-child, .pl-top > .pl-brief:last-child{ margin-bottom: 2px; }
+.pl-brief{ margin: 8px 8px 0; padding: 6px 10px; background: #fff; border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); font-size: 13px; }
+.pl-brief[hidden], .pl-kassa[hidden]{ display: none; }
+.pl-world{ font-weight: bold; color: #5a3a00; padding: 2px 0; }
+.pl-sec > summary{ font-weight: bold; padding: 2px 0; }
+.pl-away{ margin: 2px 0 0; padding: 0 0 0 1.2em; list-style: none; max-height: 140px; overflow-y: auto; font: 12px/1.45 var(--mono); }
+.pl-away li .d{ color: #666; text-transform: capitalize; }
+.pl-away li.more, .pl-away .mb-routine summary, .pl-away .mb-routine li{ color: #777; }
+.pl-away .mb-routine ul{ border-left-color: #aaa; }
+.pl-kassa{ margin: 8px 8px 0; padding: 4px 8px; background: #ece9e2; border: 1px solid #b8b3a8; font-size: 13px; }
+.pl-kassa .ks-body{ margin: 4px 0; }
+.pl-kassa .ks-report, .pl-kassa .ks-levels{ padding: 6px 8px; }
+@media (max-height: 800px){ .pl-kassa .ks-lvl small{ display: none; } .pl-away{ max-height: 96px; } }
+
+/* locker room: [ Remind everyone ] */
+.lrf-head .lrf-all{ margin-left: auto; }
+.lrf-head{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+/* the planner window never grows past the screen (its body scrolls) */
+.planner-layer{ grid-template-rows: minmax(0, 1fr); }
+.planner-layer > .win.plannerwin{ max-height: 100%; min-height: 0; }
+/* compact cash block so Monday's window fits 1366×768 */
+.pl-kassa .ks-h{ margin-bottom: 2px; }
+.pl-kassa .ks-table td{ padding: 0 4px; }
+.pl-kassa .ks-lvl{ padding: 3px 8px; margin: 2px 0; }
+.pl-kassa .ks-budget{ margin-top: 4px; }
+.pl-brief{ padding: 3px 10px; }
+@media (max-height: 800px){   /* short screens: last month's six ledger rows in two columns */
+  .pl-kassa .ks-table tbody{ display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
+  .pl-kassa .ks-table tr{ display: flex; justify-content: space-between; }
+  .pl-kassa .ks-table td{ border-bottom: none; }
+  .pl-kassa .ks-table tr.tot td{ border-top: none; }
+  .pl-col .pl-opt{ padding: 3px 4px; }
+}
+/* both blocks on Monday: side by side (briefing | cash desk) so the window keeps its height */
+@media (min-width: 900px){
+  .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])){ display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
+  .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])) .pl-brief{ margin-right: 0; }
+  .pl-top .pl-kassa .ks-lvl small{ display: none; }
+}
+@media (min-width: 900px){
+  .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])) .ks-table tbody{ display: table-row-group; }
+  .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])) .ks-table tr{ display: table-row; }
+  .pl-top .pl-kassa .ks-table{ font-size: 12px; } .pl-top .pl-kassa .ks-table td{ padding: 0 4px; line-height: 1.25; }
+  .pl-top .pl-kassa .ks-table td + td{ white-space: nowrap; }
+}

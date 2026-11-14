@@ -14,6 +14,7 @@ class LockerRoom {
     document.getElementById('lr-x').addEventListener('click', () => this.close());
     document.getElementById('lr-proceed').addEventListener('click', () => this.proceed());
     document.getElementById('lr-fees').addEventListener('click', e => {   // v3.15: [ Remind ] (free)
+      if (e.target.closest('[data-remind-all]:not([disabled])')) { if (this.state.remindAllFees()) this.render(); return; }   // v3.17
       const b = e.target.closest('[data-remind]');
       if (b && this.state.remindFee(b.dataset.remind)) this.render();
     });
@@ -37,9 +38,9 @@ class LockerRoom {
     if (this.ui.modalLock) return;   // v3.5
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.13: the plan comes first (v3.17: with the briefing + cash desk inside)
     if (s.kassaDue()) { this.ui.kassa.open(); return; }   // v3.15: KASSA.EXE first at the month's first stop
     if (!s.dayState().briefed) { this.ui.briefing.open(); return; }   // v2.8: morning briefing first
-    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.13: the plan comes first
     this.ui.modal.close();   // v2.7: an open profile may stay — it sits above the room
     const lk = s.runLocker(s.phase === 'calendar');
     const reveal = !lk.revealed;
@@ -125,7 +126,9 @@ class LockerRoom {
     if (!show) { box.innerHTML = ''; return; }
     const got = Object.values(f.got || {}).reduce((a, b) => a + b, 0), paid = squad.filter(p => f.status[p.id] === 'paid').length;
     const mark = { paid: '&#10003;', owed: '&#10007;', waived: '&ndash;', half: '&frac12;' };
-    box.innerHTML = `<div class="lrf-head"><b>${L.t('fee.title')}</b> <span>${L.t('fee.sum', { m: '$' + f.amount, p: paid, t: squad.length, g: '$' + got })}</span></div><div class="lrf-list">`
+    const canAll = squad.some(p => s.remindable(p.id));   // v3.17: [ Remind everyone ]
+    box.innerHTML = `<div class="lrf-head"><b>${L.t('fee.title')}</b> <span>${L.t('fee.sum', { m: '$' + f.amount, p: paid, t: squad.length, g: '$' + got })}</span>`
+      + `<button type="button" class="btn lrf-btn lrf-all" id="lrf-all" data-remind-all="1"${canAll ? '' : ' disabled'} title="${esc(L.t('fee.remindAllTip'))}">${L.t('fee.remindAll')}</button></div><div class="lrf-list">`
       + squad.map(p => {
         const st = f.status[p.id] || 'owed', here = !lk.absent[p.id], owes = s.feeOwes(p.id), rem = f.reminded[p.id];
         const btn = owes && here ? (rem ? `<small class="lrf-rem">${L.t('fee.reminded')}</small>` : `<button type="button" class="btn lrf-btn" data-remind="${p.id}">${L.t('fee.remind')}</button>`) : '';

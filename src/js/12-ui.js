@@ -140,7 +140,7 @@ class UIController {
   }
 
   v(x) {
-    if (x instanceof Player) return L.name(x.surname);
+    if (x instanceof Player) return this.logName(x);   // v3.17: "J. Fletcher" when the surname is on the pitch twice
     if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
     if (x && typeof x === 'object' && 'talk' in x) return L.t('tt.name.' + x.talk);  // v3.5 diary
     if (x && typeof x === 'object' && 'talkReact' in x) return L.t('tt.react.' + x.talkReact);  // v3.9 diary
@@ -156,6 +156,25 @@ class UIController {
     if (x && typeof x === 'object' && 'team' in x) return L.team(x.team);
     if (x && typeof x === 'object' && 'venue' in x) return L.t('venue.' + x.venue);
     return String(x);
+  }
+  /** v3.17: match-log name. Surname alone; a surname shared by two kids in this match (either side) → initial + surname;
+      initial + surname still shared → + the club's first word (opponents and our kids can be namesakes). */
+  logName(p) {
+    const e = this.engine, sn = L.name(p.surname);
+    if (!e) return sn;
+    if (e._nameKey !== e.sides.map(x => x.all.length).join()) {   // built once per match (+ again after a sub enters `all`)
+      const sur = new Map(), ini = new Map(), team = new Map();
+      for (const side of e.sides) for (const q of side.all) {
+        const k = q.surname, i = k + '|' + q.name[0];
+        sur.set(k, (sur.get(k) || 0) + 1); ini.set(i, (ini.get(i) || 0) + 1); team.set(q.id, side.name);
+      }
+      e._names = { sur, ini, team }; e._nameKey = e.sides.map(x => x.all.length).join();
+    }
+    const n = e._names;
+    if ((n.sur.get(p.surname) || 0) < 2) return sn;
+    const full = L.name(p.name).split(' '), short = `${full[0][0]}. ${sn}`;
+    if ((n.ini.get(p.surname + '|' + p.name[0]) || 0) < 2) return short;
+    return `${short} (${L.team(n.team.get(p.id) || '').split(' ')[0]})`;
   }
   fxText(f) { const lg = this.state.league; return `${L.team(lg.team(f.home).name)} ${f.hg}-${f.ag} ${L.team(lg.team(f.away).name)}`; }
 
@@ -814,6 +833,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   dayBlockers() {
     const s = this.state, out = [];
     if (!this.isStopDay()) return out;
+    if (!s.weekState().confirmed) { out.push('week'); return out; }   // v3.17: Monday — briefing + cash desk live inside PLANNER.EXE
     if (s.kassaDue()) { out.push('kassa'); return out; }   // v3.15: the month's first stop opens with the cash desk
     if (!s.dayState().briefed) { out.push('briefing'); return out; }   // v2.8: START DAY → morning briefing
     if (!s.weekState().confirmed) { out.push('week'); return out; }   // v3.13: [ CONFIRM WEEK ]
@@ -826,17 +846,29 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.cal.running || s.phase !== 'calendar' || this.events.active || this.dayBlockers().length) { this.renderDash(); return; }
     s.autoFees = false;   // (auto-sim only)
     s.away = s.away || [];   // diary lines from here on go to the next morning briefing ("while you were away")
-    for (let guard = 0; guard < 40; guard++) {
+    this.contLoop(40);
+  }
+  /** The CONTINUE loop. v3.17: a training day's result opens at once (TRAINING REPORT); [ OK ] resumes the loop. */
+  contLoop(guard) {
+    const s = this.state;
+    for (; guard > 0; guard--) {
+      const trained = s.isOurTraining(s.calendar.date);
       const r = this.cal.step();
       if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }   // safety: today was already a match day
       for (const info of r.infos) s.addDiary({ date: r.date, ...info });
       this.calMonth = null;
       s.save();
-      if (this.cal.nextEvent() && this.events.roll(r.date, { resume: false, cont: true })) { this.renderAll(); return; }   // stop: an event
-      if (!this.nextMorning()) return;                                                   // stop: match day / season over
-      if (this.isStopDay()) { this.renderAll(); this.briefing.open(); return; }          // stop: plan / training
+      if (trained && !(this.skipReports ?? window.YAM_SKIP_REPORTS) && this.briefing.openReport(r.date, () => { if (this.contAfter(r.date)) this.contLoop(guard - 1); })) { this.renderAll(); return; }
+      if (!this.contAfter(r.date)) return;
     }
     this.renderAll();
+  }
+  /** After a processed day: evening events, the next morning, a stop day. true = keep skipping. */
+  contAfter(date) {
+    if (this.cal.nextEvent() && this.events.roll(date, { resume: false, cont: true })) { this.renderAll(); return false; }   // stop: an event
+    if (!this.nextMorning()) return false;                                                 // stop: match day / season over
+    if (this.isStopDay()) { this.renderAll(); this.briefing.open(); return false; }        // stop: plan / training
+    return true;
   }
   endDay() { this.continueDays(); }   // pre-v3.13 name (DEBUG / tests)
   /** A new morning: absences forgotten; a match day arrives at once (→ false), the season may end (→ false). */
@@ -889,7 +921,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.events.active || (this.engine && !this.engine.finished) || this.cal.running) return 'office.blk.busy';
     if (s.phase === 'calendar' && s.worldAway(id, s.calendar.date)) return 'office.blk.notHere';   // v3.14: away at the event today
     let here = false, absent = false;
-    const atClub = s.phase === 'matchday' || (s.phase === 'calendar' && d.briefed && !this.briefing.isOpen);
+    const atClub = s.phase === 'matchday' || (s.phase === 'calendar' && (d.briefed || !s.weekState().confirmed) && !this.briefing.isOpen);   // v3.17: Monday's one window = already at the club
     if (atClub && d.locker) { here = !d.locker.absent[id]; absent = !here; }        // training / match day: who turned up
     else if (atClub && s.phase === 'calendar' && weekKey(s.calendar.date) === 'mon') here = true;   // Monday: everyone
     if (!here) return absent ? 'office.blk.absent' : 'office.blk.notHere';

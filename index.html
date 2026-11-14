@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.16</title>
+<title>Youth Academy Manager v3.17</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1312,6 +1312,13 @@ body.fx .crt-scan{ opacity: .9; }
 .pa-btn.duty.on{ background: #10243a; color: #9fd3ff; border-color: #0a0d0f #9fd3ff #9fd3ff #0a0d0f; }
 .energy.morale i{ background: linear-gradient(#c9a2e0, #7a4fa0) !important; }
 .win.pinfo{ overflow-y: auto; }
+
+/* v3.17: while the line is still typing the choices are plain Win98-grey (not the striped "can't afford" look) */
+.talk-typing .talk-btn[disabled]:not([data-short]){ cursor: wait; color: #8a8984; background: #c8c7c0; border-color: #e6e5df #8f8e88 #8f8e88 #e6e5df;
+  text-shadow: 1px 1px 0 #fff; }
+.talk-typing .talk-btn[disabled]:not([data-short]) .tb-money{ color: #8a8984; background: transparent; text-decoration: none; }
+.talk-typing .talk-text{ cursor: pointer; }
+.talk-text:focus{ outline: none; }
 /* =========================================================
    v2.1 — BOOT SCREEN (#loading-overlay) + MATCH SUMMARY
    Boot look follows the credits art: deep-space nebula, chrome/blood-red metal type, sparks, VHS glitches.
@@ -1718,6 +1725,76 @@ body.modal-lock #startmenu{ display: none; }
 .talk-btn .tb-ap{ margin-left: 6px; }
 .td-ls{ position: absolute; bottom: 0; right: 1px; font-size: 9px; color: #b9c4ff; } .td-ls.x{ color: #6d7881; text-decoration: line-through; }
 /* =========================================================
+   v3.17 "SILENCE" — routine collapsed (Win98 tree), Monday in one window (PLANNER.EXE), training report, Remind everyone
+   ========================================================= */
+/* "[+] Routine (N)" — a Win98 tree node inside any away list */
+.mb-away li.mb-routine{ list-style: none; margin-top: 4px; }
+.mb-routine summary, .pl-sec > summary{ cursor: pointer; list-style: none; user-select: none; }
+.mb-routine summary::-webkit-details-marker, .pl-sec > summary::-webkit-details-marker{ display: none; }
+.mb-routine summary::before, .pl-sec > summary::before{ content: "[+]"; display: inline-block; width: 2.4em; font-family: var(--mono); }
+.mb-routine details[open] > summary::before, .pl-sec[open] > summary::before{ content: "[\2212]"; }
+.mb-routine summary{ color: #6f8a6a; }
+.mb-routine ul{ margin: 2px 0 0 1.2em; padding: 0; list-style: none; border-left: 1px dotted #45524a; padding-left: 8px; }
+.mb-routine li{ color: #8c9787; }
+
+/* training report = the briefing panel in "report" mode */
+.briefing-layer.mb-report .mb-cupbox, .briefing-layer.mb-report .mb-news, .briefing-layer.mb-report .mb-repbox,
+.briefing-layer.mb-report .mb-weather, .briefing-layer.mb-report .mb-ap{ display: none; }
+.briefing-layer.mb-report .mb-away ul{ max-height: 46vh; }
+.mb-away li.trr{ color: #e3e8dc; }
+
+/* PLANNER.EXE: Monday's briefing + cash blocks above the plan; the window scrolls, the plan never collapses */
+.win.plannerwin .pl-scroll{ flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+/* the briefing + cash blocks shrink and scroll on a short screen; the plan below is always shown in full */
+.pl-top{ flex: 0 1 auto; min-height: 72px; overflow-y: auto; }
+.pl-top:empty, .pl-top:not(:has(> :not([hidden]))){ display: none; }
+.pl-scroll > .pl-head, .pl-scroll > .pl-grid{ flex: none; }
+.pl-top > .pl-kassa:last-child, .pl-top > .pl-brief:last-child{ margin-bottom: 2px; }
+.pl-brief{ margin: 8px 8px 0; padding: 6px 10px; background: #fff; border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); font-size: 13px; }
+.pl-brief[hidden], .pl-kassa[hidden]{ display: none; }
+.pl-world{ font-weight: bold; color: #5a3a00; padding: 2px 0; }
+.pl-sec > summary{ font-weight: bold; padding: 2px 0; }
+.pl-away{ margin: 2px 0 0; padding: 0 0 0 1.2em; list-style: none; max-height: 140px; overflow-y: auto; font: 12px/1.45 var(--mono); }
+.pl-away li .d{ color: #666; text-transform: capitalize; }
+.pl-away li.more, .pl-away .mb-routine summary, .pl-away .mb-routine li{ color: #777; }
+.pl-away .mb-routine ul{ border-left-color: #aaa; }
+.pl-kassa{ margin: 8px 8px 0; padding: 4px 8px; background: #ece9e2; border: 1px solid #b8b3a8; font-size: 13px; }
+.pl-kassa .ks-body{ margin: 4px 0; }
+.pl-kassa .ks-report, .pl-kassa .ks-levels{ padding: 6px 8px; }
+@media (max-height: 800px){ .pl-kassa .ks-lvl small{ display: none; } .pl-away{ max-height: 96px; } }
+
+/* locker room: [ Remind everyone ] */
+.lrf-head .lrf-all{ margin-left: auto; }
+.lrf-head{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+/* the planner window never grows past the screen (its body scrolls) */
+.planner-layer{ grid-template-rows: minmax(0, 1fr); }
+.planner-layer > .win.plannerwin{ max-height: 100%; min-height: 0; }
+/* compact cash block so Monday's window fits 1366×768 */
+.pl-kassa .ks-h{ margin-bottom: 2px; }
+.pl-kassa .ks-table td{ padding: 0 4px; }
+.pl-kassa .ks-lvl{ padding: 3px 8px; margin: 2px 0; }
+.pl-kassa .ks-budget{ margin-top: 4px; }
+.pl-brief{ padding: 3px 10px; }
+@media (max-height: 800px){   /* short screens: last month's six ledger rows in two columns */
+  .pl-kassa .ks-table tbody{ display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
+  .pl-kassa .ks-table tr{ display: flex; justify-content: space-between; }
+  .pl-kassa .ks-table td{ border-bottom: none; }
+  .pl-kassa .ks-table tr.tot td{ border-top: none; }
+  .pl-col .pl-opt{ padding: 3px 4px; }
+}
+/* both blocks on Monday: side by side (briefing | cash desk) so the window keeps its height */
+@media (min-width: 900px){
+  .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])){ display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
+  .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])) .pl-brief{ margin-right: 0; }
+  .pl-top .pl-kassa .ks-lvl small{ display: none; }
+}
+@media (min-width: 900px){
+  .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])) .ks-table tbody{ display: table-row-group; }
+  .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])) .ks-table tr{ display: table-row; }
+  .pl-top .pl-kassa .ks-table{ font-size: 12px; } .pl-top .pl-kassa .ks-table td{ padding: 0 4px; line-height: 1.25; }
+  .pl-top .pl-kassa .ks-table td + td{ white-space: nowrap; }
+}
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -1732,6 +1809,15 @@ body.modal-lock #startmenu{ display: none; }
   .log{ height: 30vh; }
   .tk .lbl{ display: none; }
   .tray .clk-label{ display: none; }
+}
+
+/* v3.17: the v1.4 portrait column rule (12-portraits.css) loads after 11-match-layout.css and overrode its
+   narrow-screen columns → at ~800–1180 px the centre column overlapped and [ START MATCH ] sat under the pitch. */
+@media (max-width: 1180px){
+  #win-match .match-body{ grid-template-columns: 236px minmax(0, 1fr); grid-auto-rows: max-content; }   /* rows never squeezed below their content: the body scrolls instead */
+}
+@media (max-width: 820px){
+  #win-match .match-body{ grid-template-columns: minmax(0, 1fr); }
 }
 </style>
 </head>
@@ -2035,7 +2121,7 @@ body.modal-lock #startmenu{ display: none; }
         <span class="portrait talk-face" id="talk-face"></span>
         <div class="talk-who"><b id="talk-name"></b><small id="talk-role"></small></div>
       </div>
-      <p class="talk-text" id="talk-text"></p>
+      <p class="talk-text" id="talk-text" tabindex="-1"></p>
       <div class="talk-choices" id="talk-choices"></div>
     </section>
   </div>
@@ -2096,8 +2182,14 @@ body.modal-lock #startmenu{ display: none; }
   <div class="planner-layer" id="planner-view" hidden>
     <section class="win plannerwin open" role="dialog" aria-modal="true" aria-labelledby="pl-title">
       <div class="titlebar"><span class="t-ico">&#9638;</span><span class="t-txt" id="pl-title">PLANNER.EXE</span><button class="tb-btn" id="pl-x" data-i18n-aria="ui.close">&times;</button></div>
-      <div class="pl-head" id="pl-head"></div>
-      <div class="pl-grid" id="pl-grid"></div>
+      <div class="pl-scroll">
+        <div class="pl-top">
+          <div class="pl-brief" id="pl-brief" hidden></div>
+          <details class="pl-sec pl-kassa" id="pl-kassa" hidden open><summary id="pl-kassa-h"></summary><div class="ks-body"><div class="ks-report" id="pl-ks-report"></div><div class="ks-levels" id="pl-ks-levels" role="radiogroup"></div></div></details>
+        </div>
+        <div class="pl-head" id="pl-head"></div>
+        <div class="pl-grid" id="pl-grid"></div>
+      </div>
       <div class="pl-foot"><span class="pl-sum" id="pl-sum"></span><button class="btn go big" id="pl-confirm" type="button"></button></div>
       <div class="statusbar"><span id="pl-status"></span></div>
     </section>
@@ -2346,6 +2438,25 @@ const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK
 const LESSON = { PER_KID_WEEK: 1, MULT: 2, COND: -5, HINT: 0.4, FOCUS: { physical: 'cardio', technical: 'tech', tactical: 'tactics' } };
 const LESSON_FOCI = Object.keys(LESSON.FOCUS);
 const AP_OPTION = { TRUANT_DISC: 1, TRUANT_MORALE: 3, BOOTS_MORALE: 5, KNOCK_COST: 35, KNOCK_DAYS: 8 };   // the [1 AP] choices in truant / boots / knock
+/* v3.17 "SILENCE": what the morning briefing / "While you were away" / the training report show.
+   A line = a diary entry. Its news key = template key + the kids it names (newsKey). A key shown less than COOLDOWN days ago
+   is muted in those windows (the diary keeps everything) — unless it matches NEVER_MUTE (event choices, injuries, money,
+   reputation, the world event). IMPORTANT lines come first; everything else is routine (a collapsed "Routine (N)" group).
+   Prefix match ('rep.' = every rep line); a trailing '.diary' = any event choice. */
+const NEWS = {
+  COOLDOWN: 14,
+  IMPORTANT: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'home.back', 'world.', 'fin.', 'fee.lost', 'rep.', 'week.', 'tr.plateau.',
+    'tr.improved', 'lesson.improved', 'lesson.cancel', 'lesson.clue', 'obs.', 'scout.', 'cb.', 'xi.auto'],
+  NEVER_MUTE: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'world.', 'fin.', 'fee.', 'rep.', 'week.'],
+};
+const newsMatch = (key, list) => list.some(x => x[0] === '.' ? key.endsWith(x) : key.startsWith(x));
+/** News key of a diary entry: its template key + the ids of the kids it names (sorted), e.g. 'tr.hurt|k12'. */
+function newsKey(e) {
+  const ids = [];
+  const walk = v => { if (!v || typeof v !== 'object') return; if (v.pid) ids.push(v.pid); if (Array.isArray(v.list)) v.list.forEach(walk); else for (const k in v) if (k !== 'pid') walk(v[k]); };
+  walk(e.vars);
+  return e.key + (ids.length ? '|' + [...new Set(ids)].sort().join(',') : '');
+}
 /* v3.15 CASH DESK + MONTHLY FEES + FAMILY WEALTH (all TEST values).
    Ledger categories (state.ledger['YYYY-MM'][cat], signed sums). Rent: forced on the 1st (may go below $0 → Board RENT_LATE_BOARD).
    FEES: KASSA.EXE level per month — per kid, payment modifier (pp = added to every chance, mult = by wealth), rep once on confirm.
@@ -3987,6 +4098,38 @@ Object.assign(I18N.ru, {
   'ev.knock.c': 'Отвезти к знакомому фельдшеру',
   'ev.knock.c.diary': '{k} побывал у знакомого фельдшера тренера: всё перевязали как надо, выбывает на {d} дн. {m}',
 });
+
+/* ---- v3.17 "Silence": fewer windows, important on top ---- */
+Object.assign(I18N.en, {
+  'talk.roleKnock': '#{n} · {p} · training pitch',
+  'ev.knock.helper': '{s} helped him off the pitch.',
+  'ex.stayMatch': 'Stay and play',
+  'ex.stayMatch.diary': '{k} had to stay for the match. He sulked all game; the others noticed.',
+  'ev.ulti.e': 'Drop by his family this evening',
+  'ev.ulti.e.diary': '{k} skipped training again. The coach dropped by his family in the evening: tea, a long talk, no fine.',
+  'note.readHigh': 'Read the game superbly: he kept cutting out their passes.',
+  'mb.routine': 'Routine ({n})',
+  'trr.title': 'Training report · {d}', 'trr.plan': 'Today\'s session: {p}.', 'trr.ok': '[ OK ]',
+  'trr.came': '{a} of {t} came.', 'trr.cameAll': 'All {t} came.', 'trr.absent': '{k}: {w}.',
+  'trr.fees': 'Fees paid today: {n} ({m}).', 'trr.kicker': 'Training ground', 'trr.h': 'How it went',
+  'pl.kassa': 'Cash desk · {m}',
+  'fee.remindAll': 'Remind everyone', 'fee.remindAllTip': 'Free: a reminder to every kid who still owes this month\'s fee (not the ones on a two-part deal).',
+});
+Object.assign(I18N.ru, {
+  'talk.roleKnock': '№{n} · {p} · тренировочное поле',
+  'ev.knock.helper': '{s} помог ему дойти до бровки.',
+  'ex.stayMatch': 'Остаёшься и играешь',
+  'ex.stayMatch.diary': '{k} остался на матч, но дулся всю игру; остальные это заметили.',
+  'ev.ulti.e': 'Зайти вечером к его семье',
+  'ev.ulti.e.diary': '{k} снова прогулял тренировку. Вечером тренер зашёл к его семье: чай, долгий разговор, без штрафа.',
+  'note.readHigh': 'Отлично читал игру: раз за разом перехватывал их передачи.',
+  'mb.routine': 'Рутина ({n})',
+  'trr.title': 'Итог тренировки · {d}', 'trr.plan': 'Сегодняшнее занятие: {p}.', 'trr.ok': '[ OK ]',
+  'trr.came': 'Пришли {a} из {t}.', 'trr.cameAll': 'Пришли все {t}.', 'trr.absent': '{k}: {w}.',
+  'trr.fees': 'Взносы сегодня: {n} ({m}).', 'trr.kicker': 'Тренировочное поле', 'trr.h': 'Как прошло',
+  'pl.kassa': 'Касса · {m}',
+  'fee.remindAll': 'Напомнить всем', 'fee.remindAllTip': 'Бесплатно: напоминание каждому, кто ещё не сдал взнос за месяц (кроме тех, кто платит в два приёма).',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -4755,7 +4898,7 @@ class GameState {
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
     this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)
-    this.worldSalt = null; this.ledger = {}; this.fees = null;   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
+    this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {};   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
     this.globalPlayers = GameState.buildWorld(used);
@@ -5603,6 +5746,27 @@ class GameState {
   }
   /** Locker Room [ Remind ] (free): consumed by this kid's next roll. */
   remindFee(id) { const f = this.fees; if (f && this.feeOwes(id)) { f.reminded[id] = true; this.save(); return true; } return false; }
+  /** v3.17: [ Remind everyone ] — every kid whose status is plain `owed` (not paid / waived / half) and not reminded yet. */
+  remindable(id) { const f = this.fees; return !!f && this.feeOwes(id) && f.status[id] === 'owed' && !f.reminded[id]; }
+  remindAllFees() {
+    const ids = this.squad.map(p => p.id).filter(id => this.remindable(id));
+    for (const id of ids) this.fees.reminded[id] = true;
+    if (ids.length) this.save();
+    return ids.length;
+  }
+  /* ---------- v3.17 "SILENCE": muted repeats (NEWS) ---------- */
+  /** Show this diary line in the briefing / "While you were away"? No if the same news was shown < NEWS.COOLDOWN days ago. */
+  newsFresh(e, date = this.calendar.date) {
+    if (newsMatch(e.key, NEWS.NEVER_MUTE)) return true;
+    const seen = this.newsSeen?.[newsKey(e)];
+    return !seen || isoDays(seen, date) >= NEWS.COOLDOWN;
+  }
+  /** The coach has seen these lines today (old marks are pruned so the save stays small). */
+  markNews(list, date = this.calendar.date) {
+    const m = this.newsSeen || (this.newsSeen = {});
+    for (const e of list || []) m[newsKey(e)] = date;
+    for (const k in m) if (isoDays(m[k], date) > NEWS.COOLDOWN * 2) delete m[k];
+  }
   /** Office talk about the fee: the reason is fixed per month (poor → nomoney; discipline ≤ 7 → spent 50 %; else forgot). */
   feeReason(id) {
     const f = this.fees, p = this.player(id);
@@ -5624,7 +5788,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -5646,6 +5810,7 @@ class GameState {
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
       this.away = Array.isArray(d.away) ? d.away : null;   // v3.13 "while you were away"
+      this.newsSeen = d.newsSeen && typeof d.newsSeen === 'object' ? d.newsSeen : {};   // v3.17 muted repeats (lazy migration)
       this.worldEvent = d.worldEvent && typeof d.worldEvent === 'object' && Array.isArray(d.worldEvent.playerIds) && Array.isArray(d.worldEvent.days) ? d.worldEvent : null;   // v3.14 (missing → none this week)
       this.worldLast = typeof d.worldLast === 'string' ? d.worldLast : null;
       this.worldSalt = typeof d.worldSalt === 'string' ? d.worldSalt : null;   // v3.15 (old saves: set on the next Monday roll)
@@ -6508,8 +6673,25 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.16';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.17';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.17', name: { en: 'Silence', ru: 'Тишина' },
+    en: [
+      'Fewer windows: the morning briefing only opens when there is something new. A rest day, a normal training or news you already read two weeks ago no longer stop you; everything is still in the diary.',
+      '"While you were away": important things on top (injuries, events, money, reputation, hints), the routine folded into one "[+] Routine" line.',
+      'The training report opens right after the session, not the next morning: who came, who didn\'t and why, who improved, fees paid.',
+      'Monday is one window: the news, this month\'s cash desk and the weekly plan all in PLANNER.EXE, with a single [ CONFIRM WEEK ].',
+      'Dialogue buttons wake up once the text is fully typed (click the text, Space or Enter to finish it). In the Locker Room: [ Remind everyone ] about the fee.',
+      'Fixes: the injury event shows the injured kid; no "Stay and train" on a match day; namesakes in the match log get initials; a kid with 23 interceptions no longer gets "nothing stood out"; [ START MATCH ] visible on narrow screens; the assistant\'s truancy report got the [1 AP] family visit.',
+    ],
+    ru: [
+      'Меньше окон: утренняя сводка открывается, только когда есть что-то новое. День отдыха, обычная тренировка или новость, которую ты уже читал в последние две недели, больше не останавливают игру; всё по-прежнему есть в дневнике.',
+      '«Пока вас не было»: важное наверху (травмы, события, деньги, репутация, подсказки), рутина свёрнута в одну строку «[+] Рутина».',
+      'Итог тренировки показывается сразу после занятия, а не на следующее утро: кто пришёл, кто нет и почему, кто прибавил, кто сдал взнос.',
+      'Понедельник — одно окно: новости, касса месяца и план недели вместе в PLANNER.EXE, одна кнопка [ ПОДТВЕРДИТЬ НЕДЕЛЮ ].',
+      'Кнопки в диалогах оживают, когда текст допечатан (щелчок по тексту, Пробел или Enter допечатывают сразу). В раздевалке — кнопка «Напомнить всем» о взносе.',
+      'Исправлено: в событии с травмой теперь показан сам травмированный; в день матча нет «Остаёшься и тренируешься»; однофамильцы в логе матча различаются по инициалам; за 23 перехвата больше не пишут «ничего не выделялось»; кнопка «Начать матч» видна на узком экране; в докладе ассистента о прогуле появился вариант «зайти к семье» за 1 ОД.',
+    ] },
   { v: '3.16', name: { en: 'One on One', ru: 'Один на один' },
     en: [
       'Individual lessons: in PLANNER.EXE every weekday evening without a team training can hold a one-on-one with one kid — fitness, technique or tactics. It costs 1 action point, booked at once; cancel a future lesson and you get it back.',
@@ -7698,6 +7880,7 @@ function rateStyle(r) {
 
 /** Coach's Note: looks at the strongest and weakest signal of THIS match and returns i18n keys.
     It hints at a role without naming it (duels → Aggressive, passing → Playmaker, dribbling/goals → Selfish). */
+const NOTE_READ_MIN = 10;   // v3.17: interceptions + blocks in one match for the "reads the game" note
 function coachNote(p, s, flags = {}) {
   const out = [];
   if (flags.tired) out.push('note.tired');
@@ -7711,6 +7894,8 @@ function coachNote(p, s, flags = {}) {
     if (pass) cands.push({ key: pass.r >= 0.8 ? 'note.passHigh' : pass.r < 0.45 ? 'note.passLow' : null, w: Math.abs(pass.r - 0.62) * pass.n * 0.8, good: pass.r >= 0.8 });
     if (drib) cands.push({ key: drib.r >= 0.65 ? 'note.dribHigh' : drib.r < 0.35 ? 'note.dribLow' : null, w: Math.abs(drib.r - 0.5) * drib.n, good: drib.r >= 0.65 });
     if (s.goals > 0) cands.push({ key: 'note.scorer', w: 2 + s.goals * 2, good: true });
+    // v3.17: interceptions + blocks count too (23 of them used to end as "nothing stood out"); ≥ 10 ≈ the top 5% of outfield kids
+    if ((s.intercepts || 0) >= NOTE_READ_MIN) cands.push({ key: 'note.readHigh', w: s.intercepts * 0.5, good: true });
     const hits = cands.filter(c => c.key).sort((a, b) => b.w - a.w);
     const best = hits.find(c => c.good), worst = hits.find(c => !c.good);
     if (best) out.push(best.key);
@@ -8242,9 +8427,9 @@ const NARRATIVE_EVENTS = [
     },
     execute(ctx) {
       const { kid, snitch } = ctx.cast;
-      ctx.show({
-        face: snitch.portraitSvg, name: L.name(snitch.name), role: L.t('talk.roleSnitch', { n: snitch.number, p: L.pos(snitch.position) }),
-        text: L.t('ev.knock.text', { k: L.name(kid.name) }),
+      ctx.show({   // v3.17: the window shows the injured kid himself (it showed the teammate while the text was about the kid)
+        face: kid.portraitSvg, name: L.name(kid.name), role: L.t('talk.roleKnock', { n: kid.number, p: L.pos(kid.position) }),
+        text: L.t('ev.knock.text', { k: L.name(kid.name) }) + (snitch ? ' ' + L.t('ev.knock.helper', { s: L.name(snitch.name) }) : ''),
         choices: [
           { key: 'ev.knock.a', tone: 'red', cost: EVENTS_CFG.CLINIC_COST, who: kid.id,
             run: () => { kid.injuryDays = EVENTS_CFG.CLINIC_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.CLINIC_DAYS }; } },
@@ -8498,7 +8683,7 @@ const NARRATIVE_EVENTS = [
               s.addRep('parents', REP.EXCUSE_HOME_PARENTS);
               return { k: { pid: kid.id } };
             } },
-          { key: 'ex.stay', tone: 'red', who: kid.id,
+          { key: s.phase === 'matchday' ? 'ex.stayMatch' : 'ex.stay', tone: 'red', who: kid.id,   // v3.17: match-day wording
             run: () => {
               finish();
               s.addRep('squad', REP.EXCUSE_STAY_SQUAD);
@@ -8686,6 +8871,9 @@ const NARRATIVE_EVENTS = [
           { key: 'ev.ulti.a', tone: 'green', gain: EVENTS_CFG.ULTI_FINE, who: kid.id,
             run: () => { kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.ULTI_FINE_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
           { key: 'ev.ulti.b', tone: 'gray', next: 'office' },
+          { key: 'ev.ulti.e', tone: 'green', ap: 1, who: kid.id,   // v3.17: the same [1 AP] family visit as The Truant (v3.16)
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
+              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
         ] });
     },
   },
@@ -8803,6 +8991,7 @@ class DialogueView {
     document.addEventListener('keydown', e => {
       if (this.layer.hidden) return;
       if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); }
+      if (this.typer && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopImmediatePropagation(); this.finishTyping(); return; }   // v3.17: skip, never choose
       if (e.key === 'Tab') {
         const f = [...this.layer.querySelectorAll('button:not([disabled])')], i = f.indexOf(document.activeElement);
         e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus();
@@ -8810,6 +8999,7 @@ class DialogueView {
     }, true);
     this.layer.addEventListener('click', e => {
       const b = e.target.closest('.talk-btn');
+      if (this.typer) { if (e.target.closest('.talk-text')) this.finishTyping(); return; }   // v3.17: no choice until the line is fully typed
       if (b && !b.disabled && this.choices) this.engine.choose(this.choices[+b.dataset.i]);
       else if (e.target.closest('.talk-text')) this.finishTyping();
     });
@@ -8831,25 +9021,37 @@ class DialogueView {
       const tag = (c.ap ? `<span class="tb-ap" title="${esc(L.t('talk.apTip'))}">${L.t('talk.apTag', { n: c.ap })}</span>` : '')
         + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '');
       const why = c.blocked ? L.t(c.blocked) : broke ? L.t('talk.short', { b: money(s.budget), c: c.cost }) : noAp ? L.t('talk.noAp') : '';
-      return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` disabled aria-disabled="true" title="${esc(why)}"` : ''}>
+      return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` data-short="1" disabled aria-disabled="true" title="${esc(why)}"` : ''}>
         <span class="tb-label">${esc(L.t(c.key))}</span>${tag}
         ${short ? `<small class="tb-why">${esc(why)}</small>` : ''}</button>`;
     }).join('');
-    this.type(text);
     this.layer.hidden = false;
-    this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
+    this.type(text);
+    if (!this.typer) this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
+  }
+  /** v3.17: while the line is typing every choice is disabled (Win98 grey); `data-short` keeps the money / AP / blocked reasons. */
+  setWaiting(on) {
+    this.layer.classList.toggle('talk-typing', on);
+    for (const b of this.layer.querySelectorAll('.talk-btn')) b.disabled = on || b.dataset.short === '1';
+    if (on) this.layer.querySelector('#talk-text').focus?.();
+    else if (!this.layer.hidden) this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
   }
   /** Typewriter for the narrative line (click the text to skip; instant with reduced motion). */
   type(text) {
     const el = this.layer.querySelector('#talk-text');
     clearInterval(this.typer);
     this.full = text;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = text; return; }
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || !text) { el.textContent = text; this.typer = null; this.setWaiting(false); return; }
     let n = 0;
     el.textContent = '';
     this.typer = setInterval(() => { n += 2; el.textContent = text.slice(0, n); if (n >= text.length) this.finishTyping(); }, 16);
+    this.setWaiting(true);
   }
-  finishTyping() { clearInterval(this.typer); this.typer = null; this.layer.querySelector('#talk-text').textContent = this.full || ''; }
+  finishTyping() {
+    const was = !!this.typer;
+    clearInterval(this.typer); this.typer = null; this.layer.querySelector('#talk-text').textContent = this.full || '';
+    if (was || this.layer.classList.contains('talk-typing')) this.setWaiting(false);
+  }
   close() { this.finishTyping(); this.layer.hidden = true; this.choices = null; }
 }
 /* =========================================================
@@ -9002,6 +9204,7 @@ class LockerRoom {
     document.getElementById('lr-x').addEventListener('click', () => this.close());
     document.getElementById('lr-proceed').addEventListener('click', () => this.proceed());
     document.getElementById('lr-fees').addEventListener('click', e => {   // v3.15: [ Remind ] (free)
+      if (e.target.closest('[data-remind-all]:not([disabled])')) { if (this.state.remindAllFees()) this.render(); return; }   // v3.17
       const b = e.target.closest('[data-remind]');
       if (b && this.state.remindFee(b.dataset.remind)) this.render();
     });
@@ -9025,9 +9228,9 @@ class LockerRoom {
     if (this.ui.modalLock) return;   // v3.5
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.13: the plan comes first (v3.17: with the briefing + cash desk inside)
     if (s.kassaDue()) { this.ui.kassa.open(); return; }   // v3.15: KASSA.EXE first at the month's first stop
     if (!s.dayState().briefed) { this.ui.briefing.open(); return; }   // v2.8: morning briefing first
-    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.13: the plan comes first
     this.ui.modal.close();   // v2.7: an open profile may stay — it sits above the room
     const lk = s.runLocker(s.phase === 'calendar');
     const reveal = !lk.revealed;
@@ -9113,7 +9316,9 @@ class LockerRoom {
     if (!show) { box.innerHTML = ''; return; }
     const got = Object.values(f.got || {}).reduce((a, b) => a + b, 0), paid = squad.filter(p => f.status[p.id] === 'paid').length;
     const mark = { paid: '&#10003;', owed: '&#10007;', waived: '&ndash;', half: '&frac12;' };
-    box.innerHTML = `<div class="lrf-head"><b>${L.t('fee.title')}</b> <span>${L.t('fee.sum', { m: '$' + f.amount, p: paid, t: squad.length, g: '$' + got })}</span></div><div class="lrf-list">`
+    const canAll = squad.some(p => s.remindable(p.id));   // v3.17: [ Remind everyone ]
+    box.innerHTML = `<div class="lrf-head"><b>${L.t('fee.title')}</b> <span>${L.t('fee.sum', { m: '$' + f.amount, p: paid, t: squad.length, g: '$' + got })}</span>`
+      + `<button type="button" class="btn lrf-btn lrf-all" id="lrf-all" data-remind-all="1"${canAll ? '' : ' disabled'} title="${esc(L.t('fee.remindAllTip'))}">${L.t('fee.remindAll')}</button></div><div class="lrf-list">`
       + squad.map(p => {
         const st = f.status[p.id] || 'owed', here = !lk.absent[p.id], owes = s.feeOwes(p.id), rem = f.reminded[p.id];
         const btn = owes && here ? (rem ? `<small class="lrf-rem">${L.t('fee.reminded')}</small>` : `<button type="button" class="btn lrf-btn" data-remind="${p.id}">${L.t('fee.remind')}</button>`) : '';
@@ -9157,7 +9362,6 @@ class LockerRoom {
    Weather and news are seeded by the date, so a reload shows the same morning.
    ========================================================= */
 class MorningBriefing {
-  static AWAY_MAX = 8;   // v3.13: "while you were away" lines shown (the rest → "+n more")
   static NEWS = ['scouts', 'vandal', 'leader', 'garage', 'pothole', 'mayor', 'rival', 'kitWash', 'derby', 'busStrike', 'chippy', 'floodlight', 'rain'];
   constructor(ui) {
     this.ui = ui;
@@ -9188,16 +9392,52 @@ class MorningBriefing {
     const s = this.state;
     if (this.ui.modalLock) return;   // v3.5
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.17: Monday = one window (PLANNER.EXE)
     if (s.kassaDue() && (s.phase === 'matchday' || this.ui.isStopDay())) { this.ui.kassa.open(); return; }   // v3.15: the cash desk first
+    if (!this.hasNews()) { this.go(); return; }   // v3.17: nothing new → no window, the day simply goes on
+    this.report = null;
     this.ui.modal.close(); this.ui.profile.close();
     this.render();
     this.layer.hidden = false;
     this.layer.classList.remove('in'); void this.layer.offsetWidth; this.layer.classList.add('in');
     document.getElementById('mb-go').focus();
   }
-  close() { this.layer.hidden = true; }
+  close() {
+    this.layer.hidden = true;
+    if (this.layer.classList.contains('mb-report')) {   // v3.17: back from the training report's titles
+      this.layer.classList.remove('mb-report');
+      this.layer.querySelector('.mb-kicker').textContent = L.t('mb.kicker');
+      this.layer.querySelector('#mb-away-box .mb-h').textContent = L.t('mb.away');
+    }
+  }
+
+  /* ---------- v3.17 "SILENCE": only what is new, important first ---------- */
+  /** "While you were away" lines still worth showing (muted repeats dropped), split into important / routine. */
+  static awayLines(s, date = s.calendar.date) {
+    const fresh = (s.away || []).filter(e => s.newsFresh(e, date));
+    return { imp: fresh.filter(e => newsMatch(e.key, NEWS.IMPORTANT)), rout: fresh.filter(e => !newsMatch(e.key, NEWS.IMPORTANT)) };
+  }
+  /** Important lines (by day), then a collapsed Win98 tree "[+] Routine (N)". */
+  static awayHTML(ui, a, max = 12) {
+    const li = e => `<li><span class="d">${esc(fmtDate(e.date, { weekday: 'short' }))}</span> ${esc(ui.entryText({ ...e, r: 0 }))}</li>`;
+    let h = a.imp.slice(-max).map(li).join('') + (a.imp.length > max ? `<li class="more">${esc(L.t('mb.awayMore', { n: a.imp.length - max }))}</li>` : '');
+    if (a.rout.length) h += `<li class="mb-routine"><details><summary>${esc(L.t('mb.routine', { n: a.rout.length }))}</summary><ul>${a.rout.map(li).join('')}</ul></details></li>`;
+    return h;
+  }
+  /** The fee day's agenda line (1st training of the month after KASSA). */
+  feeDay(date = this.state.calendar.date) {
+    const s = this.state, f = s.fees;
+    return s.phase === 'calendar' && !!f && !f.started && f.month === s.monthOf(date) && s.isOurTraining(date);
+  }
+  /** Is there anything new worth a window? A match day always is (the opponent report); routine lines alone never are
+      (they ride along, collapsed, when the window opens anyway). */
+  hasNews() {
+    const s = this.state, date = s.calendar.date;
+    return s.phase === 'matchday' || MorningBriefing.awayLines(s, date).imp.length > 0 || MorningBriefing.worldNews(s, date).length > 0 || this.feeDay(date);
+  }
 
   render() {
+    if (this.report) return;   // v3.17: the training report is drawn once by openReport()
     const s = this.state, date = s.calendar.date, wx = MorningBriefing.weather(date), info = this.ui.dayInfo(date);
     const w = s.weekState(), plan = s.phase === 'calendar' && !w.confirmed;   // v3.13: Monday — PLANNER.EXE comes next
     const kind = s.phase === 'matchday' ? 'match' : plan ? 'plan' : info.kind;
@@ -9210,27 +9450,63 @@ class MorningBriefing {
       const c = s.league.oppCondition(ctx.opp, new Set(s.squad.map(p => p.surname)));
       agenda += ' ' + L.t('mb.oppForm', { a: c.avg, t: c.tired });
     }
-    const f = s.fees;   // v3.15: the fee day (1st training of the month)
-    if (s.phase === 'calendar' && f && !f.started && f.month === s.monthOf(date) && s.isOurTraining(date)) agenda += ' ' + L.t('mb.feeDay', { m: '$' + f.amount });
+    if (this.feeDay(date)) agenda += ' ' + L.t('mb.feeDay', { m: '$' + s.fees.amount });   // v3.15: the fee day (1st training of the month)
     document.getElementById('mb-agenda').textContent = agenda;
     // v3.13: Monday — how this week's action points were made up
     const src = w.apSources || {}, apBox = document.getElementById('mb-ap');
     apBox.hidden = !(s.phase === 'calendar' && date === w.start);
     apBox.innerHTML = apBox.hidden ? '' : L.t('mb.ap', { line: MorningBriefing.apLine(src) });
-    // v3.13: "while you were away" — the diary lines written since the last briefing (skipped days, evenings)
-    let away = s.away || [];
-    if (away.length > MorningBriefing.AWAY_MAX) away = away.filter(e => e.key !== 'cal.rest');   // plain rest days go first
-    const box = document.getElementById('mb-away-box');
-    box.hidden = !away.length;
-    document.getElementById('mb-away').innerHTML = away.slice(-MorningBriefing.AWAY_MAX).map(e =>
-      `<li><span class="d">${esc(fmtDate(e.date, { weekday: 'short' }))}</span> ${esc(this.ui.entryText({ ...e, r: 0 }))}</li>`).join('')
-      + (away.length > MorningBriefing.AWAY_MAX ? `<li class="more">${esc(L.t('mb.awayMore', { n: away.length - MorningBriefing.AWAY_MAX }))}</li>` : '');
+    // v3.13 → v3.17: "while you were away" — new lines only (14-day mute), important first, routine collapsed
+    const a = MorningBriefing.awayLines(s, date), box = document.getElementById('mb-away-box');
+    this.shown = [...a.imp, ...a.rout];
+    box.hidden = !this.shown.length;
+    document.getElementById('mb-away').innerHTML = MorningBriefing.awayHTML(this.ui, a);
     document.getElementById('mb-news').innerHTML = MorningBriefing.worldNews(s, date).map(n => `<li class="mb-world">${esc(n)}</li>`).join('')   // v3.14
       + this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
     const bar = (k) => { const v = s.rep[k];
       return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };
     document.getElementById('mb-rep').innerHTML = ['board', 'parents', 'squad'].map(bar).join('');
     document.getElementById('mb-go').innerHTML = L.t(kind === 'plan' ? 'mb.goPlan' : kind === 'rest' || kind === 'off' ? 'mb.goQuiet' : 'mb.go');
+  }
+
+  /* ---------- v3.17: TRAINING REPORT — the same window right after a training day (not the next morning) ---------- */
+  /** Opens the report for a processed training day; onDone runs after [ OK ]. Returns false when there is nothing to show. */
+  openReport(date, onDone) {
+    const s = this.state, d = s.today?.date === date ? s.today : null, lk = d?.locker;
+    if (!lk || this.ui.modalLock || this.ui.autoRunning) return false;
+    const entries = s.diary.filter(e => e.date === date && !['lr.diary', 'lr.diaryAll', 'cal.training', 'cal.trainingAll'].includes(e.key));
+    const absent = Object.entries(lk.absent), t = s.squad.length, here = t - absent.length;
+    const lines = [L.t(absent.length ? 'trr.came' : 'trr.cameAll', { a: here, t })];
+    for (const [id, why] of absent) { const p = s.player(id); if (p) lines.push(L.t('trr.absent', { k: L.name(p.name), w: L.t('lr.short.' + why) })); }
+    const paid = (d.feesPaid || []).filter(id => s.player(id)), got = paid.reduce((m, id) => m + (s.fees?.got?.[id] || 0), 0);
+    if (paid.length) lines.push(L.t('trr.fees', { n: paid.length, m: '$' + got }));
+    this.report = { date, onDone, entries };
+    this.ui.modal.close(); this.ui.profile.close();
+    this.layer.classList.add('mb-report');
+    this.layer.querySelector('.mb-kicker').textContent = L.t('trr.kicker');
+    this.layer.querySelector('#mb-away-box .mb-h').textContent = L.t('trr.h');
+    document.getElementById('mb-date').textContent = L.t('trr.title', { d: fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }) });
+    document.getElementById('mb-weather').innerHTML = '';
+    document.getElementById('mb-agenda').textContent = L.t('trr.plan', { p: L.t('plan.' + (s.planOf(date) || WEEK.DEFAULT_REGIME)) });
+    document.getElementById('mb-ap').hidden = true;
+    const imp = entries.filter(e => newsMatch(e.key, NEWS.IMPORTANT)), rout = entries.filter(e => !newsMatch(e.key, NEWS.IMPORTANT));
+    document.getElementById('mb-away-box').hidden = false;
+    document.getElementById('mb-away').innerHTML = lines.map(x => `<li class="trr">${esc(x)}</li>`).join('')
+      + MorningBriefing.awayHTML(this.ui, { imp, rout }, 40).replace(/<span class="d">[^<]*<\/span> /g, '');
+    document.getElementById('mb-go').innerHTML = L.t('trr.ok');
+    this.layer.hidden = false;
+    this.layer.classList.remove('in'); void this.layer.offsetWidth; this.layer.classList.add('in');
+    document.getElementById('mb-go').focus();
+    return true;
+  }
+  endReport() {
+    const s = this.state, r = this.report;
+    this.report = null;
+    s.markNews(r.entries);   // not again tomorrow morning
+    if (s.away) s.away = s.away.filter(e => e.date !== r.date);
+    s.save();
+    this.close();
+    r.onDone?.();
   }
 
   /** v3.14: Monday news about this week's school / city event — the day(s) and a vague hint, never names. */
@@ -9247,7 +9523,10 @@ class MorningBriefing {
   /** [ HEAD TO THE CLUB ] */
   go() {
     const s = this.state;
+    if (this.report) { this.endReport(); return; }   // v3.17: the training report's [ OK ]
     s.dayState().briefed = true;
+    if (!this.layer.hidden && this.shown) s.markNews(this.shown);   // v3.17: what he read is muted for NEWS.COOLDOWN days
+    this.shown = null;
     s.away = null;   // v3.13: the coach has read what happened while he was away
     s.save();
     this.close();
@@ -9336,6 +9615,10 @@ class WeekPlanner {
     this.grid = document.getElementById('pl-grid');
     document.getElementById('pl-x').addEventListener('click', () => this.close());
     document.getElementById('pl-confirm').addEventListener('click', () => this.confirm());
+    document.getElementById('pl-ks-levels').addEventListener('change', e => {   // v3.17: the month's fee inside the planner
+      const r = e.target.closest('input[name="pl-level"]');
+      if (r && FINANCE.FEES[r.value]) { this.feeLevel = r.value; this.render(); }
+    });
     this.grid.addEventListener('click', e => {
       const b = e.target.closest('[data-day]');
       if (!b || b.disabled) return;
@@ -9357,8 +9640,10 @@ class WeekPlanner {
     const s = this.state;
     if (this.ui.modalLock || s.phase !== 'calendar') return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
-    if (this.ui.isStopDay() && (s.kassaDue() || !s.dayState().briefed)) { this.ui.briefing.open(); return; }   // the cash desk (v3.15) and the briefing come first
-    this.ui.modal.close();
+    // v3.17: an unconfirmed week = Monday's one window (briefing + cash desk + plan). Re-planning later keeps the old order.
+    if (s.weekState().confirmed && this.ui.isStopDay() && (s.kassaDue() || !s.dayState().briefed)) { this.ui.briefing.open(); return; }
+    if (this.layer.hidden) this.feeLevel = FINANCE.DEFAULT_LEVEL;
+    this.ui.modal.close(); this.ui.briefing.close(); this.ui.kassa.layer.hidden = true;
     this.render();
     this.layer.hidden = false;
     document.getElementById('pl-confirm').focus();
@@ -9368,7 +9653,26 @@ class WeekPlanner {
   /** Qualitative warning for the n-th training of the week (1-based), or ''. */
   static warnKey(n) { return n >= WEEK.WARN_OVER ? 'pl.warn.over' : n >= WEEK.WARN_HEAVY ? 'pl.warn.heavy' : ''; }
 
+  /** v3.17: Monday's briefing block (new "while you were away" lines + this week's world event) and the month's cash block. */
+  renderMonday() {
+    const s = this.state, w = s.weekState(), monday = !w.confirmed && s.phase === 'calendar', date = s.calendar.date;
+    const box = document.getElementById('pl-brief'), kb = document.getElementById('pl-kassa');
+    const a = monday ? MorningBriefing.awayLines(s, date) : { imp: [], rout: [] }, world = monday ? MorningBriefing.worldNews(s, date) : [];
+    this.shown = [...a.imp, ...a.rout];
+    box.hidden = !this.shown.length && !world.length;
+    box.innerHTML = box.hidden ? '' : world.map(n => `<div class="pl-world">&#10022; ${esc(n)}</div>`).join('')
+      + (this.shown.length ? `<details class="pl-sec"${a.imp.length ? ' open' : ''}><summary>${esc(L.t('mb.away'))} (${this.shown.length})</summary><ul class="pl-away">${MorningBriefing.awayHTML(this.ui, a)}</ul></details>` : '');
+    const cash = monday && s.kassaDue();
+    kb.hidden = !cash;
+    if (cash) {
+      document.getElementById('pl-kassa-h').textContent = '$ ' + L.t('pl.kassa', { m: CashDesk.mName(s.monthOf()) });
+      document.getElementById('pl-ks-report').innerHTML = CashDesk.reportHTML(s);
+      document.getElementById('pl-ks-levels').innerHTML = CashDesk.levelsHTML(s, this.feeLevel || FINANCE.DEFAULT_LEVEL, 'pl-level');
+    }
+  }
+
   render() {
+    this.renderMonday();
     const s = this.state, w = s.weekState(), today = s.calendar.date;
     let nth = 0;
     this.grid.innerHTML = WEEK.KEYS.map((k, i) => {
@@ -9400,7 +9704,8 @@ class WeekPlanner {
     const warn = WeekPlanner.warnKey(n);
     document.getElementById('pl-sum').innerHTML = `${L.t('pl.count', { n })}${warn ? ` <b class="${warn === 'pl.warn.over' ? 'over' : ''}">${esc(L.t(warn))}</b>` : n ? '' : ` <b>${esc(L.t('pl.warn.empty'))}</b>`}`;
     document.getElementById('pl-confirm').innerHTML = L.t('pl.confirm');
-    document.getElementById('pl-status').textContent = this.msg || L.t(w.confirmed ? 'pl.status.replan' : 'pl.status.new');
+    document.getElementById('pl-status').textContent = this.msg || (!w.confirmed && s.kassaDue() ? L.t('kassa.status', { n: s.squad.length, m: '$' + FINANCE.FEES[this.feeLevel || FINANCE.DEFAULT_LEVEL].fee * s.squad.length }) + ' · ' : '')
+      + (this.msg ? '' : L.t(w.confirmed ? 'pl.status.replan' : 'pl.status.new'));
     this.msg = '';
   }
 
@@ -9427,6 +9732,13 @@ class WeekPlanner {
   confirm() {
     const s = this.state;
     if (this.ui.events.active) return;
+    if (!s.weekState().confirmed) {   // v3.17: Monday's one window — the cash desk and the briefing are confirmed with the plan
+      if (s.phase === 'calendar' && s.kassaDue()) s.confirmKassa(this.feeLevel || FINANCE.DEFAULT_LEVEL);
+      s.dayState().briefed = true;
+      if (this.shown) s.markNews(this.shown);
+      this.shown = null;
+      s.away = null;
+    }
     s.confirmWeek();
     this.layer.hidden = true;
     this.ui.renderAll();
@@ -9457,6 +9769,7 @@ class CashDesk {
     const s = this.state;
     if (this.ui.modalLock || !s.kassaDue()) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.17: on Monday the cash desk is a block of PLANNER.EXE
     this.ui.modal.close();
     if (this.ui.briefing.isOpen) this.ui.briefing.close();
     this.level = FINANCE.DEFAULT_LEVEL;
@@ -9466,20 +9779,30 @@ class CashDesk {
   }
   close() { this.layer.hidden = true; this.ui.renderAll(); }
 
-  render() {
-    const s = this.state, month = s.monthOf(), rep = s.lastMonthReport();
-    const mName = m => fmtDate(m + '-01', { month: 'long', year: 'numeric' });
+  static mName(m) { return fmtDate(m + '-01', { month: 'long', year: 'numeric' }); }
+  /** Last month's ledger + the budget (v3.17: shared with the cash block inside PLANNER.EXE). */
+  static reportHTML(s) {
+    const rep = s.lastMonthReport();
     const sum = v => `<b class="${v < 0 ? 'neg' : v > 0 ? 'pos' : ''}">${v > 0 ? '+' : v < 0 ? '−' : ''}$${Math.abs(v)}</b>`;
-    document.getElementById('ks-title').textContent = 'KASSA.EXE — ' + mName(month);
-    document.getElementById('ks-report').innerHTML = (rep
-      ? `<div class="ks-h">${L.t('kassa.report', { m: mName(rep.month) })}</div><table class="ks-table">`
+    return (rep
+      ? `<div class="ks-h">${L.t('kassa.report', { m: CashDesk.mName(rep.month) })}</div><table class="ks-table">`
         + LEDGER_CATS.map(c => `<tr data-cat="${c}"><td>${L.t('kassa.row.' + c)}</td><td>${sum(rep.rows[c])}</td></tr>`).join('')
         + `<tr class="tot" data-cat="total"><td>${L.t('kassa.row.total')}</td><td>${sum(rep.total)}</td></tr></table>`
       : `<div class="ks-h">${L.t('kassa.firstH')}</div><p class="ks-first">${L.t('kassa.first')}</p>`)
       + `<div class="ks-budget">${L.t('kassa.budget')} <b class="${s.budget < 0 ? 'neg' : ''}">${money(s.budget)}</b></div>`;
-    document.getElementById('ks-levels').innerHTML = `<div class="ks-h">${L.t('kassa.level', { m: mName(month) })}</div>`
-      + FINANCE.FEE_LEVELS.map(k => `<label class="ks-lvl${this.level === k ? ' on' : ''}"><input type="radio" name="ks-level" value="${k}"${this.level === k ? ' checked' : ''}>
+  }
+  /** The fee-level radios; `name` = the radio group (ks-level here, pl-level in the planner). */
+  static levelsHTML(s, level, name = 'ks-level') {
+    return `<div class="ks-h">${L.t('kassa.level', { m: CashDesk.mName(s.monthOf()) })}</div>`
+      + FINANCE.FEE_LEVELS.map(k => `<label class="ks-lvl${level === k ? ' on' : ''}"><input type="radio" name="${name}" value="${k}"${level === k ? ' checked' : ''}>
         <b>${L.t('kassa.lvl.' + k, { m: '$' + FINANCE.FEES[k].fee })}</b><small>${L.t('kassa.lvl.' + k + '.d')}</small></label>`).join('');
+  }
+
+  render() {
+    const s = this.state;
+    document.getElementById('ks-title').textContent = 'KASSA.EXE — ' + CashDesk.mName(s.monthOf());
+    document.getElementById('ks-report').innerHTML = CashDesk.reportHTML(s);
+    document.getElementById('ks-levels').innerHTML = CashDesk.levelsHTML(s, this.level);
     document.getElementById('ks-note').textContent = L.t('kassa.note');
     document.getElementById('ks-confirm').innerHTML = L.t('kassa.confirm');
     document.getElementById('ks-status').textContent = L.t('kassa.status', { n: s.squad.length, m: '$' + FINANCE.FEES[this.level].fee * s.squad.length });
@@ -9637,7 +9960,7 @@ class UIController {
   }
 
   v(x) {
-    if (x instanceof Player) return L.name(x.surname);
+    if (x instanceof Player) return this.logName(x);   // v3.17: "J. Fletcher" when the surname is on the pitch twice
     if (x && typeof x === 'object' && 'plan' in x) return L.t('plan.' + x.plan);   // v2.5 diary
     if (x && typeof x === 'object' && 'talk' in x) return L.t('tt.name.' + x.talk);  // v3.5 diary
     if (x && typeof x === 'object' && 'talkReact' in x) return L.t('tt.react.' + x.talkReact);  // v3.9 diary
@@ -9653,6 +9976,25 @@ class UIController {
     if (x && typeof x === 'object' && 'team' in x) return L.team(x.team);
     if (x && typeof x === 'object' && 'venue' in x) return L.t('venue.' + x.venue);
     return String(x);
+  }
+  /** v3.17: match-log name. Surname alone; a surname shared by two kids in this match (either side) → initial + surname;
+      initial + surname still shared → + the club's first word (opponents and our kids can be namesakes). */
+  logName(p) {
+    const e = this.engine, sn = L.name(p.surname);
+    if (!e) return sn;
+    if (e._nameKey !== e.sides.map(x => x.all.length).join()) {   // built once per match (+ again after a sub enters `all`)
+      const sur = new Map(), ini = new Map(), team = new Map();
+      for (const side of e.sides) for (const q of side.all) {
+        const k = q.surname, i = k + '|' + q.name[0];
+        sur.set(k, (sur.get(k) || 0) + 1); ini.set(i, (ini.get(i) || 0) + 1); team.set(q.id, side.name);
+      }
+      e._names = { sur, ini, team }; e._nameKey = e.sides.map(x => x.all.length).join();
+    }
+    const n = e._names;
+    if ((n.sur.get(p.surname) || 0) < 2) return sn;
+    const full = L.name(p.name).split(' '), short = `${full[0][0]}. ${sn}`;
+    if ((n.ini.get(p.surname + '|' + p.name[0]) || 0) < 2) return short;
+    return `${short} (${L.team(n.team.get(p.id) || '').split(' ')[0]})`;
   }
   fxText(f) { const lg = this.state.league; return `${L.team(lg.team(f.home).name)} ${f.hg}-${f.ag} ${L.team(lg.team(f.away).name)}`; }
 
@@ -10311,6 +10653,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   dayBlockers() {
     const s = this.state, out = [];
     if (!this.isStopDay()) return out;
+    if (!s.weekState().confirmed) { out.push('week'); return out; }   // v3.17: Monday — briefing + cash desk live inside PLANNER.EXE
     if (s.kassaDue()) { out.push('kassa'); return out; }   // v3.15: the month's first stop opens with the cash desk
     if (!s.dayState().briefed) { out.push('briefing'); return out; }   // v2.8: START DAY → morning briefing
     if (!s.weekState().confirmed) { out.push('week'); return out; }   // v3.13: [ CONFIRM WEEK ]
@@ -10323,17 +10666,29 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.cal.running || s.phase !== 'calendar' || this.events.active || this.dayBlockers().length) { this.renderDash(); return; }
     s.autoFees = false;   // (auto-sim only)
     s.away = s.away || [];   // diary lines from here on go to the next morning briefing ("while you were away")
-    for (let guard = 0; guard < 40; guard++) {
+    this.contLoop(40);
+  }
+  /** The CONTINUE loop. v3.17: a training day's result opens at once (TRAINING REPORT); [ OK ] resumes the loop. */
+  contLoop(guard) {
+    const s = this.state;
+    for (; guard > 0; guard--) {
+      const trained = s.isOurTraining(s.calendar.date);
       const r = this.cal.step();
       if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }   // safety: today was already a match day
       for (const info of r.infos) s.addDiary({ date: r.date, ...info });
       this.calMonth = null;
       s.save();
-      if (this.cal.nextEvent() && this.events.roll(r.date, { resume: false, cont: true })) { this.renderAll(); return; }   // stop: an event
-      if (!this.nextMorning()) return;                                                   // stop: match day / season over
-      if (this.isStopDay()) { this.renderAll(); this.briefing.open(); return; }          // stop: plan / training
+      if (trained && !(this.skipReports ?? window.YAM_SKIP_REPORTS) && this.briefing.openReport(r.date, () => { if (this.contAfter(r.date)) this.contLoop(guard - 1); })) { this.renderAll(); return; }
+      if (!this.contAfter(r.date)) return;
     }
     this.renderAll();
+  }
+  /** After a processed day: evening events, the next morning, a stop day. true = keep skipping. */
+  contAfter(date) {
+    if (this.cal.nextEvent() && this.events.roll(date, { resume: false, cont: true })) { this.renderAll(); return false; }   // stop: an event
+    if (!this.nextMorning()) return false;                                                 // stop: match day / season over
+    if (this.isStopDay()) { this.renderAll(); this.briefing.open(); return false; }        // stop: plan / training
+    return true;
   }
   endDay() { this.continueDays(); }   // pre-v3.13 name (DEBUG / tests)
   /** A new morning: absences forgotten; a match day arrives at once (→ false), the season may end (→ false). */
@@ -10386,7 +10741,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.events.active || (this.engine && !this.engine.finished) || this.cal.running) return 'office.blk.busy';
     if (s.phase === 'calendar' && s.worldAway(id, s.calendar.date)) return 'office.blk.notHere';   // v3.14: away at the event today
     let here = false, absent = false;
-    const atClub = s.phase === 'matchday' || (s.phase === 'calendar' && d.briefed && !this.briefing.isOpen);
+    const atClub = s.phase === 'matchday' || (s.phase === 'calendar' && (d.briefed || !s.weekState().confirmed) && !this.briefing.isOpen);   // v3.17: Monday's one window = already at the club
     if (atClub && d.locker) { here = !d.locker.absent[id]; absent = !here; }        // training / match day: who turned up
     else if (atClub && s.phase === 'calendar' && weekKey(s.calendar.date) === 'mon') here = true;   // Monday: everyone
     if (!here) return absent ? 'office.blk.absent' : 'office.blk.notHere';

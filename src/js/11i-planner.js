@@ -12,6 +12,10 @@ class WeekPlanner {
     this.grid = document.getElementById('pl-grid');
     document.getElementById('pl-x').addEventListener('click', () => this.close());
     document.getElementById('pl-confirm').addEventListener('click', () => this.confirm());
+    document.getElementById('pl-ks-levels').addEventListener('change', e => {   // v3.17: the month's fee inside the planner
+      const r = e.target.closest('input[name="pl-level"]');
+      if (r && FINANCE.FEES[r.value]) { this.feeLevel = r.value; this.render(); }
+    });
     this.grid.addEventListener('click', e => {
       const b = e.target.closest('[data-day]');
       if (!b || b.disabled) return;
@@ -33,8 +37,10 @@ class WeekPlanner {
     const s = this.state;
     if (this.ui.modalLock || s.phase !== 'calendar') return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
-    if (this.ui.isStopDay() && (s.kassaDue() || !s.dayState().briefed)) { this.ui.briefing.open(); return; }   // the cash desk (v3.15) and the briefing come first
-    this.ui.modal.close();
+    // v3.17: an unconfirmed week = Monday's one window (briefing + cash desk + plan). Re-planning later keeps the old order.
+    if (s.weekState().confirmed && this.ui.isStopDay() && (s.kassaDue() || !s.dayState().briefed)) { this.ui.briefing.open(); return; }
+    if (this.layer.hidden) this.feeLevel = FINANCE.DEFAULT_LEVEL;
+    this.ui.modal.close(); this.ui.briefing.close(); this.ui.kassa.layer.hidden = true;
     this.render();
     this.layer.hidden = false;
     document.getElementById('pl-confirm').focus();
@@ -44,7 +50,26 @@ class WeekPlanner {
   /** Qualitative warning for the n-th training of the week (1-based), or ''. */
   static warnKey(n) { return n >= WEEK.WARN_OVER ? 'pl.warn.over' : n >= WEEK.WARN_HEAVY ? 'pl.warn.heavy' : ''; }
 
+  /** v3.17: Monday's briefing block (new "while you were away" lines + this week's world event) and the month's cash block. */
+  renderMonday() {
+    const s = this.state, w = s.weekState(), monday = !w.confirmed && s.phase === 'calendar', date = s.calendar.date;
+    const box = document.getElementById('pl-brief'), kb = document.getElementById('pl-kassa');
+    const a = monday ? MorningBriefing.awayLines(s, date) : { imp: [], rout: [] }, world = monday ? MorningBriefing.worldNews(s, date) : [];
+    this.shown = [...a.imp, ...a.rout];
+    box.hidden = !this.shown.length && !world.length;
+    box.innerHTML = box.hidden ? '' : world.map(n => `<div class="pl-world">&#10022; ${esc(n)}</div>`).join('')
+      + (this.shown.length ? `<details class="pl-sec"${a.imp.length ? ' open' : ''}><summary>${esc(L.t('mb.away'))} (${this.shown.length})</summary><ul class="pl-away">${MorningBriefing.awayHTML(this.ui, a)}</ul></details>` : '');
+    const cash = monday && s.kassaDue();
+    kb.hidden = !cash;
+    if (cash) {
+      document.getElementById('pl-kassa-h').textContent = '$ ' + L.t('pl.kassa', { m: CashDesk.mName(s.monthOf()) });
+      document.getElementById('pl-ks-report').innerHTML = CashDesk.reportHTML(s);
+      document.getElementById('pl-ks-levels').innerHTML = CashDesk.levelsHTML(s, this.feeLevel || FINANCE.DEFAULT_LEVEL, 'pl-level');
+    }
+  }
+
   render() {
+    this.renderMonday();
     const s = this.state, w = s.weekState(), today = s.calendar.date;
     let nth = 0;
     this.grid.innerHTML = WEEK.KEYS.map((k, i) => {
@@ -76,7 +101,8 @@ class WeekPlanner {
     const warn = WeekPlanner.warnKey(n);
     document.getElementById('pl-sum').innerHTML = `${L.t('pl.count', { n })}${warn ? ` <b class="${warn === 'pl.warn.over' ? 'over' : ''}">${esc(L.t(warn))}</b>` : n ? '' : ` <b>${esc(L.t('pl.warn.empty'))}</b>`}`;
     document.getElementById('pl-confirm').innerHTML = L.t('pl.confirm');
-    document.getElementById('pl-status').textContent = this.msg || L.t(w.confirmed ? 'pl.status.replan' : 'pl.status.new');
+    document.getElementById('pl-status').textContent = this.msg || (!w.confirmed && s.kassaDue() ? L.t('kassa.status', { n: s.squad.length, m: '$' + FINANCE.FEES[this.feeLevel || FINANCE.DEFAULT_LEVEL].fee * s.squad.length }) + ' · ' : '')
+      + (this.msg ? '' : L.t(w.confirmed ? 'pl.status.replan' : 'pl.status.new'));
     this.msg = '';
   }
 
@@ -103,6 +129,13 @@ class WeekPlanner {
   confirm() {
     const s = this.state;
     if (this.ui.events.active) return;
+    if (!s.weekState().confirmed) {   // v3.17: Monday's one window — the cash desk and the briefing are confirmed with the plan
+      if (s.phase === 'calendar' && s.kassaDue()) s.confirmKassa(this.feeLevel || FINANCE.DEFAULT_LEVEL);
+      s.dayState().briefed = true;
+      if (this.shown) s.markNews(this.shown);
+      this.shown = null;
+      s.away = null;
+    }
     s.confirmWeek();
     this.layer.hidden = true;
     this.ui.renderAll();

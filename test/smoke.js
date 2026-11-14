@@ -20,6 +20,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
   const errors = [];
+  await page.addInitScript(() => { window.YAM_SKIP_REPORTS = true; });   // v3.17: the training report has its own check (it would pause CONTINUE)
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_/.test(m.text())) errors.push(m.text()); });
   page.on('dialog', d => { errors.push('native dialog: ' + d.message()); d.dismiss(); });
@@ -29,6 +30,9 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     if (await page.evaluate(() => !document.getElementById('morning-briefing-view').hidden)) await page.click('#mb-go');
     await page.waitForTimeout(60);
   };
+  // v3.17: dialogue choices are disabled until the line is fully typed → skip the typewriter first
+  const finishTyping = () => page.evaluate(() => YAM.ui.events.view.finishTyping());
+  const talkClick = async (sel, opts) => { await finishTyping(); await page.click(sel, opts); };
   const shot = async name => { if (SHOTS) { fs.mkdirSync(path.join(__dirname, 'shots'), { recursive: true }); await page.screenshot({ path: path.join(__dirname, 'shots', name + '.png') }); } };
   const modalOpen = () => page.evaluate(() => !document.getElementById('modal-layer').hidden);
   const closeModal = async () => { if (await modalOpen()) await page.keyboard.press('Escape'); };
@@ -341,15 +345,16 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       led: Object.values(YAM.game.ledger).reduce((a, m) => a + Object.values(m).reduce((x, y) => x + y, 0), 0), fee: YAM.game.ledger['2002-09']?.fee || 0 }));
     await page.evaluate(() => { YAM.game.budget = 100; YAM.ui.renderBudget(); YAM.ui.events.fire('boots'); });
     await page.waitForTimeout(150);
+    await finishTyping();
     const bt = await page.evaluate(() => {
       const pe = YAM.game.pendingEvent, kid = YAM.game.player(pe.cast.kid), btns = [...document.querySelectorAll('#talk-choices .talk-btn')];
       return { kid: kid.id, agi: kid.physical.agility, n: btns.length, dis: btns[0].disabled, en: !btns[1].disabled, face: !!document.querySelector('#talk-face svg'),
         hdr: document.getElementById('hdr-budget').textContent };
     });
-    await page.click('#talk-choices .talk-btn[data-i="0"]', { force: true });   // disabled: must do nothing
+    await talkClick('#talk-choices .talk-btn[data-i="0"]', { force: true });   // disabled: must do nothing
     await page.keyboard.press('Escape');                                         // forced choice: Esc does nothing
     const still = await talkOpen();
-    await page.click('#talk-choices .talk-btn[data-i="1"]');
+    await talkClick('#talk-choices .talk-btn[data-i="1"]');
     const bt2 = await page.evaluate(k => ({ agi: YAM.game.player(k).physical.agility, closed: document.getElementById('talk-layer').hidden, pe: YAM.game.pendingEvent, b: YAM.game.budget,
       diary: YAM.game.diary[YAM.game.diary.length - 1].key }), bt.kid);
     check('budget in header = $500 + the ledger (September fees); Torn Boots: snitch face, unaffordable choice disabled, Esc blocked, "no" = agility −2',
@@ -359,12 +364,12 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.waitForTimeout(100);
     const dd = await page.evaluate(() => ({ kid: YAM.game.pendingEvent.cast.kid, worst: (w => (w('rich') || w('middle') || w(null)).id)(w => [...YAM.game.squad].filter(p => !w || p.wealth === w).sort((a, b) => a.overall - b.overall)[0]),   // v3.15: the weakest RICH kid
       sil: document.querySelector('#talk-face svg rect:nth-of-type(2)') !== null }));
-    await page.click('#talk-choices .talk-btn[data-i="0"]');
+    await talkClick('#talk-choices .talk-btn[data-i="0"]');
     const dd2 = await page.evaluate(k => ({ b: YAM.game.budget, flag: YAM.game.player(k).flags.includes('Promised_Start'), hdr: document.getElementById('hdr-budget').textContent,
       chip: !!document.querySelector(`#roster .r-row[data-id="${k}"] .tag.flag`) }), dd.kid);
     check("Rich Kid's Dad: the weakest kid of a rich family (v3.15), take money = +$300 + Promised_Start chip", dd.kid === dd.worst && dd.sil && dd2.b === 400 && dd2.flag && /\$400/.test(dd2.hdr) && dd2.chip, JSON.stringify({ dd, dd2 }));
     // v2.2/2.3: injuries, multi-step dialogue + suspension, match-day bus, dads' pool → losing dad, scout → showcase
-    const talk = async i => { await page.click(`#talk-choices .talk-btn[data-i="${i}"]`); await page.waitForTimeout(30); };
+    const talk = async i => { await talkClick(`#talk-choices .talk-btn[data-i="${i}"]`); await page.waitForTimeout(30); };
     await page.evaluate(() => { YAM.game.budget = 1000; YAM.ui.events.fire('knock'); });
     const kn = await page.evaluate(() => YAM.game.pendingEvent.cast.kid);
     await page.evaluate(k => { const s = YAM.game; if (!s.isStarter(k)) s.swapPlayers(k, s.starters().find(p => p.archetype === s.player(k).archetype && p.archetype !== 'GK')?.id || s.lineup[1]); }, kn);
@@ -420,16 +425,13 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const dayOf = d => new Date(d + 'T00:00:00Z').getUTCDay();
     const days = (a, b) => (new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5;
     const ofPre = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available); return { blk: YAM.ui.officeBlock(p.id), dow: new Date(YAM.game.calendar.date + 'T00:00:00Z').getUTCDay() }; });
-    await page.click('#btn-sim');   // Sunday: [ CONTINUE ] → Monday (the week is not planned yet) → the morning briefing opens by itself
+    await page.click('#btn-sim');   // Sunday: [ CONTINUE ] → Monday (the week is not planned yet) → v3.17: ONE window — PLANNER.EXE with the briefing inside
     // v3.14/v3.15: this week's seeded world event (if any — per-game salt) is cleared — the v3.13 checks below pin exact numbers; world events have their own checks
-    await page.evaluate(() => { YAM.game.worldEvent = null; YAM.ui.briefing.render(); });
-    const mb = await page.evaluate(() => ({ open: !document.getElementById('morning-briefing-view').hidden, z: +getComputedStyle(document.getElementById('morning-briefing-view')).zIndex,
-      date: document.getElementById('mb-date').textContent, wx: document.getElementById('mb-weather').textContent.trim(), news: document.querySelectorAll('#mb-news li').length,
-      rep: document.querySelectorAll('#mb-rep .rep-row .rep-bar').length, btn: document.getElementById('mb-go').textContent, kind: YAM.ui.dayInfo(YAM.game.calendar.date).kind,
-      ap: document.getElementById('mb-ap').hidden ? '' : document.getElementById('mb-ap').textContent, src: YAM.game.weekState().apSources, last: YAM.game.lastResult(),
-      away: document.querySelectorAll('#mb-away li').length }));
+    await page.evaluate(() => { YAM.game.worldEvent = null; YAM.ui.planner.render(); });
+    const mb = await page.evaluate(() => ({ open: !document.getElementById('morning-briefing-view').hidden, pl: !document.getElementById('planner-view').hidden,
+      kind: YAM.ui.dayInfo(YAM.game.calendar.date).kind, ap: document.getElementById('pl-head').textContent, src: YAM.game.weekState().apSources, last: YAM.game.lastResult(),
+      away: document.querySelectorAll('#pl-brief li').length, briefed: !!YAM.game.dayState().briefed }));
     await shot('11-briefing');
-    await page.click('#mb-go');   // → PLANNER.EXE
     const wp0 = await page.evaluate(() => {
       const s = YAM.game, g = document.getElementById('pl-grid');
       const r = { open: !document.getElementById('planner-view').hidden, z: +getComputedStyle(document.getElementById('planner-view')).zIndex, cols: g.querySelectorAll('.pl-col').length,
@@ -463,14 +465,15 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const wp2 = await page.evaluate(() => { const s = YAM.game, w = s.weekState();
       return { closed: document.getElementById('planner-view').hidden, confirmed: w.confirmed, plan: WEEK.PLAN_KEYS.map(k => w.plan[k] || '-').join(), blk: YAM.ui.dayBlockers().length,
         label: document.getElementById('btn-sim').textContent, dis: document.getElementById('btn-sim').disabled, monTr: s.isOurTraining(s.calendar.date), aiTue: isTrainingDay(isoAdd(w.start, 1)) }; });
-    check('v3.13 planner: Monday briefing shows the AP make-up, then PLANNER.EXE (z 50, 7 columns, Sat match + Sun rest fixed, Rest + 4 regimes Mon–Fri); [ CONFIRM WEEK ] blocks CONTINUE; 3rd = heavy, 4th–5th = overload (words only); confirm → CONTINUE',
-      dl0.today && dl0.strip === 7 && dayOf(dl0.date) === 0 && !dl0.blk && /ПРОДОЛЖИТЬ|CONTINUE/.test(dl0.label) && !dl0.btn && days(dl0.date, wp0.date) === 1 && mb.open && mb.z === 50 && mb.date.length > 6 && mb.wx.length > 2 && mb.news >= 1 && mb.news <= 2 && mb.rep === 3
-      && /PLANNER/.test(mb.btn) && mb.kind === 'rest' && mb.src.total === Math.min(7, 4 + mb.src.carry + (mb.last === 'W' ? 1 : 0)) && mb.ap.includes(String(mb.src.total)) && /4/.test(mb.ap)
+    check('v3.13 planner (v3.17: Monday = one window, the AP make-up in PLANNER.EXE): PLANNER.EXE (z 50, 7 columns, Sat match + Sun rest fixed, Rest + 4 regimes Mon–Fri); [ CONFIRM WEEK ] blocks CONTINUE; 3rd = heavy, 4th–5th = overload (words only); confirm → CONTINUE',
+      dl0.today && dl0.strip === 7 && dayOf(dl0.date) === 0 && !dl0.blk && /ПРОДОЛЖИТЬ|CONTINUE/.test(dl0.label) && !dl0.btn && days(dl0.date, wp0.date) === 1 && !mb.open && mb.pl && !mb.briefed
+      && mb.kind === 'rest' && mb.src.total === Math.min(7, 4 + mb.src.carry + (mb.last === 'W' ? 1 : 0)) && mb.ap.includes(String(mb.src.total)) && /4/.test(mb.ap)
       && wp0.open && wp0.z === 50 && wp0.cols === 7 && wp0.fixed === 2 && wp0.match && wp0.opts === 25 && wp0.blk === 'week' && /ПЛАН|PLAN/.test(wp0.label) && wp0.stuck && wp0.top === 'planner-view'
       && wp1.n === 5 && wp1.warn.length === 5 && !wp1.warn[0] && !wp1.warn[1] && /Тяжеловат|Heavy/.test(wp1.warn[2]) && /Перегруз|Overload/.test(wp1.warn[3]) && wp1.over === 2 && !/\d\s*%/.test(wp1.warn.join() + wp1.sum)
       && wp2.closed && wp2.confirmed && wp2.plan === '-,cardio,-,match,-' && wp2.blk === 0 && /ПРОДОЛЖИТЬ|CONTINUE/.test(wp2.label) && !wp2.dis && !wp2.monTr && wp2.aiTue,
       JSON.stringify({ dl0, mb, wp0, wp1, wp2 }));
-    // [ CONTINUE ] on Monday → Tuesday (planned training): the briefing opens by itself
+    // [ CONTINUE ] on Monday → Tuesday (planned training): the briefing opens by itself (v3.17: only with news → one important line is planted)
+    await page.evaluate(() => { YAM.game.away = [{ date: YAM.game.calendar.date, key: 'week.empty', cls: 'ev' }]; });
     await page.click('#btn-sim');
     const ct1 = await page.evaluate(() => ({ date: YAM.game.calendar.date, brief: !document.getElementById('morning-briefing-view').hidden, ap: YAM.game.ap, away: document.querySelectorAll('#mb-away li').length }));
     // v2.6: training day → locker room (forced absences) → roll call → Proceed → regime (from the plan) → CONTINUE
@@ -545,6 +548,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.click('#today-box .plan-btn[data-plan="cardio"]');
     const dl2 = await page.evaluate(() => ({ btn: document.getElementById('btn-sim').disabled, plan: YAM.game.todayPlan() }));
     await page.evaluate(() => { window.__R = Math.random; Math.random = () => 0.99; });
+    await page.evaluate(() => { YAM.game.away = [{ date: YAM.game.calendar.date, key: 'week.empty', cls: 'ev' }]; });   // v3.17: news → Thursday's briefing opens
     await page.click('#btn-sim');   // [ CONTINUE ]: Tuesday's training, Wednesday passes by itself, stop on Thursday (planned)
     await page.evaluate(() => { Math.random = window.__R; });
     const dl3 = await page.evaluate(ids => { const s = YAM.game, p = s.player(ids.keep), L2 = s.player(ids.lazy), T = s.player(ids.tired), wed = isoAdd(ids.date, 1);
@@ -576,6 +580,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       return { id: p.id, n0: s.squad.length, slot: s.lineup.indexOf(p.id) };
     });
     await page.click('#pinfo-office');
+    await finishTyping();
     const kb = await page.evaluate(() => [...document.querySelectorAll('#talk-choices .talk-btn')].map(b => ({ t: b.querySelector('.tb-label').textContent, red: b.classList.contains('tone-red'), dis: b.disabled })));
     await talk(3);   // kick out → confirm step
     const kc = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step, n: document.querySelectorAll('#talk-choices .talk-btn').length }));
@@ -615,7 +620,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.click('#pinfo-body [data-postag="FWD"]');
     await page.click('#pinfo-body [data-duty="captain"]');
     await page.waitForSelector('#talk-layer:not([hidden]) .talk-btn');   // v3.8: the armband opens the reaction dialogue
-    await page.click('#talk-choices .talk-btn.tone-green');
+    await talkClick('#talk-choices .talk-btn.tone-green');
     const fg1 = await page.evaluate(k => ({ tag: YAM.game.player(k).tag, cap: YAM.game.duties.captain, rowChip: document.querySelector(`#roster .r-row[data-id="${k}"] .pos`)?.textContent,
       badge: !!document.querySelector(`#roster .r-row[data-id="${k}"] .duty-badge.d-captain`) }), fg.a);
     await page.keyboard.press('Escape');
@@ -681,6 +686,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       trn.training && trn.skipped.length === 1 && trn.skipped[0] === trn.id && trn.lazy.join() === '80,50,true' && trn.other.join() === '85,52,false'
       && !trn.rest.training && trn.rest.other.join() === '95,50' && trn.rest.flag === false, JSON.stringify(trn));
     await page.evaluate(() => { YAM.game.budget = 10; YAM.ui.renderBudget(); YAM.ui.events.fire('truant'); });
+    await finishTyping();
     const tu = await page.evaluate(() => ({ kid: YAM.game.pendingEvent?.cast.kid, n: document.querySelectorAll('#talk-choices .talk-btn').length, fineOff: document.querySelector('#talk-choices .talk-btn[data-i="0"]').disabled,
       face: !!document.querySelector('#talk-face svg rect') }));
     const d0 = await page.evaluate(k => YAM.game.player(k).psych.discipline, tu.kid);
@@ -704,7 +710,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.waitForFunction(() => window.YAM && window.YAM.ui);
     await page.evaluate(() => { YAM.game.excusesOff = true; });
     const re = await page.evaluate(() => ({ open: !document.getElementById('talk-layer').hidden, b: YAM.game.budget, kid: YAM.game.pendingEvent?.cast.kid }));
-    await page.click('#talk-choices .talk-btn[data-i="0"]');
+    await talkClick('#talk-choices .talk-btn[data-i="0"]');
     const re2 = await page.evaluate(k => ({ b: YAM.game.budget, mor: YAM.game.player(k).dyn.morale }), re.kid);
     await closeModal();
     const qPersist = await page.evaluate(() => YAM.game.eventQueue.length === 1 && YAM.game.eventQueue[0].id === 'scoutvisit');
@@ -714,7 +720,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const paused = await page.evaluate(() => ({ running: YAM.ui.cal.running, date: YAM.ui.cal.date, btn: document.getElementById('btn-sim').disabled }));
     await page.waitForTimeout(900); await shot('9-talk');
     await page.evaluate(() => { EVENTS_CFG.BOOTS_CHANCE = 0; });
-    await page.click('#talk-choices .talk-btn[data-i="1"]');
+    await talkClick('#talk-choices .talk-btn[data-i="1"]');
     const resumed = await page.evaluate(() => YAM.ui.cal.running);
     await page.waitForFunction(() => YAM.game.phase === 'matchday', null, { timeout: 20000 });
     // the time bomb goes off on the match day, BEFORE kick-off
@@ -932,11 +938,11 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.evaluate(() => YAM.ui.events.fire('posreq', YAM.game.calendar.date, { cast: { kid: window.__v36.mid } }));
     const v36d = await page.evaluate(() => ({ open: !document.getElementById('talk-layer').hidden, n: document.querySelectorAll('#talk-choices .talk-btn').length,
       tones: [...document.querySelectorAll('#talk-choices .talk-btn')].map(b => b.className.match(/tone-(\w+)/)[1]).join() }));
-    await page.click('#talk-choices .talk-btn.tone-green');
+    await talkClick('#talk-choices .talk-btn.tone-green');
     Object.assign(v36d, await page.evaluate(() => { const p = YAM.game.player(window.__v36.mid);
       return { yesTag: p.tag === p.archetype, yesOop: p.outOfPositionMatches, yesMorale: p.dyn.morale, diary: YAM.game.diary.slice(-6).some(d => d.key === 'pr.yes.diary') ? 'pr.yes.diary' : YAM.game.diary.slice(-1)[0].key }; }));
     await page.evaluate(() => { const p = YAM.game.player(window.__v36.mid); p.outOfPositionMatches = 4; YAM.ui.events.fire('posreq', YAM.game.calendar.date, { cast: { kid: p.id } }); });
-    await page.click('#talk-choices .talk-btn.tone-red');
+    await talkClick('#talk-choices .talk-btn.tone-red');
     Object.assign(v36d, await page.evaluate(() => { const p = YAM.game.player(window.__v36.mid);
       const r = { ordMorale: p.dyn.morale, ordDisc: p.psych.discipline, ordCd: p.positionHintCooldown, ordDiary: YAM.game.diary.slice(-6).some(d => d.key === 'pr.order.diary') ? 'pr.order.diary' : '', closed: document.getElementById('talk-layer').hidden };
       p.dyn.morale = window.__v36.morale; p.psych.discipline = window.__v36.disc; p.outOfPositionMatches = 0; p.positionHintCooldown = 0; return r; }));
@@ -1096,34 +1102,34 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       text: document.getElementById('talk-text').textContent }));
     await page.evaluate(() => YAM.ui.events.fire('capresign', YAM.game.calendar.date, { cast: { kid: window.__v38.b, hint: window.__v38.a } }));
     v38d.resign = await talk38();
-    await page.click('#talk-choices .talk-btn.tone-green');
+    await talkClick('#talk-choices .talk-btn.tone-green');
     Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, b = s.player(window.__v38.b);
       const r = { yesCap: s.duties.captain, yesMor: b.dyn.morale, yesDiary: s.diary.slice(-4).some(d => d.key === 'cr.yes.diary') };
       s.duties.captain = b.id; b.dyn.morale = 50; YAM.ui.events.fire('capresign', s.calendar.date, { cast: { kid: b.id } }); return r; }));
-    await page.click('#talk-choices .talk-btn.tone-red');
+    await talkClick('#talk-choices .talk-btn.tone-red');
     Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, b = s.player(window.__v38.b);
       const r = { noCap: s.duties.captain === b.id, noMor: b.dyn.morale, noDisc: b.psych.discipline, noPress: b.capPressure, noHold: s.capt.hold };
       const a = s.player(window.__v38.a), m = s.player(window.__v38.k4);   // initiative A: captain k4 (leadership 9) about b
       s.duties.captain = m.id; m.dyn.morale = 50; b.dyn.morale = 50; b.outOfPositionMatches = 3; b.tag = b.archetype === 'FWD' ? 'DEF' : 'FWD';
       YAM.ui.events.fire('capobs', s.calendar.date, { cast: { kid: m.id, mate: b.id } }); return r; }));
     v38d.obsDlg = await talk38();
-    await page.click('#talk-choices .talk-btn.tone-green');
+    await talkClick('#talk-choices .talk-btn.tone-green');
     Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, b = s.player(window.__v38.b), m = s.player(window.__v38.k4), a = s.player(window.__v38.a), c = s.player(window.__v38.c);
       const r = { obsTag: b.tag === b.archetype, obsOop: b.outOfPositionMatches, obsMor: [m.dyn.morale, b.dyn.morale].join(), obsCd: s.capt.initUntil === isoAdd(s.calendar.date, 7) };
       s.duties.captain = a.id; YAM.ui.events.fire('capbench', s.calendar.date, { cast: { kid: a.id, mate: c.id } }); return r; }));
     v38d.benchDlg = await talk38();
-    await page.click('#talk-choices .talk-btn.tone-green');
+    await talkClick('#talk-choices .talk-btn.tone-green');
     Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, c = s.player(window.__v38.c);
       const r = { promised: c.promisedPitchTime === true }; c.promisedPitchTime = false;
       c.leadership = 10; c.captainReactionCooldown = 0; c.dyn.morale = 50; s.duties.captain = null;
       r.fired = YAM.ui.assignDuty('captain', c.id); return r; }));
     v38d.midDlg = await talk38();
-    await page.click('#talk-choices .talk-btn.tone-green');
+    await talkClick('#talk-choices .talk-btn.tone-green');
     Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, c = s.player(window.__v38.c), b = s.player(window.__v38.b);
       const r = { midCap: s.duties.captain === c.id, midMor: c.dyn.morale };
       b.leadership = 4; b.captainReactionCooldown = 0; b.dyn.morale = 50; YAM.ui.assignDuty('captain', b.id); return r; }));
     v38d.lowDlg = await talk38();
-    await page.click('#talk-choices .talk-btn.tone-gray');
+    await talkClick('#talk-choices .talk-btn.tone-gray');
     Object.assign(v38d, await page.evaluate(() => { const s = YAM.game, w = window.__v38, b = s.player(w.b);
       const r = { lowCap: s.duties.captain === w.c, lowMor: b.dyn.morale, closed: document.getElementById('talk-layer').hidden };
       for (const k of w.keep) { const p = s.player(k.id); Object.assign(p, { leadership: k.l, captainReactionCooldown: k.cd, tag: k.tag, outOfPositionMatches: k.oop, benchStreak: k.bs, capPressure: 0, promisedPitchTime: false });
@@ -1308,16 +1314,15 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.click('#debug-body [data-cheat="world"]');
     const w1 = await page.evaluate(() => {
       const s = YAM.game, e = s.worldEvent, msg = document.getElementById('debug-status')?.textContent || '';
-      YAM.ui.debug.close(); YAM.ui.briefing.open();
-      const news = [...document.querySelectorAll('#mb-news li')].map(x => x.textContent), all = document.querySelector('#mb-news li.mb-world')?.textContent || '';   // (the old flavour news may name any kid)
+      YAM.ui.debug.close(); YAM.ui.briefing.open();   // v3.17: on Monday this is PLANNER.EXE with the briefing block inside
+      const news = [...document.querySelectorAll('#pl-brief .pl-world')].map(x => x.textContent), all = news[0] || '';
       const re = s.buildWorldEvent(s.worldRow('athletics'), e.weekStart), re2 = s.buildWorldEvent(s.worldRow('athletics'), e.weekStart);   // (3) seeded: same week + squad → same picks
       const elig = s.squad.filter(p => !(p.injuryDays > 0) && !(p.suspensionMatches > 0) && !(p.awayDays > 0)), sp = p => p.physical.speed + p.physical.acceleration;
       const top = [...elig].sort((a, b) => sp(b) - sp(a) || a.id.localeCompare(b.id)).slice(0, 4).map(p => p.id);
-      return { e, msg, open: YAM.ui.briefing.isOpen, news, world: document.querySelectorAll('#mb-news li.mb-world').length, dayWord: L.t('world.on.' + weekKey(e.days[0])),
+      return { e, msg, open: YAM.ui.planner.isOpen && !YAM.ui.briefing.isOpen, news, world: news.length, dayWord: L.t('world.on.' + weekKey(e.days[0])),
         noNames: e.playerIds.every(id => { const p = s.player(id); return !all.includes(p.surname) && !all.includes(L.name(p.surname)); }),
         same: JSON.stringify(re) === JSON.stringify(e) && JSON.stringify(re2) === JSON.stringify(e), wrongAtMost1: e.playerIds.filter(id => !top.includes(id)).length <= 1 };
     });
-    await page.click('#mb-go');   // → PLANNER.EXE (the week is not confirmed yet)
     const w2 = await page.evaluate(() => ({ open: YAM.ui.planner.isOpen, cols: [...document.querySelectorAll('#pl-grid .pl-col.we')].map(c => c.dataset.date),
       tip: document.querySelector('#pl-grid .pl-col.we .pl-we')?.title || '' }));
     check('v3.14 world events: DEBUG forces "athletics" this week (one day Tue–Thu, top 4 by speed + acceleration, ≤ 1 wrong pick); Monday briefing news names the day but nobody; PLANNER.EXE marks the day (✦ + tooltip)',
@@ -1413,29 +1418,27 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       s.budget = 400; s.rep.parents = 50; s.save(); ui.show('dash'); ui.renderAll();
       return { ids, label: document.getElementById('btn-sim').textContent };
     });
-    await page.click('#btn-sim');   // [ CONTINUE ] → Monday 4 Nov: the month's first stop
+    await page.click('#btn-sim');   // [ CONTINUE ] → Monday 4 Nov: the month's first stop — v3.17: ONE window, PLANNER.EXE with the cash block
     const k1 = await page.evaluate(() => {
-      const t = [...document.querySelectorAll('#ks-report tr')].map(r => [r.dataset.cat, r.querySelector('td + td').textContent.trim()]);
+      const t = [...document.querySelectorAll('#pl-ks-report tr')].map(r => [r.dataset.cat, r.querySelector('td + td').textContent.trim()]);
       return { date: YAM.game.calendar.date, kassa: YAM.ui.kassa.isOpen, brief: YAM.ui.briefing.isOpen, planner: YAM.ui.planner.isOpen, blk: YAM.ui.dayBlockers()[0],
-        z: +getComputedStyle(document.getElementById('kassa-view')).zIndex, rows: Object.fromEntries(t), radios: document.querySelectorAll('#ks-levels input[type=radio]').length,
-        checked: document.querySelector('#ks-levels input:checked')?.value, budget: document.getElementById('ks-report').textContent.includes('$400'), top: YAM.ui.topLayer()?.el.id,
-        title: document.getElementById('ks-title').textContent, parents: YAM.game.rep.parents };
+        z: +getComputedStyle(document.getElementById('planner-view')).zIndex, rows: Object.fromEntries(t), radios: document.querySelectorAll('#pl-ks-levels input[type=radio]').length,
+        checked: document.querySelector('#pl-ks-levels input:checked')?.value, budget: document.getElementById('pl-ks-report').textContent.includes('$400'), top: YAM.ui.topLayer()?.el.id,
+        title: document.getElementById('pl-kassa-h').textContent, block: !document.getElementById('pl-kassa').hidden, parents: YAM.game.rep.parents };
     });
-    await page.click('#ks-levels input[value="high"]');
-    await page.click('#ks-confirm');
+    await page.click('#pl-ks-levels input[value="high"]');
+    await page.evaluate(() => { YAM.game.setWeekPlan('tue', 'match'); YAM.ui.planner.render(); });
+    await page.click('#pl-confirm');   // one button: the fee level + the plan
     const k2 = await page.evaluate(ids => { const s = YAM.game, f = s.fees;
-      return { kassa: YAM.ui.kassa.isOpen, brief: YAM.ui.briefing.isOpen, month: f.month, level: f.level, amount: f.amount, parents: s.rep.parents, owed: ids.every(id => f.status[id] === 'owed'),
-        carry: f.carry[ids[2]], due: s.feeDue(ids[2]), lost: s.diary.some(d => d.key === 'fee.lost' && d.date === '2002-10-31' && d.vars.n === 2), blk: YAM.ui.dayBlockers()[0] }; }, k0.ids);
-    await page.click('#mb-go');   // the briefing → PLANNER.EXE (Monday, week not planned)
-    const k3 = await page.evaluate(() => ({ planner: YAM.ui.planner.isOpen }));
-    check('v3.15 KASSA.EXE: the first stop of a new month opens the cash desk first (z 50, Esc layer), last month\'s ledger rows + total + budget, Low / Normal (default) / High; confirm → level + Parents −3 once, everyone owes, Oct unpaid lost (diary count), half carried; then briefing → PLANNER.EXE',
-      /CONTINUE|ПРОДОЛЖИТЬ/.test(k0.label) && k1.date === '2002-11-04' && k1.kassa && !k1.brief && !k1.planner && k1.blk === 'kassa' && k1.z === 50 && k1.top === 'kassa-view' && /KASSA/.test(k1.title)
+      return { kassa: YAM.ui.kassa.isOpen, brief: YAM.ui.briefing.isOpen, planner: YAM.ui.planner.isOpen, confirmed: s.weekState().confirmed, plan: s.weekState().plan.tue,
+        month: f.month, level: f.level, amount: f.amount, parents: s.rep.parents, owed: ids.every(id => f.status[id] === 'owed'),
+        carry: f.carry[ids[2]], due: s.feeDue(ids[2]), lost: s.diary.some(d => d.key === 'fee.lost' && d.date === '2002-10-31' && d.vars.n === 2), blk: YAM.ui.dayBlockers()[0] || null }; }, k0.ids);
+    check('v3.15 → v3.17 cash desk on a Monday: the month\'s first stop is ONE window — PLANNER.EXE (z 50, Esc layer) with the cash block (last month\'s ledger rows + total + budget, Low / Normal (default) / High); one [ CONFIRM WEEK ] → level + Parents −3 once, everyone owes, Oct unpaid lost (diary count), half carried, plan saved',
+      /CONTINUE|ПРОДОЛЖИТЬ/.test(k0.label) && k1.date === '2002-11-04' && !k1.kassa && !k1.brief && k1.planner && k1.block && k1.blk === 'week' && k1.z === 50 && k1.top === 'planner-view' && /Касса|Cash/.test(k1.title)
       && k1.rows.fee === '+$120' && k1.rows.grant === '+$50' && k1.rows.donation === '+$20' && k1.rows.rent === '−$100' && k1.rows.event === '−$30' && k1.rows.total === '+$60' && k1.budget
-      && k1.radios === 3 && k1.checked === 'normal' && !k2.kassa && k2.brief && k2.month === '2002-11' && k2.level === 'high' && k2.amount === 15 && k2.parents === k1.parents - 3 && k2.owed
-      && k2.carry === 5 && k2.due === 20 && k2.lost && k2.blk === 'briefing' && k3.planner, JSON.stringify({ k0: k0.label, k1, k2, k3 }));
+      && k1.radios === 3 && k1.checked === 'normal' && !k2.kassa && !k2.brief && !k2.planner && k2.confirmed && k2.plan === 'match' && k2.month === '2002-11' && k2.level === 'high' && k2.amount === 15 && k2.parents === k1.parents - 3 && k2.owed
+      && k2.carry === 5 && k2.due === 20 && k2.lost && k2.blk === null, JSON.stringify({ k0: k0.label, k1, k2 }));
     // (3) the fee day = the first training of the month: briefing line, Fees panel, paid kids add 'fee' money, free [ Remind ]
-    await page.evaluate(() => { YAM.game.setWeekPlan('tue', 'match'); });
-    await page.click('#pl-confirm');
     await page.click('#btn-sim');   // → Tuesday 5 Nov (training) — the briefing opens by itself
     const f0 = await page.evaluate(() => ({ date: YAM.game.calendar.date, brief: YAM.ui.briefing.isOpen, agenda: document.getElementById('mb-agenda').textContent, started: YAM.game.fees.started,
       fee0: YAM.game.ledger['2002-11']?.fee || 0 }));
@@ -1605,9 +1608,11 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.evaluate(() => { const s = YAM.game; s.weekState().ap = 0; s.budget = 300; s.eventLog = []; YAM.ui.debug.open(); YAM.ui.debug.tab = 'god'; YAM.ui.debug.render(); });
     await page.click('#debug-body [data-cheat="fire:boots"]');
     await page.waitForSelector('#talk-layer:not([hidden]) .talk-btn');
+    await finishTyping();
     const ap0 = await page.evaluate(() => { const b = document.querySelector('#talk-choices .talk-btn[data-i="2"]');
       return { n: document.querySelectorAll('#talk-choices .talk-btn').length, dis: b.disabled, tag: b.querySelector('.tb-ap')?.textContent, why: b.querySelector('.tb-why')?.textContent || '' }; });
     await page.evaluate(() => { YAM.game.weekState().ap = 2; YAM.ui.events.open(); });   // the wallet refilled → re-render the open dialogue
+    await finishTyping();
     const ap1 = await page.evaluate(() => { const pe = YAM.game.pendingEvent, k = YAM.game.player(pe.cast.kid); k.dyn.morale = 40;
       return { dis: document.querySelector('#talk-choices .talk-btn[data-i="2"]').disabled, kid: k.id, agi: k.physical.agility, b: YAM.game.budget }; });
     await talk(2);
@@ -1624,12 +1629,130 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const kn1 = await page.evaluate(k => ({ b: YAM.game.budget, days: YAM.game.player(k).injuryDays, ap: YAM.game.ap, ledger: YAM.game.ledger[YAM.game.calendar.date.slice(0, 7)]?.event }), kn0.kid);
     check('v3.16 [1 AP] in Knock: −$35 (booked as event), injury 8 days, 1 AP spent',
       kn0.n === 3 && kn1.b === 265 && kn1.days === 8 && kn1.ap === 0, JSON.stringify({ kn0, kn1 }));
+    /* ---------- v3.17 "SILENCE" ---------- */
+    // (1) typewriter: while the line types every choice is disabled; a (forced) click picks nothing; Space finishes the line only
+    await page.evaluate(() => { const s = YAM.game; s.weekState().ap = 1; s.budget = 300; s.eventLog = []; s.squad.forEach(p => { p.injuryDays = 0; p.suspensionMatches = 0; p.awayDays = 0; p.absentToday = null; }); YAM.ui.events.fire('knock'); });
+    await page.waitForSelector('#talk-layer:not([hidden]) .talk-btn');
+    const ty0 = await page.evaluate(() => { const v = YAM.ui.events.view, bs = [...document.querySelectorAll('#talk-choices .talk-btn')];
+      return { typing: !!v.typer, cls: document.getElementById('talk-layer').classList.contains('talk-typing'), dis: bs.every(b => b.disabled), n: bs.length,
+        full: document.getElementById('talk-text').textContent === v.full }; });
+    await page.click('#talk-choices .talk-btn[data-i="1"]', { force: true });   // must do nothing
+    const ty1 = await page.evaluate(() => ({ still: !!YAM.game.pendingEvent && !document.getElementById('talk-layer').hidden }));
+    await page.keyboard.press(' ');
+    const ty2 = await page.evaluate(() => { const v = YAM.ui.events.view, pe = YAM.game.pendingEvent, kid = YAM.game.player(pe.cast.kid), snitch = YAM.game.player(pe.cast.snitch);
+      return { typing: !!v.typer, still: !!pe, en: [...document.querySelectorAll('#talk-choices .talk-btn')].filter(b => !b.disabled).length,
+        full: document.getElementById('talk-text').textContent === v.full, name: document.getElementById('talk-name').textContent, kid: L.name(kid.name), snitch: L.name(snitch.name),
+        text: document.getElementById('talk-text').textContent }; });
+    await talk(1);   // ice
+    check('v3.17 typewriter: choices disabled (Win98 grey) while the line types, a forced click picks nothing, Space only finishes the line → then all choices active',
+      ty0.typing && ty0.cls && ty0.dis && ty0.n === 3 && !ty0.full && ty1.still && !ty2.typing && ty2.still && ty2.en === 3 && ty2.full, JSON.stringify({ ty0, ty1, ty2 }));
+    check('v3.17 bug: the injury event shows the injured kid himself (portrait + name match the text); the teammate who helped is named in the text',
+      ty2.name === ty2.kid && ty2.text.includes(ty2.kid) && ty2.text.includes(ty2.snitch), JSON.stringify(ty2));
+    // (2) bugs: match-day excuse wording, ulti [1 AP] family visit, namesakes in the match log, interceptions in the coach's note
+    const bg = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, kid = s.squad.find(p => p.archetype !== 'GK'), out = {};
+      const ph = s.phase; s.phase = 'matchday';
+      ui.events.fire('excuse', undefined, { cast: { kid: kid.id } }); ui.events.view.finishTyping();
+      out.matchStay = [...document.querySelectorAll('#talk-choices .tb-label')].map(x => x.textContent).includes(L.t('ex.stayMatch'));
+      ui.events.choose(ui.events.view.choices[0]);   // go home
+      s.phase = ph;
+      ui.events.fire('excuse', undefined, { cast: { kid: kid.id } }); ui.events.view.finishTyping();
+      out.trainStay = [...document.querySelectorAll('#talk-choices .tb-label')].map(x => x.textContent).includes(L.t('ex.stay'));
+      ui.events.choose(ui.events.view.choices[0]);
+      kid.absentToday = null;
+      // namesakes: surname alone → initial + surname → + the club's first word
+      const eng0 = ui.engine, P = (id, name) => ({ id, name, surname: name.split(' ').pop() });
+      const a = P('t1', 'Callum Fletcher'), b = P('t2', 'Jake Fletcher'), c = P('t3', 'Jordan Dunn'), d = P('t4', 'Jamie Dunn'), e = P('t5', 'Ethan Walsh');
+      ui.engine = { sides: [{ name: 'Ashford Rovers', all: [a, c] }, { name: 'Canal Street Youth', all: [b, d, e] }] };
+      out.names = [a, b, c, d, e].map(p => ui.logName(p));
+      ui.engine = eng0;
+      out.note = coachNote({}, { passOk: 5, passFail: 3, tackles: 2, tacklesLost: 2, dribbleOk: 0, dribbleFail: 0, intercepts: 23, goals: 0, saves: 0 }, {});
+      out.noteLow = coachNote({}, { passOk: 5, passFail: 3, tackles: 2, tacklesLost: 2, dribbleOk: 0, dribbleFail: 0, intercepts: 4, goals: 0, saves: 0 }, {});
+      return out;
+    });
+    await page.evaluate(() => { const s = YAM.game; s.weekState().ap = 1; const k = s.squad.find(p => p.archetype !== 'GK'); k.psych.discipline = 5; k.dyn.morale = 50; s.eventLog = []; YAM.ui.events.fire('ulti', undefined, { cast: { kid: k.id } }); });
+    await page.waitForSelector('#talk-layer:not([hidden]) .talk-btn');
+    await finishTyping();
+    const ul0 = await page.evaluate(() => { const b = document.querySelector('#talk-choices .talk-btn[data-i="2"]'), k = YAM.game.player(YAM.game.pendingEvent.cast.kid);
+      return { n: document.querySelectorAll('#talk-choices .talk-btn').length, tag: b?.querySelector('.tb-ap')?.textContent || '', dis: b?.disabled, kid: k.id, d: k.psych.discipline, m: k.dyn.morale }; });
+    await talk(2);
+    const ul1 = await page.evaluate(k => { const s = YAM.game, p = s.player(k); return { ap: s.ap, d: p.psych.discipline, m: p.dyn.morale, sus: p.suspensionMatches, diary: s.diary.slice(-3).some(x => x.key === 'ev.ulti.e.diary') }; }, ul0.kid);
+    check('v3.17 bugs: match-day excuse says "Stay and play" (training days keep "Stay and train"); the assistant\'s truancy report has the [1 AP] family visit (discipline +1, morale +3, no ban); namesakes in the match log get an initial (and the club when even that clashes); 23 interceptions → "read the game" note',
+      bg.matchStay && bg.trainStay && ul0.n === 3 && /AP|ОД/.test(ul0.tag) && !ul0.dis && ul1.ap === 0 && ul1.d === ul0.d + 1 && ul1.m === ul0.m + 3 && !ul1.sus && ul1.diary
+      && /^\S\. /.test(bg.names[0]) && /^\S\. /.test(bg.names[1]) && bg.names[0] !== bg.names[1] && /\(/.test(bg.names[2]) && /\(/.test(bg.names[3]) && bg.names[2] !== bg.names[3] && !/[.(]/.test(bg.names[4])
+      && bg.note.includes('note.readHigh') && !bg.noteLow.includes('note.readHigh') && !bg.note.includes('note.steady'), JSON.stringify({ bg, ul0, ul1 }));
+    // (3) the match window at ~800 px: [ START MATCH ] visible (not under the pitch)
+    await page.setViewportSize({ width: 800, height: 600 });
+    await page.evaluate(() => { document.getElementById('win-match').classList.add('open'); });   // (no match today: just lay the window out)
+    await page.waitForTimeout(200);
+    const narrow = await page.evaluate(() => { const b = document.getElementById('btn-start'), r = b.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return { w: Math.round(r.width), top: hit === b || b.contains(hit), cols: getComputedStyle(document.querySelector('#win-match .match-body')).gridTemplateColumns.split(' ').length }; });
+    await page.setViewportSize({ width: 1440, height: 860 });
+    await page.evaluate(() => { document.getElementById('win-match').classList.remove('open'); YAM.ui.show('dash'); });
+    check('v3.17 bug: at 800×600 the match window is one column and [ START MATCH ] is visible on top', narrow.top && narrow.w > 60 && narrow.cols === 1, JSON.stringify(narrow));
+    // (4) the briefing: only with news; important first, routine collapsed; 14-day mute (never for money / rep / injuries…)
+    const nw = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, out = {};
+      for (const v of ['locker', 'planner', 'briefing', 'kassa']) if (ui[v].isOpen) ui[v].layer.hidden = true;
+      ui.events.enabled = false; s.excusesOff = true; s.pendingEvent = null; s.phase = 'calendar';
+      s.calendar.date = '2002-11-19'; s.week = null; s.today = null; s.worldEvent = null; s.weekState();   // Tuesday 19 Nov
+      s.setWeekPlan('tue', 'match'); s.setWeekPlan('thu', 'match'); s.confirmWeek();
+      const k = s.squad[1], date = s.calendar.date;
+      s.newsSeen = {}; s.away = [{ date: '2002-11-18', key: 'cal.rest', vars: { n: 10 } }];
+      out.quiet = !ui.briefing.hasNews();
+      ui.briefing.open();
+      out.silent = { brief: ui.briefing.isOpen, briefed: !!s.dayState().briefed, locker: ui.locker.isOpen, away: s.away };
+      ui.locker.layer.hidden = true; s.today = null;
+      s.away = [{ date: '2002-11-18', key: 'cal.rest', vars: { n: 10 } }, { date: '2002-11-18', key: 'tr.hurt', vars: { s: { list: [{ pid: k.id }] } }, cls: 'ev' }, { date: '2002-11-18', key: 'cal.rest', vars: { n: 10 } }];
+      out.news = ui.briefing.hasNews();
+      ui.briefing.open();
+      const ul = document.getElementById('mb-away');
+      out.open = ui.briefing.isOpen;
+      out.first = ul.firstElementChild?.textContent || '';
+      out.routine = { n: ul.querySelectorAll('.mb-routine li').length, closed: !!ul.querySelector('.mb-routine details:not([open])'), label: ul.querySelector('.mb-routine summary')?.textContent || '' };
+      ui.briefing.go();   // marks what he read
+      out.after = { locker: ui.locker.isOpen, seen: Object.keys(s.newsSeen) };
+      ui.locker.layer.hidden = true;
+      const obs = { date, key: 'obs.ok.0', vars: { k: { pid: k.id } } }, rep = { date, key: 'rep.parentsGift', vars: { m: '$5' } };
+      s.markNews([obs, rep], '2002-11-01');
+      out.mute = { d13: s.newsFresh(obs, '2002-11-14'), d14: s.newsFresh(obs, '2002-11-15'), rep: s.newsFresh(rep, '2002-11-02'), other: s.newsFresh({ ...obs, vars: { k: { pid: s.squad[2].id } } }, '2002-11-02') };
+      s.save(); out.saved = JSON.parse(localStorage.getItem(GameState.KEY)).newsSeen && true;
+      return out;
+    });
+    check('v3.17 briefing: routine alone → no window (briefed, straight to the locker); an injury line → the window opens, important first, routine collapsed "[+] Routine (N)"; what he read is muted 14 days (another kid / money / rep never muted), saved',
+      nw.quiet && !nw.silent.brief && nw.silent.briefed && nw.silent.locker && !nw.silent.away && nw.news && nw.open && !/[Оо]тдых|[Rr]est/.test(nw.first) && nw.routine.n === 2 && nw.routine.closed && /2/.test(nw.routine.label)
+      && nw.after.locker && nw.after.seen.length >= 1 && nw.mute.d13 === false && nw.mute.d14 && nw.mute.rep && nw.mute.other && nw.saved, JSON.stringify(nw));
+    // (5) the training report right after the training day; not repeated the next morning; [ Remind everyone ]
+    await page.evaluate(() => { const s = YAM.game, f = s.fees, ids = s.squad.map(p => p.id);
+      f.month = s.monthOf(); f.started = true; f.closed = false; ids.forEach((id, i) => { f.status[id] = i < 3 ? 'owed' : i === 3 ? 'half' : i === 4 ? 'waived' : 'paid'; }); f.reminded = {}; f.got = {}; f.next = {};
+      s.today = null; s.dayState().briefed = true; YAM.ui.locker.open(); });
+    await page.waitForTimeout(300);
+    const rm0 = await page.evaluate(() => ({ btn: !!document.getElementById('lrf-all'), dis: document.getElementById('lrf-all')?.disabled }));
+    await page.click('#lrf-all');
+    const rm1 = await page.evaluate(() => { const s = YAM.game, f = s.fees, ids = s.squad.map(p => p.id);
+      return { owed: ids.filter(id => f.status[id] === 'owed').every(id => f.reminded[id]), others: ids.filter(id => f.status[id] !== 'owed').some(id => f.reminded[id]),
+        dis: document.getElementById('lrf-all').disabled, st: ids.map(id => f.status[id]).join() }; });
+    await page.click('#lr-proceed');
+    await page.evaluate(() => { YAM.ui.skipReports = false; YAM.ui.continueDays(); });
+    await page.waitForTimeout(200);
+    const tr0 = await page.evaluate(() => { const s = YAM.game, L1 = document.getElementById('morning-briefing-view');
+      return { open: !L1.hidden, report: L1.classList.contains('mb-report'), date: s.calendar.date, title: document.getElementById('mb-date').textContent,
+        lines: [...document.querySelectorAll('#mb-away li')].map(x => x.textContent), news: getComputedStyle(document.querySelector('#morning-briefing-view .mb-news')).display,
+        awayTue: (s.away || []).some(e => e.date === '2002-11-19') }; });
+    await page.click('#mb-go');
+    await page.waitForTimeout(200);
+    const tr1 = await page.evaluate(() => { const s = YAM.game; YAM.ui.skipReports = undefined;
+      return { report: document.getElementById('morning-briefing-view').classList.contains('mb-report'), date: s.calendar.date, awayTue: (s.away || []).some(e => e.date === '2002-11-19'),
+        seen: Object.keys(s.newsSeen).some(k => k.startsWith('cal.') || k.startsWith('tr.') || k.startsWith('obs.')) }; });
+    check('v3.17 [ Remind everyone ]: reminds every plain debtor (not half / waived / paid), free, then disabled; training report opens right after the training day (who came / why not, same window in report mode), [ OK ] → CONTINUE goes on and Tuesday\'s lines are not repeated',
+      rm0.btn && !rm0.dis && rm1.owed && !rm1.others && rm1.dis && tr0.open && tr0.report && tr0.date === '2002-11-20' && /19/.test(tr0.title) && tr0.lines.length >= 1 && /\d+/.test(tr0.lines[0]) && tr0.news === 'none'
+      && !tr1.report && tr1.date >= '2002-11-20' && !tr1.awayTue, JSON.stringify({ rm0, rm1, tr0, tr1 }));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');
     check('frame loop cost < 2 ms', await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0) < 2), (await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0).toFixed(2))) + ' ms');
   } catch (e) {
-    check('no exception during run', false, e.message.split('\n')[0]);
+    check('no exception during run', false, e.message.split('\n').slice(0, 3).join(' / '));
   }
   check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close();

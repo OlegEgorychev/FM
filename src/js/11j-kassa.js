@@ -22,6 +22,7 @@ class CashDesk {
     const s = this.state;
     if (this.ui.modalLock || !s.kassaDue()) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.17: on Monday the cash desk is a block of PLANNER.EXE
     this.ui.modal.close();
     if (this.ui.briefing.isOpen) this.ui.briefing.close();
     this.level = FINANCE.DEFAULT_LEVEL;
@@ -31,20 +32,30 @@ class CashDesk {
   }
   close() { this.layer.hidden = true; this.ui.renderAll(); }
 
-  render() {
-    const s = this.state, month = s.monthOf(), rep = s.lastMonthReport();
-    const mName = m => fmtDate(m + '-01', { month: 'long', year: 'numeric' });
+  static mName(m) { return fmtDate(m + '-01', { month: 'long', year: 'numeric' }); }
+  /** Last month's ledger + the budget (v3.17: shared with the cash block inside PLANNER.EXE). */
+  static reportHTML(s) {
+    const rep = s.lastMonthReport();
     const sum = v => `<b class="${v < 0 ? 'neg' : v > 0 ? 'pos' : ''}">${v > 0 ? '+' : v < 0 ? '−' : ''}$${Math.abs(v)}</b>`;
-    document.getElementById('ks-title').textContent = 'KASSA.EXE — ' + mName(month);
-    document.getElementById('ks-report').innerHTML = (rep
-      ? `<div class="ks-h">${L.t('kassa.report', { m: mName(rep.month) })}</div><table class="ks-table">`
+    return (rep
+      ? `<div class="ks-h">${L.t('kassa.report', { m: CashDesk.mName(rep.month) })}</div><table class="ks-table">`
         + LEDGER_CATS.map(c => `<tr data-cat="${c}"><td>${L.t('kassa.row.' + c)}</td><td>${sum(rep.rows[c])}</td></tr>`).join('')
         + `<tr class="tot" data-cat="total"><td>${L.t('kassa.row.total')}</td><td>${sum(rep.total)}</td></tr></table>`
       : `<div class="ks-h">${L.t('kassa.firstH')}</div><p class="ks-first">${L.t('kassa.first')}</p>`)
       + `<div class="ks-budget">${L.t('kassa.budget')} <b class="${s.budget < 0 ? 'neg' : ''}">${money(s.budget)}</b></div>`;
-    document.getElementById('ks-levels').innerHTML = `<div class="ks-h">${L.t('kassa.level', { m: mName(month) })}</div>`
-      + FINANCE.FEE_LEVELS.map(k => `<label class="ks-lvl${this.level === k ? ' on' : ''}"><input type="radio" name="ks-level" value="${k}"${this.level === k ? ' checked' : ''}>
+  }
+  /** The fee-level radios; `name` = the radio group (ks-level here, pl-level in the planner). */
+  static levelsHTML(s, level, name = 'ks-level') {
+    return `<div class="ks-h">${L.t('kassa.level', { m: CashDesk.mName(s.monthOf()) })}</div>`
+      + FINANCE.FEE_LEVELS.map(k => `<label class="ks-lvl${level === k ? ' on' : ''}"><input type="radio" name="${name}" value="${k}"${level === k ? ' checked' : ''}>
         <b>${L.t('kassa.lvl.' + k, { m: '$' + FINANCE.FEES[k].fee })}</b><small>${L.t('kassa.lvl.' + k + '.d')}</small></label>`).join('');
+  }
+
+  render() {
+    const s = this.state;
+    document.getElementById('ks-title').textContent = 'KASSA.EXE — ' + CashDesk.mName(s.monthOf());
+    document.getElementById('ks-report').innerHTML = CashDesk.reportHTML(s);
+    document.getElementById('ks-levels').innerHTML = CashDesk.levelsHTML(s, this.level);
     document.getElementById('ks-note').textContent = L.t('kassa.note');
     document.getElementById('ks-confirm').innerHTML = L.t('kassa.confirm');
     document.getElementById('ks-status').textContent = L.t('kassa.status', { n: s.squad.length, m: '$' + FINANCE.FEES[this.level].fee * s.squad.length });

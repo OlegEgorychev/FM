@@ -1496,3 +1496,35 @@ Object.assign(I18N.ru, {
   'ev.knock.c': 'Отвезти к знакомому фельдшеру',
   'ev.knock.c.diary': '{k} побывал у знакомого фельдшера тренера: всё перевязали как надо, выбывает на {d} дн. {m}',
 });
+
+/* ---- v3.17 "Silence": fewer windows, important on top ---- */
+Object.assign(I18N.en, {
+  'talk.roleKnock': '#{n} · {p} · training pitch',
+  'ev.knock.helper': '{s} helped him off the pitch.',
+  'ex.stayMatch': 'Stay and play',
+  'ex.stayMatch.diary': '{k} had to stay for the match. He sulked all game; the others noticed.',
+  'ev.ulti.e': 'Drop by his family this evening',
+  'ev.ulti.e.diary': '{k} skipped training again. The coach dropped by his family in the evening: tea, a long talk, no fine.',
+  'note.readHigh': 'Read the game superbly: he kept cutting out their passes.',
+  'mb.routine': 'Routine ({n})',
+  'trr.title': 'Training report · {d}', 'trr.plan': 'Today\'s session: {p}.', 'trr.ok': '[ OK ]',
+  'trr.came': '{a} of {t} came.', 'trr.cameAll': 'All {t} came.', 'trr.absent': '{k}: {w}.',
+  'trr.fees': 'Fees paid today: {n} ({m}).', 'trr.kicker': 'Training ground', 'trr.h': 'How it went',
+  'pl.kassa': 'Cash desk · {m}',
+  'fee.remindAll': 'Remind everyone', 'fee.remindAllTip': 'Free: a reminder to every kid who still owes this month\'s fee (not the ones on a two-part deal).',
+});
+Object.assign(I18N.ru, {
+  'talk.roleKnock': '№{n} · {p} · тренировочное поле',
+  'ev.knock.helper': '{s} помог ему дойти до бровки.',
+  'ex.stayMatch': 'Остаёшься и играешь',
+  'ex.stayMatch.diary': '{k} остался на матч, но дулся всю игру; остальные это заметили.',
+  'ev.ulti.e': 'Зайти вечером к его семье',
+  'ev.ulti.e.diary': '{k} снова прогулял тренировку. Вечером тренер зашёл к его семье: чай, долгий разговор, без штрафа.',
+  'note.readHigh': 'Отлично читал игру: раз за разом перехватывал их передачи.',
+  'mb.routine': 'Рутина ({n})',
+  'trr.title': 'Итог тренировки · {d}', 'trr.plan': 'Сегодняшнее занятие: {p}.', 'trr.ok': '[ OK ]',
+  'trr.came': 'Пришли {a} из {t}.', 'trr.cameAll': 'Пришли все {t}.', 'trr.absent': '{k}: {w}.',
+  'trr.fees': 'Взносы сегодня: {n} ({m}).', 'trr.kicker': 'Тренировочное поле', 'trr.h': 'Как прошло',
+  'pl.kassa': 'Касса · {m}',
+  'fee.remindAll': 'Напомнить всем', 'fee.remindAllTip': 'Бесплатно: напоминание каждому, кто ещё не сдал взнос за месяц (кроме тех, кто платит в два приёма).',
+});

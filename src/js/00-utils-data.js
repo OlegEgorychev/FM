@@ -173,6 +173,25 @@ const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK
 const LESSON = { PER_KID_WEEK: 1, MULT: 2, COND: -5, HINT: 0.4, FOCUS: { physical: 'cardio', technical: 'tech', tactical: 'tactics' } };
 const LESSON_FOCI = Object.keys(LESSON.FOCUS);
 const AP_OPTION = { TRUANT_DISC: 1, TRUANT_MORALE: 3, BOOTS_MORALE: 5, KNOCK_COST: 35, KNOCK_DAYS: 8 };   // the [1 AP] choices in truant / boots / knock
+/* v3.17 "SILENCE": what the morning briefing / "While you were away" / the training report show.
+   A line = a diary entry. Its news key = template key + the kids it names (newsKey). A key shown less than COOLDOWN days ago
+   is muted in those windows (the diary keeps everything) — unless it matches NEVER_MUTE (event choices, injuries, money,
+   reputation, the world event). IMPORTANT lines come first; everything else is routine (a collapsed "Routine (N)" group).
+   Prefix match ('rep.' = every rep line); a trailing '.diary' = any event choice. */
+const NEWS = {
+  COOLDOWN: 14,
+  IMPORTANT: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'home.back', 'world.', 'fin.', 'fee.lost', 'rep.', 'week.', 'tr.plateau.',
+    'tr.improved', 'lesson.improved', 'lesson.cancel', 'lesson.clue', 'obs.', 'scout.', 'cb.', 'xi.auto'],
+  NEVER_MUTE: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'world.', 'fin.', 'fee.', 'rep.', 'week.'],
+};
+const newsMatch = (key, list) => list.some(x => x[0] === '.' ? key.endsWith(x) : key.startsWith(x));
+/** News key of a diary entry: its template key + the ids of the kids it names (sorted), e.g. 'tr.hurt|k12'. */
+function newsKey(e) {
+  const ids = [];
+  const walk = v => { if (!v || typeof v !== 'object') return; if (v.pid) ids.push(v.pid); if (Array.isArray(v.list)) v.list.forEach(walk); else for (const k in v) if (k !== 'pid') walk(v[k]); };
+  walk(e.vars);
+  return e.key + (ids.length ? '|' + [...new Set(ids)].sort().join(',') : '');
+}
 /* v3.15 CASH DESK + MONTHLY FEES + FAMILY WEALTH (all TEST values).
    Ledger categories (state.ledger['YYYY-MM'][cat], signed sums). Rent: forced on the 1st (may go below $0 → Board RENT_LATE_BOARD).
    FEES: KASSA.EXE level per month — per kid, payment modifier (pp = added to every chance, mult = by wealth), rep once on confirm.

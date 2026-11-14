@@ -11,6 +11,7 @@ function rateStyle(r) {
 
 /** Coach's Note: looks at the strongest and weakest signal of THIS match and returns i18n keys.
     It hints at a role without naming it (duels → Aggressive, passing → Playmaker, dribbling/goals → Selfish). */
+const NOTE_READ_MIN = 10;   // v3.17: interceptions + blocks in one match for the "reads the game" note
 function coachNote(p, s, flags = {}) {
   const out = [];
   if (flags.tired) out.push('note.tired');
@@ -24,6 +25,8 @@ function coachNote(p, s, flags = {}) {
     if (pass) cands.push({ key: pass.r >= 0.8 ? 'note.passHigh' : pass.r < 0.45 ? 'note.passLow' : null, w: Math.abs(pass.r - 0.62) * pass.n * 0.8, good: pass.r >= 0.8 });
     if (drib) cands.push({ key: drib.r >= 0.65 ? 'note.dribHigh' : drib.r < 0.35 ? 'note.dribLow' : null, w: Math.abs(drib.r - 0.5) * drib.n, good: drib.r >= 0.65 });
     if (s.goals > 0) cands.push({ key: 'note.scorer', w: 2 + s.goals * 2, good: true });
+    // v3.17: interceptions + blocks count too (23 of them used to end as "nothing stood out"); ≥ 10 ≈ the top 5% of outfield kids
+    if ((s.intercepts || 0) >= NOTE_READ_MIN) cands.push({ key: 'note.readHigh', w: s.intercepts * 0.5, good: true });
     const hits = cands.filter(c => c.key).sort((a, b) => b.w - a.w);
     const best = hits.find(c => c.good), worst = hits.find(c => !c.good);
     if (best) out.push(best.key);

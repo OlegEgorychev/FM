@@ -5,7 +5,6 @@
    Weather and news are seeded by the date, so a reload shows the same morning.
    ========================================================= */
 class MorningBriefing {
-  static AWAY_MAX = 8;   // v3.13: "while you were away" lines shown (the rest → "+n more")
   static NEWS = ['scouts', 'vandal', 'leader', 'garage', 'pothole', 'mayor', 'rival', 'kitWash', 'derby', 'busStrike', 'chippy', 'floodlight', 'rain'];
   constructor(ui) {
     this.ui = ui;
@@ -36,16 +35,52 @@ class MorningBriefing {
     const s = this.state;
     if (this.ui.modalLock) return;   // v3.5
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.17: Monday = one window (PLANNER.EXE)
     if (s.kassaDue() && (s.phase === 'matchday' || this.ui.isStopDay())) { this.ui.kassa.open(); return; }   // v3.15: the cash desk first
+    if (!this.hasNews()) { this.go(); return; }   // v3.17: nothing new → no window, the day simply goes on
+    this.report = null;
     this.ui.modal.close(); this.ui.profile.close();
     this.render();
     this.layer.hidden = false;
     this.layer.classList.remove('in'); void this.layer.offsetWidth; this.layer.classList.add('in');
     document.getElementById('mb-go').focus();
   }
-  close() { this.layer.hidden = true; }
+  close() {
+    this.layer.hidden = true;
+    if (this.layer.classList.contains('mb-report')) {   // v3.17: back from the training report's titles
+      this.layer.classList.remove('mb-report');
+      this.layer.querySelector('.mb-kicker').textContent = L.t('mb.kicker');
+      this.layer.querySelector('#mb-away-box .mb-h').textContent = L.t('mb.away');
+    }
+  }
+
+  /* ---------- v3.17 "SILENCE": only what is new, important first ---------- */
+  /** "While you were away" lines still worth showing (muted repeats dropped), split into important / routine. */
+  static awayLines(s, date = s.calendar.date) {
+    const fresh = (s.away || []).filter(e => s.newsFresh(e, date));
+    return { imp: fresh.filter(e => newsMatch(e.key, NEWS.IMPORTANT)), rout: fresh.filter(e => !newsMatch(e.key, NEWS.IMPORTANT)) };
+  }
+  /** Important lines (by day), then a collapsed Win98 tree "[+] Routine (N)". */
+  static awayHTML(ui, a, max = 12) {
+    const li = e => `<li><span class="d">${esc(fmtDate(e.date, { weekday: 'short' }))}</span> ${esc(ui.entryText({ ...e, r: 0 }))}</li>`;
+    let h = a.imp.slice(-max).map(li).join('') + (a.imp.length > max ? `<li class="more">${esc(L.t('mb.awayMore', { n: a.imp.length - max }))}</li>` : '');
+    if (a.rout.length) h += `<li class="mb-routine"><details><summary>${esc(L.t('mb.routine', { n: a.rout.length }))}</summary><ul>${a.rout.map(li).join('')}</ul></details></li>`;
+    return h;
+  }
+  /** The fee day's agenda line (1st training of the month after KASSA). */
+  feeDay(date = this.state.calendar.date) {
+    const s = this.state, f = s.fees;
+    return s.phase === 'calendar' && !!f && !f.started && f.month === s.monthOf(date) && s.isOurTraining(date);
+  }
+  /** Is there anything new worth a window? A match day always is (the opponent report); routine lines alone never are
+      (they ride along, collapsed, when the window opens anyway). */
+  hasNews() {
+    const s = this.state, date = s.calendar.date;
+    return s.phase === 'matchday' || MorningBriefing.awayLines(s, date).imp.length > 0 || MorningBriefing.worldNews(s, date).length > 0 || this.feeDay(date);
+  }
 
   render() {
+    if (this.report) return;   // v3.17: the training report is drawn once by openReport()
     const s = this.state, date = s.calendar.date, wx = MorningBriefing.weather(date), info = this.ui.dayInfo(date);
     const w = s.weekState(), plan = s.phase === 'calendar' && !w.confirmed;   // v3.13: Monday — PLANNER.EXE comes next
     const kind = s.phase === 'matchday' ? 'match' : plan ? 'plan' : info.kind;
@@ -58,27 +93,63 @@ class MorningBriefing {
       const c = s.league.oppCondition(ctx.opp, new Set(s.squad.map(p => p.surname)));
       agenda += ' ' + L.t('mb.oppForm', { a: c.avg, t: c.tired });
     }
-    const f = s.fees;   // v3.15: the fee day (1st training of the month)
-    if (s.phase === 'calendar' && f && !f.started && f.month === s.monthOf(date) && s.isOurTraining(date)) agenda += ' ' + L.t('mb.feeDay', { m: '$' + f.amount });
+    if (this.feeDay(date)) agenda += ' ' + L.t('mb.feeDay', { m: '$' + s.fees.amount });   // v3.15: the fee day (1st training of the month)
     document.getElementById('mb-agenda').textContent = agenda;
     // v3.13: Monday — how this week's action points were made up
     const src = w.apSources || {}, apBox = document.getElementById('mb-ap');
     apBox.hidden = !(s.phase === 'calendar' && date === w.start);
     apBox.innerHTML = apBox.hidden ? '' : L.t('mb.ap', { line: MorningBriefing.apLine(src) });
-    // v3.13: "while you were away" — the diary lines written since the last briefing (skipped days, evenings)
-    let away = s.away || [];
-    if (away.length > MorningBriefing.AWAY_MAX) away = away.filter(e => e.key !== 'cal.rest');   // plain rest days go first
-    const box = document.getElementById('mb-away-box');
-    box.hidden = !away.length;
-    document.getElementById('mb-away').innerHTML = away.slice(-MorningBriefing.AWAY_MAX).map(e =>
-      `<li><span class="d">${esc(fmtDate(e.date, { weekday: 'short' }))}</span> ${esc(this.ui.entryText({ ...e, r: 0 }))}</li>`).join('')
-      + (away.length > MorningBriefing.AWAY_MAX ? `<li class="more">${esc(L.t('mb.awayMore', { n: away.length - MorningBriefing.AWAY_MAX }))}</li>` : '');
+    // v3.13 → v3.17: "while you were away" — new lines only (14-day mute), important first, routine collapsed
+    const a = MorningBriefing.awayLines(s, date), box = document.getElementById('mb-away-box');
+    this.shown = [...a.imp, ...a.rout];
+    box.hidden = !this.shown.length;
+    document.getElementById('mb-away').innerHTML = MorningBriefing.awayHTML(this.ui, a);
     document.getElementById('mb-news').innerHTML = MorningBriefing.worldNews(s, date).map(n => `<li class="mb-world">${esc(n)}</li>`).join('')   // v3.14
       + this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
     const bar = (k) => { const v = s.rep[k];
       return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };
     document.getElementById('mb-rep').innerHTML = ['board', 'parents', 'squad'].map(bar).join('');
     document.getElementById('mb-go').innerHTML = L.t(kind === 'plan' ? 'mb.goPlan' : kind === 'rest' || kind === 'off' ? 'mb.goQuiet' : 'mb.go');
+  }
+
+  /* ---------- v3.17: TRAINING REPORT — the same window right after a training day (not the next morning) ---------- */
+  /** Opens the report for a processed training day; onDone runs after [ OK ]. Returns false when there is nothing to show. */
+  openReport(date, onDone) {
+    const s = this.state, d = s.today?.date === date ? s.today : null, lk = d?.locker;
+    if (!lk || this.ui.modalLock || this.ui.autoRunning) return false;
+    const entries = s.diary.filter(e => e.date === date && !['lr.diary', 'lr.diaryAll', 'cal.training', 'cal.trainingAll'].includes(e.key));
+    const absent = Object.entries(lk.absent), t = s.squad.length, here = t - absent.length;
+    const lines = [L.t(absent.length ? 'trr.came' : 'trr.cameAll', { a: here, t })];
+    for (const [id, why] of absent) { const p = s.player(id); if (p) lines.push(L.t('trr.absent', { k: L.name(p.name), w: L.t('lr.short.' + why) })); }
+    const paid = (d.feesPaid || []).filter(id => s.player(id)), got = paid.reduce((m, id) => m + (s.fees?.got?.[id] || 0), 0);
+    if (paid.length) lines.push(L.t('trr.fees', { n: paid.length, m: '$' + got }));
+    this.report = { date, onDone, entries };
+    this.ui.modal.close(); this.ui.profile.close();
+    this.layer.classList.add('mb-report');
+    this.layer.querySelector('.mb-kicker').textContent = L.t('trr.kicker');
+    this.layer.querySelector('#mb-away-box .mb-h').textContent = L.t('trr.h');
+    document.getElementById('mb-date').textContent = L.t('trr.title', { d: fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }) });
+    document.getElementById('mb-weather').innerHTML = '';
+    document.getElementById('mb-agenda').textContent = L.t('trr.plan', { p: L.t('plan.' + (s.planOf(date) || WEEK.DEFAULT_REGIME)) });
+    document.getElementById('mb-ap').hidden = true;
+    const imp = entries.filter(e => newsMatch(e.key, NEWS.IMPORTANT)), rout = entries.filter(e => !newsMatch(e.key, NEWS.IMPORTANT));
+    document.getElementById('mb-away-box').hidden = false;
+    document.getElementById('mb-away').innerHTML = lines.map(x => `<li class="trr">${esc(x)}</li>`).join('')
+      + MorningBriefing.awayHTML(this.ui, { imp, rout }, 40).replace(/<span class="d">[^<]*<\/span> /g, '');
+    document.getElementById('mb-go').innerHTML = L.t('trr.ok');
+    this.layer.hidden = false;
+    this.layer.classList.remove('in'); void this.layer.offsetWidth; this.layer.classList.add('in');
+    document.getElementById('mb-go').focus();
+    return true;
+  }
+  endReport() {
+    const s = this.state, r = this.report;
+    this.report = null;
+    s.markNews(r.entries);   // not again tomorrow morning
+    if (s.away) s.away = s.away.filter(e => e.date !== r.date);
+    s.save();
+    this.close();
+    r.onDone?.();
   }
 
   /** v3.14: Monday news about this week's school / city event — the day(s) and a vague hint, never names. */
@@ -95,7 +166,10 @@ class MorningBriefing {
   /** [ HEAD TO THE CLUB ] */
   go() {
     const s = this.state;
+    if (this.report) { this.endReport(); return; }   // v3.17: the training report's [ OK ]
     s.dayState().briefed = true;
+    if (!this.layer.hidden && this.shown) s.markNews(this.shown);   // v3.17: what he read is muted for NEWS.COOLDOWN days
+    this.shown = null;
     s.away = null;   // v3.13: the coach has read what happened while he was away
     s.save();
     this.close();
