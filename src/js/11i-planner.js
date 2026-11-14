@@ -15,7 +15,15 @@ class WeekPlanner {
     this.grid.addEventListener('click', e => {
       const b = e.target.closest('[data-day]');
       if (!b || b.disabled) return;
-      if (this.state.setWeekPlan(b.dataset.day, b.dataset.reg === 'rest' ? null : b.dataset.reg)) { this.render(); this.ui.renderDash(); }
+      if (this.state.setWeekPlan(b.dataset.day, b.dataset.reg === 'rest' ? null : b.dataset.reg)) { this.render(); this.ui.renderAll(); }
+    });
+    this.grid.addEventListener('change', e => {   // v3.16: the evening lesson — kid / focus
+      const kid = e.target.closest('[data-lkid]'), foc = e.target.closest('[data-lfocus]'), s = this.state;
+      if (!kid && !foc) return;
+      const k = (kid || foc).dataset.lkid || (kid || foc).dataset.lfocus, l = s.weekState().lessons[k];
+      const why = kid ? s.setLesson(k, kid.value || null, l?.focus || 'technical') : s.setLesson(k, l?.id || null, foc.value);
+      this.msg = why ? L.t('pl.lessonNo.' + why) : '';
+      this.render(); this.ui.renderAll();
     });
   }
   get isOpen() { return !this.layer.hidden; }
@@ -58,16 +66,37 @@ class WeekPlanner {
       };
       return `<div class="${cls}${cur ? ' t' : ''}" data-date="${date}"${we ? ` title="${esc(wtip)}"` : ''}>${head}<div class="pl-opts">${opt('rest', L.t('pl.rest'))}`
         + REGIME_KEYS.map(r => opt(r, L.t('plan.' + r))).join('') + `</div>`
-        + `<div class="pl-warn${warn === 'pl.warn.over' ? ' over' : ''}">${warn ? esc(L.t(warn)) : ''}</div></div>`;
+        + `<div class="pl-warn${warn === 'pl.warn.over' ? ' over' : ''}">${warn ? esc(L.t(warn)) : ''}</div>${cur ? '' : this.lessonHTML(k, editable)}</div>`;
     }).join('');
     const n = s.trainingsPlanned(), src = w.apSources || {};
     document.getElementById('pl-title').textContent = 'PLANNER.EXE — ' + L.t('pl.week', { d: fmtDate(w.start, { day: 'numeric', month: 'short' }) });
     document.getElementById('pl-head').innerHTML = `<span class="pl-ap" title="${esc(L.t('ap.tip'))}">${L.t('pl.ap', { n: w.ap, line: esc(MorningBriefing.apLine(src)) })}</span>
+      <span class="pl-apleft">${L.t('pl.apLeft', { n: w.ap })}</span>
       <span class="pl-note">${L.t('pl.note', { m: WEEK.MAX_TRAININGS })}</span>`;
     const warn = WeekPlanner.warnKey(n);
     document.getElementById('pl-sum').innerHTML = `${L.t('pl.count', { n })}${warn ? ` <b class="${warn === 'pl.warn.over' ? 'over' : ''}">${esc(L.t(warn))}</b>` : n ? '' : ` <b>${esc(L.t('pl.warn.empty'))}</b>`}`;
     document.getElementById('pl-confirm').innerHTML = L.t('pl.confirm');
-    document.getElementById('pl-status').textContent = L.t(w.confirmed ? 'pl.status.replan' : 'pl.status.new');
+    document.getElementById('pl-status').textContent = this.msg || L.t(w.confirmed ? 'pl.status.replan' : 'pl.status.new');
+    this.msg = '';
+  }
+
+  /** v3.16: the evening slot of a weekday without team training — kid + focus (1 AP, booked at once; '— none —' refunds). */
+  lessonHTML(k, editable) {
+    const s = this.state, w = s.weekState(), l = w.lessons[k], p = l && s.player(l.id);
+    const head = `<div class="pl-lh">&#9790; ${L.t('pl.lesson')} <span class="tb-ap">${L.t('talk.apTag', { n: 1 })}</span></div>`;
+    if (!editable) {   // past / today after confirming: read-only
+      if (!l) return `<div class="pl-lesson none">${head}<small>—</small></div>`;
+      const st = l.cancelled ? L.t('pl.lessonCancelled') : l.done ? L.t('pl.lessonDone') : '';
+      return `<div class="pl-lesson on">${head}<small>${p ? `${p.number}. ${esc(L.name(p.surname))}` : '?'} · ${esc(L.t('lesson.focus.' + l.focus))}${st ? ' · ' + esc(st) : ''}</small></div>`;
+    }
+    const taken = new Set(WEEK.PLAN_KEYS.filter(x => x !== k && w.lessons[x]).map(x => w.lessons[x].id));
+    const canBook = !!l || w.ap >= 1, tip = canBook ? L.t('pl.lessonTip') : L.t('pl.lessonNo.noAp');
+    const kids = [...s.squad].sort((a, b) => a.number - b.number).map(q =>
+      `<option value="${q.id}"${l?.id === q.id ? ' selected' : ''}${taken.has(q.id) ? ' disabled' : ''}>${q.number}. ${esc(L.name(q.surname))}</option>`).join('');
+    return `<div class="pl-lesson${l ? ' on' : ''}" title="${esc(tip)}">${head}
+      <select data-lkid="${k}" aria-label="${esc(L.t('pl.lesson'))}"${canBook ? '' : ' disabled'}><option value="">${L.t('pl.lessonNone')}</option>${kids}</select>
+      <select data-lfocus="${k}" aria-label="${esc(L.t('pl.lessonFocus'))}"${l ? '' : ' disabled'}>${LESSON_FOCI.map(f =>
+        `<option value="${f}"${(l?.focus || 'technical') === f ? ' selected' : ''}>${esc(L.t('lesson.focus.' + f))}</option>`).join('')}</select></div>`;
   }
 
   /** [ CONFIRM WEEK ] → today's locker room on a training day, else the Dashboard. */

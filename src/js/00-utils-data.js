@@ -166,6 +166,13 @@ const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25
    (≈ 45 free agents remain for future transfers / poaching). MIX = hidden archetypes in the world. */
 const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 },
   CHANCE: 0.5, WRONG: 0.2 };   // v3.14 world events: weekly chance (never two weeks running), chance one pick is a wrong kid
+/* v3.16 INDIVIDUAL LESSONS + [1 AP] EVENT OPTIONS (TEST values). Weekly AP uses: office talk 1, roll call 1, an evening lesson 1
+   (reserved in PLANNER.EXE, refunded when re-planned away or cancelled on the day), an event option marked ap: 1.
+   LESSON: a weekday evening without team training; one kid + a focus. Growth chance = MULT × the matching regime's base chance
+   (FOCUS → REGIMES key) × growthMult; condition COND; with HINT one fog-of-war clue (archetype ↔ leadership, alternating). */
+const LESSON = { PER_KID_WEEK: 1, MULT: 2, COND: -5, HINT: 0.4, FOCUS: { physical: 'cardio', technical: 'tech', tactical: 'tactics' } };
+const LESSON_FOCI = Object.keys(LESSON.FOCUS);
+const AP_OPTION = { TRUANT_DISC: 1, TRUANT_MORALE: 3, BOOTS_MORALE: 5, KNOCK_COST: 35, KNOCK_DAYS: 8 };   // the [1 AP] choices in truant / boots / knock
 /* v3.15 CASH DESK + MONTHLY FEES + FAMILY WEALTH (all TEST values).
    Ledger categories (state.ledger['YYYY-MM'][cat], signed sums). Rent: forced on the 1st (may go below $0 → Board RENT_LATE_BOARD).
    FEES: KASSA.EXE level per month — per kid, payment modifier (pp = added to every chance, mult = by wealth), rep once on confirm.

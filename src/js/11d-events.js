@@ -40,6 +40,8 @@ const NARRATIVE_EVENTS = [
             run: () => { kid.dyn.morale = 100; return { k: { pid: kid.id } }; } },
           { key: 'ev.boots.b', tone: 'gray', who: kid.id,
             run: () => { kid.physical.agility = Math.max(1, kid.physical.agility + EVENTS_CFG.BOOTS_AGILITY); return { k: { pid: kid.id } }; } },
+          { key: 'ev.boots.c', tone: 'green', ap: 1, who: kid.id,   // v3.16: [1 AP] — free and no agility lost, but only +5 morale
+            run: () => { kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.BOOTS_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
         ],
       });
     },
@@ -109,6 +111,8 @@ const NARRATIVE_EVENTS = [
             run: () => { kid.injuryDays = EVENTS_CFG.CLINIC_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.CLINIC_DAYS }; } },
           { key: 'ev.knock.b', tone: 'gray', who: kid.id,
             run: () => { kid.injuryDays = EVENTS_CFG.ICE_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.ICE_DAYS }; } },
+          { key: 'ev.knock.c', tone: 'green', ap: 1, cost: AP_OPTION.KNOCK_COST, who: kid.id,   // v3.16: [1 AP] — cheaper than the clinic, slower than it
+            run: () => { kid.injuryDays = AP_OPTION.KNOCK_DAYS; return { k: { pid: kid.id }, d: AP_OPTION.KNOCK_DAYS }; } },
         ],
       });
     },
@@ -251,6 +255,9 @@ const NARRATIVE_EVENTS = [
               return { k: { pid: kid.id } };
             } },
           { key: 'ev.truant.c', tone: 'green', next: () => (Math.random() < 0.5 ? 'sorry' : 'hangup') },
+          { key: 'ev.truant.d', tone: 'green', ap: 1, who: kid.id,   // v3.16: [1 AP] — no fine, no ban, but only discipline +1
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
+              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
         ] });
     },
   },
@@ -620,7 +627,8 @@ class EventEngine {
   /** Applies a choice: money, effect, (next step | diary line + log), closes and resumes. */
   choose(choice) {
     const s = this.state, pe = s.pendingEvent;
-    if (!pe || (choice.cost && !s.canAfford(choice.cost)) || choice.blocked) return;
+    if (!pe || (choice.cost && !s.canAfford(choice.cost)) || choice.blocked || (choice.ap && s.ap < choice.ap)) return;
+    if (choice.ap) s.weekState().ap -= choice.ap;   // v3.16: [1 AP] options spend from the weekly wallet
     if (choice.cost) s.addMoney(-choice.cost, 'event');   // v3.15: ledger category
     if (choice.gain) s.addMoney(choice.gain, 'event');
     if (choice.debt) s.addMoney(-choice.debt, 'event', true);   // v2.2: forced payment, may go below $0
@@ -678,12 +686,15 @@ class DialogueView {
     this.layer.querySelector('#talk-role').textContent = role;
     this.layer.querySelector('#talk-budget').innerHTML = L.t('talk.budget', { b: money(s.budget) });
     this.layer.querySelector('#talk-choices').innerHTML = choices.map((c, i) => {
-      const short = (c.cost && !s.canAfford(c.cost)) || !!c.blocked;   // v2.9: `blocked` = i18n key of a non-money reason
+      const noAp = !!c.ap && s.ap < c.ap;   // v3.16: [1 AP] options need the weekly wallet
+      const broke = !!c.cost && !s.canAfford(c.cost), short = broke || !!c.blocked || noAp;   // v2.9: `blocked` = i18n key of a non-money reason
       const pay = c.cost || c.debt;   // v2.2: `debt` = forced payment, never disabled, may push the budget below $0
-      const tag = pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '';
-      return `<button type="button" class="talk-btn tone-${c.tone}" data-i="${i}"${short ? ' disabled aria-disabled="true"' : ''}>
+      const tag = (c.ap ? `<span class="tb-ap" title="${esc(L.t('talk.apTip'))}">${L.t('talk.apTag', { n: c.ap })}</span>` : '')
+        + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '');
+      const why = c.blocked ? L.t(c.blocked) : broke ? L.t('talk.short', { b: money(s.budget), c: c.cost }) : noAp ? L.t('talk.noAp') : '';
+      return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` disabled aria-disabled="true" title="${esc(why)}"` : ''}>
         <span class="tb-label">${esc(L.t(c.key))}</span>${tag}
-        ${short ? `<small class="tb-why">${esc(c.blocked ? L.t(c.blocked) : L.t('talk.short', { b: money(s.budget), c: c.cost }))}</small>` : ''}</button>`;
+        ${short ? `<small class="tb-why">${esc(why)}</small>` : ''}</button>`;
     }).join('');
     this.type(text);
     this.layer.hidden = false;

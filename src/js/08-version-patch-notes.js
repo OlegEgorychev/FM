@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.15';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.16';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.16', name: { en: 'One on One', ru: 'Один на один' },
+    en: [
+      'Individual lessons: in PLANNER.EXE every weekday evening without a team training can hold a one-on-one with one kid — fitness, technique or tactics. It costs 1 action point, booked at once; cancel a future lesson and you get it back.',
+      'A lesson is twice as likely as a team training to teach him something (his growth room still applies), tires him a little, and now and then you learn something about him — where he really belongs on the pitch, or how he copes under pressure. No numbers, of course.',
+      'If the kid is injured, banned, kept at home or away at a school event, the lesson is called off and the action point comes back.',
+      'Some events now have an extra [1 AP] option: drop by a truant\'s family, dig out an old pair of boots from the seniors, take a hurt kid to a paramedic you know. Each has its own catch.',
+    ],
+    ru: [
+      'Индивидуальные занятия: в PLANNER.EXE в любой будний вечер без командной тренировки можно позаниматься один на один с одним игроком — физподготовкой, техникой или тактикой. Это стоит 1 очко действия, которое списывается сразу; отменишь будущее занятие — очко вернётся.',
+      'На занятии игрок вдвое чаще, чем на командной тренировке, чему-то учится (запас роста по-прежнему действует), немного устаёт, а иногда ты узнаёшь о нём что-то новое — где ему на самом деле место на поле или как он держит давление. Никаких цифр, разумеется.',
+      'Если игрок травмирован, дисквалифицирован, оставлен дома или ушёл на школьное событие, занятие отменяется, а очко действия возвращается.',
+      'У некоторых событий появился вариант за [1 ОД]: зайти к семье прогульщика, найти старые бутсы у старших, отвезти ушибленного к знакомому фельдшеру. У каждого свой подвох.',
+    ] },
   { v: '3.15', name: { en: 'The Cash Desk', ru: 'Касса' },
     en: [
       'KASSA.EXE opens at the first stop of every month: last month\'s cash book (fees, Board grant, donations, pitch rent, events) and this month\'s fee — low $5, normal $10 or high $15 per kid.',

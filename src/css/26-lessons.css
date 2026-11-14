@@ -1,0 +1,13 @@
+/* =========================================================
+   v3.16 — PLANNER.EXE evening lessons, [1 AP] tags in dialogues, TODAY ☾ marker
+   ========================================================= */
+.pl-apleft b{ font-family: var(--mono); font-size: 15px; color: #12355e; }
+.pl-lesson{ display: flex; flex-direction: column; gap: 3px; margin-top: 2px; padding: 4px; border: 1px dashed #8a8fa8; background: #eef0f6; font-size: 11px; }
+.pl-lesson.on{ border-style: solid; border-color: #3d4a7a; background: #e2e6f4; }
+.pl-lesson.none{ opacity: .6; }
+.pl-lh{ display: flex; align-items: center; gap: 4px; font-weight: bold; color: #26305a; }
+.pl-lh .tb-ap{ margin-left: auto; }
+.pl-lesson select{ width: 100%; font: 11px var(--ui, inherit); padding: 1px; }
+.tb-ap{ font: bold 10px/1 var(--mono); padding: 2px 4px; color: #ffcf5a; background: #26305a; border: 1px solid #000; white-space: nowrap; }
+.talk-btn .tb-ap{ margin-left: 6px; }
+.td-ls{ position: absolute; bottom: 0; right: 1px; font-size: 9px; color: #b9c4ff; } .td-ls.x{ color: #6d7881; text-decoration: line-through; }

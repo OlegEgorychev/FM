@@ -279,12 +279,12 @@ class GameState {
   /** The current week (Mon–Sun), created lazily when the calendar enters a new week (never rolls backwards). */
   weekState() {
     const start = weekStartOf(this.calendar.date), w = this.week;
-    if (w && w.start >= start) return w;
+    if (w && w.start >= start) { w.lessons ||= GameState.noLessons(); return w; }   // v3.16: lazy migration → no lessons
     const prev = w && isoAdd(w.start, 7) === start ? w : null;
     const carry = prev ? Math.min(WEEK.CARRY_MAX, Math.max(0, prev.ap)) : 0;
     const win = this.lastResult() === 'W' ? WEEK.WIN_BONUS : 0;
     const ap = Math.min(WEEK.AP_MAX, WEEK.AP_BASE + carry + win);
-    this.week = { start, plan: Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null])), confirmed: false, ap, carry, trainingsDone: 0,
+    this.week = { start, plan: Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null])), lessons: GameState.noLessons(), confirmed: false, ap, carry, trainingsDone: 0,
       apSources: { base: WEEK.AP_BASE, carry, win, total: ap } };
     if (!this.plannableDays().length) {   // nothing left to plan (the season opens on a Sunday): a stub week, no AP to carry
       Object.assign(this.week, { confirmed: true, ap: 0, carry: 0, apSources: { base: 0, carry: 0, win: 0, total: 0 } });
@@ -344,13 +344,64 @@ class GameState {
     if (row.effect.absent && kids.length) this.addDiary({ date, key: 'world.' + e.id + '.diary', vars: { s: { list: kids.map(pid => ({ pid })) } }, cls: 'ev' });
     else if (!row.effect.absent && date === e.days[0]) this.addDiary({ date, key: 'world.' + e.id + '.diary', cls: 'ev' });
   }
+  static noLessons() { return Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null])); }
+  /* ---------- v3.16 INDIVIDUAL LESSONS (weekday evenings without team training, 1 AP reserved in the planner) ---------- */
+  /** PLANNER.EXE: book (id + focus) or clear (id = null) the evening lesson of a weekday. Returns null when done, else a reason:
+      'locked' (past / today after confirming / match day), 'training' (team training that day), 'perKid', 'noAp', 'bad'.
+      Booking takes 1 AP from the weekly wallet at once (the planner's "AP left after plan"); clearing a future lesson refunds it. */
+  setLesson(k, id, focus = 'technical') {
+    const w = this.weekState(), day = this.weekDays().find(d => d.k === k), cur = w.lessons[k];
+    if (!day || !LESSON_FOCI.includes(focus)) return 'bad';
+    if (!this.dayEditable(day.date)) return 'locked';
+    if (!id) { if (cur) { w.lessons[k] = null; w.ap++; this.save(); } return null; }
+    if (w.plan[k]) return 'training';
+    if (!this.player(id)) return 'bad';
+    if (WEEK.PLAN_KEYS.filter(x => x !== k && w.lessons[x]?.id === id).length >= LESSON.PER_KID_WEEK) return 'perKid';
+    if (!cur && w.ap < 1) return 'noAp';
+    if (!cur) w.ap--;
+    w.lessons[k] = { id, focus };
+    this.save();
+    return null;
+  }
+  lessonOn(date) { const w = this.weekState(); return date && weekStartOf(date) === w.start ? w.lessons?.[weekKey(date)] || null : null; }
+  /** The evening lesson (dayRoutine, rest days): cancelled + refunded if the kid can't come; else a seeded growth roll
+      (MULT × the regime's chance × growthMult, growth room respected), condition −5, maybe one fog-of-war clue. Diary lines. */
+  runLesson(date) {
+    const L = this.lessonOn(date);
+    if (!L || L.done) return null;
+    L.done = true;
+    const p = this.player(L.id), f = { focus: L.focus };
+    if (!p || p.injuryDays > 0 || p.suspensionMatches > 0 || p.awayDays > 0 || this.worldAway(p.id, date)) {
+      this.week.ap++; L.cancelled = true;
+      const who = p ? { pid: p.id } : { name: (this.expelled || []).find(e => e.id === L.id)?.name || '?' };
+      this.addDiary({ date, key: 'lesson.cancel', vars: { k: who, f }, cls: 'tr' });
+      return 'cancel';
+    }
+    const g = REGIMES[LESSON.FOCUS[L.focus]].grow, r = seeded(date + '#lessongrow#' + p.id);
+    const res = r() < Math.min(1, LESSON.MULT * g.chance * growthMult(p)) ? this.growSkill(p, g, r) : false;
+    p.energy = clamp(p.energy + LESSON.COND, 0, 100);
+    this.addDiary({ date, key: 'lesson.done', vars: { k: { pid: p.id }, f }, cls: 'tr' });
+    if (res === true) this.addDiary({ date, key: 'lesson.improved', vars: { k: { pid: p.id } }, cls: 'tr' });
+    else if (res === 'plateau' && !(p.plateau ||= []).includes(g.group)) {   // v3.11 clue, told once per group
+      p.plateau.push(g.group);
+      this.addDiary({ date, key: 'tr.plateau.' + g.group, vars: { s: { list: [{ pid: p.id }] } }, cls: 'tr' });
+    }
+    const h = seeded(date + '#lesson#' + p.id);
+    if (h() < LESSON.HINT) {   // one clue, alternating archetype ↔ leadership (no leadership line for a 'normal' kid → archetype)
+      const v = Math.floor(h() * 2), lead = (p.lessonClues || 0) % 2 === 1 && p.captainTrait && p.captainTrait !== 'normal';
+      const key = lead ? 'obs.cap.' + p.captainTrait + '.' + v : (isPlayingNaturalPosition(p, p.tag) ? 'obs.ok.' : 'obs.hint.' + p.archetype + '.') + v;
+      p.lessonClues = (p.lessonClues || 0) + 1;
+      this.addDiary({ date, key: 'lesson.clue', vars: { c: { clue: key, pid: p.id } }, cls: 'tr' });
+    }
+    return res === true ? 'grew' : res || 'none';
+  }
   /** Pre-v3.13 save in the middle of a week: Tue + Thu with the default regime (today's old pick kept), confirmed, base AP. */
   static migrateWeek(date, oldPlan) {
     const start = weekStartOf(date), plan = Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null]));
     for (const k of WEEK.DEFAULT_DAYS) plan[k] = WEEK.DEFAULT_REGIME;
     if (REGIMES[oldPlan] && plan[weekKey(date)]) plan[weekKey(date)] = oldPlan;
     const done = WEEK.PLAN_KEYS.filter((k, i) => plan[k] && isoAdd(start, i) < date).length;
-    return { start, plan, confirmed: true, ap: WEEK.AP_BASE, carry: 0, trainingsDone: done, apSources: { base: WEEK.AP_BASE, carry: 0, win: 0, total: WEEK.AP_BASE } };
+    return { start, plan, lessons: GameState.noLessons(), confirmed: true, ap: WEEK.AP_BASE, carry: 0, trainingsDone: done, apSources: { base: WEEK.AP_BASE, carry: 0, win: 0, total: WEEK.AP_BASE } };
   }
   /** 'W' | 'D' | 'L' of our last played league match (null before the first one). */
   lastResult() {
@@ -384,6 +435,7 @@ class GameState {
     const todayRegime = day.date === this.calendar.date && w.confirmed && w.plan[k] && regime;   // until CONTINUE processes the day
     if (!this.dayEditable(day.date) && !todayRegime) return false;
     if (regime && !w.plan[k] && this.trainingsPlanned() >= WEEK.MAX_TRAININGS) return false;
+    if (regime && w.lessons?.[k]) { w.lessons[k] = null; w.ap++; }   // v3.16: a team training replaces the evening lesson (AP back)
     w.plan[k] = regime;
     this.save();
     return true;
@@ -490,10 +542,10 @@ class GameState {
   }
   /** v2.5: one random skill of a group +1. v3.12: only skills with growth room left are picked (gains < room, < 20), so
       a roll is never wasted on a maxed skill. Returns true if improved, 'plateau' if the whole group has no room left. */
-  growSkill(p, g) {
+  growSkill(p, g, rng = Math.random) {   // v3.16: rng — lessons pass a seeded stream (trainings keep Math.random)
     let keys = g.keys || ATTR_GROUPS[g.group];
     if (g.group === 'technical') keys = p.archetype === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
-    const k = pick(keys.filter(k => canGrow(p, g.group, k)));   // same single Math.random as before
+    const open = keys.filter(k => canGrow(p, g.group, k)), k = open[Math.floor(rng() * open.length)];   // = pick(): same single Math.random as before
     if (!k) return 'plateau';
     p[g.group][k]++;
     (p.gains ||= {})[k] = (p.gains[k] || 0) + 1;
@@ -618,7 +670,8 @@ class GameState {
     // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
     const observed = training && plan === 'match'
       ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
-    return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed };
+    const lesson = !training && date ? this.runLesson(date) : null;   // v3.16: the evening lesson (no CONTINUE stop)
+    return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed, lesson };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
   tickInjuries() {

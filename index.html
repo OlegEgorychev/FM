@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.15</title>
+<title>Youth Academy Manager v3.16</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1705,6 +1705,19 @@ body.modal-lock #startmenu{ display: none; }
 
 .td-wd{ position: relative; } .td-we{ position: absolute; top: 0; right: 1px; font-size: 9px; color: #ffcf5a; }
 /* =========================================================
+   v3.16 — PLANNER.EXE evening lessons, [1 AP] tags in dialogues, TODAY ☾ marker
+   ========================================================= */
+.pl-apleft b{ font-family: var(--mono); font-size: 15px; color: #12355e; }
+.pl-lesson{ display: flex; flex-direction: column; gap: 3px; margin-top: 2px; padding: 4px; border: 1px dashed #8a8fa8; background: #eef0f6; font-size: 11px; }
+.pl-lesson.on{ border-style: solid; border-color: #3d4a7a; background: #e2e6f4; }
+.pl-lesson.none{ opacity: .6; }
+.pl-lh{ display: flex; align-items: center; gap: 4px; font-weight: bold; color: #26305a; }
+.pl-lh .tb-ap{ margin-left: auto; }
+.pl-lesson select{ width: 100%; font: 11px var(--ui, inherit); padding: 1px; }
+.tb-ap{ font: bold 10px/1 var(--mono); padding: 2px 4px; color: #ffcf5a; background: #26305a; border: 1px solid #000; white-space: nowrap; }
+.talk-btn .tb-ap{ margin-left: 6px; }
+.td-ls{ position: absolute; bottom: 0; right: 1px; font-size: 9px; color: #b9c4ff; } .td-ls.x{ color: #6d7881; text-decoration: line-through; }
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -2326,6 +2339,13 @@ const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25
    (≈ 45 free agents remain for future transfers / poaching). MIX = hidden archetypes in the world. */
 const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 },
   CHANCE: 0.5, WRONG: 0.2 };   // v3.14 world events: weekly chance (never two weeks running), chance one pick is a wrong kid
+/* v3.16 INDIVIDUAL LESSONS + [1 AP] EVENT OPTIONS (TEST values). Weekly AP uses: office talk 1, roll call 1, an evening lesson 1
+   (reserved in PLANNER.EXE, refunded when re-planned away or cancelled on the day), an event option marked ap: 1.
+   LESSON: a weekday evening without team training; one kid + a focus. Growth chance = MULT × the matching regime's base chance
+   (FOCUS → REGIMES key) × growthMult; condition COND; with HINT one fog-of-war clue (archetype ↔ leadership, alternating). */
+const LESSON = { PER_KID_WEEK: 1, MULT: 2, COND: -5, HINT: 0.4, FOCUS: { physical: 'cardio', technical: 'tech', tactical: 'tactics' } };
+const LESSON_FOCI = Object.keys(LESSON.FOCUS);
+const AP_OPTION = { TRUANT_DISC: 1, TRUANT_MORALE: 3, BOOTS_MORALE: 5, KNOCK_COST: 35, KNOCK_DAYS: 8 };   // the [1 AP] choices in truant / boots / knock
 /* v3.15 CASH DESK + MONTHLY FEES + FAMILY WEALTH (all TEST values).
    Ledger categories (state.ledger['YYYY-MM'][cat], signed sums). Rent: forced on the 1st (may go below $0 → Board RENT_LATE_BOARD).
    FEES: KASSA.EXE level per month — per kid, payment modifier (pp = added to every chance, mult = by wealth), rep once on confirm.
@@ -3921,6 +3941,52 @@ Object.assign(I18N.ru, {
   'office.fee.waive': 'В этом месяце без взноса — главное, приходи', 'office.fee.waive.diary': '{k} освобождён от взноса в этом месяце. В раздевалке об этом ни слова.',
   'office.fee.half': 'Половину сейчас, половину в следующем месяце', 'office.fee.half.diary': '{k} сдаст взнос в два приёма: половину на следующей тренировке, остальное в следующем месяце.',
 });
+
+/* v3.16: individual lessons (PLANNER.EXE evenings) + [1 AP] options in events */
+Object.assign(I18N.en, {
+  'lesson.focus.physical': 'fitness', 'lesson.focus.technical': 'technique', 'lesson.focus.tactical': 'tactics',
+  'lesson.done': 'Evening lesson with {k} ({f}).',
+  'lesson.improved': 'The one-on-one paid off: {k} picked something up.',
+  'lesson.cancel': 'Evening lesson cancelled: {k} couldn\'t come ({f}). The action point is back.',
+  'lesson.clue': 'One-on-one: {c}',
+  'pl.ap': 'Action points this week: {line}', 'pl.apLeft': 'Left after the plan: <b>{n}</b>',
+  'pl.note': 'Trainings are free (0 AP), 0–{m} a week. A free weekday evening can hold an individual lesson (1 AP).',
+  'pl.lesson': 'Evening lesson', 'pl.lessonNone': '— no lesson —', 'pl.lessonFocus': 'Focus',
+  'pl.lessonTip': 'One kid, one focus, 1 action point — booked now, back if you cancel a future lesson.',
+  'pl.lessonDone': 'done', 'pl.lessonCancelled': 'cancelled',
+  'pl.lessonNo.noAp': 'No action points left for a lesson this week.', 'pl.lessonNo.perKid': 'He already has a lesson this week.',
+  'pl.lessonNo.training': 'There is a team training that day.', 'pl.lessonNo.locked': 'That day can\'t be changed any more.', 'pl.lessonNo.bad': 'That lesson can\'t be booked.',
+  'today.lessonTip': 'evening lesson: {k} ({f})',
+  'talk.apTag': '[{n} AP]', 'talk.apTip': 'Spends action points from this week\'s wallet.', 'talk.noAp': 'No action points left this week.',
+  'ev.truant.d': 'Drop by his family after training',
+  'ev.truant.d.diary': '{k} skipped training. The coach dropped by his family in the evening: tea, a long talk, no punishment.',
+  'ev.boots.c': 'Dig out an old pair from the seniors',
+  'ev.boots.c.diary': '{k} got an old pair from the seniors. A size too big, but they hold — and he didn\'t complain.',
+  'ev.knock.c': 'Take him to a paramedic I know',
+  'ev.knock.c.diary': '{k} saw a paramedic the coach knows: strapped up properly, out for {d} days. {m}',
+});
+Object.assign(I18N.ru, {
+  'lesson.focus.physical': 'физподготовка', 'lesson.focus.technical': 'техника', 'lesson.focus.tactical': 'тактика',
+  'lesson.done': 'Вечернее занятие один на один: {k} ({f}).',
+  'lesson.improved': 'Индивидуальное занятие пошло впрок: {k} кое-чему научился.',
+  'lesson.cancel': 'Вечернее занятие отменено: {k} не смог прийти ({f}). Очко действия вернулось.',
+  'lesson.clue': 'Один на один: {c}',
+  'pl.ap': 'Очки действий на неделю: {line}', 'pl.apLeft': 'Останется после плана: <b>{n}</b>',
+  'pl.note': 'Тренировки бесплатны (0 ОД), от 0 до {m} в неделю. В свободный будний вечер можно провести индивидуальное занятие (1 ОД).',
+  'pl.lesson': 'Вечернее занятие', 'pl.lessonNone': '— без занятия —', 'pl.lessonFocus': 'Направление',
+  'pl.lessonTip': 'Один игрок, одно направление, 1 очко действия — списывается сразу и возвращается, если отменить будущее занятие.',
+  'pl.lessonDone': 'проведено', 'pl.lessonCancelled': 'отменено',
+  'pl.lessonNo.noAp': 'На занятие в этой неделе не осталось очков действий.', 'pl.lessonNo.perKid': 'У него уже есть занятие на этой неделе.',
+  'pl.lessonNo.training': 'В этот день командная тренировка.', 'pl.lessonNo.locked': 'Этот день уже не изменить.', 'pl.lessonNo.bad': 'Такое занятие не назначить.',
+  'today.lessonTip': 'вечернее занятие: {k} ({f})',
+  'talk.apTag': '[{n} ОД]', 'talk.apTip': 'Тратит очки действий из недельного запаса.', 'talk.noAp': 'Очков действий на этой неделе не осталось.',
+  'ev.truant.d': 'Зайти к его семье после тренировки',
+  'ev.truant.d.diary': '{k} прогулял тренировку. Вечером тренер зашёл к его семье: чай, долгий разговор, без наказаний.',
+  'ev.boots.c': 'Найти старую пару у старших',
+  'ev.boots.c.diary': '{k} получил старые бутсы от старших ребят: на размер великоваты, но держат — и он не жаловался.',
+  'ev.knock.c': 'Отвезти к знакомому фельдшеру',
+  'ev.knock.c.diary': '{k} побывал у знакомого фельдшера тренера: всё перевязали как надо, выбывает на {d} дн. {m}',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -4189,6 +4255,7 @@ class Player {
       this.plateau = Array.isArray(o.plateau) ? o.plateau.filter(g => typeof g === 'string') : [];   // v3.11: skill groups where the coach already noticed he stopped growing
       this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
       this.absentToday = o.absentToday || null;
+      this.lessonClues = Math.max(0, Math.round(o.lessonClues || 0));   // v3.16: lesson clues given (alternates archetype ↔ leadership)
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
       this.positionHintCooldown = Math.max(0, Math.round(o.positionHintCooldown || 0));   // v3.6: matches before he may ask again
       this.teamId = o.teamId || 'player_team';   // v3.1: 'player_team' | 'free_agent' | 'rival_N'   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
@@ -4946,12 +5013,12 @@ class GameState {
   /** The current week (Mon–Sun), created lazily when the calendar enters a new week (never rolls backwards). */
   weekState() {
     const start = weekStartOf(this.calendar.date), w = this.week;
-    if (w && w.start >= start) return w;
+    if (w && w.start >= start) { w.lessons ||= GameState.noLessons(); return w; }   // v3.16: lazy migration → no lessons
     const prev = w && isoAdd(w.start, 7) === start ? w : null;
     const carry = prev ? Math.min(WEEK.CARRY_MAX, Math.max(0, prev.ap)) : 0;
     const win = this.lastResult() === 'W' ? WEEK.WIN_BONUS : 0;
     const ap = Math.min(WEEK.AP_MAX, WEEK.AP_BASE + carry + win);
-    this.week = { start, plan: Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null])), confirmed: false, ap, carry, trainingsDone: 0,
+    this.week = { start, plan: Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null])), lessons: GameState.noLessons(), confirmed: false, ap, carry, trainingsDone: 0,
       apSources: { base: WEEK.AP_BASE, carry, win, total: ap } };
     if (!this.plannableDays().length) {   // nothing left to plan (the season opens on a Sunday): a stub week, no AP to carry
       Object.assign(this.week, { confirmed: true, ap: 0, carry: 0, apSources: { base: 0, carry: 0, win: 0, total: 0 } });
@@ -5011,13 +5078,64 @@ class GameState {
     if (row.effect.absent && kids.length) this.addDiary({ date, key: 'world.' + e.id + '.diary', vars: { s: { list: kids.map(pid => ({ pid })) } }, cls: 'ev' });
     else if (!row.effect.absent && date === e.days[0]) this.addDiary({ date, key: 'world.' + e.id + '.diary', cls: 'ev' });
   }
+  static noLessons() { return Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null])); }
+  /* ---------- v3.16 INDIVIDUAL LESSONS (weekday evenings without team training, 1 AP reserved in the planner) ---------- */
+  /** PLANNER.EXE: book (id + focus) or clear (id = null) the evening lesson of a weekday. Returns null when done, else a reason:
+      'locked' (past / today after confirming / match day), 'training' (team training that day), 'perKid', 'noAp', 'bad'.
+      Booking takes 1 AP from the weekly wallet at once (the planner's "AP left after plan"); clearing a future lesson refunds it. */
+  setLesson(k, id, focus = 'technical') {
+    const w = this.weekState(), day = this.weekDays().find(d => d.k === k), cur = w.lessons[k];
+    if (!day || !LESSON_FOCI.includes(focus)) return 'bad';
+    if (!this.dayEditable(day.date)) return 'locked';
+    if (!id) { if (cur) { w.lessons[k] = null; w.ap++; this.save(); } return null; }
+    if (w.plan[k]) return 'training';
+    if (!this.player(id)) return 'bad';
+    if (WEEK.PLAN_KEYS.filter(x => x !== k && w.lessons[x]?.id === id).length >= LESSON.PER_KID_WEEK) return 'perKid';
+    if (!cur && w.ap < 1) return 'noAp';
+    if (!cur) w.ap--;
+    w.lessons[k] = { id, focus };
+    this.save();
+    return null;
+  }
+  lessonOn(date) { const w = this.weekState(); return date && weekStartOf(date) === w.start ? w.lessons?.[weekKey(date)] || null : null; }
+  /** The evening lesson (dayRoutine, rest days): cancelled + refunded if the kid can't come; else a seeded growth roll
+      (MULT × the regime's chance × growthMult, growth room respected), condition −5, maybe one fog-of-war clue. Diary lines. */
+  runLesson(date) {
+    const L = this.lessonOn(date);
+    if (!L || L.done) return null;
+    L.done = true;
+    const p = this.player(L.id), f = { focus: L.focus };
+    if (!p || p.injuryDays > 0 || p.suspensionMatches > 0 || p.awayDays > 0 || this.worldAway(p.id, date)) {
+      this.week.ap++; L.cancelled = true;
+      const who = p ? { pid: p.id } : { name: (this.expelled || []).find(e => e.id === L.id)?.name || '?' };
+      this.addDiary({ date, key: 'lesson.cancel', vars: { k: who, f }, cls: 'tr' });
+      return 'cancel';
+    }
+    const g = REGIMES[LESSON.FOCUS[L.focus]].grow, r = seeded(date + '#lessongrow#' + p.id);
+    const res = r() < Math.min(1, LESSON.MULT * g.chance * growthMult(p)) ? this.growSkill(p, g, r) : false;
+    p.energy = clamp(p.energy + LESSON.COND, 0, 100);
+    this.addDiary({ date, key: 'lesson.done', vars: { k: { pid: p.id }, f }, cls: 'tr' });
+    if (res === true) this.addDiary({ date, key: 'lesson.improved', vars: { k: { pid: p.id } }, cls: 'tr' });
+    else if (res === 'plateau' && !(p.plateau ||= []).includes(g.group)) {   // v3.11 clue, told once per group
+      p.plateau.push(g.group);
+      this.addDiary({ date, key: 'tr.plateau.' + g.group, vars: { s: { list: [{ pid: p.id }] } }, cls: 'tr' });
+    }
+    const h = seeded(date + '#lesson#' + p.id);
+    if (h() < LESSON.HINT) {   // one clue, alternating archetype ↔ leadership (no leadership line for a 'normal' kid → archetype)
+      const v = Math.floor(h() * 2), lead = (p.lessonClues || 0) % 2 === 1 && p.captainTrait && p.captainTrait !== 'normal';
+      const key = lead ? 'obs.cap.' + p.captainTrait + '.' + v : (isPlayingNaturalPosition(p, p.tag) ? 'obs.ok.' : 'obs.hint.' + p.archetype + '.') + v;
+      p.lessonClues = (p.lessonClues || 0) + 1;
+      this.addDiary({ date, key: 'lesson.clue', vars: { c: { clue: key, pid: p.id } }, cls: 'tr' });
+    }
+    return res === true ? 'grew' : res || 'none';
+  }
   /** Pre-v3.13 save in the middle of a week: Tue + Thu with the default regime (today's old pick kept), confirmed, base AP. */
   static migrateWeek(date, oldPlan) {
     const start = weekStartOf(date), plan = Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null]));
     for (const k of WEEK.DEFAULT_DAYS) plan[k] = WEEK.DEFAULT_REGIME;
     if (REGIMES[oldPlan] && plan[weekKey(date)]) plan[weekKey(date)] = oldPlan;
     const done = WEEK.PLAN_KEYS.filter((k, i) => plan[k] && isoAdd(start, i) < date).length;
-    return { start, plan, confirmed: true, ap: WEEK.AP_BASE, carry: 0, trainingsDone: done, apSources: { base: WEEK.AP_BASE, carry: 0, win: 0, total: WEEK.AP_BASE } };
+    return { start, plan, lessons: GameState.noLessons(), confirmed: true, ap: WEEK.AP_BASE, carry: 0, trainingsDone: done, apSources: { base: WEEK.AP_BASE, carry: 0, win: 0, total: WEEK.AP_BASE } };
   }
   /** 'W' | 'D' | 'L' of our last played league match (null before the first one). */
   lastResult() {
@@ -5051,6 +5169,7 @@ class GameState {
     const todayRegime = day.date === this.calendar.date && w.confirmed && w.plan[k] && regime;   // until CONTINUE processes the day
     if (!this.dayEditable(day.date) && !todayRegime) return false;
     if (regime && !w.plan[k] && this.trainingsPlanned() >= WEEK.MAX_TRAININGS) return false;
+    if (regime && w.lessons?.[k]) { w.lessons[k] = null; w.ap++; }   // v3.16: a team training replaces the evening lesson (AP back)
     w.plan[k] = regime;
     this.save();
     return true;
@@ -5157,10 +5276,10 @@ class GameState {
   }
   /** v2.5: one random skill of a group +1. v3.12: only skills with growth room left are picked (gains < room, < 20), so
       a roll is never wasted on a maxed skill. Returns true if improved, 'plateau' if the whole group has no room left. */
-  growSkill(p, g) {
+  growSkill(p, g, rng = Math.random) {   // v3.16: rng — lessons pass a seeded stream (trainings keep Math.random)
     let keys = g.keys || ATTR_GROUPS[g.group];
     if (g.group === 'technical') keys = p.archetype === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
-    const k = pick(keys.filter(k => canGrow(p, g.group, k)));   // same single Math.random as before
+    const open = keys.filter(k => canGrow(p, g.group, k)), k = open[Math.floor(rng() * open.length)];   // = pick(): same single Math.random as before
     if (!k) return 'plateau';
     p[g.group][k]++;
     (p.gains ||= {})[k] = (p.gains[k] || 0) + 1;
@@ -5285,7 +5404,8 @@ class GameState {
     // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
     const observed = training && plan === 'match'
       ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
-    return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed };
+    const lesson = !training && date ? this.runLesson(date) : null;   // v3.16: the evening lesson (no CONTINUE stop)
+    return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed, lesson };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
   tickInjuries() {
@@ -6388,8 +6508,21 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.15';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.16';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.16', name: { en: 'One on One', ru: 'Один на один' },
+    en: [
+      'Individual lessons: in PLANNER.EXE every weekday evening without a team training can hold a one-on-one with one kid — fitness, technique or tactics. It costs 1 action point, booked at once; cancel a future lesson and you get it back.',
+      'A lesson is twice as likely as a team training to teach him something (his growth room still applies), tires him a little, and now and then you learn something about him — where he really belongs on the pitch, or how he copes under pressure. No numbers, of course.',
+      'If the kid is injured, banned, kept at home or away at a school event, the lesson is called off and the action point comes back.',
+      'Some events now have an extra [1 AP] option: drop by a truant\'s family, dig out an old pair of boots from the seniors, take a hurt kid to a paramedic you know. Each has its own catch.',
+    ],
+    ru: [
+      'Индивидуальные занятия: в PLANNER.EXE в любой будний вечер без командной тренировки можно позаниматься один на один с одним игроком — физподготовкой, техникой или тактикой. Это стоит 1 очко действия, которое списывается сразу; отменишь будущее занятие — очко вернётся.',
+      'На занятии игрок вдвое чаще, чем на командной тренировке, чему-то учится (запас роста по-прежнему действует), немного устаёт, а иногда ты узнаёшь о нём что-то новое — где ему на самом деле место на поле или как он держит давление. Никаких цифр, разумеется.',
+      'Если игрок травмирован, дисквалифицирован, оставлен дома или ушёл на школьное событие, занятие отменяется, а очко действия возвращается.',
+      'У некоторых событий появился вариант за [1 ОД]: зайти к семье прогульщика, найти старые бутсы у старших, отвезти ушибленного к знакомому фельдшеру. У каждого свой подвох.',
+    ] },
   { v: '3.15', name: { en: 'The Cash Desk', ru: 'Касса' },
     en: [
       'KASSA.EXE opens at the first stop of every month: last month\'s cash book (fees, Board grant, donations, pitch rent, events) and this month\'s fee — low $5, normal $10 or high $15 per kid.',
@@ -8046,6 +8179,8 @@ const NARRATIVE_EVENTS = [
             run: () => { kid.dyn.morale = 100; return { k: { pid: kid.id } }; } },
           { key: 'ev.boots.b', tone: 'gray', who: kid.id,
             run: () => { kid.physical.agility = Math.max(1, kid.physical.agility + EVENTS_CFG.BOOTS_AGILITY); return { k: { pid: kid.id } }; } },
+          { key: 'ev.boots.c', tone: 'green', ap: 1, who: kid.id,   // v3.16: [1 AP] — free and no agility lost, but only +5 morale
+            run: () => { kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.BOOTS_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
         ],
       });
     },
@@ -8115,6 +8250,8 @@ const NARRATIVE_EVENTS = [
             run: () => { kid.injuryDays = EVENTS_CFG.CLINIC_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.CLINIC_DAYS }; } },
           { key: 'ev.knock.b', tone: 'gray', who: kid.id,
             run: () => { kid.injuryDays = EVENTS_CFG.ICE_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.ICE_DAYS }; } },
+          { key: 'ev.knock.c', tone: 'green', ap: 1, cost: AP_OPTION.KNOCK_COST, who: kid.id,   // v3.16: [1 AP] — cheaper than the clinic, slower than it
+            run: () => { kid.injuryDays = AP_OPTION.KNOCK_DAYS; return { k: { pid: kid.id }, d: AP_OPTION.KNOCK_DAYS }; } },
         ],
       });
     },
@@ -8257,6 +8394,9 @@ const NARRATIVE_EVENTS = [
               return { k: { pid: kid.id } };
             } },
           { key: 'ev.truant.c', tone: 'green', next: () => (Math.random() < 0.5 ? 'sorry' : 'hangup') },
+          { key: 'ev.truant.d', tone: 'green', ap: 1, who: kid.id,   // v3.16: [1 AP] — no fine, no ban, but only discipline +1
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
+              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
         ] });
     },
   },
@@ -8626,7 +8766,8 @@ class EventEngine {
   /** Applies a choice: money, effect, (next step | diary line + log), closes and resumes. */
   choose(choice) {
     const s = this.state, pe = s.pendingEvent;
-    if (!pe || (choice.cost && !s.canAfford(choice.cost)) || choice.blocked) return;
+    if (!pe || (choice.cost && !s.canAfford(choice.cost)) || choice.blocked || (choice.ap && s.ap < choice.ap)) return;
+    if (choice.ap) s.weekState().ap -= choice.ap;   // v3.16: [1 AP] options spend from the weekly wallet
     if (choice.cost) s.addMoney(-choice.cost, 'event');   // v3.15: ledger category
     if (choice.gain) s.addMoney(choice.gain, 'event');
     if (choice.debt) s.addMoney(-choice.debt, 'event', true);   // v2.2: forced payment, may go below $0
@@ -8684,12 +8825,15 @@ class DialogueView {
     this.layer.querySelector('#talk-role').textContent = role;
     this.layer.querySelector('#talk-budget').innerHTML = L.t('talk.budget', { b: money(s.budget) });
     this.layer.querySelector('#talk-choices').innerHTML = choices.map((c, i) => {
-      const short = (c.cost && !s.canAfford(c.cost)) || !!c.blocked;   // v2.9: `blocked` = i18n key of a non-money reason
+      const noAp = !!c.ap && s.ap < c.ap;   // v3.16: [1 AP] options need the weekly wallet
+      const broke = !!c.cost && !s.canAfford(c.cost), short = broke || !!c.blocked || noAp;   // v2.9: `blocked` = i18n key of a non-money reason
       const pay = c.cost || c.debt;   // v2.2: `debt` = forced payment, never disabled, may push the budget below $0
-      const tag = pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '';
-      return `<button type="button" class="talk-btn tone-${c.tone}" data-i="${i}"${short ? ' disabled aria-disabled="true"' : ''}>
+      const tag = (c.ap ? `<span class="tb-ap" title="${esc(L.t('talk.apTip'))}">${L.t('talk.apTag', { n: c.ap })}</span>` : '')
+        + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '');
+      const why = c.blocked ? L.t(c.blocked) : broke ? L.t('talk.short', { b: money(s.budget), c: c.cost }) : noAp ? L.t('talk.noAp') : '';
+      return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` disabled aria-disabled="true" title="${esc(why)}"` : ''}>
         <span class="tb-label">${esc(L.t(c.key))}</span>${tag}
-        ${short ? `<small class="tb-why">${esc(c.blocked ? L.t(c.blocked) : L.t('talk.short', { b: money(s.budget), c: c.cost }))}</small>` : ''}</button>`;
+        ${short ? `<small class="tb-why">${esc(why)}</small>` : ''}</button>`;
     }).join('');
     this.type(text);
     this.layer.hidden = false;
@@ -9195,7 +9339,15 @@ class WeekPlanner {
     this.grid.addEventListener('click', e => {
       const b = e.target.closest('[data-day]');
       if (!b || b.disabled) return;
-      if (this.state.setWeekPlan(b.dataset.day, b.dataset.reg === 'rest' ? null : b.dataset.reg)) { this.render(); this.ui.renderDash(); }
+      if (this.state.setWeekPlan(b.dataset.day, b.dataset.reg === 'rest' ? null : b.dataset.reg)) { this.render(); this.ui.renderAll(); }
+    });
+    this.grid.addEventListener('change', e => {   // v3.16: the evening lesson — kid / focus
+      const kid = e.target.closest('[data-lkid]'), foc = e.target.closest('[data-lfocus]'), s = this.state;
+      if (!kid && !foc) return;
+      const k = (kid || foc).dataset.lkid || (kid || foc).dataset.lfocus, l = s.weekState().lessons[k];
+      const why = kid ? s.setLesson(k, kid.value || null, l?.focus || 'technical') : s.setLesson(k, l?.id || null, foc.value);
+      this.msg = why ? L.t('pl.lessonNo.' + why) : '';
+      this.render(); this.ui.renderAll();
     });
   }
   get isOpen() { return !this.layer.hidden; }
@@ -9238,16 +9390,37 @@ class WeekPlanner {
       };
       return `<div class="${cls}${cur ? ' t' : ''}" data-date="${date}"${we ? ` title="${esc(wtip)}"` : ''}>${head}<div class="pl-opts">${opt('rest', L.t('pl.rest'))}`
         + REGIME_KEYS.map(r => opt(r, L.t('plan.' + r))).join('') + `</div>`
-        + `<div class="pl-warn${warn === 'pl.warn.over' ? ' over' : ''}">${warn ? esc(L.t(warn)) : ''}</div></div>`;
+        + `<div class="pl-warn${warn === 'pl.warn.over' ? ' over' : ''}">${warn ? esc(L.t(warn)) : ''}</div>${cur ? '' : this.lessonHTML(k, editable)}</div>`;
     }).join('');
     const n = s.trainingsPlanned(), src = w.apSources || {};
     document.getElementById('pl-title').textContent = 'PLANNER.EXE — ' + L.t('pl.week', { d: fmtDate(w.start, { day: 'numeric', month: 'short' }) });
     document.getElementById('pl-head').innerHTML = `<span class="pl-ap" title="${esc(L.t('ap.tip'))}">${L.t('pl.ap', { n: w.ap, line: esc(MorningBriefing.apLine(src)) })}</span>
+      <span class="pl-apleft">${L.t('pl.apLeft', { n: w.ap })}</span>
       <span class="pl-note">${L.t('pl.note', { m: WEEK.MAX_TRAININGS })}</span>`;
     const warn = WeekPlanner.warnKey(n);
     document.getElementById('pl-sum').innerHTML = `${L.t('pl.count', { n })}${warn ? ` <b class="${warn === 'pl.warn.over' ? 'over' : ''}">${esc(L.t(warn))}</b>` : n ? '' : ` <b>${esc(L.t('pl.warn.empty'))}</b>`}`;
     document.getElementById('pl-confirm').innerHTML = L.t('pl.confirm');
-    document.getElementById('pl-status').textContent = L.t(w.confirmed ? 'pl.status.replan' : 'pl.status.new');
+    document.getElementById('pl-status').textContent = this.msg || L.t(w.confirmed ? 'pl.status.replan' : 'pl.status.new');
+    this.msg = '';
+  }
+
+  /** v3.16: the evening slot of a weekday without team training — kid + focus (1 AP, booked at once; '— none —' refunds). */
+  lessonHTML(k, editable) {
+    const s = this.state, w = s.weekState(), l = w.lessons[k], p = l && s.player(l.id);
+    const head = `<div class="pl-lh">&#9790; ${L.t('pl.lesson')} <span class="tb-ap">${L.t('talk.apTag', { n: 1 })}</span></div>`;
+    if (!editable) {   // past / today after confirming: read-only
+      if (!l) return `<div class="pl-lesson none">${head}<small>—</small></div>`;
+      const st = l.cancelled ? L.t('pl.lessonCancelled') : l.done ? L.t('pl.lessonDone') : '';
+      return `<div class="pl-lesson on">${head}<small>${p ? `${p.number}. ${esc(L.name(p.surname))}` : '?'} · ${esc(L.t('lesson.focus.' + l.focus))}${st ? ' · ' + esc(st) : ''}</small></div>`;
+    }
+    const taken = new Set(WEEK.PLAN_KEYS.filter(x => x !== k && w.lessons[x]).map(x => w.lessons[x].id));
+    const canBook = !!l || w.ap >= 1, tip = canBook ? L.t('pl.lessonTip') : L.t('pl.lessonNo.noAp');
+    const kids = [...s.squad].sort((a, b) => a.number - b.number).map(q =>
+      `<option value="${q.id}"${l?.id === q.id ? ' selected' : ''}${taken.has(q.id) ? ' disabled' : ''}>${q.number}. ${esc(L.name(q.surname))}</option>`).join('');
+    return `<div class="pl-lesson${l ? ' on' : ''}" title="${esc(tip)}">${head}
+      <select data-lkid="${k}" aria-label="${esc(L.t('pl.lesson'))}"${canBook ? '' : ' disabled'}><option value="">${L.t('pl.lessonNone')}</option>${kids}</select>
+      <select data-lfocus="${k}" aria-label="${esc(L.t('pl.lessonFocus'))}"${l ? '' : ' disabled'}>${LESSON_FOCI.map(f =>
+        `<option value="${f}"${(l?.focus || 'technical') === f ? ' selected' : ''}>${esc(L.t('lesson.focus.' + f))}</option>`).join('')}</select></div>`;
   }
 
   /** [ CONFIRM WEEK ] → today's locker room on a training day, else the Dashboard. */
@@ -9470,6 +9643,10 @@ class UIController {
     if (x && typeof x === 'object' && 'talkReact' in x) return L.t('tt.react.' + x.talkReact);  // v3.9 diary
     if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pos' in x) return L.pos(x.pos);   // v3.6 diary
+    if (x && typeof x === 'object' && 'focus' in x) return L.t('lesson.focus.' + x.focus);   // v3.16 diary
+    if (x && typeof x === 'object' && 'clue' in x) { const p = this.state.player(x.pid);   // v3.16: a v3.6 / v3.7 clue line without its "Match practice:" lead
+      return L.t(x.clue, { k: p ? L.name(p.name) : '?' }).replace(/^[^:{}]{1,30}:\s*/, ''); }
+    if (x && typeof x === 'object' && 'name' in x && !('pid' in x)) return L.name(x.name);   // v3.16: an expelled kid
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
     if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
@@ -10279,10 +10456,11 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     else body = `<div class="td-note">${L.t('today.phase.' + s.phase)}</div>`;
     const strip = WEEK.KEYS.map((k, i) => {
       const date = isoAdd(w.start, i), m = s.matchOn(date), t = s.isOurTraining(date), we = s.worldEventOn(date);   // v3.15: ✦ world event (same tooltip as PLANNER.EXE)
+      const ls = !t && !m ? s.lessonOn(date) : null, lk = ls && s.player(ls.id);   // v3.16: ☾ evening lesson
       const tip = fmtDate(date, { weekday: 'long', day: 'numeric', month: 'short' }) + ' · ' + (m ? L.t('today.kind.match') : t ? L.t('plan.' + w.plan[k]) : L.t('today.kind.rest'))
-        + (we ? ' · ' + L.t('world.tip.' + we.id) : '');
+        + (we ? ' · ' + L.t('world.tip.' + we.id) : '') + (ls ? ' · ' + L.t('today.lessonTip', { k: lk ? L.name(lk.name) : '?', f: L.t('lesson.focus.' + ls.focus) }) : '');
       return `<span class="td-wd${date === s.calendar.date ? ' now' : ''}${date < s.calendar.date ? ' past' : ''}${m ? ' m' : t ? ' t' : ''}${we ? ' we' : ''}"
-        title="${esc(tip)}">${esc(fmtDate(date, { weekday: 'narrow' }))}<i>${m ? '&#9917;' : t ? '&#9650;' : '·'}</i>${we ? '<b class="td-we">&#10022;</b>' : ''}</span>`;
+        title="${esc(tip)}">${esc(fmtDate(date, { weekday: 'narrow' }))}<i>${m ? '&#9917;' : t ? '&#9650;' : '·'}</i>${we ? '<b class="td-we">&#10022;</b>' : ''}${ls ? `<b class="td-ls${ls.cancelled ? ' x' : ''}">&#9790;</b>` : ''}</span>`;
     }).join('');
     const weekBtn = live && w.confirmed && s.plannableDays().length ? `<button type="button" class="btn td-weekbtn" data-week>${L.t('today.weekBtn')}</button>` : '';
     box.innerHTML = `<div class="td-head"><b>${fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' })}</b>

@@ -146,6 +146,10 @@ class UIController {
     if (x && typeof x === 'object' && 'talkReact' in x) return L.t('tt.react.' + x.talkReact);  // v3.9 diary
     if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pos' in x) return L.pos(x.pos);   // v3.6 diary
+    if (x && typeof x === 'object' && 'focus' in x) return L.t('lesson.focus.' + x.focus);   // v3.16 diary
+    if (x && typeof x === 'object' && 'clue' in x) { const p = this.state.player(x.pid);   // v3.16: a v3.6 / v3.7 clue line without its "Match practice:" lead
+      return L.t(x.clue, { k: p ? L.name(p.name) : '?' }).replace(/^[^:{}]{1,30}:\s*/, ''); }
+    if (x && typeof x === 'object' && 'name' in x && !('pid' in x)) return L.name(x.name);   // v3.16: an expelled kid
     if (x && typeof x === 'object' && 'pid' in x) { const p = this.state.player(x.pid); return p ? L.name(p.name) : '?'; }   // v1.9 diary
     if (x && typeof x === 'object' && Array.isArray(x.list)) return x.list.map(p => this.v(p)).join(', ');
     if (x && typeof x === 'object' && Array.isArray(x.fixtures)) return x.fixtures.map(f => this.fxText(f)).join('; ');
@@ -955,10 +959,11 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     else body = `<div class="td-note">${L.t('today.phase.' + s.phase)}</div>`;
     const strip = WEEK.KEYS.map((k, i) => {
       const date = isoAdd(w.start, i), m = s.matchOn(date), t = s.isOurTraining(date), we = s.worldEventOn(date);   // v3.15: ✦ world event (same tooltip as PLANNER.EXE)
+      const ls = !t && !m ? s.lessonOn(date) : null, lk = ls && s.player(ls.id);   // v3.16: ☾ evening lesson
       const tip = fmtDate(date, { weekday: 'long', day: 'numeric', month: 'short' }) + ' · ' + (m ? L.t('today.kind.match') : t ? L.t('plan.' + w.plan[k]) : L.t('today.kind.rest'))
-        + (we ? ' · ' + L.t('world.tip.' + we.id) : '');
+        + (we ? ' · ' + L.t('world.tip.' + we.id) : '') + (ls ? ' · ' + L.t('today.lessonTip', { k: lk ? L.name(lk.name) : '?', f: L.t('lesson.focus.' + ls.focus) }) : '');
       return `<span class="td-wd${date === s.calendar.date ? ' now' : ''}${date < s.calendar.date ? ' past' : ''}${m ? ' m' : t ? ' t' : ''}${we ? ' we' : ''}"
-        title="${esc(tip)}">${esc(fmtDate(date, { weekday: 'narrow' }))}<i>${m ? '&#9917;' : t ? '&#9650;' : '·'}</i>${we ? '<b class="td-we">&#10022;</b>' : ''}</span>`;
+        title="${esc(tip)}">${esc(fmtDate(date, { weekday: 'narrow' }))}<i>${m ? '&#9917;' : t ? '&#9650;' : '·'}</i>${we ? '<b class="td-we">&#10022;</b>' : ''}${ls ? `<b class="td-ls${ls.cancelled ? ' x' : ''}">&#9790;</b>` : ''}</span>`;
     }).join('');
     const weekBtn = live && w.confirmed && s.plannableDays().length ? `<button type="button" class="btn td-weekbtn" data-week>${L.t('today.weekBtn')}</button>` : '';
     box.innerHTML = `<div class="td-head"><b>${fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' })}</b>

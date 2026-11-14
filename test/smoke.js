@@ -353,7 +353,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const bt2 = await page.evaluate(k => ({ agi: YAM.game.player(k).physical.agility, closed: document.getElementById('talk-layer').hidden, pe: YAM.game.pendingEvent, b: YAM.game.budget,
       diary: YAM.game.diary[YAM.game.diary.length - 1].key }), bt.kid);
     check('budget in header = $500 + the ledger (September fees); Torn Boots: snitch face, unaffordable choice disabled, Esc blocked, "no" = agility −2',
-      hdr0.b === 500 + hdr0.led && hdr0.fee > 0 && hdr0.txt.includes('$' + hdr0.b) && bt.n === 2 && bt.dis && bt.en && bt.face && /\$100/.test(bt.hdr) && still
+      hdr0.b === 500 + hdr0.led && hdr0.fee > 0 && hdr0.txt.includes('$' + hdr0.b) && bt.n === 3 && bt.dis && bt.en && bt.face && /\$100/.test(bt.hdr) && still
       && bt2.agi === Math.max(1, bt.agi - 2) && bt2.closed && !bt2.pe && bt2.b === 100 && bt2.diary === 'ev.boots.b.diary', JSON.stringify({ hdr0, bt, still, bt2 }));
     await page.evaluate(() => YAM.ui.events.fire('dad'));
     await page.waitForTimeout(100);
@@ -570,7 +570,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.evaluate(() => YAM.ui.show('team'));
     await toLocker(); await page.waitForTimeout(1400);
     const kick = await page.evaluate(() => {
-      const s = YAM.game, p = s.starters().find(x => x.archetype !== 'GK' && x.available);
+      const s = YAM.game, p = s.starters().find(x => x.archetype !== 'GK' && x.available && !x.flags.includes('Promised_Start'));   // (v3.15+: the dad's son may be a starter — he is needed later)
       s.weekState().ap = 1; s.rep.parents = 50; s.rep.squad = 50; if (s.fees?.status[p.id]) s.fees.status[p.id] = 'paid';   // (v3.15: no fee line here)
       YAM.ui.profile.open(p.id);
       return { id: p.id, n0: s.squad.length, slot: s.lineup.indexOf(p.id) };
@@ -695,7 +695,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const tu4 = await page.evaluate(k => ({ sus: YAM.game.player(k).suspensionMatches, starter: YAM.game.isStarter(k) }), tu.kid);
     await page.evaluate(k => { YAM.game.player(k).suspensionMatches = 0; YAM.game.player(k).skipped_training = false; }, tu.kid);
     check('The Truant: skipper\'s portrait, fine disabled under $20, "call him" rolls a saved step (sorry → +2 discipline), suspend = 1 match',
-      trn.id === tu.kid && tu.n === 3 && tu.fineOff && tu.face && tu2.step === 'sorry' && tu2.n === 1 && tu3.disc === Math.min(20, d0 + 2) && tu3.closed && tu4.sus === 1 && !tu4.starter,
+      trn.id === tu.kid && tu.n === 4 && tu.fineOff && tu.face && tu2.step === 'sorry' && tu2.n === 1 && tu3.disc === Math.min(20, d0 + 2) && tu3.closed && tu4.sus === 1 && !tu4.starter,
       JSON.stringify({ tu, tu2, tu3, tu4 }));
 
     // a dilemma survives a reload, then the calendar pauses on a random event and resumes after the choice
@@ -1531,6 +1531,99 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     });
     check('v3.14 follow-ups: world seed salted per academy (from the squad ids, saved), ✦ + the planner tooltip on event days in the TODAY week strip',
       sl.salt && sl.fromSquad && sl.differs && sl.mark && sl.only, JSON.stringify(sl));
+    // v3.16 LESSONS — (1) planning reserves 1 AP, clearing refunds it, one lesson per kid a week, none on a training day / without AP
+    const ls0 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui;
+      for (const v of ['locker', 'planner', 'briefing', 'kassa']) if (ui[v].isOpen) ui[v].layer.hidden = true;
+      ui.events.enabled = false; s.excusesOff = true; s.pendingEvent = null; ui.modal.close();
+      s.phase = 'calendar'; s.calendar.date = '2002-11-11'; s.week = null; s.today = null; s.away = null;   // a fresh Monday
+      if (s.kassaDue()) s.confirmKassa('normal');
+      s.weekState(); s.worldEvent = null; s.dayState().briefed = true;
+      const w = s.week; w.ap = 3;
+      const [a, b, c] = s.squad.filter(p => p.archetype !== 'GK').map(p => p.id);
+      s.setWeekPlan('tue', 'match');
+      const out = { ap0: w.ap };
+      out.r1 = s.setLesson('wed', a, 'technical'); out.ap1 = w.ap;
+      out.same = s.setLesson('thu', a, 'physical'); out.apSame = w.ap;                 // same kid twice → refused
+      out.train = s.setLesson('tue', b, 'tactical');                                   // team training that day → refused
+      out.r2 = s.setLesson('thu', b, 'tactical'); out.ap2 = w.ap;
+      out.focus = s.setLesson('thu', b, 'physical') === null && w.lessons.thu.focus === 'physical' && w.ap === out.ap2;   // changing the focus is free
+      out.clear = s.setLesson('thu', null); out.ap3 = w.ap; out.thu = w.lessons.thu;   // re-planned away → refund
+      w.ap = 0; out.noAp = s.setLesson('fri', c, 'technical'); w.ap = out.ap3;
+      out.trRefund = (() => { s.setLesson('fri', c, 'technical'); const x = w.ap; s.setWeekPlan('fri', 'tech'); const r = w.ap === x + 1 && !w.lessons.fri; s.setWeekPlan('fri', null); return r; })();
+      ui.planner.open();   // the planner shows the slot + "left after the plan"
+      out.ui = { slots: document.querySelectorAll('#pl-grid .pl-lesson').length, on: document.querySelectorAll('#pl-grid .pl-lesson.on').length,
+        left: document.querySelector('#pl-head .pl-apleft')?.textContent || '', tag: !!document.querySelector('#pl-grid .pl-lesson .tb-ap') };
+      ui.planner.layer.hidden = true;
+      s.confirmWeek();
+      out.locked = s.setLesson('mon', c, 'technical');   // today after confirming → locked (same rule as trainings)
+      return { out, a, b, c };
+    });
+    const L0 = ls0.out;
+    check('v3.16 lessons: planning reserves 1 AP, clearing refunds it, focus change free, same kid twice / training day / 0 AP refused, a training replacing a lesson refunds it; the planner shows the slots + AP left after the plan',
+      L0.r1 === null && L0.ap1 === L0.ap0 - 1 && L0.same === 'perKid' && L0.apSame === L0.ap1 && L0.train === 'training' && L0.r2 === null && L0.ap2 === L0.ap1 - 1 && L0.focus
+      && L0.clear === null && L0.ap3 === L0.ap2 + 1 && L0.thu === null && L0.noAp === 'noAp' && L0.trRefund && L0.locked === 'locked'
+      && L0.ui.slots === 4 && L0.ui.on === 1 && L0.ui.left.includes(String(L0.ap3)) && L0.ui.tag, JSON.stringify(L0));
+    // (2) cancelled for an injured / world-event-away kid → AP refunded + diary; (3) a lesson: diary, condition −5, growth only in the chosen group
+    const ls1 = await page.evaluate(({ a, b, c }) => {
+      const s = YAM.game, w = s.week, out = {};
+      // injured kid on Wednesday
+      s.calendar.date = '2002-11-11'; w.confirmed = false; w.lessons = GameState.noLessons(); w.ap = 5;
+      s.setLesson('wed', a, 'technical'); s.setLesson('thu', b, 'tactical'); s.setLesson('fri', c, 'technical'); w.confirmed = true;
+      const ap0 = w.ap, A = s.player(a), B = s.player(b), C = s.player(c);
+      A.injuryDays = 3; s.worldEvent = { id: 'athletics', tier: 2, days: ['2002-11-14'], playerIds: [b], weekStart: '2002-11-11' };
+      s.calendar.date = '2002-11-13'; s.today = null; const r1 = s.dayRoutine('2002-11-13'), apAfter1 = w.ap;
+      s.calendar.date = '2002-11-14'; s.today = null; const r2 = s.dayRoutine('2002-11-14');
+      out.inj = { res: r1.lesson, ap: apAfter1 === ap0 + 1, diary: s.diary.some(d => d.date === '2002-11-13' && d.key === 'lesson.cancel') };
+      out.away = { res: r2.lesson, ap: w.ap === ap0 + 2, diary: s.diary.some(d => d.date === '2002-11-14' && d.key === 'lesson.cancel') };
+      s.worldEvent = null; A.injuryDays = 0;
+      // Friday: C's technique lesson with a forced seed (growth roll always succeeds), room left everywhere
+      const keep = { tac: { ...C.tactical }, phy: { ...C.physical }, tech: { ...C.technical }, gains: { ...C.gains }, pot: C.psych.potential, energy: C.energy };
+      C.gains = {}; C.psych.potential = 10; for (const k in C.technical) C.technical[k] = Math.min(C.technical[k], 12);
+      const MULT = LESSON.MULT; LESSON.MULT = 1000;   // forced: the growth roll always succeeds (the skill pick stays seeded)
+      C.energy = 60; s.calendar.date = '2002-11-15'; s.today = null;
+      const tech0 = JSON.stringify(C.technical), r3 = s.dayRoutine('2002-11-15');
+      LESSON.MULT = MULT;
+      const grown = Object.keys(C.technical).filter(k => C.technical[k] !== JSON.parse(tech0)[k]);
+      out.lesson = { res: r3.lesson, energy: C.energy, grown, gain: Object.values(C.gains).reduce((x, y) => x + y, 0),
+        others: JSON.stringify(C.tactical) === JSON.stringify(keep.tac) && JSON.stringify(C.physical) === JSON.stringify(keep.phy),
+        diary: s.diary.some(d => d.date === '2002-11-15' && d.key === 'lesson.done'), improved: s.diary.some(d => d.date === '2002-11-15' && d.key === 'lesson.improved'),
+        text: YAM.ui.entryText({ ...s.diary.find(d => d.date === '2002-11-15' && d.key === 'lesson.done'), r: 0 }), done: w.lessons.fri.done, noNum: true };
+      const clue = s.diary.find(d => d.key === 'lesson.clue');
+      if (clue) out.lesson.noNum = !/\d/.test(YAM.ui.entryText({ ...clue, r: 0 }).replace(/^\S+\s/, ''));
+      Object.assign(C, { tactical: keep.tac, physical: keep.phy, technical: keep.tech, gains: keep.gains }); C.psych.potential = keep.pot; C.energy = keep.energy;
+      out.det = (() => { const x = []; for (let i = 0; i < 2; i++) x.push(seeded('2002-11-15#lesson#' + c)()); return x[0] === x[1]; })();
+      out.noRandom = !/Math\.random/.test(GameState.prototype.runLesson.toString() + GameState.prototype.setLesson.toString());
+      return out;
+    }, ls0);
+    check('v3.16 lesson cancelled for an injured kid / a kid away at a world event → AP refunded + diary line (no CONTINUE stop)',
+      ls1.inj.res === 'cancel' && ls1.inj.ap && ls1.inj.diary && ls1.away.res === 'cancel' && ls1.away.ap && ls1.away.diary, JSON.stringify({ inj: ls1.inj, away: ls1.away }));
+    check('v3.16 lesson on the day: diary "Evening lesson with <name> (technique)", condition −5 (after the +10 rest), forced seed → +1 in ONE technical skill, other groups untouched; seeded, no Math.random, clues without numbers',
+      ls1.lesson.res === 'grew' && ls1.lesson.energy === 65 && ls1.lesson.grown.length === 1 && ls1.lesson.gain === 1 && ls1.lesson.others && ls1.lesson.diary && ls1.lesson.improved
+      && /\(.+\)/.test(ls1.lesson.text) && ls1.lesson.done && ls1.lesson.noNum && ls1.det && ls1.noRandom, JSON.stringify(ls1.lesson));
+    // (4) boots via DEBUG: 0 AP → the [1 AP] option is disabled; ≥ 1 AP → exactly 1 AP, $0, morale +5 (no agility loss)
+    await page.evaluate(() => { const s = YAM.game; s.weekState().ap = 0; s.budget = 300; s.eventLog = []; YAM.ui.debug.open(); YAM.ui.debug.tab = 'god'; YAM.ui.debug.render(); });
+    await page.click('#debug-body [data-cheat="fire:boots"]');
+    await page.waitForSelector('#talk-layer:not([hidden]) .talk-btn');
+    const ap0 = await page.evaluate(() => { const b = document.querySelector('#talk-choices .talk-btn[data-i="2"]');
+      return { n: document.querySelectorAll('#talk-choices .talk-btn').length, dis: b.disabled, tag: b.querySelector('.tb-ap')?.textContent, why: b.querySelector('.tb-why')?.textContent || '' }; });
+    await page.evaluate(() => { YAM.game.weekState().ap = 2; YAM.ui.events.open(); });   // the wallet refilled → re-render the open dialogue
+    const ap1 = await page.evaluate(() => { const pe = YAM.game.pendingEvent, k = YAM.game.player(pe.cast.kid); k.dyn.morale = 40;
+      return { dis: document.querySelector('#talk-choices .talk-btn[data-i="2"]').disabled, kid: k.id, agi: k.physical.agility, b: YAM.game.budget }; });
+    await talk(2);
+    const ap2 = await page.evaluate(k => { const s = YAM.game, p = s.player(k); return { ap: s.ap, b: s.budget, m: p.dyn.morale, agi: p.physical.agility, closed: !s.pendingEvent,
+      diary: s.diary.slice(-3).some(d => d.key === 'ev.boots.c.diary') }; }, ap1.kid);
+    check('v3.16 [1 AP] in Torn Boots (fired via DEBUG): 0 AP → disabled with a reason; with AP → exactly 1 AP, $0, morale +5, no agility loss',
+      ap0.n === 3 && ap0.dis && /AP|ОД/.test(ap0.tag) && ap0.why.length > 5 && !ap1.dis && ap2.ap === 1 && ap2.b === ap1.b && ap2.m === 45 && ap2.agi === ap1.agi && ap2.closed && ap2.diary,
+      JSON.stringify({ ap0, ap1, ap2 }));
+    // (5) knock [1 AP] → −$35, injury 8 days, 1 AP
+    await page.evaluate(() => { const s = YAM.game; s.weekState().ap = 1; s.budget = 300; s.squad.forEach(p => { p.injuryDays = 0; p.suspensionMatches = 0; p.awayDays = 0; p.absentToday = null; }); YAM.ui.events.fire('knock'); });
+    await page.waitForSelector('#talk-layer:not([hidden]) .talk-btn');
+    const kn0 = await page.evaluate(() => ({ kid: YAM.game.pendingEvent?.cast.kid, n: document.querySelectorAll('#talk-choices .talk-btn').length }));
+    await talk(2);
+    const kn1 = await page.evaluate(k => ({ b: YAM.game.budget, days: YAM.game.player(k).injuryDays, ap: YAM.game.ap, ledger: YAM.game.ledger[YAM.game.calendar.date.slice(0, 7)]?.event }), kn0.kid);
+    check('v3.16 [1 AP] in Knock: −$35 (booked as event), injury 8 days, 1 AP spent',
+      kn0.n === 3 && kn1.b === 265 && kn1.days === 8 && kn1.ap === 0, JSON.stringify({ kn0, kn1 }));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

@@ -137,6 +137,7 @@ class Player {
       this.plateau = Array.isArray(o.plateau) ? o.plateau.filter(g => typeof g === 'string') : [];   // v3.11: skill groups where the coach already noticed he stopped growing
       this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
       this.absentToday = o.absentToday || null;
+      this.lessonClues = Math.max(0, Math.round(o.lessonClues || 0));   // v3.16: lesson clues given (alternates archetype ↔ leadership)
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
       this.positionHintCooldown = Math.max(0, Math.round(o.positionHintCooldown || 0));   // v3.6: matches before he may ask again
       this.teamId = o.teamId || 'player_team';   // v3.1: 'player_team' | 'free_agent' | 'rival_N'   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
