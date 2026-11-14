@@ -69,7 +69,7 @@ const PortraitGenerator = (() => {
    physical  — acceleration, speed, agility, strength, baseStamina          (1–20, HIDDEN)
    technical — firstTouch, dribbling, passing, crossing, shooting, tackling, goalkeeping (1–20, HIDDEN)
    tactical  — positioning, vision, decisions                               (1–20, HIDDEN)
-   psych     — passion, discipline, composure (1–20) + potential (PA 1–100)  (HIDDEN)
+   psych     — passion, discipline, composure (1–20) + potential (1–20 = growth ceiling, v3.11)  (HIDDEN)
    dyn       — condition (= energy), sharpness (match tone), morale         (0–100)
    ========================================================= */
 const AttrGen = {
@@ -78,7 +78,7 @@ const AttrGen = {
     const P = PROFILES[position] || PROFILES.MID, out = {};
     for (const g of SKILL_KEYS) { out[g] = {}; for (const k of ATTR_GROUPS[g]) { const [lo, hi] = P[k]; out[g][k] = clamp(rndR(r, lo, hi) + mod, 1, 20); } }
     out.psych = { passion: rndR(r, 4, 18), discipline: rndR(r, 3, 18), composure: rndR(r, 3, 17),
-      potential: clamp(Math.round(30 + (r() + r() + r()) / 3 * 65 + mod * 2), 1, 100) };   // bell-ish 30–95
+      potential: clamp(Math.round(10.2 + (r() + r() + r()) / 3 * 9.1 + mod * 0.28), 1, 20) };   // v3.11: bell-ish 10–19 (same curve as the old PA 30–95)
     out.bio = AttrGen.bio(position, r, age, out.physical);
     return out;
   },
@@ -133,6 +133,7 @@ class Player {
       this.suspensionMatches = Math.max(0, Math.round(o.suspensionMatches || 0));  // v2.2: matches banned
       this.awayDays = Math.max(0, Math.round(o.awayDays || 0));                    // v2.3: kept at home by a parent (days)
       this.promiseBy = o.promiseBy || null;
+      this.plateau = Array.isArray(o.plateau) ? o.plateau.filter(g => typeof g === 'string') : [];   // v3.11: skill groups where the coach already noticed he stopped growing
       this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
       this.absentToday = o.absentToday || null;
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
@@ -146,7 +147,8 @@ class Player {
       : AttrGen.roll(position, seeded(id + name + '#v18'), 0, o.age);
     const src = fresh || o;
     for (const g of [...SKILL_KEYS, 'psych']) this[g] = { ...src[g] };
-    this.psych.potential = clamp(Math.round(src.psych.potential ?? 50), 1, 100);
+    { const v = src.psych.potential;   // v3.11: 1–20; a value above 20 can only be an old PA 1–100 save
+      this.psych.potential = !Number.isFinite(v) ? POTENTIAL.DEFAULT : v > POTENTIAL.MAX ? potentialFrom100(v) : clamp(Math.round(v), 1, 20); }
     const b = o.bio && Number.isInteger(o.bio.age) ? o.bio : (fresh?.bio || AttrGen.bio(position, seeded(id + name + '#bio'), o.age, this.physical));
     this.bio = { ...b };
     // v3.7: HIDDEN captain trait ('leader' | 'anxious' | 'normal') — seeded from id + name + psych, so old saves,

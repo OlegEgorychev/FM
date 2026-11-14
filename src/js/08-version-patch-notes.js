@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.10';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.11';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.11', name: { en: 'Room to Grow', ru: 'Есть куда расти' },
+    en: [
+      'Each kid\'s hidden potential now works as a plain ceiling on the same 1–20 scale as his skills: a kid with potential 15 can train every skill up to 15, never beyond.',
+      'Training growth is no longer wasted: a lucky roll always goes to a skill that still has room, instead of sometimes landing on one already at the limit.',
+      'New diary clue: when a kid has maxed out a whole area (fitness, ball work or tactics), the coach notices once that nothing new sticks — a hint to train something else.',
+      'Old saves convert automatically; the growth speed and the draft stars keep the same balance.',
+    ],
+    ru: [
+      'Скрытый потенциал каждого игрока теперь — простой потолок на той же шкале 1–20, что и навыки: с потенциалом 15 любой навык тренируется до 15, но не выше.',
+      'Рост на тренировках больше не пропадает: удачный бросок всегда достаётся навыку, которому ещё есть куда расти, а не упирается в уже максимальный.',
+      'Новая подсказка в дневнике: когда игрок упёрся в потолок во всей области (физика, работа с мячом или тактика), тренер один раз замечает, что ничего нового не прибавляется, — значит, пора тренировать другое.',
+      'Старые сохранения конвертируются сами; скорость роста и звёзды драфта сохраняют прежний баланс.',
+    ] },
   { v: '3.10', name: { en: 'Who Am I Swapping?', ru: 'С кем меняю?' },
     en: [
       'Team Management: with a kid selected, hover another kid in the list or on the tactics board and he lights up in BOTH places — a bright white frame and a \u21C4 badge on his dot show exactly who you are about to swap with.',

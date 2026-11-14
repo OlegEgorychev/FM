@@ -20,7 +20,7 @@ class DraftView {
   /** 1–5 stars: a loose mix of hidden quality and potential, plus yard-match luck (stable per kid). */
   static stars(p) {
     const luck = (seeded('yard' + p.id)() - 0.5) * 2.2;
-    return clamp(Math.round((p.overall - 7) / 1.8 + (p.psych.potential - 50) / 25 + luck), 1, 5);
+    return clamp(Math.round((p.overall - 7) / 1.8 + (p.psych.potential - 13) / 3.5 + luck), 1, 5);
   }
   open() { this.render(); this.layer.hidden = false; }
   close() { this.layer.hidden = true; }

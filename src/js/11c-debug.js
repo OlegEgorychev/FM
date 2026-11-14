@@ -17,7 +17,7 @@ class DebugConsole {
       positioning: 'POS', vision: 'VIS', decisions: 'DEC', passion: 'PSN', discipline: 'DSC', composure: 'CMP' };
     for (const g of ['physical', 'technical', 'tactical', 'psych'])
       for (const k of ATTR_GROUPS[g]) add(g.toUpperCase(), short[k], p => p[g][k], 20, k);
-    add('PSYCH', 'PA', p => p.psych.potential, 100, 'potential ability 1-100');
+    add('PSYCH', 'PA', p => p.psych.potential, 20, 'v3.11 potential 1-20 = ceiling for training growth');
     add('PSYCH', 'CAPT', p => L.t('dbg.cap.' + (p.captainTrait || 'normal')), null, 'v3.7 hidden captain trait: leader (rally +morale) / anxious (stress, may break down) / normal');
     add('PSYCH', 'LDR', p => p.leadership, 20, 'v3.8 hidden leadership 1-20 (≥14 leader, ≤7 anxious): armband reactions, captain initiatives, resignation');
     add('DYNAMIC', 'CON', p => Math.round(p.dyn.condition), 100, 'condition (energy)');

@@ -22,7 +22,7 @@ const NARRATIVE_EVENTS = [
       const helped = new Set(s.eventLog.filter(e => e.id === 'boots' && e.season === s.season).map(e => e.who));
       const snitch = pick(s.squad);
       // the "talented kid" is drawn from the 6 highest potentials (hidden), never the snitch himself
-      const pool = s.squad.filter(p => p !== snitch && !helped.has(p.id)).sort((a, b) => b.psych.potential - a.psych.potential).slice(0, 6);
+      const pool = s.squad.filter(p => p !== snitch && !helped.has(p.id)).sort((a, b) => b.psych.potential - a.psych.potential || b.overall - a.overall).slice(0, 6);   // v3.11: 1–20 ties → overall
       if (!pool.length) return null;
       return { snitch: snitch.id, kid: pick(pool).id };
     },

@@ -303,7 +303,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const okRange = (v, a, b) => Number.isFinite(v) && v >= a && v <= b;
       return { groups: sq.every(p => Object.entries(G).every(([g, n]) => Object.keys(p[g]).length === n)),
         skills: sq.every(p => ['physical', 'technical', 'tactical'].every(g => Object.values(p[g]).every(v => okRange(v, 1, 20)))),
-        pa: sq.every(p => okRange(p.psych.potential, 1, 100)), bio: sq.every(p => okRange(p.bio.age, 13, 16) && 'LR'.includes(p.bio.strongFoot) && okRange(p.bio.weakFoot, 1, 5) && p.bio.height > 130),
+        pa: sq.every(p => okRange(p.psych.potential, 1, 20) && Number.isInteger(p.psych.potential)), bio: sq.every(p => okRange(p.bio.age, 13, 16) && 'LR'.includes(p.bio.strongFoot) && okRange(p.bio.weakFoot, 1, 5) && p.bio.height > 130),
         dyn: sq.every(p => ['condition', 'sharpness', 'morale'].every(k => okRange(p.dyn[k], 0, 100)) && p.energy === p.dyn.condition),
         saved: /"technical":\{/.test(localStorage.getItem('yam_save_v1') || '') && !/"attrs"/.test(localStorage.getItem('yam_save_v1') || '') };
     });
@@ -1160,6 +1160,22 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('v3.10 swap hover: list ↔ board target sync (bench = list only, self ignored), Smart Swap + selection kept, no re-render; cleared on leave / Esc / screen / click swap; drag-over target + drop swap',
       Object.values(hv).every(Boolean), JSON.stringify(hv));
     await page.evaluate(() => YAM.ui.show('dash'));
+    // v3.11: potential 1–20 = growth ceiling; old PA 1–100 saves convert; growth skips maxed skills; plateau clue once per group
+    const pot = await page.evaluate(() => {
+      const G = YAM.game, sq = G.squad, p = sq.find(k => k.available) || sq[0];
+      const old = new Player({ ...JSON.parse(JSON.stringify(p)), psych: { ...p.psych, potential: 70 } });
+      const keep = new Player(JSON.parse(JSON.stringify(p)));
+      const tac = { ...p.tactical }, plat = [...(p.plateau || [])], mem = p.psych.potential;
+      p.psych.potential = 14; p.tactical = { positioning: 14, vision: 9, decisions: 14 };
+      let grew = 0; for (let i = 0; i < 20; i++) if (G.growSkill(p, REGIMES.tactics.grow) === true) grew++;
+      const capped = p.tactical.positioning === 14 && p.tactical.decisions === 14 && p.tactical.vision === 14 && grew === 5;
+      const flat = G.growSkill(p, REGIMES.tactics.grow) === 'plateau';
+      p.tactical = tac; p.plateau = plat; p.psych.potential = mem;
+      return { conv: old.psych.potential === 16, kept: keep.psych.potential === mem, capped, flat,
+        dbg: /PA 1–20/.test(L.t('dbg.dbHint')), text: L.t('tr.plateau.technical', { s: 'X' }).includes('X'),
+        draft: [1, 2, 3, 4, 5].includes(DraftView.stars(p)) };
+    });
+    check('v3.11 potential 1–20: old PA converts (70 → 16), saves keep it, growth only below the ceiling, plateau result + diary text', Object.values(pot).every(Boolean), JSON.stringify(pot));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

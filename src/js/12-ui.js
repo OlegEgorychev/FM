@@ -67,6 +67,7 @@ class UIController {
       if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
       const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
       if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
+      if (r.plateau?.length) s.addDiary({ date, key: 'tr.plateau.' + REGIMES[r.plan].grow.group, vars: { s: ids(r.plateau) }, cls: 'tr' });   // v3.11: hit his ceiling
       if (r.hurt.length) s.addDiary({ date, key: 'tr.hurt', vars: { s: ids(r.hurt) }, cls: 'ev' });
       for (const o of r.observed || []) {
         s.addDiary({ date, key: o.key, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.6 practice scouting

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.10</title>
+<title>Youth Academy Manager v3.11</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -2067,13 +2067,13 @@ const rndR = (r, a, b) => a + Math.floor(r() * (b - a + 1));
 
 /* =========================================================
    v1.8 PLAYER ATTRIBUTES — classic RPG / manager framework. ALL HIDDEN from the normal UI
-   (only DEBUG.EXE shows raw numbers). Skills 1–20, potential 1–100, dynamic states 0–100.
+   (only DEBUG.EXE shows raw numbers). Skills 1–20, potential 1–20 (v3.11: = growth ceiling), dynamic states 0–100.
    ========================================================= */
 const ATTR_GROUPS = {
   physical:  ['acceleration', 'speed', 'agility', 'strength', 'baseStamina'],
   technical: ['firstTouch', 'dribbling', 'passing', 'crossing', 'shooting', 'tackling', 'goalkeeping'],
   tactical:  ['positioning', 'vision', 'decisions'],
-  psych:     ['passion', 'discipline', 'composure'],          // + psych.potential (1–100)
+  psych:     ['passion', 'discipline', 'composure'],          // + psych.potential (1–20, v3.11)
 };
 const SKILL_KEYS = ['physical', 'technical', 'tactical'];     // groups that scale with club strength
 /* [min, max] per position (13–15 year olds). Psych is rolled the same for everybody. */
@@ -2129,7 +2129,8 @@ const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAI
    Attend: condition −10, sharpness +5. Skip chance = (SKIP_FROM − discipline) × SKIP_STEP (discipline 1 → 27%, 9 → 3%, 10+ → 0). */
 const TRAINING = { WEEKDAYS: [2, 4], DRAIN: 10, SHARP: 5, SKIP_FROM: 10, SKIP_STEP: 0.03 };
 /* v2.5 TRAINING REGIMES — the coach picks one every training day (attendees only; skippers get nothing).
-   grow: per attendee, chance × (0.6 + potential/100) to gain +1 in a random skill of `group` (capped by potential). */
+   grow: per attendee, chance × growthMult(p) to gain +1 in a random skill of `group` that is still below his potential
+   (v3.11: potential 1–20 IS the ceiling; skills already at it are skipped, so a roll is never wasted). */
 const REGIMES = {
   cardio:  { cond: 5,   sharp: 2, morale: -4, grow: { group: 'physical', keys: ['baseStamina', 'acceleration', 'speed'], chance: 0.06 } },
   match:   { cond: -10, sharp: 8, injury: 0.03, injDays: [2, 5] },
@@ -2137,7 +2138,13 @@ const REGIMES = {
   tactics: { cond: -5,  sharp: 2, extraSkip: 0.35, lowDisc: 8, grow: { group: 'tactical', chance: 0.12 } },
 };
 const REGIME_KEYS = Object.keys(REGIMES);
-const potentialCap = p => clamp(Math.round(6 + (p.psych?.potential ?? 50) * 0.14), 8, 20);   // PA 50 → 13, PA 100 → 20
+/* v3.11 POTENTIAL 1–20 = the ceiling of every trainable skill (was PA 1–100 → cap 6 + PA·0.14).
+   growthMult keeps the old curve: PA 50 (now 13) → ×1.1, PA 95 (now 19) → ×1.53. */
+const POTENTIAL = { MIN: 1, MAX: 20, DEFAULT: 13 };
+const potentialCap = p => clamp(Math.round(p.psych?.potential ?? POTENTIAL.DEFAULT), POTENTIAL.MIN, POTENTIAL.MAX);
+const growthMult = p => 0.6 + (potentialCap(p) - 6) / 14;
+/** Old saves stored PA 1–100 (rolled 24–100, never ≤ 20): convert with the old cap formula. */
+const potentialFrom100 = v => clamp(Math.round(6 + v * 0.14), 8, 20);
 /* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
 /* v3.0 EXCLUSIVE TEAM DUTIES + SET PIECES */
 const DUTIES = { captain: 'C', penalty: 'PK', corner: 'CK' };
@@ -2765,7 +2772,7 @@ Object.assign(I18N.ru, {
 Object.assign(I18N.en, {
   'pi.height': 'Height', 'pi.weight': 'Weight', 'pi.foot': 'Foot', 'pi.cm': '{n} cm', 'pi.kg': '{n} kg', 'pi.footL': 'Left', 'pi.footR': 'Right',
   'dbg.btn': '[DEBUG.EXE]', 'dbg.title': 'DEBUG.EXE — Academy Registry Editor', 'dbg.tabDb': 'DATABASE', 'dbg.tabGod': 'GOD MODE',
-  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — raw values, click a column to sort. Skills 1–20, PA 1–100, states 0–100. Composites = what the match engine rolls (incl. sharpness penalty).',
+  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — raw values, click a column to sort. Skills 1–20, PA 1–20 (growth ceiling), states 0–100. Composites = what the match engine rolls (incl. sharpness penalty).',
   'dbg.avg': 'Squad average', 'dbg.rows': '{n} players · {c} columns',
   'dbg.energy': 'Restore All Energy to 100%', 'dbg.energyD': 'Sets condition = 100 for the whole squad (and on the pitch, if a match is running).',
   'dbg.maxMs': 'Max Morale & Sharpness', 'dbg.maxMsD': 'Morale = 100 and sharpness = 100 for every kid.',
@@ -2778,7 +2785,7 @@ Object.assign(I18N.en, {
 Object.assign(I18N.ru, {
   'pi.height': 'Рост', 'pi.weight': 'Вес', 'pi.foot': 'Нога', 'pi.cm': '{n} см', 'pi.kg': '{n} кг', 'pi.footL': 'Левая', 'pi.footR': 'Правая',
   'dbg.btn': '[DEBUG.EXE]', 'dbg.title': 'DEBUG.EXE — редактор реестра академии', 'dbg.tabDb': 'БАЗА ДАННЫХ', 'dbg.tabGod': 'РЕЖИМ БОГА',
-  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — сырые значения, щёлкни по столбцу для сортировки. Навыки 1–20, PA 1–100, состояния 0–100. Композиты = то, что бросает движок матча (с учётом штрафа за форму).',
+  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — сырые значения, щёлкни по столбцу для сортировки. Навыки 1–20, PA 1–20 (потолок роста), состояния 0–100. Композиты = то, что бросает движок матча (с учётом штрафа за форму).',
   'dbg.avg': 'Среднее по составу', 'dbg.rows': 'Игроков: {n} · столбцов: {c}',
   'dbg.energy': 'Восстановить всю энергию до 100%', 'dbg.energyD': 'Кондиция = 100 у всего состава (и на поле, если идёт матч).',
   'dbg.maxMs': 'Макс. мораль и игровой тонус', 'dbg.maxMsD': 'Мораль = 100 и тонус = 100 у каждого игрока.',
@@ -3035,6 +3042,9 @@ Object.assign(I18N.en, {
   'plan.tech': 'Technical Drills', 'plan.tech.d': 'technique grows slowly, −−energy',
   'plan.tactics': 'Tactics Room', 'plan.tactics.d': 'tactics grow, restless kids skip',
   'cal.training': 'Training ({p}): {a} turned up. Skipped: {s}.', 'cal.trainingAll': 'Training ({p}): all {a} turned up.',
+  'tr.plateau.physical': 'Runs as hard as anyone, but his legs don\'t get any quicker: {s}. Maybe that\'s his limit.',
+  'tr.plateau.technical': 'The drills come easy, yet nothing new sticks: {s}. Looks like he has hit his ceiling with the ball.',
+  'tr.plateau.tactical': 'Nods along in the tactics room, but the game doesn\'t open up any further for him: {s}.',
   'tr.improved': 'Progress in training: {s}.', 'tr.hurt': 'Knocked in match practice: {s}.',
   'office.btn': '[ CALL INTO OFFICE ] · AP {n}', 'office.btnTip': 'Costs 1 action point (1 per day).', 'office.btnNoAp': 'No action points left today. Come back tomorrow.',
   'talk.roleOffice': '#{n} · {p} · coach\'s office',
@@ -3064,6 +3074,9 @@ Object.assign(I18N.ru, {
   'plan.tech': 'Техника', 'plan.tech.d': 'техника медленно растёт, −−энергия',
   'plan.tactics': 'Тактический класс', 'plan.tactics.d': 'тактика растёт, непоседы прогуливают',
   'cal.training': 'Тренировка ({p}): пришли {a}. Прогуляли: {s}.', 'cal.trainingAll': 'Тренировка ({p}): пришли все {a}.',
+  'tr.plateau.physical': 'Пашет наравне со всеми, но быстрее не становится: {s}. Похоже, это его предел.',
+  'tr.plateau.technical': 'Упражнения даются легко, но ничего нового не прибавляется: {s}. Кажется, с мячом он упёрся в потолок.',
+  'tr.plateau.tactical': 'Кивает на разборе тактики, но игру глубже читать не начинает: {s}.',
   'tr.improved': 'Прогресс на тренировке: {s}.', 'tr.hurt': 'Ушиб на игровой практике: {s}.',
   'office.btn': '[ ВЫЗВАТЬ В КАБИНЕТ ] · ОД {n}', 'office.btnTip': 'Стоит 1 очко действия (1 в день).', 'office.btnNoAp': 'Очков действий на сегодня нет. Приходи завтра.',
   'talk.roleOffice': '№{n} · {p} · кабинет тренера',
@@ -3750,7 +3763,7 @@ const PortraitGenerator = (() => {
    physical  — acceleration, speed, agility, strength, baseStamina          (1–20, HIDDEN)
    technical — firstTouch, dribbling, passing, crossing, shooting, tackling, goalkeeping (1–20, HIDDEN)
    tactical  — positioning, vision, decisions                               (1–20, HIDDEN)
-   psych     — passion, discipline, composure (1–20) + potential (PA 1–100)  (HIDDEN)
+   psych     — passion, discipline, composure (1–20) + potential (1–20 = growth ceiling, v3.11)  (HIDDEN)
    dyn       — condition (= energy), sharpness (match tone), morale         (0–100)
    ========================================================= */
 const AttrGen = {
@@ -3759,7 +3772,7 @@ const AttrGen = {
     const P = PROFILES[position] || PROFILES.MID, out = {};
     for (const g of SKILL_KEYS) { out[g] = {}; for (const k of ATTR_GROUPS[g]) { const [lo, hi] = P[k]; out[g][k] = clamp(rndR(r, lo, hi) + mod, 1, 20); } }
     out.psych = { passion: rndR(r, 4, 18), discipline: rndR(r, 3, 18), composure: rndR(r, 3, 17),
-      potential: clamp(Math.round(30 + (r() + r() + r()) / 3 * 65 + mod * 2), 1, 100) };   // bell-ish 30–95
+      potential: clamp(Math.round(10.2 + (r() + r() + r()) / 3 * 9.1 + mod * 0.28), 1, 20) };   // v3.11: bell-ish 10–19 (same curve as the old PA 30–95)
     out.bio = AttrGen.bio(position, r, age, out.physical);
     return out;
   },
@@ -3814,6 +3827,7 @@ class Player {
       this.suspensionMatches = Math.max(0, Math.round(o.suspensionMatches || 0));  // v2.2: matches banned
       this.awayDays = Math.max(0, Math.round(o.awayDays || 0));                    // v2.3: kept at home by a parent (days)
       this.promiseBy = o.promiseBy || null;
+      this.plateau = Array.isArray(o.plateau) ? o.plateau.filter(g => typeof g === 'string') : [];   // v3.11: skill groups where the coach already noticed he stopped growing
       this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
       this.absentToday = o.absentToday || null;
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
@@ -3827,7 +3841,8 @@ class Player {
       : AttrGen.roll(position, seeded(id + name + '#v18'), 0, o.age);
     const src = fresh || o;
     for (const g of [...SKILL_KEYS, 'psych']) this[g] = { ...src[g] };
-    this.psych.potential = clamp(Math.round(src.psych.potential ?? 50), 1, 100);
+    { const v = src.psych.potential;   // v3.11: 1–20; a value above 20 can only be an old PA 1–100 save
+      this.psych.potential = !Number.isFinite(v) ? POTENTIAL.DEFAULT : v > POTENTIAL.MAX ? potentialFrom100(v) : clamp(Math.round(v), 1, 20); }
     const b = o.bio && Number.isInteger(o.bio.age) ? o.bio : (fresh?.bio || AttrGen.bio(position, seeded(id + name + '#bio'), o.age, this.physical));
     this.bio = { ...b };
     // v3.7: HIDDEN captain trait ('leader' | 'anxious' | 'normal') — seeded from id + name + psych, so old saves,
@@ -4631,12 +4646,13 @@ class GameState {
     for (const p of cands) if (seeded(date + '#posreq#' + p.id)() < positionRequestChance(p.outOfPositionMatches)) return { pid: p.id, done: false };
     return null;
   }
-  /** v2.5: one random skill of a group +1 (capped by potential). Returns true if something improved. */
+  /** v2.5: one random skill of a group +1. v3.11: only skills still below his potential (1–20) are picked, so
+      a roll is never wasted on a maxed skill. Returns true if improved, 'plateau' if the whole group is at the ceiling. */
   growSkill(p, g) {
     let keys = g.keys || ATTR_GROUPS[g.group];
     if (g.group === 'technical') keys = p.archetype === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
-    const k = pick(keys), cap = potentialCap(p);
-    if (!k || p[g.group][k] >= cap) return false;
+    const cap = potentialCap(p), k = pick(keys.filter(k => p[g.group][k] < cap));   // same single Math.random as before
+    if (!k) return 'plateau';
     p[g.group][k]++;
     return true;
   }
@@ -4715,7 +4731,7 @@ class GameState {
   clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
 
   dayRoutine(date, training = !!date && isTrainingDay(date), plan = 'match') {
-    const skipped = [], improved = [], hurt = [], trained = [], R = REGIMES[plan] || REGIMES.match;
+    const skipped = [], improved = [], plateau = [], hurt = [], trained = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
     if (training) { const lk = this.runLocker(true); lk.done = true; }   // auto-sim: arrivals are rolled without the view
     else this.clearDayStatus();
@@ -4731,7 +4747,11 @@ class GameState {
         p.energy = clamp(p.energy + R.cond, 0, 100);
         p.dyn.sharpness = clamp(p.dyn.sharpness + R.sharp, 0, 100);
         if (R.morale) p.dyn.morale = clamp(p.dyn.morale + R.morale, 0, 100);
-        if (R.grow && Math.random() < R.grow.chance * (0.6 + p.psych.potential / 100) && this.growSkill(p, R.grow)) improved.push(p);
+        if (R.grow && Math.random() < R.grow.chance * growthMult(p)) {
+          const res = this.growSkill(p, R.grow);
+          if (res === true) improved.push(p);
+          else if (res === 'plateau' && !(p.plateau ||= []).includes(R.grow.group)) { p.plateau.push(R.grow.group); plateau.push(p); }   // v3.11: told once per group
+        }
         if (R.injury && Math.random() < R.injury) { p.injuryDays = Math.max(p.injuryDays, rnd(...R.injDays)); hurt.push(p); }
       } else {
         p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
@@ -4744,7 +4764,7 @@ class GameState {
     // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
     const observed = training && plan === 'match'
       ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
-    return { training, plan: training ? plan : null, attended, skipped, improved, hurt, observed };
+    return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
   tickInjuries() {
@@ -5752,8 +5772,21 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.10';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.11';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.11', name: { en: 'Room to Grow', ru: 'Есть куда расти' },
+    en: [
+      'Each kid\'s hidden potential now works as a plain ceiling on the same 1–20 scale as his skills: a kid with potential 15 can train every skill up to 15, never beyond.',
+      'Training growth is no longer wasted: a lucky roll always goes to a skill that still has room, instead of sometimes landing on one already at the limit.',
+      'New diary clue: when a kid has maxed out a whole area (fitness, ball work or tactics), the coach notices once that nothing new sticks — a hint to train something else.',
+      'Old saves convert automatically; the growth speed and the draft stars keep the same balance.',
+    ],
+    ru: [
+      'Скрытый потенциал каждого игрока теперь — простой потолок на той же шкале 1–20, что и навыки: с потенциалом 15 любой навык тренируется до 15, но не выше.',
+      'Рост на тренировках больше не пропадает: удачный бросок всегда достаётся навыку, которому ещё есть куда расти, а не упирается в уже максимальный.',
+      'Новая подсказка в дневнике: когда игрок упёрся в потолок во всей области (физика, работа с мячом или тактика), тренер один раз замечает, что ничего нового не прибавляется, — значит, пора тренировать другое.',
+      'Старые сохранения конвертируются сами; скорость роста и звёзды драфта сохраняют прежний баланс.',
+    ] },
   { v: '3.10', name: { en: 'Who Am I Swapping?', ru: 'С кем меняю?' },
     en: [
       'Team Management: with a kid selected, hover another kid in the list or on the tactics board and he lights up in BOTH places — a bright white frame and a \u21C4 badge on his dot show exactly who you are about to swap with.',
@@ -7150,7 +7183,7 @@ class DebugConsole {
       positioning: 'POS', vision: 'VIS', decisions: 'DEC', passion: 'PSN', discipline: 'DSC', composure: 'CMP' };
     for (const g of ['physical', 'technical', 'tactical', 'psych'])
       for (const k of ATTR_GROUPS[g]) add(g.toUpperCase(), short[k], p => p[g][k], 20, k);
-    add('PSYCH', 'PA', p => p.psych.potential, 100, 'potential ability 1-100');
+    add('PSYCH', 'PA', p => p.psych.potential, 20, 'v3.11 potential 1-20 = ceiling for training growth');
     add('PSYCH', 'CAPT', p => L.t('dbg.cap.' + (p.captainTrait || 'normal')), null, 'v3.7 hidden captain trait: leader (rally +morale) / anxious (stress, may break down) / normal');
     add('PSYCH', 'LDR', p => p.leadership, 20, 'v3.8 hidden leadership 1-20 (≥14 leader, ≤7 anxious): armband reactions, captain initiatives, resignation');
     add('DYNAMIC', 'CON', p => Math.round(p.dyn.condition), 100, 'condition (energy)');
@@ -7314,7 +7347,7 @@ const NARRATIVE_EVENTS = [
       const helped = new Set(s.eventLog.filter(e => e.id === 'boots' && e.season === s.season).map(e => e.who));
       const snitch = pick(s.squad);
       // the "talented kid" is drawn from the 6 highest potentials (hidden), never the snitch himself
-      const pool = s.squad.filter(p => p !== snitch && !helped.has(p.id)).sort((a, b) => b.psych.potential - a.psych.potential).slice(0, 6);
+      const pool = s.squad.filter(p => p !== snitch && !helped.has(p.id)).sort((a, b) => b.psych.potential - a.psych.potential || b.overall - a.overall).slice(0, 6);   // v3.11: 1–20 ties → overall
       if (!pool.length) return null;
       return { snitch: snitch.id, kid: pick(pool).id };
     },
@@ -8344,7 +8377,7 @@ class DraftView {
   /** 1–5 stars: a loose mix of hidden quality and potential, plus yard-match luck (stable per kid). */
   static stars(p) {
     const luck = (seeded('yard' + p.id)() - 0.5) * 2.2;
-    return clamp(Math.round((p.overall - 7) / 1.8 + (p.psych.potential - 50) / 25 + luck), 1, 5);
+    return clamp(Math.round((p.overall - 7) / 1.8 + (p.psych.potential - 13) / 3.5 + luck), 1, 5);
   }
   open() { this.render(); this.layer.hidden = false; }
   close() { this.layer.hidden = true; }
@@ -8449,6 +8482,7 @@ class UIController {
       if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
       const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
       if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
+      if (r.plateau?.length) s.addDiary({ date, key: 'tr.plateau.' + REGIMES[r.plan].grow.group, vars: { s: ids(r.plateau) }, cls: 'tr' });   // v3.11: hit his ceiling
       if (r.hurt.length) s.addDiary({ date, key: 'tr.hurt', vars: { s: ids(r.hurt) }, cls: 'ev' });
       for (const o of r.observed || []) {
         s.addDiary({ date, key: o.key, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.6 practice scouting

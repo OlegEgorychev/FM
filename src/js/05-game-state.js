@@ -351,12 +351,13 @@ class GameState {
     for (const p of cands) if (seeded(date + '#posreq#' + p.id)() < positionRequestChance(p.outOfPositionMatches)) return { pid: p.id, done: false };
     return null;
   }
-  /** v2.5: one random skill of a group +1 (capped by potential). Returns true if something improved. */
+  /** v2.5: one random skill of a group +1. v3.11: only skills still below his potential (1–20) are picked, so
+      a roll is never wasted on a maxed skill. Returns true if improved, 'plateau' if the whole group is at the ceiling. */
   growSkill(p, g) {
     let keys = g.keys || ATTR_GROUPS[g.group];
     if (g.group === 'technical') keys = p.archetype === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
-    const k = pick(keys), cap = potentialCap(p);
-    if (!k || p[g.group][k] >= cap) return false;
+    const cap = potentialCap(p), k = pick(keys.filter(k => p[g.group][k] < cap));   // same single Math.random as before
+    if (!k) return 'plateau';
     p[g.group][k]++;
     return true;
   }
@@ -435,7 +436,7 @@ class GameState {
   clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
 
   dayRoutine(date, training = !!date && isTrainingDay(date), plan = 'match') {
-    const skipped = [], improved = [], hurt = [], trained = [], R = REGIMES[plan] || REGIMES.match;
+    const skipped = [], improved = [], plateau = [], hurt = [], trained = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
     if (training) { const lk = this.runLocker(true); lk.done = true; }   // auto-sim: arrivals are rolled without the view
     else this.clearDayStatus();
@@ -451,7 +452,11 @@ class GameState {
         p.energy = clamp(p.energy + R.cond, 0, 100);
         p.dyn.sharpness = clamp(p.dyn.sharpness + R.sharp, 0, 100);
         if (R.morale) p.dyn.morale = clamp(p.dyn.morale + R.morale, 0, 100);
-        if (R.grow && Math.random() < R.grow.chance * (0.6 + p.psych.potential / 100) && this.growSkill(p, R.grow)) improved.push(p);
+        if (R.grow && Math.random() < R.grow.chance * growthMult(p)) {
+          const res = this.growSkill(p, R.grow);
+          if (res === true) improved.push(p);
+          else if (res === 'plateau' && !(p.plateau ||= []).includes(R.grow.group)) { p.plateau.push(R.grow.group); plateau.push(p); }   // v3.11: told once per group
+        }
         if (R.injury && Math.random() < R.injury) { p.injuryDays = Math.max(p.injuryDays, rnd(...R.injDays)); hurt.push(p); }
       } else {
         p.energy = clamp(p.energy + ENERGY.DAILY_REST, 0, 100);
@@ -464,7 +469,7 @@ class GameState {
     // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
     const observed = training && plan === 'match'
       ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
-    return { training, plan: training ? plan : null, attended, skipped, improved, hurt, observed };
+    return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed };
   }
   /** v2.2: one calendar day of healing (rest days AND the match day itself). Returns kids who just got fit. */
   tickInjuries() {
