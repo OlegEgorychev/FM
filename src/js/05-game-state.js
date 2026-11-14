@@ -351,14 +351,15 @@ class GameState {
     for (const p of cands) if (seeded(date + '#posreq#' + p.id)() < positionRequestChance(p.outOfPositionMatches)) return { pid: p.id, done: false };
     return null;
   }
-  /** v2.5: one random skill of a group +1. v3.11: only skills still below his potential (1–20) are picked, so
-      a roll is never wasted on a maxed skill. Returns true if improved, 'plateau' if the whole group is at the ceiling. */
+  /** v2.5: one random skill of a group +1. v3.12: only skills with growth room left are picked (gains < room, < 20), so
+      a roll is never wasted on a maxed skill. Returns true if improved, 'plateau' if the whole group has no room left. */
   growSkill(p, g) {
     let keys = g.keys || ATTR_GROUPS[g.group];
     if (g.group === 'technical') keys = p.archetype === 'GK' ? ['goalkeeping', 'passing', 'firstTouch'] : keys.filter(k => k !== 'goalkeeping');
-    const cap = potentialCap(p), k = pick(keys.filter(k => p[g.group][k] < cap));   // same single Math.random as before
+    const k = pick(keys.filter(k => canGrow(p, g.group, k)));   // same single Math.random as before
     if (!k) return 'plateau';
     p[g.group][k]++;
+    (p.gains ||= {})[k] = (p.gains[k] || 0) + 1;
     return true;
   }
   /** v2.4: one non-match calendar day. Training day (Tue/Thu): fit kids roll vs discipline —

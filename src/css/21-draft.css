@@ -23,7 +23,9 @@
 .dr-name{ font: bold 12px/1.1 var(--ui); text-align: center; min-height: 2.2em; }
 .dr-bio{ display: grid; grid-template-columns: auto 1fr; gap: 1px 6px; margin: 0; width: 100%; font-size: 11px; }
 .dr-bio dt{ color: #6a6555; } .dr-bio dd{ margin: 0; text-align: right; font-family: var(--mono); font-size: 13px; }
-.dr-stars{ font-size: 16px; color: #b8860b; letter-spacing: 1px; } .dr-stars span{ color: #c9c2a8; }
+.dr-notes{ list-style: none; margin: 0; padding: 3px 0 0; width: 100%; min-height: 2.6em; display: flex; flex-direction: column; gap: 1px;
+  border-top: 1px dashed #a49f8a; font: italic 12px/1.15 'Comic Sans MS', 'Segoe Print', cursive; color: #1d3f8a; }   /* v3.12: coach's pencil notes */
+.dr-notes li::before{ content: '\2013\00a0'; } .dr-notes li.quiet{ color: #7a7563; }
 .dr-btn{ width: 100%; padding: 4px; cursor: pointer; font: bold 11px/1.2 var(--mono); letter-spacing: .5px; text-transform: uppercase;
   color: #fff; background: #2f6b2a; border: 2px solid; border-color: #6aa060 #10240e #10240e #6aa060; border-radius: 0; }
 .dr-card.on .dr-btn{ background: #6b3a2a; border-color: #a0706a #24100e #24100e #a0706a; }

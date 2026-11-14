@@ -69,7 +69,7 @@ const PortraitGenerator = (() => {
    physical  — acceleration, speed, agility, strength, baseStamina          (1–20, HIDDEN)
    technical — firstTouch, dribbling, passing, crossing, shooting, tackling, goalkeeping (1–20, HIDDEN)
    tactical  — positioning, vision, decisions                               (1–20, HIDDEN)
-   psych     — passion, discipline, composure (1–20) + potential (1–20 = growth ceiling, v3.11)  (HIDDEN)
+   psych     — passion, discipline, composure (1–20) + potential (v3.12: growth room 1–10)  (HIDDEN)
    dyn       — condition (= energy), sharpness (match tone), morale         (0–100)
    ========================================================= */
 const AttrGen = {
@@ -78,8 +78,9 @@ const AttrGen = {
     const P = PROFILES[position] || PROFILES.MID, out = {};
     for (const g of SKILL_KEYS) { out[g] = {}; for (const k of ATTR_GROUPS[g]) { const [lo, hi] = P[k]; out[g][k] = clamp(rndR(r, lo, hi) + mod, 1, 20); } }
     out.psych = { passion: rndR(r, 4, 18), discipline: rndR(r, 3, 18), composure: rndR(r, 3, 17),
-      potential: clamp(Math.round(10.2 + (r() + r() + r()) / 3 * 9.1 + mod * 0.28), 1, 20) };   // v3.11: bell-ish 10–19 (same curve as the old PA 30–95)
+      potential: Math.round(2 + (r() + r() + r()) / 3 * 6 + mod * 0.2) };   // v3.12: growth room, bell-ish 2–8 (same 3 random calls)
     out.bio = AttrGen.bio(position, r, age, out.physical);
+    out.psych.potential = clamp(out.psych.potential + (GROWTH.AGE[out.bio.age] ?? 0), GROWTH.MIN, GROWTH.MAX);   // younger → more room
     return out;
   },
   bio(position, r, age, phys) {
@@ -147,8 +148,6 @@ class Player {
       : AttrGen.roll(position, seeded(id + name + '#v18'), 0, o.age);
     const src = fresh || o;
     for (const g of [...SKILL_KEYS, 'psych']) this[g] = { ...src[g] };
-    { const v = src.psych.potential;   // v3.11: 1–20; a value above 20 can only be an old PA 1–100 save
-      this.psych.potential = !Number.isFinite(v) ? POTENTIAL.DEFAULT : v > POTENTIAL.MAX ? potentialFrom100(v) : clamp(Math.round(v), 1, 20); }
     const b = o.bio && Number.isInteger(o.bio.age) ? o.bio : (fresh?.bio || AttrGen.bio(position, seeded(id + name + '#bio'), o.age, this.physical));
     this.bio = { ...b };
     // v3.7: HIDDEN captain trait ('leader' | 'anxious' | 'normal') — seeded from id + name + psych, so old saves,
@@ -168,6 +167,12 @@ class Player {
     this.dyn = { condition: clamp(Math.round(d.condition ?? o.energy ?? 100), 0, 100),
       sharpness: clamp(Math.round(d.sharpness ?? rndR(r, 55, 75)), 0, 100),
       morale: clamp(Math.round(d.morale ?? rndR(r, 55, 75)), 0, 100) };
+    // v3.12: potential = growth room 1–10, `gains` = points each skill already gained in training.
+    // Older saves (no `gains`) stored a ceiling (v3.11: 1–20, before: PA 1–100) → room = ceiling − overall (≥ 2).
+    const newRoom = !!fresh || (o.gains && typeof o.gains === 'object');
+    this.gains = newRoom && !fresh ? Object.fromEntries(Object.entries(o.gains).filter(([, n]) => Number.isFinite(n) && n > 0)) : {};
+    { const v = src.psych.potential;
+      this.psych.potential = !Number.isFinite(v) ? GROWTH.DEFAULT : newRoom ? clamp(Math.round(v), GROWTH.MIN, GROWTH.MAX) : roomFromCeiling(v, this.overall); }
     this.refreshPortrait();
   }
   /** v3.0: what the UI calls the position — the coach's tag for academy kids, the (scouted) role for opponents. */
@@ -229,6 +234,6 @@ class Player {
     usedSurnames.add(last);
     const a = AttrGen.roll(position, Math.random, mod);
     return new Player({ id, name: `${pick(FIRST)} ${last}`, archetype: position, number, tags: withTags ? [] : undefined, face: PortraitGenerator.roll(),
-      ...a, dyn: { condition: 100, sharpness: rnd(55, 75), morale: rnd(55, 75) } });
+      ...a, gains: {}, dyn: { condition: 100, sharpness: rnd(55, 75), morale: rnd(55, 75) } });   // v3.12: gains = new-scale room
   }
 }

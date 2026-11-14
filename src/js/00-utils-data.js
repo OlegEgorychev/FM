@@ -31,13 +31,13 @@ const rndR = (r, a, b) => a + Math.floor(r() * (b - a + 1));
 
 /* =========================================================
    v1.8 PLAYER ATTRIBUTES — classic RPG / manager framework. ALL HIDDEN from the normal UI
-   (only DEBUG.EXE shows raw numbers). Skills 1–20, potential 1–20 (v3.11: = growth ceiling), dynamic states 0–100.
+   (only DEBUG.EXE shows raw numbers). Skills 1–20, potential = growth room 1–10 (v3.12), dynamic states 0–100.
    ========================================================= */
 const ATTR_GROUPS = {
   physical:  ['acceleration', 'speed', 'agility', 'strength', 'baseStamina'],
   technical: ['firstTouch', 'dribbling', 'passing', 'crossing', 'shooting', 'tackling', 'goalkeeping'],
   tactical:  ['positioning', 'vision', 'decisions'],
-  psych:     ['passion', 'discipline', 'composure'],          // + psych.potential (1–20, v3.11)
+  psych:     ['passion', 'discipline', 'composure'],          // + psych.potential (v3.12: growth room 1–10 = +points per skill)
 };
 const SKILL_KEYS = ['physical', 'technical', 'tactical'];     // groups that scale with club strength
 /* [min, max] per position (13–15 year olds). Psych is rolled the same for everybody. */
@@ -93,8 +93,8 @@ const SHARPNESS = { RUSTY: 50, RUSTY_PEN: 2, PLAYED: 12, SUB: 6, UNUSED: -2, DAI
    Attend: condition −10, sharpness +5. Skip chance = (SKIP_FROM − discipline) × SKIP_STEP (discipline 1 → 27%, 9 → 3%, 10+ → 0). */
 const TRAINING = { WEEKDAYS: [2, 4], DRAIN: 10, SHARP: 5, SKIP_FROM: 10, SKIP_STEP: 0.03 };
 /* v2.5 TRAINING REGIMES — the coach picks one every training day (attendees only; skippers get nothing).
-   grow: per attendee, chance × growthMult(p) to gain +1 in a random skill of `group` that is still below his potential
-   (v3.11: potential 1–20 IS the ceiling; skills already at it are skipped, so a roll is never wasted). */
+   grow: per attendee, chance × growthMult(p) to gain +1 in a random skill of `group` that still has room
+   (v3.12: every skill can grow `potential` points above its start, max 20; maxed skills are skipped, so a roll is never wasted). */
 const REGIMES = {
   cardio:  { cond: 5,   sharp: 2, morale: -4, grow: { group: 'physical', keys: ['baseStamina', 'acceleration', 'speed'], chance: 0.06 } },
   match:   { cond: -10, sharp: 8, injury: 0.03, injDays: [2, 5] },
@@ -102,13 +102,21 @@ const REGIMES = {
   tactics: { cond: -5,  sharp: 2, extraSkip: 0.35, lowDisc: 8, grow: { group: 'tactical', chance: 0.12 } },
 };
 const REGIME_KEYS = Object.keys(REGIMES);
-/* v3.11 POTENTIAL 1–20 = the ceiling of every trainable skill (was PA 1–100 → cap 6 + PA·0.14).
-   growthMult keeps the old curve: PA 50 (now 13) → ×1.1, PA 95 (now 19) → ×1.53. */
-const POTENTIAL = { MIN: 1, MAX: 20, DEFAULT: 13 };
-const potentialCap = p => clamp(Math.round(p.psych?.potential ?? POTENTIAL.DEFAULT), POTENTIAL.MIN, POTENTIAL.MAX);
-const growthMult = p => 0.6 + (potentialCap(p) - 6) / 14;
-/** Old saves stored PA 1–100 (rolled 24–100, never ≤ 20): convert with the old cap formula. */
-const potentialFrom100 = v => clamp(Math.round(6 + v * 0.14), 8, 20);
+/* v3.12 GROWTH ROOM — psych.potential (HIDDEN) = how many points EVERY skill can still gain above its starting value
+   (p.gains counts what each skill already gained; 20 stays the hard max). Rolled independently of current quality
+   (late bloomers / early peakers); younger kids get more. growthMult: room 2 → ×0.8, 5 → ×1.1, 8 → ×1.4. */
+const GROWTH = { MIN: 1, MAX: 10, DEFAULT: 5, AGE: { 13: 1, 14: 0, 15: -1, 16: -2 } };
+const growthRoom = p => clamp(Math.round(p.psych?.potential ?? GROWTH.DEFAULT), GROWTH.MIN, GROWTH.MAX);
+const growthMult = p => 0.6 + growthRoom(p) / 10;
+/** Can this skill still grow? (room left and below 20) */
+const canGrow = (p, g, k) => (p.gains?.[k] || 0) < growthRoom(p) && p[g][k] < 20;
+/** Pre-v3.12 saves stored a ceiling: v3.11 = 1–20, older = PA 1–100 (always > 20). Room = ceiling − overall, at least 2. */
+const roomFromCeiling = (v, overall) => clamp(Math.round((v > 20 ? clamp(Math.round(6 + v * 0.14), 8, 20) : v) - overall), 2, GROWTH.MAX);
+/* v3.12 YARD NOTES (draft cards, replace the old stars): what the coach noticed in one muddy afternoon — only CURRENT
+   strengths (never the growth room); a trait shows when its value ≥ SHOW, up to 2 per kid; each note is wrong with WRONG chance. */
+const YARD = { SHOW: 14, MAX: 2, WRONG: 0.2,
+  TRAITS: { pace: p => p.rating('Speed'), dribble: p => p.rating('Dribble'), pass: p => p.rating('Pass'), shot: p => p.rating('Shoot'),
+    tackle: p => p.rating('Tackle'), hands: p => p.rating('Save'), engine: p => p.physical.baseStamina - 1, strong: p => p.physical.strength - 1 } };   // raw skills swing more than composites → −1
 /* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
 /* v3.0 EXCLUSIVE TEAM DUTIES + SET PIECES */
 const DUTIES = { captain: 'C', penalty: 'PK', corner: 'CK' };

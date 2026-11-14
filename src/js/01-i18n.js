@@ -481,7 +481,7 @@ Object.assign(I18N.ru, {
 Object.assign(I18N.en, {
   'pi.height': 'Height', 'pi.weight': 'Weight', 'pi.foot': 'Foot', 'pi.cm': '{n} cm', 'pi.kg': '{n} kg', 'pi.footL': 'Left', 'pi.footR': 'Right',
   'dbg.btn': '[DEBUG.EXE]', 'dbg.title': 'DEBUG.EXE — Academy Registry Editor', 'dbg.tabDb': 'DATABASE', 'dbg.tabGod': 'GOD MODE',
-  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — raw values, click a column to sort. Skills 1–20, PA 1–20 (growth ceiling), states 0–100. Composites = what the match engine rolls (incl. sharpness penalty).',
+  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — raw values, click a column to sort. Skills 1–20, ROOM 1–10 (+points each skill can still gain), states 0–100. Composites = what the match engine rolls (incl. sharpness penalty).',
   'dbg.avg': 'Squad average', 'dbg.rows': '{n} players · {c} columns',
   'dbg.energy': 'Restore All Energy to 100%', 'dbg.energyD': 'Sets condition = 100 for the whole squad (and on the pitch, if a match is running).',
   'dbg.maxMs': 'Max Morale & Sharpness', 'dbg.maxMsD': 'Morale = 100 and sharpness = 100 for every kid.',
@@ -494,7 +494,7 @@ Object.assign(I18N.en, {
 Object.assign(I18N.ru, {
   'pi.height': 'Рост', 'pi.weight': 'Вес', 'pi.foot': 'Нога', 'pi.cm': '{n} см', 'pi.kg': '{n} кг', 'pi.footL': 'Левая', 'pi.footR': 'Правая',
   'dbg.btn': '[DEBUG.EXE]', 'dbg.title': 'DEBUG.EXE — редактор реестра академии', 'dbg.tabDb': 'БАЗА ДАННЫХ', 'dbg.tabGod': 'РЕЖИМ БОГА',
-  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — сырые значения, щёлкни по столбцу для сортировки. Навыки 1–20, PA 1–20 (потолок роста), состояния 0–100. Композиты = то, что бросает движок матча (с учётом штрафа за форму).',
+  'dbg.dbHint': 'HKEY_ACADEMY\\Squad — сырые значения, щёлкни по столбцу для сортировки. Навыки 1–20, ROOM 1–10 (на сколько ещё может вырасти каждый навык), состояния 0–100. Композиты = то, что бросает движок матча (с учётом штрафа за форму).',
   'dbg.avg': 'Среднее по составу', 'dbg.rows': 'Игроков: {n} · столбцов: {c}',
   'dbg.energy': 'Восстановить всю энергию до 100%', 'dbg.energyD': 'Кондиция = 100 у всего состава (и на поле, если идёт матч).',
   'dbg.maxMs': 'Макс. мораль и игровой тонус', 'dbg.maxMsD': 'Мораль = 100 и тонус = 100 у каждого игрока.',
@@ -970,17 +970,25 @@ Object.assign(I18N.ru, {
 Object.assign(I18N.en, {
   'draft.title': 'The Yard Match',
   'draft.prompt': 'You arrive at a muddy local pitch. Dozens of kids are playing a chaotic tournament. You have room in your minivan for 15 players to form your new Academy. Choose wisely based on their physical builds and their yard-match performance.',
-  'draft.hint': 'All you can see: faces, ages, sizes — and how they did today in the mud (★). Their real football is a mystery.',
+  'draft.hint': 'All you can see: faces, ages, sizes — and a few scribbles about what caught your eye in the mud. How far each kid can grow is anyone\'s guess.',
+  'draft.notesTip': 'Your notes from one chaotic afternoon. They only describe what he can do today — and the mud lies sometimes.',
+  'yard.pace': 'quick off the mark', 'yard.dribble': 'keeps the ball close', 'yard.pass': 'sees the pass', 'yard.shot': 'hits it hard',
+  'yard.tackle': 'wins his tackles', 'yard.hands': 'safe hands in goal', 'yard.engine': 'runs all afternoon', 'yard.strong': 'strong for his age',
+  'yard.quiet': 'didn\'t stand out today',
   'draft.count': 'Minivan: <b>{n}</b>/{m}', 'draft.sign': '[ Sign to academy ]', 'draft.release': '[ Leave him ]',
-  'draft.start': '&#9654; START SEASON', 'draft.startNeed': 'Pick {n} more kid(s)', 'draft.starsTip': 'Yard match rating: a rough impression from one chaotic afternoon.',
+  'draft.start': '&#9654; START SEASON', 'draft.startNeed': 'Pick {n} more kid(s)',
   'draft.diary': 'The minivan is full: {n} kids from the yard match form the new academy.',
 });
 Object.assign(I18N.ru, {
   'draft.title': 'Дворовый матч',
   'draft.prompt': 'Ты приезжаешь на грязное местное поле. Десятки ребят играют в хаотичный турнир. В твоём минивэне 15 мест — это будет твоя новая академия. Выбирай с умом: по телосложению и по тому, как они играют во дворе.',
-  'draft.hint': 'Видно только лица, возраст, рост и вес — и как они сыграли сегодня в грязи (★). Настоящий их футбол — загадка.',
+  'draft.hint': 'Видно только лица, возраст, рост и вес — и пара пометок о том, что бросилось в глаза в грязи. Насколько каждый может вырасти — не знает никто.',
+  'draft.notesTip': 'Твои пометки за один сумбурный день. Они только о том, что он умеет сегодня, — и грязь иногда обманывает.',
+  'yard.pace': 'резкий на старте', 'yard.dribble': 'держит мяч у ноги', 'yard.pass': 'видит пас', 'yard.shot': 'сильно бьёт',
+  'yard.tackle': 'выигрывает отбор', 'yard.hands': 'надёжные руки в воротах', 'yard.engine': 'бегает весь день', 'yard.strong': 'крепкий для своего возраста',
+  'yard.quiet': 'сегодня ничем не выделился',
   'draft.count': 'Минивэн: <b>{n}</b>/{m}', 'draft.sign': '[ Взять в академию ]', 'draft.release': '[ Оставить ]',
-  'draft.start': '&#9654; НАЧАТЬ СЕЗОН', 'draft.startNeed': 'Выбери ещё {n}', 'draft.starsTip': 'Оценка за дворовый матч: грубое впечатление от одного сумбурного дня.',
+  'draft.start': '&#9654; НАЧАТЬ СЕЗОН', 'draft.startNeed': 'Выбери ещё {n}',
   'draft.diary': 'Минивэн полон: {n} ребят с дворового матча — это новая академия.',
 });
 

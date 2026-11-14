@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.11';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.12';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.12', name: { en: 'Late Bloomers', ru: 'Поздние таланты' },
+    en: [
+      'Hidden potential now means room to grow: every skill can climb the same number of points above where it started (up to 20). A sharp shooter keeps getting sharper instead of freezing at his limit.',
+      'How much a kid can grow has nothing to do with how good he is today: a quiet two-star lad may become your best player, and the yard-match hero may already be close to his peak. The youngest kids usually have the most room.',
+      'The Yard Match has no more stars. Instead each card carries your pencil notes from the mud — "quick off the mark", "hits it hard", "didn\'t stand out today". They describe today only, and the mud lies sometimes.',
+      'Old saves convert automatically: each kid keeps roughly the growth he had left.',
+    ],
+    ru: [
+      'Скрытый потенциал теперь означает запас роста: каждый навык может подняться на одно и то же число пунктов от стартового значения (максимум до 20). Меткий бомбардир продолжает прибавлять, а не замирает на потолке.',
+      'Насколько игрок вырастет, никак не связано с тем, насколько он хорош сегодня: тихий середнячок может стать лучшим в команде, а герой дворового матча — уже почти упереться в свой предел. Больше всего запас обычно у самых младших.',
+      'На дворовом матче больше нет звёзд. Вместо них на каждой карточке твои пометки карандашом — «резкий на старте», «сильно бьёт», «сегодня ничем не выделился». Они только про сегодняшний день, и грязь иногда обманывает.',
+      'Старые сохранения конвертируются сами: у каждого игрока остаётся примерно тот же запас роста, что был.',
+    ] },
   { v: '3.11', name: { en: 'Room to Grow', ru: 'Есть куда расти' },
     en: [
       'Each kid\'s hidden potential now works as a plain ceiling on the same 1–20 scale as his skills: a kid with potential 15 can train every skill up to 15, never beyond.',

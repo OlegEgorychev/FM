@@ -69,7 +69,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const s = YAM.game, w = s.globalPlayers, g = document.getElementById('dr-grid'), card = g.querySelector('.dr-card');
       return { open: !document.getElementById('intro-draft-view').hidden, phase: s.phase, world: w.length, free: w.filter(p => p.teamId === 'free_agent').length,
         rivals: w.filter(p => /^rival_/.test(p.teamId)).length, squad: s.squad.length, cards: g.querySelectorAll('.dr-card').length,
-        allFree: s.draft.pool.every(id => w.find(p => p.id === id).teamId === 'free_agent'), stars: !!card.querySelector('.dr-stars'), face: !!card.querySelector('svg'),
+        allFree: s.draft.pool.every(id => w.find(p => p.id === id).teamId === 'free_agent'), notes: !!card.querySelector('.dr-notes li') && !card.querySelector('.dr-stars') && !/★/.test(g.textContent), face: !!card.querySelector('svg'),
         noPos: !card.querySelector('.pos'), bio: (card.querySelector('.dr-bio').textContent.match(/\d+/g) || []).length === 3, start: document.getElementById('dr-start').disabled };
     });
     for (let i = 0; i < 16; i++) await page.click(`#dr-grid .dr-card:nth-child(${i + 1}) [data-sign]`, { force: true });   // the 16th must be refused
@@ -84,8 +84,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const dr2 = await page.evaluate(ids => { const s = YAM.game; return { phase: s.phase, n: s.squad.length, same: s.squad.every(p => ids.includes(p.id)) && ids.length === 15,
       team: s.squad.every(p => p.teamId === 'player_team'), free: s.globalPlayers.filter(p => p.teamId === 'free_agent').length, world: s.globalPlayers.length,
       xi: s.lineup.length === 11 && s.lineup.every(id => ids.includes(id)), closed: document.getElementById('intro-draft-view').hidden, nums: s.squad.map(p => p.number).sort((a, b) => a - b).join() }; }, picked);
-    check('Yard Match draft: 100-kid world (40 at rivals, 60 free), 30 free agents shown with face/age/height/weight/stars only; exactly 15 signed (16th refused, survives reload); START SEASON → squad = those 15',
-      dr0.open && dr0.phase === 'draft' && dr0.world === 100 && dr0.free === 60 && dr0.rivals === 40 && dr0.squad === 0 && dr0.cards === 30 && dr0.allFree && dr0.stars && dr0.face && dr0.noPos && dr0.bio && dr0.start
+    check('Yard Match draft: 100-kid world (40 at rivals, 60 free), 30 free agents shown with face/age/height/weight + yard notes only (no stars); exactly 15 signed (16th refused, survives reload); START SEASON → squad = those 15',
+      dr0.open && dr0.phase === 'draft' && dr0.world === 100 && dr0.free === 60 && dr0.rivals === 40 && dr0.squad === 0 && dr0.cards === 30 && dr0.allFree && dr0.notes && dr0.face && dr0.noPos && dr0.bio && dr0.start
       && dr1.signed === 15 && dr1.open && dr1.start && dr1.off === 15 && dr2.phase === 'calendar' && dr2.n === 15 && dr2.same && dr2.team && dr2.free === 45 && dr2.world === 100 && dr2.xi && dr2.closed
       && dr2.nums === Array.from({ length: 15 }, (_, i) => i + 1).join(), JSON.stringify({ dr0, dr1, dr2 }));
 
@@ -303,7 +303,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const okRange = (v, a, b) => Number.isFinite(v) && v >= a && v <= b;
       return { groups: sq.every(p => Object.entries(G).every(([g, n]) => Object.keys(p[g]).length === n)),
         skills: sq.every(p => ['physical', 'technical', 'tactical'].every(g => Object.values(p[g]).every(v => okRange(v, 1, 20)))),
-        pa: sq.every(p => okRange(p.psych.potential, 1, 20) && Number.isInteger(p.psych.potential)), bio: sq.every(p => okRange(p.bio.age, 13, 16) && 'LR'.includes(p.bio.strongFoot) && okRange(p.bio.weakFoot, 1, 5) && p.bio.height > 130),
+        pa: sq.every(p => okRange(p.psych.potential, 1, 10) && Number.isInteger(p.psych.potential) && p.gains && typeof p.gains === 'object'), bio: sq.every(p => okRange(p.bio.age, 13, 16) && 'LR'.includes(p.bio.strongFoot) && okRange(p.bio.weakFoot, 1, 5) && p.bio.height > 130),
         dyn: sq.every(p => ['condition', 'sharpness', 'morale'].every(k => okRange(p.dyn[k], 0, 100)) && p.energy === p.dyn.condition),
         saved: /"technical":\{/.test(localStorage.getItem('yam_save_v1') || '') && !/"attrs"/.test(localStorage.getItem('yam_save_v1') || '') };
     });
@@ -1160,22 +1160,26 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('v3.10 swap hover: list ↔ board target sync (bench = list only, self ignored), Smart Swap + selection kept, no re-render; cleared on leave / Esc / screen / click swap; drag-over target + drop swap',
       Object.values(hv).every(Boolean), JSON.stringify(hv));
     await page.evaluate(() => YAM.ui.show('dash'));
-    // v3.11: potential 1–20 = growth ceiling; old PA 1–100 saves convert; growth skips maxed skills; plateau clue once per group
+    // v3.12: potential = growth room (1–10, +points per skill above its start, max 20); old ceilings convert; growth skips maxed skills; plateau once per group; yard notes
     const pot = await page.evaluate(() => {
       const G = YAM.game, sq = G.squad, p = sq.find(k => k.available) || sq[0];
-      const old = new Player({ ...JSON.parse(JSON.stringify(p)), psych: { ...p.psych, potential: 70 } });
+      const js = JSON.parse(JSON.stringify(p)); delete js.gains;
+      const v311 = new Player({ ...js, psych: { ...p.psych, potential: 16 } }), v310 = new Player({ ...js, psych: { ...p.psych, potential: 70 } });
       const keep = new Player(JSON.parse(JSON.stringify(p)));
-      const tac = { ...p.tactical }, plat = [...(p.plateau || [])], mem = p.psych.potential;
-      p.psych.potential = 14; p.tactical = { positioning: 14, vision: 9, decisions: 14 };
+      const tac = { ...p.tactical }, gains = { ...p.gains }, plat = [...(p.plateau || [])], mem = p.psych.potential;
+      p.psych.potential = 3; p.gains = { positioning: 3, vision: 1 }; p.tactical = { positioning: 12, vision: 18, decisions: 19 };
       let grew = 0; for (let i = 0; i < 20; i++) if (G.growSkill(p, REGIMES.tactics.grow) === true) grew++;
-      const capped = p.tactical.positioning === 14 && p.tactical.decisions === 14 && p.tactical.vision === 14 && grew === 5;
+      const t = p.tactical, room = t.positioning === 12 && t.vision === 20 && t.decisions === 20 && grew === 3 && p.gains.vision === 3 && p.gains.decisions === 1;
       const flat = G.growSkill(p, REGIMES.tactics.grow) === 'plateau';
-      p.tactical = tac; p.plateau = plat; p.psych.potential = mem;
-      return { conv: old.psych.potential === 16, kept: keep.psych.potential === mem, capped, flat,
-        dbg: /PA 1–20/.test(L.t('dbg.dbHint')), text: L.t('tr.plateau.technical', { s: 'X' }).includes('X'),
-        draft: [1, 2, 3, 4, 5].includes(DraftView.stars(p)) };
+      p.tactical = tac; p.gains = gains; p.plateau = plat; p.psych.potential = mem;
+      const pool = G.globalPlayers.slice(0, 60), notes = pool.map(k => DraftView.notes(k));
+      const okNotes = notes.every(n => n.length >= 1 && n.length <= 2 && n.every(k => k === 'quiet' || YARD.TRAITS[k]))
+        && JSON.stringify(DraftView.notes(pool[0])) === JSON.stringify(notes[0]) && notes.some(n => n[0] !== 'quiet');
+      const conv = k => k.psych.potential === clamp(Math.round(16 - k.overall), 2, 10);
+      return { v311: conv(v311), v310: conv(v310), kept: keep.psych.potential === mem && JSON.stringify(keep.gains) === JSON.stringify(p.gains), room, flat, okNotes,
+        dbg: /ROOM 1–10/.test(L.t('dbg.dbHint')), text: L.t('tr.plateau.technical', { s: 'X' }).includes('X'), noStars: typeof DraftView.stars === 'undefined' };
     });
-    check('v3.11 potential 1–20: old PA converts (70 → 16), saves keep it, growth only below the ceiling, plateau result + diary text', Object.values(pot).every(Boolean), JSON.stringify(pot));
+    check('v3.12 growth room: v3.11 / PA saves convert (ceiling − overall), saves keep room + gains, growth = start + room (max 20), plateau, seeded yard notes, no stars', Object.values(pot).every(Boolean), JSON.stringify(pot));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');
