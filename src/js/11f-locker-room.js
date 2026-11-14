@@ -6,7 +6,7 @@
    XI, the bench and the training until the next morning. An empty locker can be investigated for 1 AP.
    ========================================================= */
 class LockerRoom {
-  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?', excused: '\u2302' };
+  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?', excused: '\u2302', overload: '\u270E' };   // v3.13: ✎ school / not recovered
   constructor(ui) {
     this.ui = ui;
     this.layer = document.getElementById('locker-room-view');
@@ -34,6 +34,7 @@ class LockerRoom {
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
     if (!s.dayState().briefed) { this.ui.briefing.open(); return; }   // v2.8: morning briefing first
+    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.13: the plan comes first
     this.ui.modal.close();   // v2.7: an open profile may stay — it sits above the room
     const lk = s.runLocker(s.phase === 'calendar');
     const reveal = !lk.revealed;
@@ -92,20 +93,20 @@ class LockerRoom {
           <div class="lk-name">${esc(L.name(p.surname))}</div>
           <div class="energy ${this.ui.energyClass(e)}"><i style="width:${e}%"></i><span>${e}%</span></div></div>`;
       }
-      const note = checked ? `<div class="lk-note open">${esc(L.t('lr.short.' + why))}</div>`
+      const load = why === 'overload';   // v3.13: kept home by the weekly load — known at once, no roll call (not truancy)
+      const note = checked || load ? `<div class="lk-note open">${load ? LockerRoom.NOTE.overload + ' ' : ''}${esc(L.t('lr.short.' + why))}</div>`
         : `<div class="lk-note">${LockerRoom.NOTE[why] && why !== 'skipped' && why !== 'exhausted' ? LockerRoom.NOTE[why] : '?'}</div>`;
-      const can = !checked && s.ap > 0;
-      return `<div class="lk empty${reveal ? ' rv' : ''}${checked ? ' checked' : ''}${can ? ' can' : ''}" ${delay} data-pid="${p.id}" role="button" tabindex="0"
-          title="${esc(checked ? L.t('lr.short.' + why) : can ? L.t('lr.investigate') : L.t('lr.noAp'))}">${plate}
+      const can = !checked && !load && s.ap > 0;
+      return `<div class="lk empty${reveal ? ' rv' : ''}${checked || load ? ' checked' : ''}${load ? ' load' : ''}${can ? ' can' : ''}" ${delay} data-pid="${p.id}" role="button" tabindex="0"
+          title="${esc(checked || load ? L.t('lr.short.' + why) : can ? L.t('lr.investigate') : L.t('lr.noAp'))}">${plate}
         <div class="lk-in dark">${note}</div>
         <div class="lk-name">${esc(L.name(p.surname))}</div><div class="lk-miss">${L.t('lr.missing')}</div></div>`;
     }).join('');
-    const d = s.dayState();
     document.getElementById('lr-title').textContent = 'LOCKER_ROOM.EXE — ' + fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' });
     document.getElementById('lr-head').innerHTML = `
       <span class="lr-kind ${match ? 'k-match' : 'k-training'}">${match ? L.t('lr.kindMatch', { o: esc(L.team(ctx?.opp.name || '')) }) : L.t('lr.kindTraining')}</span>
       <span class="lr-count${present < 11 ? ' low' : ''}">${L.t('lr.arrived', { n: present, t: squad.length })}</span>
-      <span class="lr-ap">${L.t('ap.left')} <b>${d.ap}/${COACH.AP}</b></span>`;
+      <span class="lr-ap" title="${esc(L.t('ap.tip'))}">${L.t('ap.left')} <b>${s.ap}/${this.ui.apTotal()}</b></span>`;   // v3.13: weekly wallet
     document.getElementById('lr-proceed').innerHTML = L.t('lr.toPitch');   // v2.8: [ HEAD TO PITCH ]
     document.getElementById('lr-status').textContent = L.t(present < 11 ? 'lr.statusShort' : 'lr.status');
   }
@@ -113,7 +114,7 @@ class LockerRoom {
   /** Roll call: 1 AP, a short phone call about one empty locker. */
   investigate(pid) {
     const s = this.state, lk = s.dayState().locker;
-    if (!lk || !lk.absent[pid] || lk.checked.includes(pid) || this.ui.events.active) return;
+    if (!lk || !lk.absent[pid] || lk.absent[pid] === 'overload' || lk.checked.includes(pid) || this.ui.events.active) return;   // v3.13: no roll call for 'overload'
     if (!s.spendAP()) { document.getElementById('lr-status').textContent = L.t('lr.noAp'); return; }
     lk.checked.push(pid);
     s.save();

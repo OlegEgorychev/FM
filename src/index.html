@@ -348,9 +348,22 @@
         <div class="mb-cupbox" aria-hidden="true"><svg class="mb-cup" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true"><g fill="#3b2a20"><rect x="7" y="14" width="16" height="12"/><rect x="8" y="26" width="14" height="2"/></g><g fill="#d9d2c0"><rect x="7" y="13" width="16" height="2"/><rect x="6" y="14" width="1" height="11"/><rect x="23" y="14" width="1" height="11"/><rect x="7" y="25" width="16" height="1"/><rect x="8" y="27" width="14" height="1"/><rect x="24" y="16" width="3" height="1"/><rect x="26" y="17" width="1" height="5"/><rect x="24" y="22" width="3" height="1"/></g><g fill="#a63b30"><rect x="9" y="18" width="12" height="2"/></g><rect x="4" y="28" width="22" height="2" fill="#151a1d"/></svg><i class="steam s1"></i><i class="steam s2"></i><i class="steam s3"></i></div>
       </header>
       <div class="mb-agenda" id="mb-agenda"></div>
+      <div class="mb-ap" id="mb-ap" hidden></div>
+      <div class="mb-away" id="mb-away-box" hidden><div class="mb-h" data-i18n="mb.away"></div><ul id="mb-away"></ul></div>
       <div class="mb-news"><div class="mb-h" data-i18n="mb.news"></div><ul id="mb-news"></ul></div>
       <div class="mb-repbox"><div class="mb-h" data-i18n="mb.rep"></div><div id="mb-rep"></div></div>
       <button class="btn go big mb-go" id="mb-go" type="button"></button>
+    </section>
+  </div>
+
+  <!-- v3.13: PLANNER.EXE — the weekly plan (Monday, after the morning briefing) -->
+  <div class="planner-layer" id="planner-view" hidden>
+    <section class="win plannerwin open" role="dialog" aria-modal="true" aria-labelledby="pl-title">
+      <div class="titlebar"><span class="t-ico">&#9638;</span><span class="t-txt" id="pl-title">PLANNER.EXE</span><button class="tb-btn" id="pl-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="pl-head" id="pl-head"></div>
+      <div class="pl-grid" id="pl-grid"></div>
+      <div class="pl-foot"><span class="pl-sum" id="pl-sum"></span><button class="btn go big" id="pl-confirm" type="button"></button></div>
+      <div class="statusbar"><span id="pl-status"></span></div>
     </section>
   </div>
 

@@ -137,7 +137,7 @@ class DebugConsole {
       if (eng || ui.events.active || ui.cal.running || s.phase !== 'calendar') { this.msg = L.t('dbg.busy'); this.render(); return; }
       this.close(); ui.autoSim(); return;
     } else if (id === 'ap') {
-      s.dayState().ap++;
+      s.weekState().ap++;   // v3.13: weekly wallet
       this.msg = L.t('dbg.doneAp', { n: s.ap });
     } else if (id === 'money') {
       s.addMoney(500);

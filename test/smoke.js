@@ -412,41 +412,77 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       && sp.q[0].matchDay && sp.q[0].due === plus14(sp.date), JSON.stringify(sp));
     await page.evaluate(d => { YAM.game.eventQueue[0].due = d; YAM.game.save(); }, sp.date);   // fast-forward the bomb: due today → next match day
 
-    // v2.5: END DAY loop, mandatory training plan, regimes, action points + call into office
+    // v3.13: weekly loop — Monday briefing (AP line) → PLANNER.EXE → [ CONFIRM WEEK ] → [ CONTINUE ] skips quiet days, stops on trainings
     await page.evaluate(() => { YAM.ui.events.enabled = false; YAM.ui.show('dash'); });
-    const dl0 = await page.evaluate(() => ({ date: YAM.game.calendar.date, ap: document.getElementById('hdr-ap').textContent, btn: document.getElementById('btn-sim').disabled, today: !!document.querySelector('#today-box .td-ap') }));
-    const endDay = async () => {   // v2.8: a fresh day starts with the briefing (rest days go back to the Dashboard)
-      if (await page.evaluate(() => YAM.ui.dayBlockers()[0] === 'briefing')) { await page.click('#btn-sim'); await page.click('#mb-go'); await page.waitForTimeout(30); }
-      await page.click('#btn-sim'); await page.waitForTimeout(40);
-    };
-    // v2.8: morning briefing on a plain day
-    await page.click('#btn-sim');
+    const dl0 = await page.evaluate(() => ({ date: YAM.game.calendar.date, ap: document.getElementById('hdr-ap').textContent, btn: document.getElementById('btn-sim').disabled,
+      today: !!document.querySelector('#today-box .td-ap'), strip: document.querySelectorAll('#today-box .td-wd').length, blk: YAM.ui.dayBlockers()[0], label: document.getElementById('btn-sim').textContent }));
+    const dayOf = d => new Date(d + 'T00:00:00Z').getUTCDay();
+    const days = (a, b) => (new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5;
+    const ofPre = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available); return { blk: YAM.ui.officeBlock(p.id), dow: new Date(YAM.game.calendar.date + 'T00:00:00Z').getUTCDay() }; });
+    await page.click('#btn-sim');   // Sunday: [ CONTINUE ] → Monday (the week is not planned yet) → the morning briefing opens by itself
     const mb = await page.evaluate(() => ({ open: !document.getElementById('morning-briefing-view').hidden, z: +getComputedStyle(document.getElementById('morning-briefing-view')).zIndex,
       date: document.getElementById('mb-date').textContent, wx: document.getElementById('mb-weather').textContent.trim(), news: document.querySelectorAll('#mb-news li').length,
-      rep: document.querySelectorAll('#mb-rep .rep-row .rep-bar').length, btn: document.getElementById('mb-go').textContent, kind: YAM.ui.dayInfo(YAM.game.calendar.date).kind }));
+      rep: document.querySelectorAll('#mb-rep .rep-row .rep-bar').length, btn: document.getElementById('mb-go').textContent, kind: YAM.ui.dayInfo(YAM.game.calendar.date).kind,
+      ap: document.getElementById('mb-ap').hidden ? '' : document.getElementById('mb-ap').textContent, src: YAM.game.weekState().apSources, last: YAM.game.lastResult(),
+      away: document.querySelectorAll('#mb-away li').length }));
     await shot('11-briefing');
-    await page.click('#mb-go');
-    const mb2 = await page.evaluate(() => ({ briefed: YAM.game.dayState().briefed, locker: !document.getElementById('locker-room-view').hidden, endDay: !document.getElementById('btn-sim').disabled }));
-    check('morning briefing: START DAY opens it (z 50), date + weather + 1–2 news + 3 reputation bars; HEAD TO THE CLUB on a rest day → Dashboard, END DAY ready',
-      mb.open && mb.z === 50 && mb.date.length > 6 && mb.wx.length > 2 && mb.news >= 1 && mb.news <= 2 && mb.rep === 3 && /CLUB|КЛУБ/.test(mb.btn) && mb.kind === 'rest'
-      && mb2.briefed && !mb2.locker && mb2.endDay, JSON.stringify({ mb, mb2 }));
-    const dayOf = d => new Date(d + 'T00:00:00Z').getUTCDay();
-    let guard = 0;
-    while (!(await page.evaluate(() => isTrainingDay(YAM.game.calendar.date))) && guard++ < 7) await endDay();
-    // v2.6: training day → START DAY → locker room (forced absences) → roll call → Proceed → plan → END DAY
+    await page.click('#mb-go');   // → PLANNER.EXE
+    const wp0 = await page.evaluate(() => {
+      const s = YAM.game, g = document.getElementById('pl-grid');
+      const r = { open: !document.getElementById('planner-view').hidden, z: +getComputedStyle(document.getElementById('planner-view')).zIndex, cols: g.querySelectorAll('.pl-col').length,
+        fixed: g.querySelectorAll('.pl-col.fixed').length, match: !!g.querySelector('.pl-col.fixed.m'), opts: g.querySelectorAll('.pl-opt:not(:disabled)').length, blk: YAM.ui.dayBlockers()[0],
+        label: document.getElementById('btn-sim').textContent, date: s.calendar.date, confirmed: s.weekState().confirmed, top: YAM.ui.topLayer()?.el.id };
+      YAM.ui.continueDays(); r.stuck = s.calendar.date === r.date && !s.weekState().confirmed;   // the blocker holds the calendar
+      return r;
+    });
+    await shot('12-planner');
+    // v3.13: the office is open on Monday for every kid (here: over the planner), 1 AP from the weekly wallet
+    const ofPost = await page.evaluate(() => YAM.ui.officeBlock(YAM.game.squad.find(x => x.available).id));
+    const kidO = await page.evaluate(() => { const s = YAM.game, p = s.squad.find(x => x.available && x.archetype !== 'GK'); s.weekState().ap = 1; p.dyn.sharpness = 30; p.dyn.morale = 60;
+      YAM.ui.renderBudget(); YAM.ui.profile.open(p.id); return p.id; });
+    const of0 = await page.evaluate(() => ({ vis: !document.getElementById('pinfo-office').hidden, dis: document.getElementById('pinfo-office').disabled }));
+    await page.click('#pinfo-office');
+    const of1 = await page.evaluate(() => ({ ap: YAM.game.ap, open: !document.getElementById('talk-layer').hidden, n: document.querySelectorAll('#talk-choices .talk-btn').length, chip: document.getElementById('hdr-ap').className }));
+    await talk(0);   // praise — he is out of form → backfire
+    const of2 = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step }));
+    await talk(0);
+    const of3 = await page.evaluate(k => { YAM.ui.profile.open(k); return { m: YAM.game.player(k).dyn.morale, dis: document.getElementById('pinfo-office').disabled, closed: !YAM.game.pendingEvent,
+      planner: !document.getElementById('planner-view').hidden }; }, kidO);
+    await page.keyboard.press('Escape');   // closes only the profile; the planner stays
+    // planner: 5 trainings → words-only warnings on the 3rd and the 4th–5th; then Tue cardio + Thu match practice, confirm
+    for (const k of ['mon', 'tue', 'wed', 'thu', 'fri']) await page.click(`#pl-grid [data-day="${k}"][data-reg="tech"]`);
+    const wp1 = await page.evaluate(() => ({ n: YAM.game.trainingsPlanned(), warn: [...document.querySelectorAll('#pl-grid .pl-warn')].map(x => x.textContent.trim()),
+      over: document.querySelectorAll('#pl-grid .pl-warn.over').length, sum: document.getElementById('pl-sum').textContent, planner: !document.getElementById('planner-view').hidden }));
+    for (const k of ['mon', 'wed', 'fri']) await page.click(`#pl-grid [data-day="${k}"][data-reg="rest"]`);
+    await page.click('#pl-grid [data-day="tue"][data-reg="cardio"]'); await page.click('#pl-grid [data-day="thu"][data-reg="match"]');
+    await page.click('#pl-confirm');
+    const wp2 = await page.evaluate(() => { const s = YAM.game, w = s.weekState();
+      return { closed: document.getElementById('planner-view').hidden, confirmed: w.confirmed, plan: WEEK.PLAN_KEYS.map(k => w.plan[k] || '-').join(), blk: YAM.ui.dayBlockers().length,
+        label: document.getElementById('btn-sim').textContent, dis: document.getElementById('btn-sim').disabled, monTr: s.isOurTraining(s.calendar.date), aiTue: isTrainingDay(isoAdd(w.start, 1)) }; });
+    check('v3.13 planner: Monday briefing shows the AP make-up, then PLANNER.EXE (z 50, 7 columns, Sat match + Sun rest fixed, Rest + 4 regimes Mon–Fri); [ CONFIRM WEEK ] blocks CONTINUE; 3rd = heavy, 4th–5th = overload (words only); confirm → CONTINUE',
+      dl0.today && dl0.strip === 7 && dayOf(dl0.date) === 0 && !dl0.blk && /ПРОДОЛЖИТЬ|CONTINUE/.test(dl0.label) && !dl0.btn && days(dl0.date, wp0.date) === 1 && mb.open && mb.z === 50 && mb.date.length > 6 && mb.wx.length > 2 && mb.news >= 1 && mb.news <= 2 && mb.rep === 3
+      && /PLANNER/.test(mb.btn) && mb.kind === 'rest' && mb.src.total === Math.min(7, 4 + mb.src.carry + (mb.last === 'W' ? 1 : 0)) && mb.ap.includes(String(mb.src.total)) && /4/.test(mb.ap)
+      && wp0.open && wp0.z === 50 && wp0.cols === 7 && wp0.fixed === 2 && wp0.match && wp0.opts === 25 && wp0.blk === 'week' && /ПЛАН|PLAN/.test(wp0.label) && wp0.stuck && wp0.top === 'planner-view'
+      && wp1.n === 5 && wp1.warn.length === 5 && !wp1.warn[0] && !wp1.warn[1] && /Тяжеловат|Heavy/.test(wp1.warn[2]) && /Перегруз|Overload/.test(wp1.warn[3]) && wp1.over === 2 && !/\d\s*%/.test(wp1.warn.join() + wp1.sum)
+      && wp2.closed && wp2.confirmed && wp2.plan === '-,cardio,-,match,-' && wp2.blk === 0 && /ПРОДОЛЖИТЬ|CONTINUE/.test(wp2.label) && !wp2.dis && !wp2.monTr && wp2.aiTue,
+      JSON.stringify({ dl0, mb, wp0, wp1, wp2 }));
+    // [ CONTINUE ] on Monday → Tuesday (planned training): the briefing opens by itself
+    await page.click('#btn-sim');
+    const ct1 = await page.evaluate(() => ({ date: YAM.game.calendar.date, brief: !document.getElementById('morning-briefing-view').hidden, ap: YAM.game.ap, away: document.querySelectorAll('#mb-away li').length }));
+    // v2.6: training day → locker room (forced absences) → roll call → Proceed → regime (from the plan) → CONTINUE
     const lr0 = await page.evaluate(() => {
       const s = YAM.game, fit = s.squad.filter(p => p.available && p.archetype !== 'GK' && !(p.suspensionMatches > 0));
       for (const p of s.squad) { p.energy = 50; p.dyn.morale = 60; p.psych.discipline = 15; p.injuryDays = 0; p.awayDays = 0; }
       const [tired, lazy, hurt, keep] = [fit[0], fit[1], fit[2], fit[3]];
       tired.energy = 10; lazy.psych.discipline = 1; hurt.injuryDays = 5;
       if (!s.isStarter(lazy.id)) { const i = s.lineup.findIndex((id, k) => k > 0 && ![tired.id, hurt.id].includes(id)); s.lineup[i] = lazy.id; }
+      s.weekState().ap = 1;
       s.save(); YAM.ui.renderAll();
       return { pre: s.squad.filter(p => p.suspensionMatches > 0).length, date: s.calendar.date, tired: tired.id, lazy: lazy.id, hurt: hurt.id, keep: keep.id, lazyStarter: s.isStarter(lazy.id),
         btn: document.getElementById('btn-sim').disabled, label: document.getElementById('btn-sim').textContent, need: !!document.querySelector('#today-box .td-req.need'),
         plans: document.querySelectorAll('#today-box .plan-btn').length };
     });
     await page.evaluate(() => { window.__R = Math.random; Math.random = () => 0.99; });
-    await page.click('#btn-sim');   // START DAY → morning briefing
     await page.click('#mb-go');     // HEAD TO THE CLUB → locker room (arrivals rolled here)
     await page.evaluate(() => { Math.random = window.__R; });
     await page.waitForTimeout(250);
@@ -456,7 +492,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         faces: g.querySelectorAll('.lk.here .lk-face svg').length, why: [lk.absent[ids.tired], lk.absent[ids.lazy], lk.absent[ids.hurt]], skipFlag: YAM.game.player(ids.lazy).skipped_training };
     }, lr0);
     await shot('10-locker');
-    // v3.2: in the locker room the office is open only for kids who turned up
+    // v3.2 → v3.13: in the locker room the office is open only for kids who turned up
     const ofLk = await page.evaluate(ids => {
       const ui = YAM.ui, here = YAM.game.squad.find(p => !YAM.game.dayState().locker.absent[p.id]);
       ui.profile.open(ids.lazy); const absentBtn = { dis: document.getElementById('pinfo-office').disabled, t: document.getElementById('pinfo-office').textContent }; ui.profile.close();
@@ -491,54 +527,47 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       noAp: !document.querySelector(`#lr-grid .lk.empty[data-pid="${t}"]`).classList.contains('can'), note: !!document.querySelector(`#lr-grid .lk.empty[data-pid="${id}"] .lk-note.open`) }), [lr0.lazy, lr0.tired]);
     await page.click('#lr-proceed');
     const lr4 = await page.evaluate(id => ({ open: !document.getElementById('locker-room-view').hidden, lazyStarter: YAM.game.isStarter(id), btn: document.getElementById('btn-sim').disabled,
-      swap: YAM.game.swapPlayers(YAM.game.lineup[1], id),
+      swap: YAM.game.swapPlayers(YAM.game.lineup[1], id), on: document.querySelector('#today-box .plan-btn.on')?.dataset.plan,
       need: !!document.querySelector('#today-box .td-req.need'), plans: document.querySelectorAll('#today-box .plan-btn').length }), lr0.lazy);
-    check('locker room: START DAY opens it, absences = exhausted / skipped / injured (empty lockers), absent kids locked out, roll call = 1 AP + fine, Proceed → plan',
+    check('locker room: START DAY opens it, absences = exhausted / skipped / injured (empty lockers), absent kids locked out, roll call = 1 AP + fine, Proceed → today\'s regime from the plan, CONTINUE ready',
       !lr0.btn && lr0.need && lr0.plans === 0 && lr0.lazyStarter && lr1.open && lr1.cells === lr1.n && lr1.empty.length === 3 + lr0.pre && lr1.faces === lr1.n - 3 - lr0.pre
       && lr1.why.join() === 'exhausted,skipped,injury' && lr1.skipFlag && lr4.swap === 'unavail_absent' && lr2.ap === 0 && lr2.talk && lr2.n === 2
-      && lr3.b === lr2.b - 10 && lr3.disc === disc0 + 2 && lr3.still && lr3.noAp && lr3.note && !lr4.open && !lr4.lazyStarter && lr4.btn && lr4.need && lr4.plans === 4,
+      && lr3.b === lr2.b - 10 && lr3.disc === disc0 + 2 && lr3.still && lr3.noAp && lr3.note && !lr4.open && !lr4.lazyStarter && !lr4.btn && !lr4.need && lr4.plans === 4 && lr4.on === 'cardio',
       JSON.stringify({ lr0, lr1, lr2, lr3, lr4 }));
-    const dl1 = { date: lr0.date };
+    // today's regime can still change on the day (not Rest ↔ Training); past days are locked, future days re-plannable
+    await page.click('#today-box .plan-btn[data-plan="tech"]');
+    const rg = await page.evaluate(() => { const s = YAM.game, w = s.weekState(), r = { tech: w.plan.tue };
+      r.monLocked = !s.setWeekPlan('mon', 'match'); r.todayRest = !s.setWeekPlan('tue', null); r.wedOk = s.setWeekPlan('wed', 'tech') && s.setWeekPlan('wed', null); return r; });
     await page.click('#today-box .plan-btn[data-plan="cardio"]');
-    const dl2 = await page.evaluate(() => ({ btn: document.getElementById('btn-sim').disabled, plan: YAM.game.dayState().plan }));
+    const dl2 = await page.evaluate(() => ({ btn: document.getElementById('btn-sim').disabled, plan: YAM.game.todayPlan() }));
     await page.evaluate(() => { window.__R = Math.random; Math.random = () => 0.99; });
-    await endDay();
+    await page.click('#btn-sim');   // [ CONTINUE ]: Tuesday's training, Wednesday passes by itself, stop on Thursday (planned)
     await page.evaluate(() => { Math.random = window.__R; });
-    const dl3 = await page.evaluate(ids => { const p = YAM.game.player(ids.keep), L2 = YAM.game.player(ids.lazy), T = YAM.game.player(ids.tired);
-      return { date: YAM.game.calendar.date, e: p.energy, m: p.dyn.morale, plan: YAM.game.dayState().plan, diary: YAM.game.diary.slice(-4).some(d => d.key === 'cal.training'),
-        lazyE: L2.energy, tiredE: T.energy, cleared: !L2.absentToday && !T.absentToday && L2.available }; }, lr0);
-    const oneDay = (a, b) => (new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5 === 1;
-    check('END DAY after the locker: cardio for those present (+5 energy, −4 morale +1 drift), skipper unchanged, exhausted kid rested, absences cleared next morning',
-      dl0.today && /1\/1/.test(dl0.ap) && !dl0.btn && [2, 4].includes(dayOf(dl1.date)) && !dl2.btn && dl2.plan === 'cardio'
-      && oneDay(dl1.date, dl3.date) && dl3.e === 55 && dl3.m === 57 && dl3.plan === null && dl3.diary && dl3.lazyE === 50 && dl3.tiredE === 20 && dl3.cleared, JSON.stringify({ dl0, dl1, dl2, dl3 }));
+    const dl3 = await page.evaluate(ids => { const s = YAM.game, p = s.player(ids.keep), L2 = s.player(ids.lazy), T = s.player(ids.tired), wed = isoAdd(ids.date, 1);
+      return { date: s.calendar.date, e: p.energy, m: p.dyn.morale, plan: s.todayPlan(), tue: s.diary.some(d => d.date === ids.date && d.key === 'cal.training'),
+        wed: s.diary.some(d => d.date === wed && d.key === 'cal.rest'), lazyE: L2.energy, tiredE: T.energy, cleared: !L2.absentToday && !T.absentToday && L2.available,
+        brief: !document.getElementById('morning-briefing-view').hidden, away: [...document.querySelectorAll('#mb-away li')].map(x => x.textContent), apHidden: document.getElementById('mb-ap').hidden,
+        ap: s.ap, done: s.weekState().trainingsDone }; }, lr0);
+    check('v3.13 CONTINUE: Sunday → stops on the unplanned Monday; Monday → stops on Tuesday\'s planned training (briefing opens itself); Tuesday → Wednesday (rest) passes by itself → stops on Thursday; "while you were away" lists the skipped days',
+      dayOf(wp0.date) === 1 && mb.away >= 1 && days(wp0.date, ct1.date) === 1 && ct1.brief && ct1.away >= 1 && dayOf(lr0.date) === 2
+      && days(lr0.date, dl3.date) === 2 && dayOf(dl3.date) === 4 && dl3.brief && dl3.away.length >= 2 && dl3.wed && dl3.tue && dl3.apHidden && dl3.done === 1,
+      JSON.stringify({ dl0: dl0.date, ct1, dl3: { date: dl3.date, brief: dl3.brief, away: dl3.away, wed: dl3.wed } }));
+    check('training regime from the plan: cardio for those present (+5 energy, −4 morale, +1 drift ×2), skipper unchanged, exhausted kid rested, absences cleared; regime changeable on the day, Mon locked, no Rest today, Wed re-plannable',
+      !dl2.btn && dl2.plan === 'cardio' && rg.tech === 'tech' && rg.monLocked && rg.todayRest && rg.wedOk
+      && dl3.e === 65 && dl3.m === 58 && dl3.plan === 'match' && dl3.lazyE === 60 && dl3.tiredE === 30 && dl3.cleared, JSON.stringify({ dl2, rg, dl3 }));
     await page.evaluate(id => { YAM.game.player(id).injuryDays = 0; }, lr0.hurt);
-    // v3.2: office talks only when the kid is at the club — Wednesday (day before training), after the briefing
-    const ofPre = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available); return { blk: YAM.ui.officeBlock(p.id), dow: new Date(YAM.game.calendar.date + 'T00:00:00Z').getUTCDay() }; });
-    await page.click('#btn-sim'); await page.click('#mb-go');   // START DAY → briefing → club
-    const ofPost = await page.evaluate(() => YAM.ui.officeBlock(YAM.game.squad.find(x => x.available).id));
-    const kidO = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available && x.archetype !== 'GK'); p.dyn.sharpness = 30; p.dyn.morale = 60; YAM.ui.profile.open(p.id); return p.id; });
-    const of0 = await page.evaluate(() => ({ vis: !document.getElementById('pinfo-office').hidden, dis: document.getElementById('pinfo-office').disabled }));
-    await page.click('#pinfo-office');
-    const of1 = await page.evaluate(() => ({ ap: YAM.game.ap, open: !document.getElementById('talk-layer').hidden, n: document.querySelectorAll('#talk-choices .talk-btn').length, chip: document.getElementById('hdr-ap').className }));
-    await talk(0);   // praise — he is out of form → backfire
-    const of2 = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step }));
-    await talk(0);
-    const of3 = await page.evaluate(k => { YAM.ui.profile.open(k); return { m: YAM.game.player(k).dyn.morale, dis: document.getElementById('pinfo-office').disabled, closed: !YAM.game.pendingEvent }; }, kidO);
-    await page.keyboard.press('Escape');
-    await endDay();
-    const of4 = await page.evaluate(() => YAM.game.ap);
     await page.evaluate(() => { YAM.ui.events.enabled = true; });
-    check('Call into office: costs 1 AP, praise backfires when out of form, button disabled until the next morning (AP refilled)',
-      of0.vis && !of0.dis && of1.ap === 0 && of1.open && of1.n === 4 && /spent/.test(of1.chip) && of2.step === 'praiseBad' && of3.m === 52 && of3.dis && of3.closed && of4 === 1,
-      JSON.stringify({ of0, of1, of2, of3, of4 }));
+    check('Call into office (weekly AP): costs 1, praise backfires when out of form, button disabled at 0 AP — the wallet is NOT refilled the next morning',
+      of0.vis && !of0.dis && of1.ap === 0 && of1.open && of1.n === 4 && /spent/.test(of1.chip) && of2.step === 'praiseBad' && of3.m === 52 && of3.dis && of3.closed && of3.planner && ct1.ap === 0,
+      JSON.stringify({ of0, of1, of2, of3, ct1 }));
 
     // v2.9: office buttons show the coach's lines (not the kid's reactions) + KICK OUT OF THE ACADEMY
-    // (Thursday = training day: the office is only reachable from the locker room now)
+    // (Thursday = training day: the office is reachable from the locker room)
     await page.evaluate(() => YAM.ui.show('team'));
     await toLocker(); await page.waitForTimeout(1400);
     const kick = await page.evaluate(() => {
       const s = YAM.game, p = s.starters().find(x => x.archetype !== 'GK' && x.available);
-      s.dayState().ap = 1; s.rep.parents = 50; s.rep.squad = 50; YAM.ui.profile.open(p.id);
+      s.weekState().ap = 1; s.rep.parents = 50; s.rep.squad = 50; YAM.ui.profile.open(p.id);
       return { id: p.id, n0: s.squad.length, slot: s.lineup.indexOf(p.id) };
     });
     await page.click('#pinfo-office');
@@ -556,15 +585,15 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('office: 4 coach lines (no reaction text / no {k}); KICK OUT (red) asks once, then removes the kid for good: squad −1, XI refilled, Parents −10, Squad −5',
       kb.length === 4 && kb.every(b => !/\{k\}|«|"/.test(b.t)) && kb[3].red && !kb[3].dis && kc.step === 'kickConfirm' && kc.n === 2
       && ka.gone && ka.n === kick.n0 - 1 && ka.xi && ka.rep.join() === '40,45' && ka.closed && !ka.row && ka.saved, JSON.stringify({ kb, kc, ka }));
-    const ofNo = await page.evaluate(() => { const s = YAM.game, lk = s.dayState().locker, p = s.squad.find(x => !lk.absent[x.id]); s.dayState().ap = 0; YAM.ui.profile.open(p.id);
+    const ofNo = await page.evaluate(() => { const s = YAM.game, lk = s.dayState().locker, p = s.squad.find(x => !lk.absent[x.id]); s.weekState().ap = 0; YAM.ui.profile.open(p.id);
       const b = document.getElementById('pinfo-office'), r = { blk: YAM.ui.officeBlock(p.id), dis: b.disabled, t: b.textContent }; YAM.ui.profile.close(); return r; });
     await page.evaluate(() => { YAM.ui.locker.close(); YAM.game.rep.parents = 50; YAM.game.rep.squad = 50; YAM.ui.show('dash'); });
-    const ofSat = await page.evaluate(() => { const s = YAM.game, d = s.calendar.date; s.dayState().ap = 1;
+    const ofSat = await page.evaluate(() => { const s = YAM.game, d = s.calendar.date; s.weekState().ap = 1;
       // simulate a Saturday / Sunday at the club: never allowed outside the locker room
-      const sat = ['2002-09-14', '2002-09-15'].map(x => { s.calendar.date = x; s.dayState().briefed = true; s.dayState().ap = 1; return YAM.ui.officeBlock(s.squad[0].id); });
+      const sat = ['2002-09-14', '2002-09-15'].map(x => { s.calendar.date = x; s.dayState().briefed = true; return YAM.ui.officeBlock(s.squad[0].id); });
       s.calendar.date = d; return sat; });
-    check('office access: Wed after briefing ✓ (before: not at the club); locker: present ✓ / absent ✗ "NOT AT FACILITY"; 0 AP → "NO ACTION POINTS"; weekend ✗',
-      ofPre.dow === 3 && ofPre.blk === 'office.blk.notHere' && ofPost === null && ofLk.absent === 'office.blk.absent' && ofLk.absentBtn.dis && /FACILITY|НЕТ В КЛУБЕ/.test(ofLk.absentBtn.t)
+    check('office access (v3.13): Monday after briefing ✓ for everyone (a quiet Sunday: not at the club); locker: present ✓ / absent ✗ "NOT AT FACILITY"; 0 AP → "NO ACTION POINTS"; weekend ✗',
+      ofPre.dow === 0 && ofPre.blk === 'office.blk.notHere' && ofPost === null && ofLk.absent === 'office.blk.absent' && ofLk.absentBtn.dis && /FACILITY|НЕТ В КЛУБЕ/.test(ofLk.absentBtn.t)
       && ofLk.here === null && ofLk.hereBtn && ofNo.blk === 'office.blk.noAp' && ofNo.dis && /ACTION POINTS|ОЧКОВ/.test(ofNo.t) && ofSat.every(x => x === 'office.blk.notHere'),
       JSON.stringify({ ofPre, ofPost, ofLk, ofNo, ofSat }));
 
@@ -626,8 +655,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       YAM.ui.calMonth = null; YAM.ui.renderDash();
       return { mon: wd[0] === fmtDate('2002-09-02', { weekday: 'short' }), sun: wd[6] === fmtDate('2002-09-08', { weekday: 'short' }), sep, oct };
     });
-    check('calendar: Monday-first header, Sep 2002 lead 6 (1st = Sunday), Oct 2002 lead 1 (1st = Tuesday), training cells only Tue/Thu',
-      cg.mon && cg.sun && cg.sep.lead === 6 && cg.oct.lead === 1 && cg.sep.ok && cg.oct.ok && cg.sep.tr >= 6 && cg.sep.cone && cg.oct.cols === 0, JSON.stringify(cg));
+    check('calendar: Monday-first header, Sep 2002 lead 6 (1st = Sunday), Oct 2002 lead 1 (1st = Tuesday), training cells = the plan / diary (Tue/Thu here)',
+      cg.mon && cg.sun && cg.sep.lead === 6 && cg.oct.lead === 1 && cg.sep.ok && cg.oct.ok && cg.sep.tr >= 4 && cg.sep.cone && cg.oct.cols === 0, JSON.stringify(cg));
     const trn = await page.evaluate(() => {
       const s = YAM.game, fit = s.squad.filter(p => p.available), lazy = fit[3];
       for (const p of s.squad) { p.energy = 80; p.dyn.sharpness = 50; p.psych.discipline = 15; }
@@ -806,8 +835,9 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const lg = YAM.game.league, t = lg.teams.find(x => !x.user), hooks = { onUpdate() {}, onEnd() {}, onLog() {} };
       const pool = lg.roster(t, new Set()), mine = { name: 'X', formation: '4-4-2', players: YAM.game.squad.slice(0, 11) };
       let short = 'ok';
-      try { const e = new MatchEngine(mine, { name: t.name, formation: t.formation, players: pool.slice(0, 11) }, hooks, { missing: [mine.players[3].id, mine.players[7].id] }); e.runInstant();
-        if (e.active(0).length !== 9 || !e.finished) short = 'wrong'; } catch (err) { short = err.message; }
+      try { const miss = [mine.players[3].id, mine.players[7].id], e = new MatchEngine(mine, { name: t.name, formation: t.formation, players: pool.slice(0, 11) }, hooks, { missing: miss }); e.runInstant();
+        const reds = mine.players.filter(p => !miss.includes(p.id) && e.sentOff.has(p.id)).length;   // v3.13: a red card in the match is not the bug under test
+        if (e.active(0).length + reds !== 9 || !e.finished || miss.some(id => e.everPlayed.has(id))) short = 'wrong:' + e.active(0).length + '+' + reds; } catch (err) { short = err.message; }
       const keep = t.squad.map(k => k.en);
       t.squad.forEach(k => { k.en = 100; }); pool.slice(0, 11).forEach(p => { lg.kid(p.id).en = 30; });
       const xi = lg.matchXI(t, new Set()), rotated = xi.filter((p, i) => p !== pool[i]).length, bench = pool.length - 11;
@@ -1180,6 +1210,77 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         dbg: /ROOM 1–10/.test(L.t('dbg.dbHint')), text: L.t('tr.plateau.technical', { s: 'X' }).includes('X'), noStars: typeof DraftView.stars === 'undefined' };
     });
     check('v3.12 growth room: v3.11 / PA saves convert (ceiling − overall), saves keep room + gains, growth = start + room (max 20), plateau, seeded yard notes, no stars', Object.values(pot).every(Boolean), JSON.stringify(pot));
+    // v3.13: weekly AP formula — base 4 + carry (≤ 2, only from the previous week) + 1 after a win, max 7; spending; briefing line
+    const apf = await page.evaluate(() => {
+      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, base: WEEK.AP_BASE }, out = {};
+      const mk = (left, res, gap = 7) => { s.week = { ...keep.week, start: '2003-03-03', ap: left }; s.calendar.date = isoAdd('2003-03-03', gap); s.lastResult = () => res;
+        const w = s.weekState(); return [w.ap, w.carry, w.apSources.win, w.apSources.total].join(); };
+      out.base = mk(0, 'L') === '4,0,0,4'; out.carry1 = mk(1, 'D') === '5,1,0,5'; out.carryCap = mk(5, 'L') === '6,2,0,6';
+      out.win = mk(0, 'W') === '5,0,1,5'; out.all = mk(2, 'W') === '7,2,1,7'; out.gap = mk(3, 'W', 14) === '5,0,1,5';
+      WEEK.AP_BASE = 6; out.max = mk(2, 'W') === '7,2,1,7'; WEEK.AP_BASE = keep.base;
+      out.noBack = (() => { const w = s.week; s.calendar.date = '2003-03-04'; return s.weekState() === w; })();   // a debug jump back never rolls the week
+      s.week.ap = 1; out.spend = s.spendAP() && s.week.ap === 0 && !s.spendAP() && s.week.ap === 0;
+      delete s.lastResult;
+      out.real = [null, 'W', 'D', 'L'].includes(s.lastResult());
+      const line = MorningBriefing.apLine({ base: 4, carry: 1, win: 1, total: 6 });
+      out.line = line === 'Base 4 · Carried 1 · Win +1 = 6 AP' || line === 'База 4 · Перенос 1 · Победа +1 = 6 ОД';
+      const m = GameState.migrateWeek('2002-09-12', 'cardio');   // pre-v3.13 save on a Thursday with today's plan picked
+      out.migrate = m.confirmed && m.plan.tue === WEEK.DEFAULT_REGIME && m.plan.thu === 'cardio' && !m.plan.mon && m.ap === WEEK.AP_BASE && m.trainingsDone === 1 && m.start === '2002-09-09';
+      out.noCoachAp = !('AP' in COACH);
+      s.week = keep.week; s.calendar.date = keep.date;
+      return { out, line };
+    });
+    check('v3.13 weekly AP: base 4 / carry ≤ 2 (previous week only) / win +1 / max 7, spend to 0, briefing line "Base 4 · Carried 1 · Win +1 = 6 AP", old-save migration (Tue + Thu, confirmed, base AP), COACH.AP gone',
+      Object.values(apf.out).every(Boolean), JSON.stringify(apf));
+    // v3.13: a 5-training week → 'overload' absences from the 3rd training (seeded, not truancy, no roll call), Sunday: Parents −2
+    const ov = await page.evaluate(() => {
+      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, today: s.today, ex: s.excusesOff, rep: { ...s.rep }, kids: s.squad.map(p => [p.energy, p.psych.discipline, p.injuryDays, p.suspensionMatches, p.awayDays, p.dyn.morale]) };
+      s.calendar.date = '2003-03-03'; s.week = null; s.today = null; s.excusesOff = true;
+      s.weekState(); for (const k of WEEK.PLAN_KEYS) s.setWeekPlan(k, 'tech'); s.confirmWeek();
+      s.squad.forEach(p => { p.injuryDays = 0; p.suspensionMatches = 0; p.awayDays = 0; p.psych.discipline = 20; });   // nobody skips: only the curve
+      const truant = NARRATIVE_EVENTS.find(e => e.id === 'truant'), per = [];
+      for (let i = 0; i < 5; i++) {
+        s.squad.forEach(p => { p.energy = 80; });
+        const date = s.calendar.date, lk = s.runLocker(), why = Object.values(lk.absent), first = JSON.stringify(lk.absent);
+        const pid = Object.keys(lk.absent).find(id => lk.absent[id] === 'overload'), ap0 = s.ap;
+        if (pid) YAM.ui.locker.investigate(pid);   // no roll call for 'overload'
+        s.today.locker = null; const again = JSON.stringify(s.runLocker().absent) === first;   // seeded: same arrivals on a re-roll
+        per.push({ k: s.trainingIndex(date), over: why.filter(x => x === 'overload').length, other: why.filter(x => x !== 'overload').length,
+          skip: s.squad.some(p => p.skipped_training), truant: truant.trigger(s, date), unavail: s.squad.filter(p => p.absentToday === 'overload').every(p => p.unavailableReason === 'absent'),
+          noCall: !pid || (s.ap === ap0 && !YAM.game.pendingEvent), again });
+        s.dayRoutine(date); s.today = null; s.calendar.date = isoAdd(date, 1);
+      }
+      const p0 = s.rep.parents, b0 = s.rep.board; s.calendar.date = '2003-03-09';
+      const review = s.weekReview('2003-03-09'), heavy = { r: review, parents: s.rep.parents - p0, board: s.rep.board - b0, diary: s.diary.at(-1)?.key };
+      const ch = [attendChance({ psych: { discipline: 10 }, energy: 80 }, 2), attendChance({ psych: { discipline: 10 }, energy: 40 }, 2), attendChance({ psych: { discipline: 20 }, energy: 80 }, 3),
+        attendChance({ psych: { discipline: 1 }, energy: 10 }, 4), attendChance({ psych: { discipline: 10 }, energy: 80 }, 0)].map(v => +v.toFixed(3));
+      const done = s.week.trainingsDone;
+      s.squad.forEach((p, i) => { [p.energy, p.psych.discipline, p.injuryDays, p.suspensionMatches, p.awayDays, p.dyn.morale] = keep.kids[i]; p.absentToday = null; p.skipped_training = false; });
+      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.excusesOff = keep.ex;
+      return { per, heavy, ch, done, label: L.t('lr.short.overload') };
+    });
+    check('v3.13 attendance curve: 5 trainings → no overload on the 1st–2nd, \'overload\' absences on the 3rd–5th (curve 0.7/0.5/0.3 ± discipline / tiredness, clamp 0.05), seeded, unavailable, no skipped_training / truant / roll call; Sunday ≥ 4 trainings → Parents −2',
+      ov.per.length === 5 && ov.per.map(x => x.k).join() === '0,1,2,3,4' && ov.per[0].over === 0 && ov.per[1].over === 0 && ov.per.slice(2).reduce((a, x) => a + x.over, 0) > 0
+      && ov.per[4].over >= 1 && ov.per.every(x => !x.skip && !x.truant && x.unavail && x.noCall && x.again && x.other === 0) && ov.done === 5
+      && ov.ch.join() === '0.7,0.55,0.65,0.05,1' && ov.heavy.r === 'heavy' && ov.heavy.parents === -2 && ov.heavy.board === 0 && ov.heavy.diary === 'week.heavy' && /уроков|school/.test(ov.label),
+      JSON.stringify(ov));
+    // v3.13: a week with no training at all → Sunday (through the real daily hook): Board −2, Parents −2, "the gym stood empty"
+    const ew = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, keep = { date: s.calendar.date, week: s.week, today: s.today, rep: { ...s.rep }, kids: s.squad.map(p => [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays]) };
+      s.calendar.date = '2003-03-10'; s.week = null; s.today = null; s.rep.parents = 50; s.rep.board = 50;
+      s.weekState(); s.confirmWeek();   // empty plan
+      const b0 = s.rep.board, p0 = s.rep.parents, R = Math.random; Math.random = () => 0.5;
+      let tr = 0;
+      for (let i = 0; i < 7; i++) { const d = isoAdd('2003-03-10', i); s.calendar.date = d; if (ui.cal.dailyHooks[0](d)?.key !== 'cal.rest') tr++; }
+      Math.random = R;
+      const r = { tr, board: s.rep.board - b0, parents: s.rep.parents - p0, diary: s.diary.some(d => d.key === 'week.empty' && d.date === '2003-03-16'), text: L.t('week.empty'), both: !!(I18N.en['week.empty'] && I18N.ru['week.empty'] && I18N.en['pl.warn.heavy'] && I18N.ru['pl.warn.over']) };
+      s.squad.forEach((p, i) => { [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays] = keep.kids[i]; });
+      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date;
+      return r;
+    });
+    check('v3.13 Sunday review: 0 trainings all week → Board −2, Parents −2, diary "The gym stood empty all week" (EN + RU)',
+      ew.tr === 0 && ew.board === -2 && ew.parents === -2 && ew.diary && ew.both && /Зал пустовал всю неделю|The gym stood empty all week/.test(ew.text),
+      JSON.stringify(ew));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

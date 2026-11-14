@@ -32,6 +32,7 @@ class UIController {
     this.briefing = new MorningBriefing(this);   // v2.8: the morning routine
     this.draft = new DraftView(this);            // v3.1: the Yard Match intro
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
+    this.planner = new WeekPlanner(this);        // v3.13: PLANNER.EXE (the weekly plan)
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
     this.bind();
@@ -61,9 +62,10 @@ class UIController {
     // Future event types plug in here, e.g.:
     // cal.registerType('training', { blocking: false, label: ev => '…', onArrive: ev => this.state.applyTraining(ev) });
     // cal.registerType('dialogue', { blocking: true,  label: ev => '…', onArrive: ev => this.openDialogue(ev) });
-    cal.onDay(date => {   // v2.4/2.5: Tue/Thu = training with the coach's regime (auto-sim falls back to Match Practice)
-      const s = this.state, r = s.dayRoutine(date, isTrainingDay(date), s.dayState().plan || 'match');
+    cal.onDay(date => {   // v2.4/2.5 → v3.13: our training days + regimes come from the weekly plan (auto-sim: Tue + Thu Match Practice)
+      const s = this.state, r = s.dayRoutine(date);
       s.repDaily(date);   // v2.8: faction reputation (board grant on the 1st, parents on Sundays, squad drift)
+      s.weekReview(date);   // v3.13: Sunday — empty gym / overloaded week
       if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
       const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
       if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
@@ -209,6 +211,7 @@ class UIController {
       if (b) { this.state.setPlan(b.dataset.plan); this.renderDash(); }
       const o = e.target.closest('[data-observe]');   // v3.6: Practice Match — "Under Observation"
       if (o && !o.disabled) { this.state.toggleObserve(o.dataset.observe); this.renderDash(); }
+      if (e.target.closest('[data-week]')) this.planner.open();   // v3.13: re-plan the rest of the week
     });
     // v1.6 calendar: month navigation + clickable day cells (info in the status bar)
     this.$('cal-prev').addEventListener('click', () => { this.calMonth = this.shiftMonth(this.viewMonth(), -1); this.renderCalendar(); });
@@ -245,6 +248,7 @@ class UIController {
       { el: this.teamCard.layer, close: () => this.teamCard.close() },
       { el: this.profile.layer, close: () => this.profile.close() },
       { el: this.locker.layer, close: () => this.locker.close() },
+      { el: this.planner.layer, close: () => this.planner.close() },   // v3.13
       { el: this.briefing.layer, close: () => this.briefing.close() },
     ];
     this.topLayer = () => {
@@ -645,10 +649,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     // main action button
     const btn = this.$('btn-sim');
     const blk = this.dayBlockers()[0];
-    btn.disabled = this.cal.running || this.live || this.events.active || blk === 'plan';
+    btn.disabled = this.cal.running || this.live || this.events.active;
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
-    else if (phase === 'calendar') btn.innerHTML = L.t({ briefing: 'dash.startDay', locker: 'dash.toLocker', plan: 'dash.endDayBlocked' }[blk] || 'dash.endDay');
+    else if (phase === 'calendar') btn.innerHTML = L.t({ briefing: 'dash.startDay', week: 'dash.planWeek', locker: 'dash.toLocker' }[blk] || 'dash.continue');   // v3.13
     else if (phase === 'matchday' && !s.dayState().briefed) btn.innerHTML = L.t('dash.startDay');
     else if (phase === 'matchday' && !s.dayState().locker?.done) btn.innerHTML = L.t('dash.startMatchDay');
     else if (phase === 'matchday') btn.innerHTML = L.t('dash.goMatch');
@@ -693,7 +697,13 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const start = s.calendar.events[0] && isoAdd(s.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
     const end = s.calendar.events[s.calendar.events.length - 1]?.date;
     if (!(start && iso >= start && iso <= end)) return { kind: 'off' };
-    return { kind: isTrainingDay(iso) ? 'training' : 'rest' };   // v2.4
+    return { kind: this.trainedOn(iso) ? 'training' : 'rest' };   // v2.4 → v3.13: the weekly plan
+  }
+  /** v3.13: our training day — the current week's plan; earlier weeks from the diary (future weeks are not planned yet). */
+  trainedOn(iso) {
+    const s = this.state;
+    if (s.isOurTraining(iso)) return true;
+    return iso < s.weekState().start && s.diary.some(d => d.date === iso && /^cal\.training/.test(d.key));
   }
 
   renderCalendar() {
@@ -778,44 +788,71 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return;
     }
     if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
-    if (this.dayBlockers()[0] === 'briefing') { this.briefing.open(); return; }   // v2.8: START DAY → morning briefing
-    if (this.dayBlockers()[0] === 'locker') { this.locker.open(); return; }   // v2.6: back to the locker room
-    this.endDay();   // v2.5: one day per click
+    const blk = this.dayBlockers()[0];
+    if (blk === 'briefing') { this.briefing.open(); return; }   // v2.8: START DAY → morning briefing
+    if (blk === 'week') { this.planner.open(); return; }        // v3.13: PLANNER.EXE until the week is confirmed
+    if (blk === 'locker') { this.locker.open(); return; }       // v2.6: back to the locker room
+    this.continueDays();   // v3.13: [ CONTINUE ] — empty days pass by themselves
   }
 
-  /* ---------- v2.5 DAILY LOOP: decide → END DAY → (evening event?) → next morning ---------- */
-  /** Mandatory tasks that block END DAY. */
+  /* ---------- v3.13 WEEKLY LOOP: plan on Monday → [ CONTINUE ] skips empty days → stops ----------
+     Stops: the week is not confirmed (Monday), a planned training, the match day, any fired event. */
+  /** Is today a day the coach has to look at? (calendar phase only; match days stop through the calendar itself) */
+  isStopDay() {
+    const s = this.state;
+    return s.phase === 'calendar' && (!s.weekState().confirmed || s.isOurTraining(s.calendar.date));
+  }
+  /** Mandatory tasks that block [ CONTINUE ] on a stop day: briefing → weekly plan → locker room. */
   dayBlockers() {
     const s = this.state, out = [];
-    if (s.phase === 'calendar' && !s.dayState().briefed) { out.push('briefing'); return out; }   // v2.8: START DAY → morning briefing
-    if (s.phase === 'calendar' && this.dayInfo(s.calendar.date).kind === 'training') {
-      if (!s.dayState().locker?.done) out.push('locker');   // v2.6: START DAY → locker room first
-      else if (!s.dayState().plan) out.push('plan');
-    }
+    if (!this.isStopDay()) return out;
+    if (!s.dayState().briefed) { out.push('briefing'); return out; }   // v2.8: START DAY → morning briefing
+    if (!s.weekState().confirmed) { out.push('week'); return out; }   // v3.13: [ CONFIRM WEEK ]
+    if (s.isOurTraining(s.calendar.date) && !s.dayState().locker?.done) out.push('locker');   // v2.6: locker room first
     return out;
   }
-  endDay() {
+  /** [ CONTINUE ]: process today, then every empty day (routine + evening events) until the next stop. */
+  continueDays() {
     const s = this.state;
     if (this.cal.running || s.phase !== 'calendar' || this.events.active || this.dayBlockers().length) { this.renderDash(); return; }
-    const r = this.cal.step();
-    if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }   // safety: today was already a match day
-    for (const info of r.infos) s.addDiary({ date: r.date, ...info });
-    this.calMonth = null;
-    s.save();
-    const fired = this.cal.nextEvent() && this.events.roll(r.date, { resume: false });   // the evening: something may happen
-    if (!fired) this.morning();
-    else this.renderAll();
+    s.away = s.away || [];   // diary lines from here on go to the next morning briefing ("while you were away")
+    for (let guard = 0; guard < 40; guard++) {
+      const r = this.cal.step();
+      if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }   // safety: today was already a match day
+      for (const info of r.infos) s.addDiary({ date: r.date, ...info });
+      this.calMonth = null;
+      s.save();
+      if (this.cal.nextEvent() && this.events.roll(r.date, { resume: false, cont: true })) { this.renderAll(); return; }   // stop: an event
+      if (!this.nextMorning()) return;                                                   // stop: match day / season over
+      if (this.isStopDay()) { this.renderAll(); this.briefing.open(); return; }          // stop: plan / training
+    }
+    this.renderAll();
   }
-  /** New morning: AP and plan reset (lazily in dayState); a match day arrives straight away. */
-  morning() {
+  endDay() { this.continueDays(); }   // pre-v3.13 name (DEBUG / tests)
+  /** A new morning: absences forgotten; a match day arrives at once (→ false), the season may end (→ false). */
+  nextMorning() {
     const s = this.state;
     s.clearDayStatus();   // v2.6: yesterday's absences are forgotten
     if (s.phase === 'calendar' && this.cal.blockingToday()) {
       const r = this.cal.step();
-      if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return; }
+      if (r.stopped) { this.cal.types[r.stopped.type]?.onArrive?.(r.stopped); return false; }
     }
-    if (s.phase === 'calendar' && !this.cal.nextEvent()) { s.phase = 'seasonEnd'; s.save(); }
+    if (s.phase === 'calendar' && !this.cal.nextEvent()) { s.phase = 'seasonEnd'; s.save(); this.renderAll(); return false; }
+    return true;
+  }
+  /** After an evening event. cont = it stopped a [ CONTINUE ] run → keep skipping empty days to the next stop. */
+  morning({ cont = false } = {}) {
+    if (!this.nextMorning()) return;
+    if (cont && this.isStopDay()) { this.renderAll(); this.briefing.open(); return; }
+    if (cont && !this.dayBlockers().length) { this.continueDays(); return; }
     this.renderAll();
+  }
+  /** v3.13: auto-sim / tests — an unconfirmed week gets Tue + Thu Match Practice and is confirmed. */
+  autoPlan() {
+    const s = this.state, w = s.weekState();
+    if (w.confirmed) return;
+    for (const k of WEEK.DEFAULT_DAYS) s.setWeekPlan(k, WEEK.DEFAULT_REGIME);
+    s.confirmWeek();
   }
   /** v2.6: after a coach-initiated dialogue (office / roll call) the same day simply goes on. */
   afterManualEvent() { this.renderAll(); this.profile.tick(); if (this.locker?.isOpen) this.locker.maybeRequest(500); }   // v3.6: the next locker request waits its turn
@@ -823,18 +860,18 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
 
   /** v2.5: [ CALL INTO OFFICE ] — 1 action point, a short talk in the dialogue box. */
-  /** v3.2: why the coach can NOT call this kid in right now (i18n key), or null. Two windows only:
-      A) the day before a training day (Mon / Wed), in the normal club screens, after the morning briefing;
-      B) in the Locker Room, for a kid who actually turned up. Then: at least 1 action point. */
+  /** v3.13 (replaces the v3.2 rule): why the coach can NOT call this kid in right now (i18n key), or null.
+      Open at any stop while the kid is at the club: Monday (planner / dashboard, after the briefing) → every kid;
+      a training or match day → the kids who turned up in the locker room. Then: at least 1 action point (weekly wallet). */
   officeBlock(id) {
     const s = this.state, p = s.player(id), d = s.dayState();
     if (!p) return 'office.blk.notHere';
     if (this.events.active || (this.engine && !this.engine.finished) || this.cal.running) return 'office.blk.busy';
-    let here = false;
-    if (this.locker.isOpen && d.locker) here = !d.locker.absent[id];                                   // B
-    else if (s.phase === 'calendar' && d.briefed && !this.briefing.isOpen
-      && isTrainingDay(isoAdd(s.calendar.date, 1)) && this.dayInfo(s.calendar.date).kind === 'rest') here = true;   // A
-    if (!here) return this.locker.isOpen ? 'office.blk.absent' : 'office.blk.notHere';
+    let here = false, absent = false;
+    const atClub = s.phase === 'matchday' || (s.phase === 'calendar' && d.briefed && !this.briefing.isOpen);
+    if (atClub && d.locker) { here = !d.locker.absent[id]; absent = !here; }        // training / match day: who turned up
+    else if (atClub && s.phase === 'calendar' && weekKey(s.calendar.date) === 'mon') here = true;   // Monday: everyone
+    if (!here) return absent ? 'office.blk.absent' : 'office.blk.notHere';
     if (s.ap < 1) return 'office.blk.noAp';
     return null;
   }
@@ -861,10 +898,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   runCalendar() {
     if (this.cal.running || this.state.phase !== 'calendar') return;
     this.calMonth = null;   // calendar view follows the days as they pass
+    this.autoPlan();   // v3.13
     this.cal.simulate({
       stepMs: 180,
       onStep: (date, infos) => {
         for (const info of infos) this.state.addDiary({ date, ...info });
+        this.autoPlan();   // v3.13: a new week on the way (Monday) gets the default plan before its routine runs
         if (this.cal.nextEvent() && this.events.roll(date)) this.cal.stop();
         this.state.save();
         this.renderDash();
@@ -875,29 +914,40 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.renderDash();
   }
 
-  /** v2.5: TODAY widget — date, action points, mandatory training plan (Tue/Thu). */
+  /** v2.5 → v3.13: TODAY widget — date, the weekly AP wallet, the week strip, today's task (briefing / plan / locker / regime). */
   renderToday() {
     const s = this.state, box = this.$('today-box');
     if (!box) return;
-    const d = s.dayState(), info = this.dayInfo(s.calendar.date), live = s.phase === 'calendar';
-    const pips = Array.from({ length: COACH.AP }, (_, i) => `<i class="${i < d.ap ? 'on' : ''}"></i>`).join('');
+    const d = s.dayState(), w = s.weekState(), info = this.dayInfo(s.calendar.date), live = s.phase === 'calendar', plan = s.todayPlan();
+    const tot = this.apTotal();
+    const pips = Array.from({ length: tot }, (_, i) => `<i class="${i < w.ap ? 'on' : ''}"></i>`).join('');
     let body = '';
-    if (live && !d.briefed) {   // v2.8: every day starts with the morning briefing
+    if (live && this.isStopDay() && !d.briefed) {   // v2.8: a stop starts with the morning briefing
       body = `<div class="td-req need">${L.t('today.briefReq')}</div><div class="td-note">${L.t('today.briefNote')}</div>`;
+    } else if (live && !w.confirmed) {   // v3.13: PLANNER.EXE
+      body = `<div class="td-req need">${L.t('today.weekReq')}</div><div class="td-note">${L.t('today.weekNote')}</div>`;
     } else if (live && info.kind === 'training' && !d.locker?.done) {   // v2.6: the locker room comes first
       body = `<div class="td-req need">${L.t('today.lockerReq')}</div><div class="td-note">${L.t('today.lockerNote')}</div>`;
-    } else if (live && info.kind === 'training') {
-      const need = !d.plan;
-      body = `<div class="td-req${need ? ' need' : ''}">${L.t(need ? 'today.planReq' : 'today.planSet')}</div><div class="plan-grid">`
-        + REGIME_KEYS.map(k => `<button type="button" class="plan-btn${d.plan === k ? ' on' : ''}" data-plan="${k}" aria-pressed="${d.plan === k}">
+    } else if (live && info.kind === 'training') {   // v3.13: the regime comes from the plan, still changeable today
+      body = `<div class="td-req">${L.t('today.planSet')}</div><div class="td-note">${L.t('today.planChange')}</div><div class="plan-grid">`
+        + REGIME_KEYS.map(k => `<button type="button" class="plan-btn${plan === k ? ' on' : ''}" data-plan="${k}" aria-pressed="${plan === k}">
             <b>${L.t('plan.' + k)}</b><small>${L.t('plan.' + k + '.d')}</small></button>`).join('') + '</div>'
-        + (d.plan === 'match' ? this.observeHTML(d) : '');
+        + (plan === 'match' ? this.observeHTML(d) : '');
     } else if (live) body = `<div class="td-note">${L.t(info.kind === 'rest' ? 'today.rest' : 'today.off', { n: ENERGY.DAILY_REST })}</div>`;
     else body = `<div class="td-note">${L.t('today.phase.' + s.phase)}</div>`;
+    const strip = WEEK.KEYS.map((k, i) => {
+      const date = isoAdd(w.start, i), m = s.matchOn(date), t = s.isOurTraining(date);
+      return `<span class="td-wd${date === s.calendar.date ? ' now' : ''}${date < s.calendar.date ? ' past' : ''}${m ? ' m' : t ? ' t' : ''}"
+        title="${esc(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'short' }) + ' · ' + (m ? L.t('today.kind.match') : t ? L.t('plan.' + w.plan[k]) : L.t('today.kind.rest')))}">${esc(fmtDate(date, { weekday: 'narrow' }))}<i>${m ? '&#9917;' : t ? '&#9650;' : '·'}</i></span>`;
+    }).join('');
+    const weekBtn = live && w.confirmed && s.plannableDays().length ? `<button type="button" class="btn td-weekbtn" data-week>${L.t('today.weekBtn')}</button>` : '';
     box.innerHTML = `<div class="td-head"><b>${fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' })}</b>
         <span class="td-kind k-${info.kind}">${L.t('today.kind.' + info.kind)}</span></div>
-      <div class="td-ap" title="${esc(L.t('ap.tip'))}">${L.t('ap.left')} <span class="ap-pips">${pips}</span> <b>${d.ap}/${COACH.AP}</b></div>${body}`;
+      <div class="td-ap" title="${esc(L.t('ap.tip'))}">${L.t('ap.left')} <span class="ap-pips">${pips}</span> <b>${w.ap}/${tot}</b></div>
+      <div class="td-strip" aria-label="${esc(L.t('today.week'))}">${strip}</div>${body}${weekBtn}`;
   }
+  /** v3.13: the size of this week's AP wallet (for pips and "n/m"). */
+  apTotal() { const w = this.state.weekState(); return Math.max(w.apSources?.total || 0, w.ap); }
 
   /** v3.6: Practice Match — mark up to POS_HINT.OBSERVE_MAX present kids "Under Observation" (0 AP). */
   observeHTML(d) {
@@ -917,7 +967,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (!el) return;
     el.innerHTML = L.t('hdr.budget', { b: money(this.state.budget) }); el.classList.toggle('debt', this.state.budget < 0);
     const ap = this.$('hdr-ap');   // v2.5
-    if (ap) { const n = this.state.ap; ap.innerHTML = L.t('hdr.ap', { n, m: COACH.AP }); ap.classList.toggle('spent', n < 1); }
+    if (ap) { const n = this.state.ap; ap.innerHTML = L.t('hdr.ap', { n, m: this.apTotal() }); ap.classList.toggle('spent', n < 1); ap.title = L.t('ap.tip'); }   // v3.13: weekly wallet
     if (delta) { el.classList.remove('up', 'down'); void el.offsetWidth; el.classList.add(delta > 0 ? 'up' : 'down'); }
   }
 

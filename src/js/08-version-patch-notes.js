@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.12';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.13';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.13', name: { en: 'The Weekly Plan', ru: 'План на неделю' },
+    en: [
+      'Monday is planning day: after the morning briefing PLANNER.EXE opens. Pick Rest or a training regime for Monday to Friday (0–5 sessions, they cost nothing), then [ CONFIRM WEEK ]. Saturday is the match, Sunday is rest.',
+      'END DAY is gone. [ CONTINUE ] lets the quiet days pass by themselves and stops only on a training, the match, or when something happens. The next morning briefing sums up what you missed ("While you were away").',
+      'Action points are now a weekly budget: 4 every Monday, up to 2 unspent ones carried over, +1 after a win (max 7). They pay for office talks and roll calls only.',
+      'Kids are kids: a third training in a week thins the locker room, a fourth or fifth leaves fewer than half — kept home for school or simply not recovered. That is not truancy. An empty gym all week, or an overloaded one, upsets the Board and the parents.',
+      'The office is open on Monday for every kid, and on training and match days for those who turned up. Old saves keep training Tuesday and Thursday for the current week.',
+    ],
+    ru: [
+      'Понедельник — день планирования: после утренней сводки открывается PLANNER.EXE. Выбери отдых или режим тренировки на понедельник–пятницу (0–5 занятий, они бесплатны) и нажми «Подтвердить неделю». Суббота — матч, воскресенье — отдых.',
+      'Кнопки «Завершить день» больше нет. «Продолжить» проматывает спокойные дни сама и останавливается только на тренировке, матче или когда что-то случилось. Следующая утренняя сводка расскажет, что ты пропустил («Пока вас не было»).',
+      'Очки действий теперь недельные: 4 каждый понедельник, до 2 неистраченных переносятся, +1 после победы (максимум 7). Тратятся только на кабинет и перекличку.',
+      'Дети есть дети: на третью тренировку за неделю придут не все, на четвёртую-пятую — меньше половины: кого-то не отпустили из-за уроков, кто-то не восстановился. Это не прогул. Пустой зал всю неделю или перегруз расстроят Совет и родителей.',
+      'Кабинет открыт в понедельник для всех ребят, а в дни тренировок и матчей — для тех, кто пришёл. В старых сохранениях текущая неделя идёт по вторникам и четвергам.',
+    ] },
   { v: '3.12', name: { en: 'Late Bloomers', ru: 'Поздние таланты' },
     en: [
       'Hidden potential now means room to grow: every skill can climb the same number of points above where it started (up to 20). A sharp shooter keeps getting sharper instead of freezing at his limit.',

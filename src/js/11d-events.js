@@ -546,17 +546,17 @@ class EventEngine {
   }
 
   /** After a NON-match day. Returns true when an event fired (the calendar must pause). */
-  roll(date, { resume = true } = {}) {   // v2.5: resume=false in the END DAY loop (no auto-simulation afterwards)
+  roll(date, { resume = true, cont = false } = {}) {   // v2.5: resume=false in the day loop; v3.13: cont = a [ CONTINUE ] run goes on afterwards
     if (this.active) return false;
     const due = this.takeDue(date, false);
-    if (due && this.fire(due.id, date, { resume, cast: due.cast })) return true;
+    if (due && this.fire(due.id, date, { resume, cont, cast: due.cast })) return true;
     if (!this.enabled) return false;
     const s = this.state, last = [...s.eventLog].reverse().find(e => this.find(e.id)?.when !== 'manual');   // the coach's own talks don't count
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
     // v2.4: on a training day the training events are evaluated first (the routine has just run)
-    const pool = (isTrainingDay(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
+    const pool = (s.isOurTraining(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
       .concat(shuffle(NARRATIVE_EVENTS.filter(e => (e.when || 'day') === 'day')));
-    for (const ev of pool) if (ev.trigger(s, date) && this.fire(ev.id, date, { resume })) return true;
+    for (const ev of pool) if (ev.trigger(s, date) && this.fire(ev.id, date, { resume, cont })) return true;
     return false;
   }
   /** v2.2: on a MATCH day, before kick-off (called when the calendar stops on the matchday). */
@@ -571,14 +571,14 @@ class EventEngine {
     return false;
   }
   /** Starts an event now (also used by DEBUG.EXE). resume = continue the calendar afterwards; after = 'matchday' → matchday dialog. */
-  fire(id, date = this.state.calendar.date, { resume = false, after = null, cast: preset = null } = {}) {
+  fire(id, date = this.state.calendar.date, { resume = false, cont = false, after = null, cast: preset = null } = {}) {
     const ev = this.find(id);
     if (!ev || this.active) return false;
     // v2.3: a scheduled event may carry its actors from the moment it was planned (if they are still in the squad)
     const keep = preset && Object.values(preset).every(v => [].concat(v).every(pid => this.state.player(pid)));
     const cast = keep ? preset : ev.cast ? ev.cast(this.state) : {};
     if (!cast) return false;
-    this.state.pendingEvent = { id, date, cast, resume, after, step: 'start' };
+    this.state.pendingEvent = { id, date, cast, resume, after, step: 'start', ...(cont ? { cont } : {}) };
     this.state.save();
     this.open();
     return true;
@@ -620,7 +620,7 @@ class EventEngine {
     if (pe.after === 'matchday') this.ui.afterMatchdayEvent();
     else if (pe.resume && s.phase === 'calendar') this.ui.runCalendar();
     else if (this.find(pe.id)?.when === 'manual') this.ui.afterManualEvent?.();   // v2.6: office / roll call: same day goes on
-    else this.ui.morning();   // v2.5: END DAY loop → the next morning (a match day arrives now)
+    else this.ui.morning({ cont: !!pe.cont });   // v2.5: the day loop → the next morning (v3.13: CONTINUE keeps skipping empty days)
   }
 }
 

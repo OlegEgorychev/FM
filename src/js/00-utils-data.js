@@ -117,7 +117,21 @@ const roomFromCeiling = (v, overall) => clamp(Math.round((v > 20 ? clamp(Math.ro
 const YARD = { SHOW: 14, MAX: 2, WRONG: 0.2,
   TRAITS: { pace: p => p.rating('Speed'), dribble: p => p.rating('Dribble'), pass: p => p.rating('Pass'), shot: p => p.rating('Shoot'),
     tackle: p => p.rating('Tackle'), hands: p => p.rating('Save'), engine: p => p.physical.baseStamina - 1, strong: p => p.physical.strength - 1 } };   // raw skills swing more than composites → −1
-/* v2.5 COACH ACTION POINTS — reset every morning; "Call into office" costs 1. */
+/* v3.13 WEEKLY PLAN + WEEKLY ACTION POINTS (replaces the v2.5 1 AP/day). All numbers are test values.
+   Monday: ap = min(AP_MAX, AP_BASE + carry + WIN_BONUS if the last match was won); carry = min(CARRY_MAX, AP left on Sunday).
+   AP pay only for the coach's own actions (office, roll call); trainings are free (0–MAX_TRAININGS, Mon–Fri).
+   Sunday review: 0 trainings → Board / Parents EMPTY_*; ≥ HEAVY_FROM trainings → Parents HEAVY_PARENTS. */
+const WEEK = { AP_BASE: 4, AP_MAX: 7, CARRY_MAX: 2, WIN_BONUS: 1, MAX_TRAININGS: 5, DEFAULT_REGIME: 'match', DEFAULT_DAYS: ['tue', 'thu'],
+  WARN_HEAVY: 3, WARN_OVER: 4, EMPTY_BOARD: -2, EMPTY_PARENTS: -2, HEAVY_FROM: 4, HEAVY_PARENTS: -2,
+  KEYS: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], PLAN_KEYS: ['mon', 'tue', 'wed', 'thu', 'fri'] };
+/* v3.13 ATTENDANCE CURVE — chance to turn up for the k-th training of the week (index 0…4), only from the 3rd one.
+   chance = curve[k] + (discipline − 10)/10 × DISC − (energy < TIRED ? TIRED_PEN : 0), clamped MIN–MAX; seeded(date + '#load#' + id). */
+const ATTEND_CURVE = [1, 1, 0.7, 0.5, 0.3];
+const ATTEND = { FROM: 2, DISC: 0.15, TIRED: 50, TIRED_PEN: 0.15, MIN: 0.05, MAX: 1 };
+const attendChance = (p, k) => clamp((ATTEND_CURVE[k] ?? ATTEND_CURVE[ATTEND_CURVE.length - 1]) + ((p.psych?.discipline ?? 10) - 10) / 10 * ATTEND.DISC
+  - ((p.energy ?? 100) < ATTEND.TIRED ? ATTEND.TIRED_PEN : 0), ATTEND.MIN, ATTEND.MAX);
+const weekKey = iso => WEEK.KEYS[(new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7];
+const weekStartOf = iso => isoAdd(iso, -((new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7));
 /* v3.0 EXCLUSIVE TEAM DUTIES + SET PIECES */
 const DUTIES = { captain: 'C', penalty: 'PK', corner: 'CK' };
 /* v3.7 HIDDEN CAPTAIN TRAITS (only DEBUG.EXE shows them; the coach reads them from the Notebook / diary).
@@ -152,7 +166,8 @@ const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25
    (≈ 45 free agents remain for future transfers / poaching). MIX = hidden archetypes in the world. */
 const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 } };
 const COACH = { KICK_PARENTS: -10, KICK_SQUAD: -5, MIN_SQUAD: 12,   // v2.9: kick out (keep ≥ 12 kids and ≥ 1 keeper)
-  AP: 1, PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
+  PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
+/** v2.4 AI clubs' training days (Tue/Thu). v3.13: our club trains on the days of state.week.plan (GameState.isOurTraining). */
 const isTrainingDay = iso => TRAINING.WEEKDAYS.includes(new Date(iso + 'T00:00:00Z').getUTCDay());
 /* v2.6 LOCKER ROOM — who turns up on training / match days.
    Absent if: condition < MIN_COND, injured / suspended / kept at home, or skips: random·20 > discipline + DISC_GRACE.

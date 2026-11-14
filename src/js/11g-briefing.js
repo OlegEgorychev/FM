@@ -5,6 +5,7 @@
    Weather and news are seeded by the date, so a reload shows the same morning.
    ========================================================= */
 class MorningBriefing {
+  static AWAY_MAX = 8;   // v3.13: "while you were away" lines shown (the rest → "+n more")
   static NEWS = ['scouts', 'vandal', 'leader', 'garage', 'pothole', 'mayor', 'rival', 'kitWash', 'derby', 'busStrike', 'chippy', 'floodlight', 'rain'];
   constructor(ui) {
     this.ui = ui;
@@ -45,7 +46,8 @@ class MorningBriefing {
 
   render() {
     const s = this.state, date = s.calendar.date, wx = MorningBriefing.weather(date), info = this.ui.dayInfo(date);
-    const kind = s.phase === 'matchday' ? 'match' : info.kind;
+    const w = s.weekState(), plan = s.phase === 'calendar' && !w.confirmed;   // v3.13: Monday — PLANNER.EXE comes next
+    const kind = s.phase === 'matchday' ? 'match' : plan ? 'plan' : info.kind;
     this.layer.dataset.wx = wx;
     document.getElementById('mb-date').textContent = fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     document.getElementById('mb-weather').innerHTML = `<span class="wx-ico wx-${wx}"></span>${L.t('wx.' + wx)}`;
@@ -56,19 +58,38 @@ class MorningBriefing {
       agenda += ' ' + L.t('mb.oppForm', { a: c.avg, t: c.tired });
     }
     document.getElementById('mb-agenda').textContent = agenda;
+    // v3.13: Monday — how this week's action points were made up
+    const src = w.apSources || {}, apBox = document.getElementById('mb-ap');
+    apBox.hidden = !(s.phase === 'calendar' && date === w.start);
+    apBox.innerHTML = apBox.hidden ? '' : L.t('mb.ap', { line: MorningBriefing.apLine(src) });
+    // v3.13: "while you were away" — the diary lines written since the last briefing (skipped days, evenings)
+    let away = s.away || [];
+    if (away.length > MorningBriefing.AWAY_MAX) away = away.filter(e => e.key !== 'cal.rest');   // plain rest days go first
+    const box = document.getElementById('mb-away-box');
+    box.hidden = !away.length;
+    document.getElementById('mb-away').innerHTML = away.slice(-MorningBriefing.AWAY_MAX).map(e =>
+      `<li><span class="d">${esc(fmtDate(e.date, { weekday: 'short' }))}</span> ${esc(this.ui.entryText({ ...e, r: 0 }))}</li>`).join('')
+      + (away.length > MorningBriefing.AWAY_MAX ? `<li class="more">${esc(L.t('mb.awayMore', { n: away.length - MorningBriefing.AWAY_MAX }))}</li>` : '');
     document.getElementById('mb-news').innerHTML = this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
     const bar = (k) => { const v = s.rep[k];
       return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };
     document.getElementById('mb-rep').innerHTML = ['board', 'parents', 'squad'].map(bar).join('');
-    document.getElementById('mb-go').innerHTML = L.t(kind === 'rest' || kind === 'off' ? 'mb.goQuiet' : 'mb.go');
+    document.getElementById('mb-go').innerHTML = L.t(kind === 'plan' ? 'mb.goPlan' : kind === 'rest' || kind === 'off' ? 'mb.goQuiet' : 'mb.go');
   }
 
+  /** v3.13: "Base 4 · Carried 1 · Win +1 = 6 AP" */
+  static apLine(src) {
+    return [L.t('mb.ap.base', { n: src.base ?? 0 }), src.carry ? L.t('mb.ap.carry', { n: src.carry }) : '', src.win ? L.t('mb.ap.win', { n: src.win }) : '']
+      .filter(Boolean).join(' · ') + ' = ' + L.t('mb.ap.total', { n: src.total ?? 0 });
+  }
   /** [ HEAD TO THE CLUB ] */
   go() {
     const s = this.state;
     s.dayState().briefed = true;
+    s.away = null;   // v3.13: the coach has read what happened while he was away
     s.save();
     this.close();
+    if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.renderAll(); this.ui.planner.open(); return; }   // v3.13: Monday → PLANNER.EXE
     const kind = s.phase === 'matchday' ? 'match' : this.ui.dayInfo(s.calendar.date).kind;
     if (kind === 'training' || kind === 'match') this.ui.locker.open();
     else this.ui.renderAll();

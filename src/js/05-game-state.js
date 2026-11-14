@@ -20,6 +20,7 @@ class GameState {
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
+    this.today = null; this.week = null; this.away = null;   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
     this.globalPlayers = GameState.buildWorld(used);
@@ -266,12 +267,90 @@ class GameState {
   /* ----- energy ----- */
   /** Rest day: condition +10, match sharpness fades −2 (floor 20), morale drifts 1 point toward 60. */
   restDay() { this.dayRoutine(null, false); }
-  /** v2.5: today's coach state { date, ap, plan } — resets lazily every morning (whatever advanced the calendar). */
+  /** v2.5: today's coach state { date, briefed, locker, observe } — resets lazily every morning (whatever advanced the calendar).
+      v3.13: action points moved to the weekly wallet (weekState), the training regime to the weekly plan. */
   dayState() {
-    if (!this.today || this.today.date !== this.calendar.date) this.today = { date: this.calendar.date, ap: COACH.AP, plan: null };
+    if (!this.today || this.today.date !== this.calendar.date) this.today = { date: this.calendar.date };
     return this.today;
   }
-  get ap() { return this.dayState().ap; }
+  get ap() { return this.weekState().ap; }
+  /* ---------- v3.13 WEEKLY PLAN + WEEKLY ACTION POINTS ---------- */
+  /** The current week (Mon–Sun), created lazily when the calendar enters a new week (never rolls backwards). */
+  weekState() {
+    const start = weekStartOf(this.calendar.date), w = this.week;
+    if (w && w.start >= start) return w;
+    const prev = w && isoAdd(w.start, 7) === start ? w : null;
+    const carry = prev ? Math.min(WEEK.CARRY_MAX, Math.max(0, prev.ap)) : 0;
+    const win = this.lastResult() === 'W' ? WEEK.WIN_BONUS : 0;
+    const ap = Math.min(WEEK.AP_MAX, WEEK.AP_BASE + carry + win);
+    this.week = { start, plan: Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null])), confirmed: false, ap, carry, trainingsDone: 0,
+      apSources: { base: WEEK.AP_BASE, carry, win, total: ap } };
+    if (!this.plannableDays().length) {   // nothing left to plan (the season opens on a Sunday): a stub week, no AP to carry
+      Object.assign(this.week, { confirmed: true, ap: 0, carry: 0, apSources: { base: 0, carry: 0, win: 0, total: 0 } });
+    }
+    return this.week;
+  }
+  /** Pre-v3.13 save in the middle of a week: Tue + Thu with the default regime (today's old pick kept), confirmed, base AP. */
+  static migrateWeek(date, oldPlan) {
+    const start = weekStartOf(date), plan = Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null]));
+    for (const k of WEEK.DEFAULT_DAYS) plan[k] = WEEK.DEFAULT_REGIME;
+    if (REGIMES[oldPlan] && plan[weekKey(date)]) plan[weekKey(date)] = oldPlan;
+    const done = WEEK.PLAN_KEYS.filter((k, i) => plan[k] && isoAdd(start, i) < date).length;
+    return { start, plan, confirmed: true, ap: WEEK.AP_BASE, carry: 0, trainingsDone: done, apSources: { base: WEEK.AP_BASE, carry: 0, win: 0, total: WEEK.AP_BASE } };
+  }
+  /** 'W' | 'D' | 'L' of our last played league match (null before the first one). */
+  lastResult() {
+    const lg = this.league;
+    const f = lg?.fixtures.filter(x => (x.home === 0 || x.away === 0) && lg.played(x)).sort((a, b) => b.md - a.md)[0];
+    if (!f) return null;
+    const gf = f.home === 0 ? f.hg : f.ag, ga = f.home === 0 ? f.ag : f.hg;
+    return gf > ga ? 'W' : gf < ga ? 'L' : 'D';
+  }
+  matchOn(date) { return this.calendar.events.some(e => e.type === 'match' && e.date === date); }
+  /** Mon–Fri of the current week: [{ k, date }]. */
+  weekDays() { const w = this.weekState(); return WEEK.PLAN_KEYS.map((k, i) => ({ k, date: isoAdd(w.start, i) })); }
+  /** Can the coach still change this day? Future days always; today only before the week is confirmed. */
+  dayEditable(date) { const t = this.calendar.date; return !this.matchOn(date) && (date > t || (date === t && !this.weekState().confirmed)); }
+  plannableDays() { return this.weekDays().filter(d => this.dayEditable(d.date)); }
+  /** Does OUR club train on this day? (the weekly plan; AI clubs keep isTrainingDay) */
+  isOurTraining(date) {
+    if (!date) return false;
+    const w = this.weekState();
+    return weekStartOf(date) === w.start && !!w.plan[weekKey(date)] && !this.matchOn(date);
+  }
+  planOf(date) { return this.isOurTraining(date) ? this.week.plan[weekKey(date)] : null; }
+  todayPlan() { return this.planOf(this.calendar.date); }
+  /** 0-based number of this training within its week (attendance curve index). */
+  trainingIndex(date) { return this.weekDays().filter(d => d.date <= date && this.isOurTraining(d.date)).length - 1; }
+  trainingsPlanned() { return this.weekDays().filter(d => this.isOurTraining(d.date)).length; }
+  /** PLANNER.EXE: Rest (null) or a regime for one weekday. Today's regime can change after confirming (not Rest ↔ Training). */
+  setWeekPlan(k, regime) {
+    const w = this.weekState(), day = this.weekDays().find(d => d.k === k);
+    if (!day || (regime !== null && !REGIMES[regime])) return false;
+    const todayRegime = day.date === this.calendar.date && w.confirmed && w.plan[k] && regime;   // until CONTINUE processes the day
+    if (!this.dayEditable(day.date) && !todayRegime) return false;
+    if (regime && !w.plan[k] && this.trainingsPlanned() >= WEEK.MAX_TRAININGS) return false;
+    w.plan[k] = regime;
+    this.save();
+    return true;
+  }
+  confirmWeek() { this.weekState().confirmed = true; this.save(); }
+  /** Sunday (daily hook): an empty gym or an overloaded week upsets the factions. */
+  weekReview(date) {
+    const w = this.weekState(), first = this.calendar.events[0] && isoAdd(this.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
+    if (weekKey(date) !== 'sun' || weekStartOf(date) !== w.start || (first && w.start < first)) return null;
+    if (!w.trainingsDone) {
+      this.addRep('board', WEEK.EMPTY_BOARD); this.addRep('parents', WEEK.EMPTY_PARENTS);
+      this.addDiary({ date, key: 'week.empty', cls: 'ev' });
+      return 'empty';
+    }
+    if (w.trainingsDone >= WEEK.HEAVY_FROM) {
+      this.addRep('parents', WEEK.HEAVY_PARENTS);
+      this.addDiary({ date, key: 'week.heavy', vars: { n: w.trainingsDone }, cls: 'ev' });
+      return 'heavy';
+    }
+    return null;
+  }
   /* ---------- v2.8 faction reputation ---------- */
   addRep(key, delta) { if (this.rep && key in this.rep) this.rep[key] = clamp(Math.round(this.rep[key] + delta), 0, 100); }
   /** Daily: squad rep drifts 1 toward the squad's average morale; 1st of the month: board grant; Sundays: parents. */
@@ -297,8 +376,9 @@ class GameState {
       }
     }
   }
-  spendAP() { const d = this.dayState(); if (d.ap < 1) return false; d.ap--; this.save(); return true; }
-  setPlan(plan) { if (REGIMES[plan]) { this.dayState().plan = plan; this.save(); } }
+  spendAP() { const w = this.weekState(); if (w.ap < 1) return false; w.ap--; this.save(); return true; }
+  /** TODAY widget: change today's regime (only on a planned training day). */
+  setPlan(plan) { const d = this.calendar.date; if (REGIMES[plan] && this.isOurTraining(d)) this.setWeekPlan(weekKey(d), plan); }
   /* ---------- v3.6 POSITION DISCOVERY ---------- */
   /** Practice Match: mark / unmark a present kid "Under Observation" (0 AP, at most POS_HINT.OBSERVE_MAX). Returns true if changed. */
   toggleObserve(id) {
@@ -376,13 +456,15 @@ class GameState {
     return null;
   }
   /** Rolls the arrivals once per day (training / match days). Absent kids are locked out until the next morning. */
-  runLocker(training = isTrainingDay(this.calendar.date)) {
+  runLocker(training = this.isOurTraining(this.calendar.date), date = this.calendar.date) {
     const d = this.dayState();
     if (d.locker) return d.locker;
-    const absent = {};
+    const absent = {}, k = training ? this.trainingIndex(date) : -1;
     for (const p of this.squad) {
-      const r = this.arrivalCheck(p);
-      p.absentToday = r === 'exhausted' || r === 'skipped' ? r : null;   // injured / banned / home are locked by their own status
+      let r = this.arrivalCheck(p);
+      // v3.13: from the 3rd training of the week the kids who'd come may be kept home (school / not recovered) — not truancy
+      if (!r && k >= ATTEND.FROM && seeded(date + '#load#' + p.id)() >= attendChance(p, k)) r = 'overload';
+      p.absentToday = ['exhausted', 'skipped', 'overload'].includes(r) ? r : null;   // injured / banned / home are locked by their own status
       p.skipped_training = training && r === 'skipped';                   // feeds The Truant
       if (r) absent[p.id] = r;
     }
@@ -436,10 +518,11 @@ class GameState {
   /** Every morning (and after a match): nobody is "absent" any more. */
   clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
 
-  dayRoutine(date, training = !!date && isTrainingDay(date), plan = 'match') {
+  dayRoutine(date, training = this.isOurTraining(date), plan = this.planOf(date) || WEEK.DEFAULT_REGIME) {
     const skipped = [], improved = [], plateau = [], hurt = [], trained = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
-    if (training) { const lk = this.runLocker(true); lk.done = true; }   // auto-sim: arrivals are rolled without the view
+    if (training) { const lk = this.runLocker(true, date || this.calendar.date); lk.done = true; }   // auto-sim: arrivals are rolled without the view
+    if (training && date && weekStartOf(date) === this.weekState().start) this.week.trainingsDone++;   // v3.13: Sunday review
     else this.clearDayStatus();
     for (const p of this.squad) {
       const present = training && p.available;   // v2.6: only kids who came to the locker room train
@@ -466,7 +549,7 @@ class GameState {
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
     this.tickInjuries();
-    this.league?.aiDay(training);   // v3.4: AI clubs rest / train on the same calendar
+    this.league?.aiDay(!!date && isTrainingDay(date));   // v3.4: AI clubs rest / train on the same calendar (v3.13: always Tue / Thu)
     // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
     const observed = training && plan === 'match'
       ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
@@ -593,7 +676,10 @@ class GameState {
     return this.budget - before;
   }
 
-  addDiary(entry) { this.diary.push(entry); if (this.diary.length > 80) this.diary.shift(); }
+  addDiary(entry) {
+    this.diary.push(entry); if (this.diary.length > 80) this.diary.shift();
+    if (this.away) { this.away.push(entry); if (this.away.length > 40) this.away.shift(); }   // v3.13: CONTINUE → next morning briefing
+  }
 
   save() {
     try {
@@ -602,7 +688,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -623,6 +709,7 @@ class GameState {
       this.formation = FORMATIONS[d.formation] ? d.formation : '4-4-2';
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
+      this.away = Array.isArray(d.away) ? d.away : null;   // v3.13 "while you were away"
       this.expelled = Array.isArray(d.expelled) ? d.expelled : [];   // v2.9
       const r = d.rep || {};   // v2.8 (older saves start neutral)
       this.rep = { board: clamp(r.board ?? REP.START, 0, 100), parents: clamp(r.parents ?? REP.START, 0, 100), squad: clamp(r.squad ?? REP.START, 0, 100) };
@@ -662,6 +749,8 @@ class GameState {
         this.coachNotes = d.coachNotes && typeof d.coachNotes === 'object' ? d.coachNotes : {};
         this.cheats = { forceWin: !!d.cheats?.forceWin };
         if (this.lastReport && !d.coachNotes) this.recordCoachNotes(this.lastReport);   // pre-v1.5 save
+        // v3.13: weekly plan (pre-v3.13 saves: Tue + Thu, confirmed, base AP — the current day is never broken)
+        this.week = d.week && typeof d.week === 'object' && d.week.plan && d.week.start ? d.week : GameState.migrateWeek(this.calendar.date, d.today?.plan);
         // a match interrupted by a page reload is simply replayed
       } else {
         this.newSeason(SEASON.FIRST_YEAR);   // older saves: keep the squad, start the league
