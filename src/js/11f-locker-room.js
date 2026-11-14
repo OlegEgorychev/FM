@@ -6,7 +6,7 @@
    XI, the bench and the training until the next morning. An empty locker can be investigated for 1 AP.
    ========================================================= */
 class LockerRoom {
-  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?', excused: '\u2302', overload: '\u270E' };   // v3.13: ✎ school / not recovered
+  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?', excused: '\u2302', overload: '\u270E', world: '\u2726' };   // v3.13: ✎ school / not recovered
   constructor(ui) {
     this.ui = ui;
     this.layer = document.getElementById('locker-room-view');
@@ -93,8 +93,8 @@ class LockerRoom {
           <div class="lk-name">${esc(L.name(p.surname))}</div>
           <div class="energy ${this.ui.energyClass(e)}"><i style="width:${e}%"></i><span>${e}%</span></div></div>`;
       }
-      const load = why === 'overload';   // v3.13: kept home by the weekly load — known at once, no roll call (not truancy)
-      const note = checked || load ? `<div class="lk-note open">${load ? LockerRoom.NOTE.overload + ' ' : ''}${esc(L.t('lr.short.' + why))}</div>`
+      const load = why === 'overload' || why.startsWith('world:');   // v3.13: weekly load / v3.14: school or city event — known at once, no roll call (not truancy)
+      const note = checked || load ? `<div class="lk-note open">${load ? (why === 'overload' || why === 'world:tests' ? LockerRoom.NOTE.overload : LockerRoom.NOTE.world) + ' ' : ''}${esc(L.t('lr.short.' + why))}</div>`
         : `<div class="lk-note">${LockerRoom.NOTE[why] && why !== 'skipped' && why !== 'exhausted' ? LockerRoom.NOTE[why] : '?'}</div>`;
       const can = !checked && !load && s.ap > 0;
       return `<div class="lk empty${reveal ? ' rv' : ''}${checked || load ? ' checked' : ''}${load ? ' load' : ''}${can ? ' can' : ''}" ${delay} data-pid="${p.id}" role="button" tabindex="0"
@@ -114,7 +114,7 @@ class LockerRoom {
   /** Roll call: 1 AP, a short phone call about one empty locker. */
   investigate(pid) {
     const s = this.state, lk = s.dayState().locker;
-    if (!lk || !lk.absent[pid] || lk.absent[pid] === 'overload' || lk.checked.includes(pid) || this.ui.events.active) return;   // v3.13: no roll call for 'overload'
+    if (!lk || !lk.absent[pid] || lk.absent[pid] === 'overload' || lk.absent[pid].startsWith('world:') || lk.checked.includes(pid) || this.ui.events.active) return;   // v3.13: no roll call for 'overload'
     if (!s.spendAP()) { document.getElementById('lr-status').textContent = L.t('lr.noAp'); return; }
     lk.checked.push(pid);
     s.save();

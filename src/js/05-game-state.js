@@ -20,7 +20,7 @@ class GameState {
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
-    this.today = null; this.week = null; this.away = null;   // v3.13: weekly plan / AP wallet / "while you were away"
+    this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
     this.globalPlayers = GameState.buildWorld(used);
@@ -288,7 +288,57 @@ class GameState {
     if (!this.plannableDays().length) {   // nothing left to plan (the season opens on a Sunday): a stub week, no AP to carry
       Object.assign(this.week, { confirmed: true, ap: 0, carry: 0, apSources: { base: 0, carry: 0, win: 0, total: 0 } });
     }
+    this.rollWorldEvent(start);   // v3.14: Monday — before the morning briefing is shown
     return this.week;
+  }
+  /* ---------- v3.14 WORLD EVENTS: one engine, the rows live in WORLD_EVENTS ---------- */
+  /** A new week: maybe one school / city event — seeded by the week, never two weeks running, never in the season's first week. */
+  rollWorldEvent(start) {
+    this.worldEvent = null;   // last week's event is over
+    const md1 = this.calendar.events.find(e => e.type === 'match');
+    if (this.phase === 'draft' || !this.squad.length || !md1 || start <= weekStartOf(md1.date)) return null;
+    if (this.worldLast && isoAdd(this.worldLast, 7) === start) return null;
+    const r = seeded(start + '#world');
+    if (r() >= WORLD.CHANCE) return null;
+    this.worldEvent = this.buildWorldEvent(WORLD_EVENTS[Math.floor(r() * WORLD_EVENTS.length)], start, r);
+    this.worldLast = start;
+    return this.worldEvent;
+  }
+  /** The day(s) and the kids of one event row (fixed for the week). Injured / banned / kept-home kids are not picked.
+      With WORLD.WRONG one picked kid is swapped for another (a hint, not a proof); 'all' events have no wrong picks. */
+  buildWorldEvent(row, start, r = seeded(start + '#world#' + row.id)) {
+    const days = row.days === 'mon-thu' ? [0, 1, 2, 3].map(i => isoAdd(start, i)) : [isoAdd(start, 1 + Math.floor(r() * 3))];
+    const all = this.squad.filter(p => !(p.injuryDays > 0) && !(p.suspensionMatches > 0) && !(p.awayDays > 0)).sort((a, b) => a.id.localeCompare(b.id));
+    let picked = all;
+    if (row.pick.kind !== 'all') {
+      const n = typeof row.pick.n === 'function' ? row.pick.n(all) : row.pick.n, dir = row.pick.kind === 'bottom' ? 1 : -1;
+      const sc = new Map(all.map(p => [p.id, row.pick.score(p, all)]));
+      picked = [...all].sort((a, b) => dir * (sc.get(a.id) - sc.get(b.id)) || a.id.localeCompare(b.id)).slice(0, n);
+      const others = all.filter(p => !picked.includes(p));
+      if (r() < WORLD.WRONG && picked.length && others.length) picked[Math.floor(r() * picked.length)] = others[Math.floor(r() * others.length)];
+    }
+    return { id: row.id, tier: row.tier, days, playerIds: picked.map(p => p.id), weekStart: start };
+  }
+  /** DEBUG.EXE: replace this week's event (id) or clear it (null). */
+  forceWorldEvent(id) {
+    const start = this.weekState().start, row = WORLD_EVENTS.find(e => e.id === id);
+    this.worldEvent = row ? this.buildWorldEvent(row, start) : null;
+    if (row) this.worldLast = start;
+    this.save();
+    return this.worldEvent;
+  }
+  worldRow(id) { return WORLD_EVENTS.find(e => e.id === id) || null; }
+  /** This week's event if it runs on that date. */
+  worldEventOn(date) { const e = this.worldEvent; return e && date && e.days.includes(date) && this.worldRow(e.id) ? e : null; }
+  /** 'world:<id>' when this kid is away at the event that day (absent-type events only). */
+  worldAway(id, date) { const e = this.worldEventOn(date); return e && this.worldRow(e.id).effect.absent && e.playerIds.includes(id) ? 'world:' + e.id : null; }
+  /** Daily hook: the diary names the kids away at the event (tests: one line on its first day). */
+  worldDaily(date) {
+    const e = this.worldEventOn(date);
+    if (!e) return;
+    const row = this.worldRow(e.id), kids = e.playerIds.filter(id => this.player(id));
+    if (row.effect.absent && kids.length) this.addDiary({ date, key: 'world.' + e.id + '.diary', vars: { s: { list: kids.map(pid => ({ pid })) } }, cls: 'ev' });
+    else if (!row.effect.absent && date === e.days[0]) this.addDiary({ date, key: 'world.' + e.id + '.diary', cls: 'ev' });
   }
   /** Pre-v3.13 save in the middle of a week: Tue + Thu with the default regime (today's old pick kept), confirmed, base AP. */
   static migrateWeek(date, oldPlan) {
@@ -459,12 +509,14 @@ class GameState {
   runLocker(training = this.isOurTraining(this.calendar.date), date = this.calendar.date) {
     const d = this.dayState();
     if (d.locker) return d.locker;
-    const absent = {}, k = training ? this.trainingIndex(date) : -1;
+    const absent = {}, k = training ? this.trainingIndex(date) : -1, we = this.worldEventOn(date), mult = training && we ? this.worldRow(we.id).effect.attendMult ?? 1 : 1;
     for (const p of this.squad) {
-      let r = this.arrivalCheck(p);
+      let r = this.worldAway(p.id, date) || this.arrivalCheck(p);   // v3.14: away at a school / city event — before the other checks
       // v3.13: from the 3rd training of the week the kids who'd come may be kept home (school / not recovered) — not truancy
-      if (!r && k >= ATTEND.FROM && seeded(date + '#load#' + p.id)() >= attendChance(p, k)) r = 'overload';
-      p.absentToday = ['exhausted', 'skipped', 'overload'].includes(r) ? r : null;   // injured / banned / home are locked by their own status
+      // v3.14: the 'tests' week multiplies that chance (×attendMult); a kid lost only to the tests gets 'world:tests'
+      const base = training && k >= ATTEND.FROM ? attendChance(p, k) : 1, m = mult < 1 && we.playerIds.includes(p.id) ? mult : 1;
+      if (!r && training && (base < 1 || m < 1)) { const x = seeded(date + '#load#' + p.id)(); r = x >= base ? 'overload' : x >= base * m ? 'world:' + we.id : null; }
+      p.absentToday = ['exhausted', 'skipped', 'overload'].includes(r) || r?.startsWith('world:') ? r : null;   // injured / banned / home are locked by their own status
       p.skipped_training = training && r === 'skipped';                   // feeds The Truant
       if (r) absent[p.id] = r;
     }
@@ -501,6 +553,7 @@ class GameState {
     const lk = this.today?.locker;
     if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null;
       if ([lk.capRequest?.pid, lk.capRequest?.mate, lk.capRequest?.hint].includes(id)) lk.capRequest = null; }   // v3.8
+    if (this.worldEvent) this.worldEvent.playerIds = this.worldEvent.playerIds.filter(x => x !== id);   // v3.14
     p.teamId = 'free_agent';   // v3.1: he stays in the world database (future transfers)
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
     this.save();
@@ -522,8 +575,9 @@ class GameState {
     const skipped = [], improved = [], plateau = [], hurt = [], trained = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
     if (training) { const lk = this.runLocker(true, date || this.calendar.date); lk.done = true; }   // auto-sim: arrivals are rolled without the view
-    if (training && date && weekStartOf(date) === this.weekState().start) this.week.trainingsDone++;   // v3.13: Sunday review
     else this.clearDayStatus();
+    if (training && date && weekStartOf(date) === this.weekState().start) this.week.trainingsDone++;   // v3.13: Sunday review
+    const wc = training ? this.worldRow(this.worldEventOn(date || this.calendar.date)?.id)?.effect.condition || 0 : 0;   // v3.14: tests week — tired trainees
     for (const p of this.squad) {
       const present = training && p.available;   // v2.6: only kids who came to the locker room train
       const walkOut = present && R.extraSkip && p.psych.discipline < R.lowDisc && Math.random() < R.extraSkip;   // v2.5: tactics bore the restless ones
@@ -533,7 +587,7 @@ class GameState {
       if (training && p.skipped_training) { /* skipped: no tiredness, no sharpness (exhausted / injured kids rest) */ }
       else if (trains) {   // v2.5: the coach's regime
         attended++; trained.push(p);
-        p.energy = clamp(p.energy + R.cond, 0, 100);
+        p.energy = clamp(p.energy + R.cond + wc, 0, 100);
         p.dyn.sharpness = clamp(p.dyn.sharpness + R.sharp, 0, 100);
         if (R.morale) p.dyn.morale = clamp(p.dyn.morale + R.morale, 0, 100);
         if (R.grow && Math.random() < R.grow.chance * growthMult(p)) {
@@ -688,7 +742,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -710,6 +764,8 @@ class GameState {
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
       this.away = Array.isArray(d.away) ? d.away : null;   // v3.13 "while you were away"
+      this.worldEvent = d.worldEvent && typeof d.worldEvent === 'object' && Array.isArray(d.worldEvent.playerIds) && Array.isArray(d.worldEvent.days) ? d.worldEvent : null;   // v3.14 (missing → none this week)
+      this.worldLast = typeof d.worldLast === 'string' ? d.worldLast : null;
       this.expelled = Array.isArray(d.expelled) ? d.expelled : [];   // v2.9
       const r = d.rep || {};   // v2.8 (older saves start neutral)
       this.rep = { board: clamp(r.board ?? REP.START, 0, 100), parents: clamp(r.parents ?? REP.START, 0, 100), squad: clamp(r.squad ?? REP.START, 0, 100) };

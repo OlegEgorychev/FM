@@ -70,13 +70,20 @@ class MorningBriefing {
     document.getElementById('mb-away').innerHTML = away.slice(-MorningBriefing.AWAY_MAX).map(e =>
       `<li><span class="d">${esc(fmtDate(e.date, { weekday: 'short' }))}</span> ${esc(this.ui.entryText({ ...e, r: 0 }))}</li>`).join('')
       + (away.length > MorningBriefing.AWAY_MAX ? `<li class="more">${esc(L.t('mb.awayMore', { n: away.length - MorningBriefing.AWAY_MAX }))}</li>` : '');
-    document.getElementById('mb-news').innerHTML = this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
+    document.getElementById('mb-news').innerHTML = MorningBriefing.worldNews(s, date).map(n => `<li class="mb-world">${esc(n)}</li>`).join('')   // v3.14
+      + this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
     const bar = (k) => { const v = s.rep[k];
       return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };
     document.getElementById('mb-rep').innerHTML = ['board', 'parents', 'squad'].map(bar).join('');
     document.getElementById('mb-go').innerHTML = L.t(kind === 'plan' ? 'mb.goPlan' : kind === 'rest' || kind === 'off' ? 'mb.goQuiet' : 'mb.go');
   }
 
+  /** v3.14: Monday news about this week's school / city event — the day(s) and a vague hint, never names. */
+  static worldNews(s, date) {
+    const e = s.worldEvent;
+    if (!e || s.phase !== 'calendar' || date !== e.weekStart) return [];
+    return [L.t('world.news.' + e.id, { d: L.t('world.on.' + weekKey(e.days[0])) })];
+  }
   /** v3.13: "Base 4 · Carried 1 · Win +1 = 6 AP" */
   static apLine(src) {
     return [L.t('mb.ap.base', { n: src.base ?? 0 }), src.carry ? L.t('mb.ap.carry', { n: src.carry }) : '', src.win ? L.t('mb.ap.win', { n: src.win }) : '']

@@ -420,6 +420,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const days = (a, b) => (new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5;
     const ofPre = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available); return { blk: YAM.ui.officeBlock(p.id), dow: new Date(YAM.game.calendar.date + 'T00:00:00Z').getUTCDay() }; });
     await page.click('#btn-sim');   // Sunday: [ CONTINUE ] → Monday (the week is not planned yet) → the morning briefing opens by itself
+    // v3.14: this week's seeded world event (always quarter tests for 9 Sep) is cleared — the v3.13 checks below pin exact numbers; world events have their own checks
+    await page.evaluate(() => { YAM.game.worldEvent = null; YAM.ui.briefing.render(); });
     const mb = await page.evaluate(() => ({ open: !document.getElementById('morning-briefing-view').hidden, z: +getComputedStyle(document.getElementById('morning-briefing-view')).zIndex,
       date: document.getElementById('mb-date').textContent, wx: document.getElementById('mb-weather').textContent.trim(), news: document.querySelectorAll('#mb-news li').length,
       rep: document.querySelectorAll('#mb-rep .rep-row .rep-bar').length, btn: document.getElementById('mb-go').textContent, kind: YAM.ui.dayInfo(YAM.game.calendar.date).kind,
@@ -1212,7 +1214,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('v3.12 growth room: v3.11 / PA saves convert (ceiling − overall), saves keep room + gains, growth = start + room (max 20), plateau, seeded yard notes, no stars', Object.values(pot).every(Boolean), JSON.stringify(pot));
     // v3.13: weekly AP formula — base 4 + carry (≤ 2, only from the previous week) + 1 after a win, max 7; spending; briefing line
     const apf = await page.evaluate(() => {
-      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, base: WEEK.AP_BASE }, out = {};
+      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, base: WEEK.AP_BASE, we: s.worldEvent, wl: s.worldLast }, out = {};
       const mk = (left, res, gap = 7) => { s.week = { ...keep.week, start: '2003-03-03', ap: left }; s.calendar.date = isoAdd('2003-03-03', gap); s.lastResult = () => res;
         const w = s.weekState(); return [w.ap, w.carry, w.apSources.win, w.apSources.total].join(); };
       out.base = mk(0, 'L') === '4,0,0,4'; out.carry1 = mk(1, 'D') === '5,1,0,5'; out.carryCap = mk(5, 'L') === '6,2,0,6';
@@ -1227,16 +1229,17 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const m = GameState.migrateWeek('2002-09-12', 'cardio');   // pre-v3.13 save on a Thursday with today's plan picked
       out.migrate = m.confirmed && m.plan.tue === WEEK.DEFAULT_REGIME && m.plan.thu === 'cardio' && !m.plan.mon && m.ap === WEEK.AP_BASE && m.trainingsDone === 1 && m.start === '2002-09-09';
       out.noCoachAp = !('AP' in COACH);
-      s.week = keep.week; s.calendar.date = keep.date;
+      s.week = keep.week; s.calendar.date = keep.date; s.worldEvent = keep.we; s.worldLast = keep.wl;
       return { out, line };
     });
     check('v3.13 weekly AP: base 4 / carry ≤ 2 (previous week only) / win +1 / max 7, spend to 0, briefing line "Base 4 · Carried 1 · Win +1 = 6 AP", old-save migration (Tue + Thu, confirmed, base AP), COACH.AP gone',
       Object.values(apf.out).every(Boolean), JSON.stringify(apf));
     // v3.13: a 5-training week → 'overload' absences from the 3rd training (seeded, not truancy, no roll call), Sunday: Parents −2
     const ov = await page.evaluate(() => {
-      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, today: s.today, ex: s.excusesOff, rep: { ...s.rep }, kids: s.squad.map(p => [p.energy, p.psych.discipline, p.injuryDays, p.suspensionMatches, p.awayDays, p.dyn.morale]) };
+      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, today: s.today, ex: s.excusesOff, rep: { ...s.rep }, we: s.worldEvent, wl: s.worldLast, kids: s.squad.map(p => [p.energy, p.psych.discipline, p.injuryDays, p.suspensionMatches, p.awayDays, p.dyn.morale]) };
       s.calendar.date = '2003-03-03'; s.week = null; s.today = null; s.excusesOff = true;
-      s.weekState(); for (const k of WEEK.PLAN_KEYS) s.setWeekPlan(k, 'tech'); s.confirmWeek();
+      s.weekState(); s.worldEvent = null;   // v3.14: no school / city event in this synthetic week
+      for (const k of WEEK.PLAN_KEYS) s.setWeekPlan(k, 'tech'); s.confirmWeek();
       s.squad.forEach(p => { p.injuryDays = 0; p.suspensionMatches = 0; p.awayDays = 0; p.psych.discipline = 20; });   // nobody skips: only the curve
       const truant = NARRATIVE_EVENTS.find(e => e.id === 'truant'), per = [];
       for (let i = 0; i < 5; i++) {
@@ -1256,7 +1259,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         attendChance({ psych: { discipline: 1 }, energy: 10 }, 4), attendChance({ psych: { discipline: 10 }, energy: 80 }, 0)].map(v => +v.toFixed(3));
       const done = s.week.trainingsDone;
       s.squad.forEach((p, i) => { [p.energy, p.psych.discipline, p.injuryDays, p.suspensionMatches, p.awayDays, p.dyn.morale] = keep.kids[i]; p.absentToday = null; p.skipped_training = false; });
-      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.excusesOff = keep.ex;
+      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.excusesOff = keep.ex; s.worldEvent = keep.we; s.worldLast = keep.wl;
       return { per, heavy, ch, done, label: L.t('lr.short.overload') };
     });
     check('v3.13 attendance curve: 5 trainings → no overload on the 1st–2nd, \'overload\' absences on the 3rd–5th (curve 0.7/0.5/0.3 ± discipline / tiredness, clamp 0.05), seeded, unavailable, no skipped_training / truant / roll call; Sunday ≥ 4 trainings → Parents −2',
@@ -1266,21 +1269,124 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       JSON.stringify(ov));
     // v3.13: a week with no training at all → Sunday (through the real daily hook): Board −2, Parents −2, "the gym stood empty"
     const ew = await page.evaluate(() => {
-      const s = YAM.game, ui = YAM.ui, keep = { date: s.calendar.date, week: s.week, today: s.today, rep: { ...s.rep }, kids: s.squad.map(p => [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays]) };
+      const s = YAM.game, ui = YAM.ui, keep = { date: s.calendar.date, week: s.week, today: s.today, rep: { ...s.rep }, we: s.worldEvent, wl: s.worldLast, kids: s.squad.map(p => [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays]) };
       s.calendar.date = '2003-03-10'; s.week = null; s.today = null; s.rep.parents = 50; s.rep.board = 50;
-      s.weekState(); s.confirmWeek();   // empty plan
+      s.weekState(); s.worldEvent = null; s.confirmWeek();   // empty plan (v3.14: and no world event)
       const b0 = s.rep.board, p0 = s.rep.parents, R = Math.random; Math.random = () => 0.5;
       let tr = 0;
       for (let i = 0; i < 7; i++) { const d = isoAdd('2003-03-10', i); s.calendar.date = d; if (ui.cal.dailyHooks[0](d)?.key !== 'cal.rest') tr++; }
       Math.random = R;
       const r = { tr, board: s.rep.board - b0, parents: s.rep.parents - p0, diary: s.diary.some(d => d.key === 'week.empty' && d.date === '2003-03-16'), text: L.t('week.empty'), both: !!(I18N.en['week.empty'] && I18N.ru['week.empty'] && I18N.en['pl.warn.heavy'] && I18N.ru['pl.warn.over']) };
       s.squad.forEach((p, i) => { [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays] = keep.kids[i]; });
-      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date;
+      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.worldEvent = keep.we; s.worldLast = keep.wl;
       return r;
     });
     check('v3.13 Sunday review: 0 trainings all week → Board −2, Parents −2, diary "The gym stood empty all week" (EN + RU)',
       ew.tr === 0 && ew.board === -2 && ew.parents === -2 && ew.diary && ew.both && /Зал пустовал всю неделю|The gym stood empty all week/.test(ew.text),
       JSON.stringify(ew));
+    // v3.14: WORLD EVENTS — (1) DEBUG force on a Monday → briefing news without names + planner marker
+    await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui;
+      if (ui.locker.isOpen) ui.locker.close(); if (ui.planner.isOpen) ui.planner.close(); if (ui.briefing.isOpen) ui.briefing.close();
+      s.phase = 'calendar'; s.calendar.date = '2002-12-02'; s.week = null; s.today = null; s.away = null; s.excusesOff = true;
+      s.weekState(); ui.show('dash'); ui.renderAll();
+      ui.debug.open(); ui.debug.tab = 'god'; ui.debug.render();
+    });
+    await page.selectOption('#dbg-world', 'athletics');
+    await page.click('#debug-body [data-cheat="world"]');
+    const w1 = await page.evaluate(() => {
+      const s = YAM.game, e = s.worldEvent, msg = document.getElementById('debug-status')?.textContent || '';
+      YAM.ui.debug.close(); YAM.ui.briefing.open();
+      const news = [...document.querySelectorAll('#mb-news li')].map(x => x.textContent), all = document.querySelector('#mb-news li.mb-world')?.textContent || '';   // (the old flavour news may name any kid)
+      const re = s.buildWorldEvent(s.worldRow('athletics'), e.weekStart), re2 = s.buildWorldEvent(s.worldRow('athletics'), e.weekStart);   // (3) seeded: same week + squad → same picks
+      const elig = s.squad.filter(p => !(p.injuryDays > 0) && !(p.suspensionMatches > 0) && !(p.awayDays > 0)), sp = p => p.physical.speed + p.physical.acceleration;
+      const top = [...elig].sort((a, b) => sp(b) - sp(a) || a.id.localeCompare(b.id)).slice(0, 4).map(p => p.id);
+      return { e, msg, open: YAM.ui.briefing.isOpen, news, world: document.querySelectorAll('#mb-news li.mb-world').length, dayWord: L.t('world.on.' + weekKey(e.days[0])),
+        noNames: e.playerIds.every(id => { const p = s.player(id); return !all.includes(p.surname) && !all.includes(L.name(p.surname)); }),
+        same: JSON.stringify(re) === JSON.stringify(e) && JSON.stringify(re2) === JSON.stringify(e), wrongAtMost1: e.playerIds.filter(id => !top.includes(id)).length <= 1 };
+    });
+    await page.click('#mb-go');   // → PLANNER.EXE (the week is not confirmed yet)
+    const w2 = await page.evaluate(() => ({ open: YAM.ui.planner.isOpen, cols: [...document.querySelectorAll('#pl-grid .pl-col.we')].map(c => c.dataset.date),
+      tip: document.querySelector('#pl-grid .pl-col.we .pl-we')?.title || '' }));
+    check('v3.14 world events: DEBUG forces "athletics" this week (one day Tue–Thu, top 4 by speed + acceleration, ≤ 1 wrong pick); Monday briefing news names the day but nobody; PLANNER.EXE marks the day (✦ + tooltip)',
+      w1.e?.id === 'athletics' && w1.e.tier === 2 && w1.e.days.length === 1 && [2, 3, 4].includes(new Date(w1.e.days[0] + 'T00:00:00Z').getUTCDay()) && w1.e.playerIds.length === 4
+      && w1.e.weekStart === '2002-12-02' && w1.wrongAtMost1 && /athletics|спартакиад/i.test(w1.msg) && w1.open && w1.world === 1 && w1.news[0].includes(w1.dayWord) && w1.noNames
+      && w2.open && w2.cols.length === 1 && w2.cols[0] === w1.e.days[0] && w2.tip.length > 10, JSON.stringify({ w1, w2 }));
+    // (2) on that day: the picked kids are away ('world:athletics'), not truants, rested, no roll call, no office, rep unchanged, diary names them
+    const w3 = await page.evaluate(d => {
+      const s = YAM.game, e = s.worldEvent;
+      s.setWeekPlan(weekKey(d), 'match'); s.confirmWeek(); YAM.ui.planner.close();
+      s.calendar.date = d; s.today = null; s.dayState().briefed = true; s.weekState().ap = 2;
+      s.squad.forEach(p => { p.energy = 60; });
+      const rep0 = JSON.stringify(s.rep), lk = s.runLocker(), away = e.playerIds.map(id => lk.absent[id]);
+      const kids = e.playerIds.map(id => s.player(id)), here = s.squad.find(p => !lk.absent[p.id]);
+      const truant = NARRATIVE_EVENTS.find(x => x.id === 'truant').trigger(s, d);
+      const ap0 = s.ap; YAM.ui.locker.investigate(e.playerIds[0]);
+      const noCall = s.ap === ap0 && !s.pendingEvent && !lk.checked.includes(e.playerIds[0]);
+      const office = [YAM.ui.officeBlock(e.playerIds[0]), YAM.ui.officeBlock(here.id)];
+      YAM.ui.locker.open();
+      const label = document.querySelector(`#lr-grid .lk.load[data-pid="${e.playerIds[0]}"] .lk-note.open`)?.textContent || '';
+      YAM.ui.locker.close();
+      s.dayRoutine(d); s.worldDaily(d);
+      const last = s.diary[s.diary.length - 1], txt = YAM.ui.entryText({ ...last, r: 0 });
+      return { away, flags: kids.map(p => [p.absentToday, p.skipped_training, p.unavailableReason]), truant, noCall, office, label, want: L.t('lr.short.world:athletics'),
+        rested: kids.every(p => p.energy === 70), hereE: here.energy, rep: JSON.stringify(s.rep) === rep0, diary: last.key, named: kids.every(p => txt.includes(L.name(p.surname))) };
+    }, w1.e.days[0]);
+    check('v3.14 event day: picked kids absent as world:athletics (unavailable, no skipped_training, no truant, no roll call, office "not at the club"), rested +10, rep unchanged, locker label, diary names them',
+      w3.away.every(x => x === 'world:athletics') && w3.flags.every(f => f[0] === 'world:athletics' && f[1] === false && f[2] === 'absent') && !w3.truant && w3.noCall
+      && w3.office[0] === 'office.blk.notHere' && w3.office[1] === null && w3.label.includes(w3.want) && w3.rested && w3.rep && w3.diary === 'world.athletics.diary' && w3.named, JSON.stringify(w3));
+    // (4) quarter tests: fewer kids at a Mon–Thu training than with the same seed and no event; trainees −5 extra condition
+    const w4 = await page.evaluate(() => {
+      const s = YAM.game, keepEv = s.worldEvent, keepPlan = { ...s.week.plan }, ev = s.buildWorldEvent(s.worldRow('tests'), s.week.start);
+      const elig = s.squad.filter(p => !(p.injuryDays > 0) && !(p.suspensionMatches > 0) && !(p.awayDays > 0)).map(p => p.id).sort();
+      const out = { noAbs: 0, withAbs: 0, allTests: true, skip: false, again: true, idx: [] };
+      const run = (we, d) => { s.worldEvent = we; s.today = null; s.squad.forEach(p => { p.energy = 80; p.injuryDays = 0; p.suspensionMatches = 0; p.awayDays = 0; p.psych.discipline = 20; });
+        return s.runLocker(true, d); };
+      for (const d of ev.days) {   // each Mon–Thu day as the week's only (1st) training: base chance 1, so only the tests can keep a kid away
+        s.calendar.date = d; s.week.plan = { mon: null, tue: null, wed: null, thu: null, fri: null, [weekKey(d)]: 'match' }; out.idx.push(s.trainingIndex(d));
+        out.noAbs += Object.keys(run(null, d).absent).length;
+        const b = run(ev, d), why = Object.values(b.absent);
+        out.withAbs += why.length; out.allTests = out.allTests && why.every(x => x === 'world:tests'); out.skip = out.skip || s.squad.some(p => p.skipped_training);
+        out.again = out.again && JSON.stringify(run(ev, d).absent) === JSON.stringify(b.absent);
+      }
+      const d = ev.days[1];   // condition: Match Practice −10, the tests week −5 more for the trainees
+      s.calendar.date = d; s.week.plan = { mon: null, tue: 'match', wed: null, thu: null, fri: null };
+      const a = run(null, d), fresh = s.squad.find(p => !a.absent[p.id]); s.dayRoutine(d); out.eNo = fresh.energy;
+      const b = run(ev, d), hereT = s.squad.find(p => !b.absent[p.id]); s.dayRoutine(d); out.eT = hereT.energy;
+      Object.assign(out, { all: JSON.stringify([...ev.playerIds].sort()) === JSON.stringify(elig), days: ev.days.join(), label: L.t('lr.short.world:tests') });
+      s.worldEvent = keepEv; s.week.plan = keepPlan; s.today = null;
+      return out;
+    });
+    check('v3.14 quarter tests (Mon–Thu, everyone): a 1st-training-of-the-week roll call loses kids (×0.75, seeded, label "world:tests") vs none with the same seed and no event; trainees −5 extra condition',
+      w4.idx.join() === '0,0,0,0' && w4.noAbs === 0 && w4.withAbs > 0 && w4.allTests && !w4.skip && w4.eNo === 70 && w4.eT === 65 && w4.all && w4.days === '2002-12-02,2002-12-03,2002-12-04,2002-12-05'
+      && /school|контрольн/i.test(w4.label) && w4.again, JSON.stringify(w4));
+    // (5) the weekly roll: seeded, ~half the weeks, never two weeks running (CHANCE 1 → every other week), never in the season's first week
+    const w5 = await page.evaluate(() => {
+      const s = YAM.game, keep = { we: s.worldEvent, wl: s.worldLast, ch: WORLD.CHANCE }, out = {};
+      const run = () => { s.worldLast = null; const seq = []; for (let i = 0; i < 40; i++) { const e = s.rollWorldEvent(isoAdd('2002-09-09', 7 * i)); seq.push(e ? e.id : ''); } return seq; };
+      const a = run(); out.n = a.filter(Boolean).length;
+      out.noRow = a.every((x, i) => !(x && a[i - 1]));
+      out.det = JSON.stringify(run()) === JSON.stringify(a);
+      WORLD.CHANCE = 1; const b = run(); WORLD.CHANCE = keep.ch;
+      out.alt = b.every((x, i) => !!x === (i % 2 === 0)); out.rows = new Set(b.filter(Boolean)).size;
+      s.worldLast = null;
+      out.first = !s.rollWorldEvent(weekStartOf(s.calendar.events.find(e => e.type === 'match').date)) && !s.rollWorldEvent('2002-08-26');
+      out.noRandom = !/Math\.random/.test(GameState.prototype.rollWorldEvent.toString() + GameState.prototype.buildWorldEvent.toString());
+      out.council = (() => { const r = s.worldRow('council'), all = s.squad.slice(0, 6); const keepD = all.map(p => p.psych.discipline);
+        all.forEach((p, i) => { p.psych.discipline = i < 2 ? 5 : 12; }); const two = r.pick.n(all); all[1].psych.discipline = 12; const one = r.pick.n(all);
+        all.forEach((p, i) => { p.psych.discipline = keepD[i]; }); return two === 2 && one === 1; })();
+      s.worldEvent = keep.we; s.worldLast = keep.wl;
+      return { out, a: a.join('|') };
+    });
+    check('v3.14 weekly roll: seeded (same sequence twice), roughly every other week at 50 %, never two weeks in a row (100 % → exactly every other week), none in the season\'s first week, no Math.random; council picks 2 only when two kids have discipline ≤ 7',
+      w5.out.n >= 6 && w5.out.n <= 20 && w5.out.noRow && w5.out.det && w5.out.alt && w5.out.rows >= 3 && w5.out.first && w5.out.noRandom && w5.out.council, JSON.stringify(w5));
+    // (3) the event survives a save / reload unchanged (picks fixed for the week)
+    const w6a = await page.evaluate(() => { YAM.game.save(); return JSON.stringify(YAM.game.worldEvent); });
+    await page.reload();
+    await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    const w6b = await page.evaluate(() => ({ e: JSON.stringify(YAM.game.worldEvent), last: YAM.game.worldLast, wk: YAM.game.week?.start }));
+    check('v3.14 deterministic picks: same week + squad → same playerIds (recomputed twice), and the saved event comes back unchanged after a reload',
+      w1.same && w6a === w6b.e && JSON.parse(w6b.e).id === 'athletics' && w6b.last === '2002-12-02' && w6b.wk === '2002-12-02', JSON.stringify({ w6a, w6b }));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

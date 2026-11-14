@@ -41,8 +41,9 @@ class WeekPlanner {
     let nth = 0;
     this.grid.innerHTML = WEEK.KEYS.map((k, i) => {
       const date = isoAdd(w.start, i), past = date < today, isToday = date === today;
-      const head = `<div class="pl-day"><b>${esc(fmtDate(date, { weekday: 'short' }))}</b><span>${esc(fmtDate(date, { day: 'numeric', month: 'short' }))}</span>${isToday ? `<em>${L.t('pl.today')}</em>` : ''}</div>`;
-      const cls = `pl-col${past ? ' past' : ''}${isToday ? ' now' : ''}`;
+      const we = s.worldEventOn(date), wtip = we ? L.t('world.tip.' + we.id) : '';   // v3.14: school / city event marker
+      const head = `<div class="pl-day"><b>${esc(fmtDate(date, { weekday: 'short' }))}</b><span>${esc(fmtDate(date, { day: 'numeric', month: 'short' }))}</span>${isToday ? `<em>${L.t('pl.today')}</em>` : ''}${we ? `<i class="pl-we" title="${esc(wtip)}" aria-label="${esc(wtip)}">&#10022;</i>` : ''}</div>`;
+      const cls = `pl-col${past ? ' past' : ''}${isToday ? ' now' : ''}${we ? ' we' : ''}`;
       if (s.matchOn(date) || !WEEK.PLAN_KEYS.includes(k)) {   // fixed days: the match / Sunday rest
         const ev = s.calendar.events.find(e => e.type === 'match' && e.date === date), ctx = s.matchContext();
         const label = ev ? L.t('pl.match') + (ctx && ctx.ev.id === ev.id ? `<small>${esc(L.team(ctx.opp.name))}</small>` : '') : L.t('pl.rest');
@@ -55,7 +56,7 @@ class WeekPlanner {
         const on = (cur || 'rest') === reg, ok = editable || (todayRegime && reg !== 'rest');
         return `<button type="button" class="pl-opt${on ? ' on' : ''}${reg === 'rest' ? ' rest' : ''}" data-day="${k}" data-reg="${reg}" aria-pressed="${on}"${ok ? '' : ' disabled'}>${txt}</button>`;
       };
-      return `<div class="${cls}${cur ? ' t' : ''}">${head}<div class="pl-opts">${opt('rest', L.t('pl.rest'))}`
+      return `<div class="${cls}${cur ? ' t' : ''}" data-date="${date}"${we ? ` title="${esc(wtip)}"` : ''}>${head}<div class="pl-opts">${opt('rest', L.t('pl.rest'))}`
         + REGIME_KEYS.map(r => opt(r, L.t('plan.' + r))).join('') + `</div>`
         + `<div class="pl-warn${warn === 'pl.warn.over' ? ' over' : ''}">${warn ? esc(L.t(warn)) : ''}</div></div>`;
     }).join('');

@@ -66,6 +66,7 @@ class UIController {
       const s = this.state, r = s.dayRoutine(date);
       s.repDaily(date);   // v2.8: faction reputation (board grant on the 1st, parents on Sundays, squad drift)
       s.weekReview(date);   // v3.13: Sunday — empty gym / overloaded week
+      s.worldDaily(date);   // v3.14: who was away at the school / city event
       if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
       const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
       if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
@@ -867,6 +868,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const s = this.state, p = s.player(id), d = s.dayState();
     if (!p) return 'office.blk.notHere';
     if (this.events.active || (this.engine && !this.engine.finished) || this.cal.running) return 'office.blk.busy';
+    if (s.phase === 'calendar' && s.worldAway(id, s.calendar.date)) return 'office.blk.notHere';   // v3.14: away at the event today
     let here = false, absent = false;
     const atClub = s.phase === 'matchday' || (s.phase === 'calendar' && d.briefed && !this.briefing.isOpen);
     if (atClub && d.locker) { here = !d.locker.absent[id]; absent = !here; }        // training / match day: who turned up

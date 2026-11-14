@@ -164,7 +164,22 @@ const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25
   CAPTAIN: 0.5 };   // captain on the pitch: + (0.5 + passion/20) on all our rolls (≈ +0.55 … +1.5)
 /* v3.1 SANDBOX WORLD — 100 kids; 40 at rival clubs, 60 free agents; 30 of them play the Yard Match; you sign 15
    (≈ 45 free agents remain for future transfers / poaching). MIX = hidden archetypes in the world. */
-const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 } };
+const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 },
+  CHANCE: 0.5, WRONG: 0.2 };   // v3.14 world events: weekly chance (never two weeks running), chance one pick is a wrong kid
+/* v3.14 WORLD EVENTS — school / city events announced in the Monday news. ONE engine (GameState.rollWorldEvent), rows of data:
+   a new event = a new row (+ its EN/RU strings: world.news.<id>, world.tip.<id>, lr.short.world:<id>, world.<id>.diary).
+   days: 'mon-thu' | 'one' (one of Tue–Thu); pick: { kind: 'all' } | { kind: 'top' | 'bottom', n: number | (eligible) => number, score: (p, eligible) => number };
+   effect: { absent: true } (picked kids away that day, not truancy) | { attendMult, condition } (training days: attendance ×, trainees' extra condition). */
+const worldRank = (list, f) => { const v = list.map(f).sort((a, b) => a - b); return x => v.indexOf(x) + 1; };   // 1 = lowest
+const WORLD_EVENTS = [
+  { id: 'tests', tier: 1, days: 'mon-thu', pick: { kind: 'all' }, effect: { attendMult: 0.75, condition: -5 } },
+  { id: 'athletics', tier: 2, days: 'one', pick: { kind: 'top', n: 4, score: p => p.physical.speed + p.physical.acceleration }, effect: { absent: true } },
+  { id: 'olympiad', tier: 2, days: 'one', pick: { kind: 'top', n: 3, score: p => p.tactical.decisions + p.tactical.vision }, effect: { absent: true } },
+  { id: 'basketball', tier: 2, days: 'one', pick: { kind: 'top', n: 3,
+    score: (p, all) => worldRank(all, q => q.bio.height)(p.bio.height) + worldRank(all, q => q.physical.agility)(p.physical.agility) }, effect: { absent: true } },
+  { id: 'council', tier: 3, days: 'one', pick: { kind: 'bottom', n: all => all.filter(p => p.psych.discipline <= 7).length >= 2 ? 2 : 1, score: p => p.psych.discipline },
+    effect: { absent: true } },
+];
 const COACH = { KICK_PARENTS: -10, KICK_SQUAD: -5, MIN_SQUAD: 12,   // v2.9: kick out (keep ≥ 12 kids and ≥ 1 keeper)
   PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 /** v2.4 AI clubs' training days (Tue/Thu). v3.13: our club trains on the days of state.week.plan (GameState.isOurTraining). */

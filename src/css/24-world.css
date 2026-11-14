@@ -1,0 +1,9 @@
+/* =========================================================
+   v3.14 — WORLD EVENTS: briefing news line, planner day marker, DEBUG select
+   ========================================================= */
+.mb-news li.mb-world{ color: #ffcf5a; } .mb-news li.mb-world::before{ content: '\2726 '; color: #ffcf5a; }
+.pl-col.we{ box-shadow: inset 0 3px 0 #b07a12; }
+.pl-we{ margin-left: auto; font-style: normal; font-size: 14px; line-height: 1; color: #b07a12; cursor: help; }
+.pl-day em + .pl-we{ margin-left: 4px; }
+.dbg-world{ display: inline-flex; gap: 4px; align-items: center; }
+.dbg-world select{ font: 12px var(--mono); padding: 2px; }

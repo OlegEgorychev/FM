@@ -111,6 +111,9 @@ class DebugConsole {
       <hr class="dbg-hr">
       ${btn('autosim', L.t('dbg.autosim'), L.t('dbg.autosimD'))}
       ${btn('ap', L.t('dbg.ap'), L.t('dbg.apD'))}
+      <div class="dbg-cheat"><span class="dbg-world"><select id="dbg-world" aria-label="${esc(L.t('dbg.world'))}"><option value="">${L.t('dbg.worldNone')}</option>${WORLD_EVENTS.map(e =>
+        `<option value="${e.id}"${this.ui.state.worldEvent?.id === e.id ? ' selected' : ''}>${esc(L.t('world.name.' + e.id))}</option>`).join('')}</select>
+        <button class="btn" type="button" data-cheat="world">${L.t('dbg.world')}</button></span><span>${L.t('dbg.worldD')}</span></div>
       ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[${money(this.ui.state.budget)}]</b>`, L.t('dbg.moneyD'))}
       ${NARRATIVE_EVENTS.filter(e => e.when !== 'manual').map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
       ${btn('events', L.t('dbg.events') + ` <b class="dbg-flag ${ev ? '' : 'on'}">[${L.t(ev ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.eventsD'))}
@@ -139,6 +142,10 @@ class DebugConsole {
     } else if (id === 'ap') {
       s.weekState().ap++;   // v3.13: weekly wallet
       this.msg = L.t('dbg.doneAp', { n: s.ap });
+    } else if (id === 'world') {   // v3.14: dev tool — force (or clear) this week's school / city event
+      const e = s.forceWorldEvent(document.getElementById('dbg-world')?.value || null);
+      this.msg = L.t('dbg.doneWorld', { e: e ? L.t('world.name.' + e.id) + ' · ' + e.days.join(', ') : L.t('dbg.worldNone') });
+      if (ui.planner?.isOpen) ui.planner.render();
     } else if (id === 'money') {
       s.addMoney(500);
       this.msg = L.t('dbg.doneMoney', { b: money(s.budget) });

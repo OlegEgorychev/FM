@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.13</title>
+<title>Youth Academy Manager v3.14</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1666,6 +1666,15 @@ body.modal-lock #startmenu{ display: none; }
 /* Locker: kept home by the weekly load — a school-notebook slip instead of the yellow note (no roll call) */
 .lk.empty.load .lk-note.open{ background: repeating-linear-gradient(#f4f1e6 0 9px, #b9cde6 9px 10px); color: #1f3a5f; }
 /* =========================================================
+   v3.14 — WORLD EVENTS: briefing news line, planner day marker, DEBUG select
+   ========================================================= */
+.mb-news li.mb-world{ color: #ffcf5a; } .mb-news li.mb-world::before{ content: '\2726 '; color: #ffcf5a; }
+.pl-col.we{ box-shadow: inset 0 3px 0 #b07a12; }
+.pl-we{ margin-left: auto; font-style: normal; font-size: 14px; line-height: 1; color: #b07a12; cursor: help; }
+.pl-day em + .pl-we{ margin-left: 4px; }
+.dbg-world{ display: inline-flex; gap: 4px; align-items: center; }
+.dbg-world select{ font: 12px var(--mono); padding: 2px; }
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -2274,7 +2283,22 @@ const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25
   CAPTAIN: 0.5 };   // captain on the pitch: + (0.5 + passion/20) on all our rolls (≈ +0.55 … +1.5)
 /* v3.1 SANDBOX WORLD — 100 kids; 40 at rival clubs, 60 free agents; 30 of them play the Yard Match; you sign 15
    (≈ 45 free agents remain for future transfers / poaching). MIX = hidden archetypes in the world. */
-const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 } };
+const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 },
+  CHANCE: 0.5, WRONG: 0.2 };   // v3.14 world events: weekly chance (never two weeks running), chance one pick is a wrong kid
+/* v3.14 WORLD EVENTS — school / city events announced in the Monday news. ONE engine (GameState.rollWorldEvent), rows of data:
+   a new event = a new row (+ its EN/RU strings: world.news.<id>, world.tip.<id>, lr.short.world:<id>, world.<id>.diary).
+   days: 'mon-thu' | 'one' (one of Tue–Thu); pick: { kind: 'all' } | { kind: 'top' | 'bottom', n: number | (eligible) => number, score: (p, eligible) => number };
+   effect: { absent: true } (picked kids away that day, not truancy) | { attendMult, condition } (training days: attendance ×, trainees' extra condition). */
+const worldRank = (list, f) => { const v = list.map(f).sort((a, b) => a - b); return x => v.indexOf(x) + 1; };   // 1 = lowest
+const WORLD_EVENTS = [
+  { id: 'tests', tier: 1, days: 'mon-thu', pick: { kind: 'all' }, effect: { attendMult: 0.75, condition: -5 } },
+  { id: 'athletics', tier: 2, days: 'one', pick: { kind: 'top', n: 4, score: p => p.physical.speed + p.physical.acceleration }, effect: { absent: true } },
+  { id: 'olympiad', tier: 2, days: 'one', pick: { kind: 'top', n: 3, score: p => p.tactical.decisions + p.tactical.vision }, effect: { absent: true } },
+  { id: 'basketball', tier: 2, days: 'one', pick: { kind: 'top', n: 3,
+    score: (p, all) => worldRank(all, q => q.bio.height)(p.bio.height) + worldRank(all, q => q.physical.agility)(p.physical.agility) }, effect: { absent: true } },
+  { id: 'council', tier: 3, days: 'one', pick: { kind: 'bottom', n: all => all.filter(p => p.psych.discipline <= 7).length >= 2 ? 2 : 1, score: p => p.psych.discipline },
+    effect: { absent: true } },
+];
 const COACH = { KICK_PARENTS: -10, KICK_SQUAD: -5, MIN_SQUAD: 12,   // v2.9: kick out (keep ≥ 12 kids and ≥ 1 keeper)
   PRAISE: 12, PRAISE_BACKFIRE: -8, PRAISE_LOW: 50, CRIT_DISC: 2, CRIT_COMP: -1, CRIT_MORALE: -8, CHECK_MORALE: 4 };
 /** v2.4 AI clubs' training days (Tue/Thu). v3.13: our club trains on the days of state.week.plan (GameState.isOurTraining). */
@@ -3732,6 +3756,56 @@ Object.assign(I18N.ru, {
   'pl.status.new': 'Спланируй понедельник–пятницу и подтверди. Суббота — матч, воскресенье — отдых.',
   'pl.status.replan': 'Будущие дни ещё можно перепланировать, сегодня — только режим. Прошедшие дни закрыты.',
 });
+
+/* v3.14: world events (school / city) — news (no names), planner tooltips, locker labels, diary lines, DEBUG */
+Object.assign(I18N.en, {
+  'world.on.mon': 'on Monday', 'world.on.tue': 'on Tuesday', 'world.on.wed': 'on Wednesday', 'world.on.thu': 'on Thursday',
+  'world.name.tests': 'Quarter tests', 'world.name.athletics': 'City athletics meet', 'world.name.olympiad': 'District olympiad',
+  'world.name.basketball': 'School basketball tournament', 'world.name.council': 'Emergency teachers\' council',
+  'world.news.tests': 'Quarter tests at school from Monday to Thursday: some parents will keep their kids at their desks, the rest will come to training tired.',
+  'world.news.athletics': 'The PE teacher is taking the fastest kids to the city athletics meet {d}.',
+  'world.news.olympiad': 'The district maths & history olympiad is {d}: the school is sending its sharpest heads.',
+  'world.news.basketball': 'The school basketball tournament is {d}: their coach has asked for the tallest, most agile lads.',
+  'world.news.council': 'Emergency teachers\' council {d}: a couple of troublemakers will have to sit it out with their parents.',
+  'world.tip.tests': 'Quarter tests (Mon–Thu): fewer kids at training, and those who come get more tired.',
+  'world.tip.athletics': 'City athletics meet: the fastest kids will be away.',
+  'world.tip.olympiad': 'District olympiad: the sharpest heads will be away.',
+  'world.tip.basketball': 'Basketball tournament: the tall, agile kids will be away.',
+  'world.tip.council': 'Teachers\' council: a couple of troublemakers will be away.',
+  'lr.short.world:tests': 'Kept home for school (quarter tests)', 'lr.short.world:athletics': 'At the athletics meet', 'lr.short.world:olympiad': 'At the olympiad',
+  'lr.short.world:basketball': 'Basketball tournament', 'lr.short.world:council': 'Teachers\' council',
+  'world.tests.diary': 'Quarter tests at school until Thursday: homework first, football second.',
+  'world.athletics.diary': 'City athletics meet — running for the school: {s}.',
+  'world.olympiad.diary': 'District olympiad — solving problems for the school: {s}.',
+  'world.basketball.diary': 'School basketball tournament — on the school team: {s}.',
+  'world.council.diary': 'Teachers\' council — sitting it out with their parents: {s}.',
+  'dbg.world': 'World event → force this week', 'dbg.worldD': 'Dev tool: replaces this week\'s school / city event (days and kids are rolled again, seeded).',
+  'dbg.worldNone': '— none —', 'dbg.doneWorld': 'World event this week: {e}',
+});
+Object.assign(I18N.ru, {
+  'world.on.mon': 'в понедельник', 'world.on.tue': 'во вторник', 'world.on.wed': 'в среду', 'world.on.thu': 'в четверг',
+  'world.name.tests': 'Четвертные контрольные', 'world.name.athletics': 'Городская спартакиада', 'world.name.olympiad': 'Районная олимпиада',
+  'world.name.basketball': 'Школьный турнир по баскетболу', 'world.name.council': 'Внеочередной педсовет',
+  'world.news.tests': 'С понедельника по четверг в школе четвертные контрольные: кого-то родители усадят за уроки, остальные придут на тренировку уставшими.',
+  'world.news.athletics': 'Физрук забирает самых быстрых ребят на городскую спартакиаду {d}.',
+  'world.news.olympiad': 'Районная олимпиада по математике и истории {d}: школа отправляет самых сообразительных.',
+  'world.news.basketball': 'Школьный турнир по баскетболу {d}: тамошний тренер просил самых высоких и ловких.',
+  'world.news.council': 'Внеочередной педсовет {d}: паре хулиганов придётся отсидеть его вместе с родителями.',
+  'world.tip.tests': 'Четвертные контрольные (пн–чт): на тренировки придут не все, а пришедшие сильнее устанут.',
+  'world.tip.athletics': 'Городская спартакиада: самых быстрых не будет.',
+  'world.tip.olympiad': 'Районная олимпиада: самых сообразительных не будет.',
+  'world.tip.basketball': 'Турнир по баскетболу: высоких и ловких не будет.',
+  'world.tip.council': 'Педсовет: пары хулиганов не будет.',
+  'lr.short.world:tests': 'Не отпустили: четвертные контрольные', 'lr.short.world:athletics': 'На спартакиаде', 'lr.short.world:olympiad': 'На олимпиаде',
+  'lr.short.world:basketball': 'Турнир по баскетболу', 'lr.short.world:council': 'На педсовете',
+  'world.tests.diary': 'В школе до четверга четвертные контрольные: сначала уроки, потом футбол.',
+  'world.athletics.diary': 'Городская спартакиада, за школу бегут: {s}.',
+  'world.olympiad.diary': 'Районная олимпиада, за школу решают задачи: {s}.',
+  'world.basketball.diary': 'Школьный турнир по баскетболу, в команде школы: {s}.',
+  'world.council.diary': 'Педсовет, с родителями у директора сидят: {s}.',
+  'dbg.world': 'Мировое событие → на эту неделю', 'dbg.worldD': 'Инструмент разработчика: заменяет школьное / городское событие этой недели (дни и ребята бросаются заново, seeded).',
+  'dbg.worldNone': '— нет —', 'dbg.doneWorld': 'Мировое событие недели: {e}',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -4489,7 +4563,7 @@ class GameState {
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
-    this.today = null; this.week = null; this.away = null;   // v3.13: weekly plan / AP wallet / "while you were away"
+    this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
     this.globalPlayers = GameState.buildWorld(used);
@@ -4757,7 +4831,57 @@ class GameState {
     if (!this.plannableDays().length) {   // nothing left to plan (the season opens on a Sunday): a stub week, no AP to carry
       Object.assign(this.week, { confirmed: true, ap: 0, carry: 0, apSources: { base: 0, carry: 0, win: 0, total: 0 } });
     }
+    this.rollWorldEvent(start);   // v3.14: Monday — before the morning briefing is shown
     return this.week;
+  }
+  /* ---------- v3.14 WORLD EVENTS: one engine, the rows live in WORLD_EVENTS ---------- */
+  /** A new week: maybe one school / city event — seeded by the week, never two weeks running, never in the season's first week. */
+  rollWorldEvent(start) {
+    this.worldEvent = null;   // last week's event is over
+    const md1 = this.calendar.events.find(e => e.type === 'match');
+    if (this.phase === 'draft' || !this.squad.length || !md1 || start <= weekStartOf(md1.date)) return null;
+    if (this.worldLast && isoAdd(this.worldLast, 7) === start) return null;
+    const r = seeded(start + '#world');
+    if (r() >= WORLD.CHANCE) return null;
+    this.worldEvent = this.buildWorldEvent(WORLD_EVENTS[Math.floor(r() * WORLD_EVENTS.length)], start, r);
+    this.worldLast = start;
+    return this.worldEvent;
+  }
+  /** The day(s) and the kids of one event row (fixed for the week). Injured / banned / kept-home kids are not picked.
+      With WORLD.WRONG one picked kid is swapped for another (a hint, not a proof); 'all' events have no wrong picks. */
+  buildWorldEvent(row, start, r = seeded(start + '#world#' + row.id)) {
+    const days = row.days === 'mon-thu' ? [0, 1, 2, 3].map(i => isoAdd(start, i)) : [isoAdd(start, 1 + Math.floor(r() * 3))];
+    const all = this.squad.filter(p => !(p.injuryDays > 0) && !(p.suspensionMatches > 0) && !(p.awayDays > 0)).sort((a, b) => a.id.localeCompare(b.id));
+    let picked = all;
+    if (row.pick.kind !== 'all') {
+      const n = typeof row.pick.n === 'function' ? row.pick.n(all) : row.pick.n, dir = row.pick.kind === 'bottom' ? 1 : -1;
+      const sc = new Map(all.map(p => [p.id, row.pick.score(p, all)]));
+      picked = [...all].sort((a, b) => dir * (sc.get(a.id) - sc.get(b.id)) || a.id.localeCompare(b.id)).slice(0, n);
+      const others = all.filter(p => !picked.includes(p));
+      if (r() < WORLD.WRONG && picked.length && others.length) picked[Math.floor(r() * picked.length)] = others[Math.floor(r() * others.length)];
+    }
+    return { id: row.id, tier: row.tier, days, playerIds: picked.map(p => p.id), weekStart: start };
+  }
+  /** DEBUG.EXE: replace this week's event (id) or clear it (null). */
+  forceWorldEvent(id) {
+    const start = this.weekState().start, row = WORLD_EVENTS.find(e => e.id === id);
+    this.worldEvent = row ? this.buildWorldEvent(row, start) : null;
+    if (row) this.worldLast = start;
+    this.save();
+    return this.worldEvent;
+  }
+  worldRow(id) { return WORLD_EVENTS.find(e => e.id === id) || null; }
+  /** This week's event if it runs on that date. */
+  worldEventOn(date) { const e = this.worldEvent; return e && date && e.days.includes(date) && this.worldRow(e.id) ? e : null; }
+  /** 'world:<id>' when this kid is away at the event that day (absent-type events only). */
+  worldAway(id, date) { const e = this.worldEventOn(date); return e && this.worldRow(e.id).effect.absent && e.playerIds.includes(id) ? 'world:' + e.id : null; }
+  /** Daily hook: the diary names the kids away at the event (tests: one line on its first day). */
+  worldDaily(date) {
+    const e = this.worldEventOn(date);
+    if (!e) return;
+    const row = this.worldRow(e.id), kids = e.playerIds.filter(id => this.player(id));
+    if (row.effect.absent && kids.length) this.addDiary({ date, key: 'world.' + e.id + '.diary', vars: { s: { list: kids.map(pid => ({ pid })) } }, cls: 'ev' });
+    else if (!row.effect.absent && date === e.days[0]) this.addDiary({ date, key: 'world.' + e.id + '.diary', cls: 'ev' });
   }
   /** Pre-v3.13 save in the middle of a week: Tue + Thu with the default regime (today's old pick kept), confirmed, base AP. */
   static migrateWeek(date, oldPlan) {
@@ -4928,12 +5052,14 @@ class GameState {
   runLocker(training = this.isOurTraining(this.calendar.date), date = this.calendar.date) {
     const d = this.dayState();
     if (d.locker) return d.locker;
-    const absent = {}, k = training ? this.trainingIndex(date) : -1;
+    const absent = {}, k = training ? this.trainingIndex(date) : -1, we = this.worldEventOn(date), mult = training && we ? this.worldRow(we.id).effect.attendMult ?? 1 : 1;
     for (const p of this.squad) {
-      let r = this.arrivalCheck(p);
+      let r = this.worldAway(p.id, date) || this.arrivalCheck(p);   // v3.14: away at a school / city event — before the other checks
       // v3.13: from the 3rd training of the week the kids who'd come may be kept home (school / not recovered) — not truancy
-      if (!r && k >= ATTEND.FROM && seeded(date + '#load#' + p.id)() >= attendChance(p, k)) r = 'overload';
-      p.absentToday = ['exhausted', 'skipped', 'overload'].includes(r) ? r : null;   // injured / banned / home are locked by their own status
+      // v3.14: the 'tests' week multiplies that chance (×attendMult); a kid lost only to the tests gets 'world:tests'
+      const base = training && k >= ATTEND.FROM ? attendChance(p, k) : 1, m = mult < 1 && we.playerIds.includes(p.id) ? mult : 1;
+      if (!r && training && (base < 1 || m < 1)) { const x = seeded(date + '#load#' + p.id)(); r = x >= base ? 'overload' : x >= base * m ? 'world:' + we.id : null; }
+      p.absentToday = ['exhausted', 'skipped', 'overload'].includes(r) || r?.startsWith('world:') ? r : null;   // injured / banned / home are locked by their own status
       p.skipped_training = training && r === 'skipped';                   // feeds The Truant
       if (r) absent[p.id] = r;
     }
@@ -4970,6 +5096,7 @@ class GameState {
     const lk = this.today?.locker;
     if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null;
       if ([lk.capRequest?.pid, lk.capRequest?.mate, lk.capRequest?.hint].includes(id)) lk.capRequest = null; }   // v3.8
+    if (this.worldEvent) this.worldEvent.playerIds = this.worldEvent.playerIds.filter(x => x !== id);   // v3.14
     p.teamId = 'free_agent';   // v3.1: he stays in the world database (future transfers)
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
     this.save();
@@ -4991,8 +5118,9 @@ class GameState {
     const skipped = [], improved = [], plateau = [], hurt = [], trained = [], R = REGIMES[plan] || REGIMES.match;
     let attended = 0;
     if (training) { const lk = this.runLocker(true, date || this.calendar.date); lk.done = true; }   // auto-sim: arrivals are rolled without the view
-    if (training && date && weekStartOf(date) === this.weekState().start) this.week.trainingsDone++;   // v3.13: Sunday review
     else this.clearDayStatus();
+    if (training && date && weekStartOf(date) === this.weekState().start) this.week.trainingsDone++;   // v3.13: Sunday review
+    const wc = training ? this.worldRow(this.worldEventOn(date || this.calendar.date)?.id)?.effect.condition || 0 : 0;   // v3.14: tests week — tired trainees
     for (const p of this.squad) {
       const present = training && p.available;   // v2.6: only kids who came to the locker room train
       const walkOut = present && R.extraSkip && p.psych.discipline < R.lowDisc && Math.random() < R.extraSkip;   // v2.5: tactics bore the restless ones
@@ -5002,7 +5130,7 @@ class GameState {
       if (training && p.skipped_training) { /* skipped: no tiredness, no sharpness (exhausted / injured kids rest) */ }
       else if (trains) {   // v2.5: the coach's regime
         attended++; trained.push(p);
-        p.energy = clamp(p.energy + R.cond, 0, 100);
+        p.energy = clamp(p.energy + R.cond + wc, 0, 100);
         p.dyn.sharpness = clamp(p.dyn.sharpness + R.sharp, 0, 100);
         if (R.morale) p.dyn.morale = clamp(p.dyn.morale + R.morale, 0, 100);
         if (R.grow && Math.random() < R.grow.chance * growthMult(p)) {
@@ -5157,7 +5285,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -5179,6 +5307,8 @@ class GameState {
       this.budget = Number.isFinite(d.budget) ? Math.round(d.budget) : ECONOMY.START;   // pre-v1.9 saves start with $500 (v2.2: debt allowed)
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
       this.away = Array.isArray(d.away) ? d.away : null;   // v3.13 "while you were away"
+      this.worldEvent = d.worldEvent && typeof d.worldEvent === 'object' && Array.isArray(d.worldEvent.playerIds) && Array.isArray(d.worldEvent.days) ? d.worldEvent : null;   // v3.14 (missing → none this week)
+      this.worldLast = typeof d.worldLast === 'string' ? d.worldLast : null;
       this.expelled = Array.isArray(d.expelled) ? d.expelled : [];   // v2.9
       const r = d.rep || {};   // v2.8 (older saves start neutral)
       this.rep = { board: clamp(r.board ?? REP.START, 0, 100), parents: clamp(r.parents ?? REP.START, 0, 100), squad: clamp(r.squad ?? REP.START, 0, 100) };
@@ -6036,8 +6166,21 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.13';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.14';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.14', name: { en: 'School Comes First', ru: 'Сначала школа' },
+    en: [
+      'About every other week the Monday news brings a school or city event: quarter tests, the city athletics meet, the district olympiad, a basketball tournament, an emergency teachers\' council. Never two weeks running, never in the first week of the season.',
+      'Plan around it: PLANNER.EXE marks the affected day with ✦ and a tooltip. Quarter tests (Mon–Thu) keep some kids at their desks and tire the ones who come.',
+      'The news never names anyone — "the fastest kids", "the sharpest heads", "a couple of troublemakers". You find out who in the locker room ("At the athletics meet"). The school picks by real hidden qualities, though the teacher gets it wrong now and then.',
+      'Kids away at an event are not truants: no penalties, no roll call, they simply rest that day, and the office can\'t reach them.',
+    ],
+    ru: [
+      'Примерно раз в две недели в понедельничных новостях появляется школьное или городское событие: четвертные контрольные, городская спартакиада, районная олимпиада, турнир по баскетболу, внеочередной педсовет. Никогда две недели подряд и никогда в первую неделю сезона.',
+      'Планируй с поправкой на него: PLANNER.EXE отмечает нужный день значком ✦ с подсказкой. Четвертные (пн–чт) усаживают часть ребят за уроки, а пришедшие сильнее устают.',
+      'В новостях не бывает имён — «самые быстрые», «самые сообразительные», «пара хулиганов». Кого именно забрали, видно в раздевалке («На спартакиаде»). Школа выбирает по настоящим скрытым качествам, хотя учитель иногда ошибается.',
+      'Ушедшие на событие — не прогульщики: никаких штрафов и перекличек, в этот день они просто отдыхают, и в кабинет их не вызвать.',
+    ] },
   { v: '3.13', name: { en: 'The Weekly Plan', ru: 'План на неделю' },
     en: [
       'Monday is planning day: after the morning briefing PLANNER.EXE opens. Pick Rest or a training regime for Monday to Friday (0–5 sessions, they cost nothing), then [ CONFIRM WEEK ]. Saturday is the match, Sunday is rest.',
@@ -7569,6 +7712,9 @@ class DebugConsole {
       <hr class="dbg-hr">
       ${btn('autosim', L.t('dbg.autosim'), L.t('dbg.autosimD'))}
       ${btn('ap', L.t('dbg.ap'), L.t('dbg.apD'))}
+      <div class="dbg-cheat"><span class="dbg-world"><select id="dbg-world" aria-label="${esc(L.t('dbg.world'))}"><option value="">${L.t('dbg.worldNone')}</option>${WORLD_EVENTS.map(e =>
+        `<option value="${e.id}"${this.ui.state.worldEvent?.id === e.id ? ' selected' : ''}>${esc(L.t('world.name.' + e.id))}</option>`).join('')}</select>
+        <button class="btn" type="button" data-cheat="world">${L.t('dbg.world')}</button></span><span>${L.t('dbg.worldD')}</span></div>
       ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[${money(this.ui.state.budget)}]</b>`, L.t('dbg.moneyD'))}
       ${NARRATIVE_EVENTS.filter(e => e.when !== 'manual').map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
       ${btn('events', L.t('dbg.events') + ` <b class="dbg-flag ${ev ? '' : 'on'}">[${L.t(ev ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.eventsD'))}
@@ -7597,6 +7743,10 @@ class DebugConsole {
     } else if (id === 'ap') {
       s.weekState().ap++;   // v3.13: weekly wallet
       this.msg = L.t('dbg.doneAp', { n: s.ap });
+    } else if (id === 'world') {   // v3.14: dev tool — force (or clear) this week's school / city event
+      const e = s.forceWorldEvent(document.getElementById('dbg-world')?.value || null);
+      this.msg = L.t('dbg.doneWorld', { e: e ? L.t('world.name.' + e.id) + ' · ' + e.days.join(', ') : L.t('dbg.worldNone') });
+      if (ui.planner?.isOpen) ui.planner.render();
     } else if (id === 'money') {
       s.addMoney(500);
       this.msg = L.t('dbg.doneMoney', { b: money(s.budget) });
@@ -8439,7 +8589,7 @@ class MatchSummary {
    XI, the bench and the training until the next morning. An empty locker can be investigated for 1 AP.
    ========================================================= */
 class LockerRoom {
-  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?', excused: '\u2302', overload: '\u270E' };   // v3.13: ✎ school / not recovered
+  static NOTE = { injury: '✚', suspended: '▮', home: '⌂', exhausted: 'Zz', skipped: '?', excused: '\u2302', overload: '\u270E', world: '\u2726' };   // v3.13: ✎ school / not recovered
   constructor(ui) {
     this.ui = ui;
     this.layer = document.getElementById('locker-room-view');
@@ -8526,8 +8676,8 @@ class LockerRoom {
           <div class="lk-name">${esc(L.name(p.surname))}</div>
           <div class="energy ${this.ui.energyClass(e)}"><i style="width:${e}%"></i><span>${e}%</span></div></div>`;
       }
-      const load = why === 'overload';   // v3.13: kept home by the weekly load — known at once, no roll call (not truancy)
-      const note = checked || load ? `<div class="lk-note open">${load ? LockerRoom.NOTE.overload + ' ' : ''}${esc(L.t('lr.short.' + why))}</div>`
+      const load = why === 'overload' || why.startsWith('world:');   // v3.13: weekly load / v3.14: school or city event — known at once, no roll call (not truancy)
+      const note = checked || load ? `<div class="lk-note open">${load ? (why === 'overload' || why === 'world:tests' ? LockerRoom.NOTE.overload : LockerRoom.NOTE.world) + ' ' : ''}${esc(L.t('lr.short.' + why))}</div>`
         : `<div class="lk-note">${LockerRoom.NOTE[why] && why !== 'skipped' && why !== 'exhausted' ? LockerRoom.NOTE[why] : '?'}</div>`;
       const can = !checked && !load && s.ap > 0;
       return `<div class="lk empty${reveal ? ' rv' : ''}${checked || load ? ' checked' : ''}${load ? ' load' : ''}${can ? ' can' : ''}" ${delay} data-pid="${p.id}" role="button" tabindex="0"
@@ -8547,7 +8697,7 @@ class LockerRoom {
   /** Roll call: 1 AP, a short phone call about one empty locker. */
   investigate(pid) {
     const s = this.state, lk = s.dayState().locker;
-    if (!lk || !lk.absent[pid] || lk.absent[pid] === 'overload' || lk.checked.includes(pid) || this.ui.events.active) return;   // v3.13: no roll call for 'overload'
+    if (!lk || !lk.absent[pid] || lk.absent[pid] === 'overload' || lk.absent[pid].startsWith('world:') || lk.checked.includes(pid) || this.ui.events.active) return;   // v3.13: no roll call for 'overload'
     if (!s.spendAP()) { document.getElementById('lr-status').textContent = L.t('lr.noAp'); return; }
     lk.checked.push(pid);
     s.save();
@@ -8645,13 +8795,20 @@ class MorningBriefing {
     document.getElementById('mb-away').innerHTML = away.slice(-MorningBriefing.AWAY_MAX).map(e =>
       `<li><span class="d">${esc(fmtDate(e.date, { weekday: 'short' }))}</span> ${esc(this.ui.entryText({ ...e, r: 0 }))}</li>`).join('')
       + (away.length > MorningBriefing.AWAY_MAX ? `<li class="more">${esc(L.t('mb.awayMore', { n: away.length - MorningBriefing.AWAY_MAX }))}</li>` : '');
-    document.getElementById('mb-news').innerHTML = this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
+    document.getElementById('mb-news').innerHTML = MorningBriefing.worldNews(s, date).map(n => `<li class="mb-world">${esc(n)}</li>`).join('')   // v3.14
+      + this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
     const bar = (k) => { const v = s.rep[k];
       return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };
     document.getElementById('mb-rep').innerHTML = ['board', 'parents', 'squad'].map(bar).join('');
     document.getElementById('mb-go').innerHTML = L.t(kind === 'plan' ? 'mb.goPlan' : kind === 'rest' || kind === 'off' ? 'mb.goQuiet' : 'mb.go');
   }
 
+  /** v3.14: Monday news about this week's school / city event — the day(s) and a vague hint, never names. */
+  static worldNews(s, date) {
+    const e = s.worldEvent;
+    if (!e || s.phase !== 'calendar' || date !== e.weekStart) return [];
+    return [L.t('world.news.' + e.id, { d: L.t('world.on.' + weekKey(e.days[0])) })];
+  }
   /** v3.13: "Base 4 · Carried 1 · Win +1 = 6 AP" */
   static apLine(src) {
     return [L.t('mb.ap.base', { n: src.base ?? 0 }), src.carry ? L.t('mb.ap.carry', { n: src.carry }) : '', src.win ? L.t('mb.ap.win', { n: src.win }) : '']
@@ -8778,8 +8935,9 @@ class WeekPlanner {
     let nth = 0;
     this.grid.innerHTML = WEEK.KEYS.map((k, i) => {
       const date = isoAdd(w.start, i), past = date < today, isToday = date === today;
-      const head = `<div class="pl-day"><b>${esc(fmtDate(date, { weekday: 'short' }))}</b><span>${esc(fmtDate(date, { day: 'numeric', month: 'short' }))}</span>${isToday ? `<em>${L.t('pl.today')}</em>` : ''}</div>`;
-      const cls = `pl-col${past ? ' past' : ''}${isToday ? ' now' : ''}`;
+      const we = s.worldEventOn(date), wtip = we ? L.t('world.tip.' + we.id) : '';   // v3.14: school / city event marker
+      const head = `<div class="pl-day"><b>${esc(fmtDate(date, { weekday: 'short' }))}</b><span>${esc(fmtDate(date, { day: 'numeric', month: 'short' }))}</span>${isToday ? `<em>${L.t('pl.today')}</em>` : ''}${we ? `<i class="pl-we" title="${esc(wtip)}" aria-label="${esc(wtip)}">&#10022;</i>` : ''}</div>`;
+      const cls = `pl-col${past ? ' past' : ''}${isToday ? ' now' : ''}${we ? ' we' : ''}`;
       if (s.matchOn(date) || !WEEK.PLAN_KEYS.includes(k)) {   // fixed days: the match / Sunday rest
         const ev = s.calendar.events.find(e => e.type === 'match' && e.date === date), ctx = s.matchContext();
         const label = ev ? L.t('pl.match') + (ctx && ctx.ev.id === ev.id ? `<small>${esc(L.team(ctx.opp.name))}</small>` : '') : L.t('pl.rest');
@@ -8792,7 +8950,7 @@ class WeekPlanner {
         const on = (cur || 'rest') === reg, ok = editable || (todayRegime && reg !== 'rest');
         return `<button type="button" class="pl-opt${on ? ' on' : ''}${reg === 'rest' ? ' rest' : ''}" data-day="${k}" data-reg="${reg}" aria-pressed="${on}"${ok ? '' : ' disabled'}>${txt}</button>`;
       };
-      return `<div class="${cls}${cur ? ' t' : ''}">${head}<div class="pl-opts">${opt('rest', L.t('pl.rest'))}`
+      return `<div class="${cls}${cur ? ' t' : ''}" data-date="${date}"${we ? ` title="${esc(wtip)}"` : ''}>${head}<div class="pl-opts">${opt('rest', L.t('pl.rest'))}`
         + REGIME_KEYS.map(r => opt(r, L.t('plan.' + r))).join('') + `</div>`
         + `<div class="pl-warn${warn === 'pl.warn.over' ? ' over' : ''}">${warn ? esc(L.t(warn)) : ''}</div></div>`;
     }).join('');
@@ -8884,6 +9042,7 @@ class UIController {
       const s = this.state, r = s.dayRoutine(date);
       s.repDaily(date);   // v2.8: faction reputation (board grant on the 1st, parents on Sundays, squad drift)
       s.weekReview(date);   // v3.13: Sunday — empty gym / overloaded week
+      s.worldDaily(date);   // v3.14: who was away at the school / city event
       if (!r.training) return { key: 'cal.rest', vars: { n: ENERGY.DAILY_REST } };
       const ids = list => ({ list: list.map(p => ({ pid: p.id })) });
       if (r.improved.length) s.addDiary({ date, key: 'tr.improved', vars: { s: ids(r.improved) }, cls: 'tr' });
@@ -9685,6 +9844,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const s = this.state, p = s.player(id), d = s.dayState();
     if (!p) return 'office.blk.notHere';
     if (this.events.active || (this.engine && !this.engine.finished) || this.cal.running) return 'office.blk.busy';
+    if (s.phase === 'calendar' && s.worldAway(id, s.calendar.date)) return 'office.blk.notHere';   // v3.14: away at the event today
     let here = false, absent = false;
     const atClub = s.phase === 'matchday' || (s.phase === 'calendar' && d.briefed && !this.briefing.isOpen);
     if (atClub && d.locker) { here = !d.locker.absent[id]; absent = !here; }        // training / match day: who turned up

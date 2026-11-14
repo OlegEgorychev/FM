@@ -2,8 +2,21 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.13';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.14';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.14', name: { en: 'School Comes First', ru: 'Сначала школа' },
+    en: [
+      'About every other week the Monday news brings a school or city event: quarter tests, the city athletics meet, the district olympiad, a basketball tournament, an emergency teachers\' council. Never two weeks running, never in the first week of the season.',
+      'Plan around it: PLANNER.EXE marks the affected day with ✦ and a tooltip. Quarter tests (Mon–Thu) keep some kids at their desks and tire the ones who come.',
+      'The news never names anyone — "the fastest kids", "the sharpest heads", "a couple of troublemakers". You find out who in the locker room ("At the athletics meet"). The school picks by real hidden qualities, though the teacher gets it wrong now and then.',
+      'Kids away at an event are not truants: no penalties, no roll call, they simply rest that day, and the office can\'t reach them.',
+    ],
+    ru: [
+      'Примерно раз в две недели в понедельничных новостях появляется школьное или городское событие: четвертные контрольные, городская спартакиада, районная олимпиада, турнир по баскетболу, внеочередной педсовет. Никогда две недели подряд и никогда в первую неделю сезона.',
+      'Планируй с поправкой на него: PLANNER.EXE отмечает нужный день значком ✦ с подсказкой. Четвертные (пн–чт) усаживают часть ребят за уроки, а пришедшие сильнее устают.',
+      'В новостях не бывает имён — «самые быстрые», «самые сообразительные», «пара хулиганов». Кого именно забрали, видно в раздевалке («На спартакиаде»). Школа выбирает по настоящим скрытым качествам, хотя учитель иногда ошибается.',
+      'Ушедшие на событие — не прогульщики: никаких штрафов и перекличек, в этот день они просто отдыхают, и в кабинет их не вызвать.',
+    ] },
   { v: '3.13', name: { en: 'The Weekly Plan', ru: 'План на неделю' },
     en: [
       'Monday is planning day: after the morning briefing PLANNER.EXE opens. Pick Rest or a training regime for Monday to Friday (0–5 sessions, they cost nothing), then [ CONFIRM WEEK ]. Saturday is the match, Sunday is rest.',
