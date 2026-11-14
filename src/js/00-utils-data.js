@@ -166,6 +166,24 @@ const SETPIECE = { FOUL: 0.05, PEN_IN_BOX: 0.25, PEN_BONUS: 6, CORNER_SAVE: 0.25
    (≈ 45 free agents remain for future transfers / poaching). MIX = hidden archetypes in the world. */
 const WORLD = { SIZE: 100, RIVALS: 40, DRAFT_POOL: 30, DRAFT_SIGN: 15, MIX: { GK: 12, DEF: 30, MID: 32, FWD: 26 },
   CHANCE: 0.5, WRONG: 0.2 };   // v3.14 world events: weekly chance (never two weeks running), chance one pick is a wrong kid
+/* v3.15 CASH DESK + MONTHLY FEES + FAMILY WEALTH (all TEST values).
+   Ledger categories (state.ledger['YYYY-MM'][cat], signed sums). Rent: forced on the 1st (may go below $0 → Board RENT_LATE_BOARD).
+   FEES: KASSA.EXE level per month — per kid, payment modifier (pp = added to every chance, mult = by wealth), rep once on confirm.
+   PAY: chance to pay at a training by wealth — the fee day (1st training of the month), later reminded / not reminded.
+   OFFICE: forgot / told parents → next roll NEXT_CHANCE; HALF_CHANCE for the first half of a two-part payment. */
+const LEDGER_CATS = ['fee', 'grant', 'donation', 'rent', 'event'];
+const WEALTH = { KEYS: ['rich', 'middle', 'poor'], SHARE: [0.2, 0.6, 0.2] };
+const FINANCE = { RENT: 100, RENT_LATE_BOARD: -3,
+  FEES: { low: { fee: 5, pp: 0.10, rep: { parents: 2 } }, normal: { fee: 10 }, high: { fee: 15, mult: { poor: 0.6, middle: 0.9 }, rep: { parents: -3 } } },
+  FEE_LEVELS: ['low', 'normal', 'high'], DEFAULT_LEVEL: 'normal',
+  PAY: { first: { rich: 0.95, middle: 0.80, poor: 0.40 }, reminded: { rich: 1, middle: 0.90, poor: 0.50 }, later: { rich: 0.50, middle: 0.45, poor: 0.25 } },
+  NEXT_CHANCE: 0.9, HALF_CHANCE: 1, SPENT_DISC: 7, SPENT_SHARE: 0.5,
+  FORGIVE_MORALE: 5, TELL_MORALE: -8, TELL_DISC: 1, TELL_PARENTS: 2, WAIVE_MORALE: 8, WAIVE_SQUAD: 2 };
+/** Chance to pay one fee roll: the wealth table for the kind of roll, then the month's level modifier, clamped 0–1. */
+const feeChance = (wealth, kind, level) => {
+  const L = FINANCE.FEES[level] || FINANCE.FEES.normal, base = (FINANCE.PAY[kind] || FINANCE.PAY.later)[wealth] ?? FINANCE.PAY[kind].middle;
+  return clamp(base * (L.mult?.[wealth] ?? 1) + (L.pp || 0), 0, 1);
+};
 /* v3.14 WORLD EVENTS — school / city events announced in the Monday news. ONE engine (GameState.rollWorldEvent), rows of data:
    a new event = a new row (+ its EN/RU strings: world.news.<id>, world.tip.<id>, lr.short.world:<id>, world.<id>.diary).
    days: 'mon-thu' | 'one' (one of Tue–Thu); pick: { kind: 'all' } | { kind: 'top' | 'bottom', n: number | (eligible) => number, score: (p, eligible) => number };

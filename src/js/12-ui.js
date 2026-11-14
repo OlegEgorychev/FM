@@ -33,6 +33,7 @@ class UIController {
     this.draft = new DraftView(this);            // v3.1: the Yard Match intro
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.planner = new WeekPlanner(this);        // v3.13: PLANNER.EXE (the weekly plan)
+    this.kassa = new CashDesk(this);             // v3.15: KASSA.EXE (monthly fees)
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
     this.bind();
@@ -250,6 +251,7 @@ class UIController {
       { el: this.profile.layer, close: () => this.profile.close() },
       { el: this.locker.layer, close: () => this.locker.close() },
       { el: this.planner.layer, close: () => this.planner.close() },   // v3.13
+      { el: this.kassa.layer, close: () => this.kassa.close() },       // v3.15
       { el: this.briefing.layer, close: () => this.briefing.close() },
     ];
     this.topLayer = () => {
@@ -653,7 +655,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     btn.disabled = this.cal.running || this.live || this.events.active;
     btn.classList.toggle('pulse', phase === 'matchday' || phase === 'post');
     if (this.cal.running) btn.innerHTML = L.t('dash.simming');
-    else if (phase === 'calendar') btn.innerHTML = L.t({ briefing: 'dash.startDay', week: 'dash.planWeek', locker: 'dash.toLocker' }[blk] || 'dash.continue');   // v3.13
+    else if (phase === 'calendar') btn.innerHTML = L.t({ kassa: 'dash.kassa', briefing: 'dash.startDay', week: 'dash.planWeek', locker: 'dash.toLocker' }[blk] || 'dash.continue');   // v3.13 / v3.15
     else if (phase === 'matchday' && !s.dayState().briefed) btn.innerHTML = L.t('dash.startDay');
     else if (phase === 'matchday' && !s.dayState().locker?.done) btn.innerHTML = L.t('dash.startMatchDay');
     else if (phase === 'matchday') btn.innerHTML = L.t('dash.goMatch');
@@ -790,6 +792,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     }
     if (this.events.active) { this.events.open(); return; }   // a dilemma is still waiting for an answer
     const blk = this.dayBlockers()[0];
+    if (blk === 'kassa') { this.kassa.open(); return; }         // v3.15: KASSA.EXE at the month's first stop
     if (blk === 'briefing') { this.briefing.open(); return; }   // v2.8: START DAY → morning briefing
     if (blk === 'week') { this.planner.open(); return; }        // v3.13: PLANNER.EXE until the week is confirmed
     if (blk === 'locker') { this.locker.open(); return; }       // v2.6: back to the locker room
@@ -807,6 +810,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   dayBlockers() {
     const s = this.state, out = [];
     if (!this.isStopDay()) return out;
+    if (s.kassaDue()) { out.push('kassa'); return out; }   // v3.15: the month's first stop opens with the cash desk
     if (!s.dayState().briefed) { out.push('briefing'); return out; }   // v2.8: START DAY → morning briefing
     if (!s.weekState().confirmed) { out.push('week'); return out; }   // v3.13: [ CONFIRM WEEK ]
     if (s.isOurTraining(s.calendar.date) && !s.dayState().locker?.done) out.push('locker');   // v2.6: locker room first
@@ -816,6 +820,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   continueDays() {
     const s = this.state;
     if (this.cal.running || s.phase !== 'calendar' || this.events.active || this.dayBlockers().length) { this.renderDash(); return; }
+    s.autoFees = false;   // (auto-sim only)
     s.away = s.away || [];   // diary lines from here on go to the next morning briefing ("while you were away")
     for (let guard = 0; guard < 40; guard++) {
       const r = this.cal.step();
@@ -848,9 +853,19 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (cont && !this.dayBlockers().length) { this.continueDays(); return; }
     this.renderAll();
   }
-  /** v3.13: auto-sim / tests — an unconfirmed week gets Tue + Thu Match Practice and is confirmed. */
+  /** v3.15: after KASSA.EXE — on with the day: the match-day locker, or the next blocker (briefing → plan → locker). */
+  resumeStop() {
+    const s = this.state;
+    if (s.phase === 'matchday') { this.locker.open(); return; }
+    const b = this.dayBlockers()[0];
+    if (b === 'briefing') this.briefing.open(); else if (b === 'week') this.planner.open(); else if (b === 'locker') this.locker.open(); else this.renderAll();
+  }
+  /** v3.13: auto-sim / tests — an unconfirmed week gets Tue + Thu Match Practice and is confirmed.
+      v3.15: a new month's cash desk is confirmed with the normal fee. */
   autoPlan() {
-    const s = this.state, w = s.weekState();
+    const s = this.state;
+    if (s.kassaDue()) s.confirmKassa(FINANCE.DEFAULT_LEVEL);
+    const w = s.weekState();
     if (w.confirmed) return;
     for (const k of WEEK.DEFAULT_DAYS) s.setWeekPlan(k, WEEK.DEFAULT_REGIME);
     s.confirmWeek();
@@ -901,6 +916,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.cal.running || this.state.phase !== 'calendar') return;
     this.calMonth = null;   // calendar view follows the days as they pass
     this.autoPlan();   // v3.13
+    this.state.autoFees = true;   // v3.15: auto-sim reminds every present kid who still owes
     this.cal.simulate({
       stepMs: 180,
       onStep: (date, infos) => {
@@ -911,7 +927,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         this.renderDash();
         this.renderTeam();
       },
-      onStop: () => { this.state.save(); this.renderAll(); },
+      onStop: () => { this.state.autoFees = false; this.state.save(); this.renderAll(); },
     });
     this.renderDash();
   }
@@ -938,9 +954,11 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     } else if (live) body = `<div class="td-note">${L.t(info.kind === 'rest' ? 'today.rest' : 'today.off', { n: ENERGY.DAILY_REST })}</div>`;
     else body = `<div class="td-note">${L.t('today.phase.' + s.phase)}</div>`;
     const strip = WEEK.KEYS.map((k, i) => {
-      const date = isoAdd(w.start, i), m = s.matchOn(date), t = s.isOurTraining(date);
-      return `<span class="td-wd${date === s.calendar.date ? ' now' : ''}${date < s.calendar.date ? ' past' : ''}${m ? ' m' : t ? ' t' : ''}"
-        title="${esc(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'short' }) + ' · ' + (m ? L.t('today.kind.match') : t ? L.t('plan.' + w.plan[k]) : L.t('today.kind.rest')))}">${esc(fmtDate(date, { weekday: 'narrow' }))}<i>${m ? '&#9917;' : t ? '&#9650;' : '·'}</i></span>`;
+      const date = isoAdd(w.start, i), m = s.matchOn(date), t = s.isOurTraining(date), we = s.worldEventOn(date);   // v3.15: ✦ world event (same tooltip as PLANNER.EXE)
+      const tip = fmtDate(date, { weekday: 'long', day: 'numeric', month: 'short' }) + ' · ' + (m ? L.t('today.kind.match') : t ? L.t('plan.' + w.plan[k]) : L.t('today.kind.rest'))
+        + (we ? ' · ' + L.t('world.tip.' + we.id) : '');
+      return `<span class="td-wd${date === s.calendar.date ? ' now' : ''}${date < s.calendar.date ? ' past' : ''}${m ? ' m' : t ? ' t' : ''}${we ? ' we' : ''}"
+        title="${esc(tip)}">${esc(fmtDate(date, { weekday: 'narrow' }))}<i>${m ? '&#9917;' : t ? '&#9650;' : '·'}</i>${we ? '<b class="td-we">&#10022;</b>' : ''}</span>`;
     }).join('');
     const weekBtn = live && w.confirmed && s.plannableDays().length ? `<button type="button" class="btn td-weekbtn" data-week>${L.t('today.weekBtn')}</button>` : '';
     box.innerHTML = `<div class="td-head"><b>${fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' })}</b>

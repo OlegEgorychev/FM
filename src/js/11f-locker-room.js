@@ -13,6 +13,10 @@ class LockerRoom {
     this.grid = document.getElementById('lr-grid');
     document.getElementById('lr-x').addEventListener('click', () => this.close());
     document.getElementById('lr-proceed').addEventListener('click', () => this.proceed());
+    document.getElementById('lr-fees').addEventListener('click', e => {   // v3.15: [ Remind ] (free)
+      const b = e.target.closest('[data-remind]');
+      if (b && this.state.remindFee(b.dataset.remind)) this.render();
+    });
     this.grid.addEventListener('click', e => {
       if (e.target.closest('[data-info]')) return;   // v2.7: the [i] opens the profile, not the roll call
       if (this.requestPending) return;               // v2.8: answer the kid first
@@ -33,6 +37,7 @@ class LockerRoom {
     if (this.ui.modalLock) return;   // v3.5
     if (!(s.phase === 'matchday' || (s.phase === 'calendar' && this.ui.dayInfo(s.calendar.date).kind === 'training'))) return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (s.kassaDue()) { this.ui.kassa.open(); return; }   // v3.15: KASSA.EXE first at the month's first stop
     if (!s.dayState().briefed) { this.ui.briefing.open(); return; }   // v2.8: morning briefing first
     if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.13: the plan comes first
     this.ui.modal.close();   // v2.7: an open profile may stay — it sits above the room
@@ -107,8 +112,25 @@ class LockerRoom {
       <span class="lr-kind ${match ? 'k-match' : 'k-training'}">${match ? L.t('lr.kindMatch', { o: esc(L.team(ctx?.opp.name || '')) }) : L.t('lr.kindTraining')}</span>
       <span class="lr-count${present < 11 ? ' low' : ''}">${L.t('lr.arrived', { n: present, t: squad.length })}</span>
       <span class="lr-ap" title="${esc(L.t('ap.tip'))}">${L.t('ap.left')} <b>${s.ap}/${this.ui.apTotal()}</b></span>`;   // v3.13: weekly wallet
+    this.renderFees(match, squad, lk);   // v3.15
     document.getElementById('lr-proceed').innerHTML = L.t('lr.toPitch');   // v2.8: [ HEAD TO PITCH ]
     document.getElementById('lr-status').textContent = L.t(present < 11 ? 'lr.statusShort' : 'lr.status');
+  }
+
+  /** v3.15: the "Fees" panel on training days of the month (after the fee day): ✓ paid / ✗ owes / waived / ½, free [ Remind ]. */
+  renderFees(match, squad, lk) {
+    const s = this.state, f = s.fees, box = document.getElementById('lr-fees');
+    const show = !match && f && f.started && f.month === s.monthOf();
+    box.hidden = !show;
+    if (!show) { box.innerHTML = ''; return; }
+    const got = Object.values(f.got || {}).reduce((a, b) => a + b, 0), paid = squad.filter(p => f.status[p.id] === 'paid').length;
+    const mark = { paid: '&#10003;', owed: '&#10007;', waived: '&ndash;', half: '&frac12;' };
+    box.innerHTML = `<div class="lrf-head"><b>${L.t('fee.title')}</b> <span>${L.t('fee.sum', { m: '$' + f.amount, p: paid, t: squad.length, g: '$' + got })}</span></div><div class="lrf-list">`
+      + squad.map(p => {
+        const st = f.status[p.id] || 'owed', here = !lk.absent[p.id], owes = s.feeOwes(p.id), rem = f.reminded[p.id];
+        const btn = owes && here ? (rem ? `<small class="lrf-rem">${L.t('fee.reminded')}</small>` : `<button type="button" class="btn lrf-btn" data-remind="${p.id}">${L.t('fee.remind')}</button>`) : '';
+        return `<div class="lrf-row st-${st}${here ? '' : ' away'}" title="${esc(L.t('fee.st.' + st))}"><i>${mark[st] || '?'}</i><span>${p.number}. ${esc(L.name(p.surname))}</span>${btn}</div>`;
+      }).join('') + '</div>';
   }
 
   /** Roll call: 1 AP, a short phone call about one empty locker. */

@@ -337,7 +337,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('force win flag: user wins >= 9/10 engine runs', fw >= 9, fw + '/10');
     // v1.9: budget + narrative events + locker room dialogue
     const talkOpen = () => page.evaluate(() => !document.getElementById('talk-layer').hidden);
-    const hdr0 = await page.evaluate(() => ({ b: YAM.game.budget, txt: document.getElementById('hdr-budget').textContent }));
+    const hdr0 = await page.evaluate(() => ({ b: YAM.game.budget, txt: document.getElementById('hdr-budget').textContent,   // v3.15: $500 + this month's fees (every change is in the ledger)
+      led: Object.values(YAM.game.ledger).reduce((a, m) => a + Object.values(m).reduce((x, y) => x + y, 0), 0), fee: YAM.game.ledger['2002-09']?.fee || 0 }));
     await page.evaluate(() => { YAM.game.budget = 100; YAM.ui.renderBudget(); YAM.ui.events.fire('boots'); });
     await page.waitForTimeout(150);
     const bt = await page.evaluate(() => {
@@ -351,17 +352,17 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.click('#talk-choices .talk-btn[data-i="1"]');
     const bt2 = await page.evaluate(k => ({ agi: YAM.game.player(k).physical.agility, closed: document.getElementById('talk-layer').hidden, pe: YAM.game.pendingEvent, b: YAM.game.budget,
       diary: YAM.game.diary[YAM.game.diary.length - 1].key }), bt.kid);
-    check('budget $500 in header; Torn Boots: snitch face, unaffordable choice disabled, Esc blocked, "no" = agility −2',
-      hdr0.b === 500 && /\$500/.test(hdr0.txt) && bt.n === 2 && bt.dis && bt.en && bt.face && /\$100/.test(bt.hdr) && still
+    check('budget in header = $500 + the ledger (September fees); Torn Boots: snitch face, unaffordable choice disabled, Esc blocked, "no" = agility −2',
+      hdr0.b === 500 + hdr0.led && hdr0.fee > 0 && hdr0.txt.includes('$' + hdr0.b) && bt.n === 2 && bt.dis && bt.en && bt.face && /\$100/.test(bt.hdr) && still
       && bt2.agi === Math.max(1, bt.agi - 2) && bt2.closed && !bt2.pe && bt2.b === 100 && bt2.diary === 'ev.boots.b.diary', JSON.stringify({ hdr0, bt, still, bt2 }));
     await page.evaluate(() => YAM.ui.events.fire('dad'));
     await page.waitForTimeout(100);
-    const dd = await page.evaluate(() => ({ kid: YAM.game.pendingEvent.cast.kid, worst: [...YAM.game.squad].sort((a, b) => a.overall - b.overall)[0].id,
+    const dd = await page.evaluate(() => ({ kid: YAM.game.pendingEvent.cast.kid, worst: (w => (w('rich') || w('middle') || w(null)).id)(w => [...YAM.game.squad].filter(p => !w || p.wealth === w).sort((a, b) => a.overall - b.overall)[0]),   // v3.15: the weakest RICH kid
       sil: document.querySelector('#talk-face svg rect:nth-of-type(2)') !== null }));
     await page.click('#talk-choices .talk-btn[data-i="0"]');
     const dd2 = await page.evaluate(k => ({ b: YAM.game.budget, flag: YAM.game.player(k).flags.includes('Promised_Start'), hdr: document.getElementById('hdr-budget').textContent,
       chip: !!document.querySelector(`#roster .r-row[data-id="${k}"] .tag.flag`) }), dd.kid);
-    check("Rich Kid's Dad: worst player, take money = +$300 + Promised_Start chip", dd.kid === dd.worst && dd.sil && dd2.b === 400 && dd2.flag && /\$400/.test(dd2.hdr) && dd2.chip, JSON.stringify({ dd, dd2 }));
+    check("Rich Kid's Dad: the weakest kid of a rich family (v3.15), take money = +$300 + Promised_Start chip", dd.kid === dd.worst && dd.sil && dd2.b === 400 && dd2.flag && /\$400/.test(dd2.hdr) && dd2.chip, JSON.stringify({ dd, dd2 }));
     // v2.2/2.3: injuries, multi-step dialogue + suspension, match-day bus, dads' pool → losing dad, scout → showcase
     const talk = async i => { await page.click(`#talk-choices .talk-btn[data-i="${i}"]`); await page.waitForTimeout(30); };
     await page.evaluate(() => { YAM.game.budget = 1000; YAM.ui.events.fire('knock'); });
@@ -420,7 +421,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const days = (a, b) => (new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5;
     const ofPre = await page.evaluate(() => { const p = YAM.game.squad.find(x => x.available); return { blk: YAM.ui.officeBlock(p.id), dow: new Date(YAM.game.calendar.date + 'T00:00:00Z').getUTCDay() }; });
     await page.click('#btn-sim');   // Sunday: [ CONTINUE ] → Monday (the week is not planned yet) → the morning briefing opens by itself
-    // v3.14: this week's seeded world event (always quarter tests for 9 Sep) is cleared — the v3.13 checks below pin exact numbers; world events have their own checks
+    // v3.14/v3.15: this week's seeded world event (if any — per-game salt) is cleared — the v3.13 checks below pin exact numbers; world events have their own checks
     await page.evaluate(() => { YAM.game.worldEvent = null; YAM.ui.briefing.render(); });
     const mb = await page.evaluate(() => ({ open: !document.getElementById('morning-briefing-view').hidden, z: +getComputedStyle(document.getElementById('morning-briefing-view')).zIndex,
       date: document.getElementById('mb-date').textContent, wx: document.getElementById('mb-weather').textContent.trim(), news: document.querySelectorAll('#mb-news li').length,
@@ -441,6 +442,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     // v3.13: the office is open on Monday for every kid (here: over the planner), 1 AP from the weekly wallet
     const ofPost = await page.evaluate(() => YAM.ui.officeBlock(YAM.game.squad.find(x => x.available).id));
     const kidO = await page.evaluate(() => { const s = YAM.game, p = s.squad.find(x => x.available && x.archetype !== 'GK'); s.weekState().ap = 1; p.dyn.sharpness = 30; p.dyn.morale = 60;
+      if (s.fees?.status[p.id]) s.fees.status[p.id] = 'paid';   // v3.15: a kid who owes gets a 5th line ("About the fee") — tested separately
       YAM.ui.renderBudget(); YAM.ui.profile.open(p.id); return p.id; });
     const of0 = await page.evaluate(() => ({ vis: !document.getElementById('pinfo-office').hidden, dis: document.getElementById('pinfo-office').disabled }));
     await page.click('#pinfo-office');
@@ -569,7 +571,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await toLocker(); await page.waitForTimeout(1400);
     const kick = await page.evaluate(() => {
       const s = YAM.game, p = s.starters().find(x => x.archetype !== 'GK' && x.available);
-      s.weekState().ap = 1; s.rep.parents = 50; s.rep.squad = 50; YAM.ui.profile.open(p.id);
+      s.weekState().ap = 1; s.rep.parents = 50; s.rep.squad = 50; if (s.fees?.status[p.id]) s.fees.status[p.id] = 'paid';   // (v3.15: no fee line here)
+      YAM.ui.profile.open(p.id);
       return { id: p.id, n0: s.squad.length, slot: s.lineup.indexOf(p.id) };
     });
     await page.click('#pinfo-office');
@@ -731,7 +734,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       if (YAM.game.isStarter(p.id)) { const fit = YAM.game.bench(); /* v3.0: no position rules */ const i = YAM.game.lineup.indexOf(p.id); if (fit.length) YAM.game.lineup[i] = (fit.find(b => b.archetype === p.archetype) || fit[0]).id; else window.__noFit = YAM.game.bench().map(b => [b.id, b.archetype, b.available]); }
       const b0 = YAM.game.budget, m0 = p.dyn.morale, starter = YAM.game.isStarter(p.id);
       YAM.ui.checkPromises();
-      return { starter, refund: b0 - YAM.game.budget, morale: p.dyn.morale < m0 || m0 === 0, cleared: !p.flags.length };
+      return { starter, refund: b0 - YAM.game.budget, morale: p.dyn.morale < m0 || m0 === 0, cleared: !p.flags.includes('Promised_Start') };
     });
     check('event persists over reload; random event pauses + resumes calendar; broken promise refunds $150',
       re.open && re2.b === re.b - 150 && re2.mor === 100 && !paused.running && paused.btn && resumed && pr.refund === 150 && pr.morale && pr.cleared && !pr.starter,
@@ -769,15 +772,23 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('immediate request: a present kid interrupts the locker room (Proceed blocked); "Go home" → out of today\'s squad, Parents +5',
       ex0.id === 'excuse' && ex0.n === 2 && ex0.blocked && ex1.parents === 55 && ex1.absent === 'excused' && ex1.slot && ex1.done, JSON.stringify({ ex0, ex1 }));
     const rp = await page.evaluate(() => {
-      const s = YAM.game, b0 = s.budget; s.rep.board = 75; s.rep.parents = 80;
-      s.repDaily('2002-10-01'); const grant = s.budget - b0;
-      const b1 = s.budget; s.repDaily('2002-10-06'); const gift = s.budget - b1;
+      const s = YAM.game, b0 = s.budget, lg0 = JSON.stringify(s.ledger['2002-10'] || {}); s.rep.board = 75; s.rep.parents = 80;
+      const got = c => s.ledger['2002-10']?.[c] || 0;
+      s.repDaily('2002-10-01'); const grant = got('grant'), rent = got('rent'), net = s.budget - b0;   // v3.15: the rent is booked next to the grant
+      const rentLine = s.diary.some(d => d.date === '2002-10-01' && d.key === 'fin.rent');
+      const b1 = s.budget; s.repDaily('2002-10-06'); const gift = s.budget - b1, don = got('donation');
+      // overdue rent: the budget below $0 after the rent → Board −3 + diary line (no other penalty)
+      s.budget = 50; s.rep.board = 30; const bd0 = s.rep.board; /* board 30 → no grant */ s.repDaily('2002-11-01'); const late = { b: s.budget, board: s.rep.board - bd0, line: s.diary.some(d => d.date === '2002-11-01' && d.key === 'fin.rentLate') };
+      if (lg0 === '{}') delete s.ledger['2002-10']; else s.ledger['2002-10'] = JSON.parse(lg0);
+      delete s.ledger['2002-11'];
       const e = new YAM.MatchEngine(YAM.ui.homeTeam(), s.matchContext().team, { onLog() {}, onUpdate() {}, onEnd() {} }, { squadRep: 100 });
       s.rep.board = 50; s.rep.parents = 55; s.budget = b0;
-      return { grant, gift, bonus: e.repBonus, mod: e.mod(0, 'atk') - e.mod(1, 'atk') };
+      return { grant, rent, net, rentLine, gift, don, late, bonus: e.repBonus, mod: e.mod(0, 'atk') - e.mod(1, 'atk') };
     });
     check('reputation: board grant on the 1st ($50 + (75−50)×4 = $150), happy parents donate on Sunday, squad rep 100 → +2 on our rolls',
-      rp.grant === 150 && rp.gift > 0 && rp.bonus === 2 && rp.mod === 2, JSON.stringify(rp));
+      rp.grant === 150 && rp.gift > 0 && rp.don === rp.gift && rp.bonus === 2 && rp.mod === 2, JSON.stringify(rp));
+    check('v3.15 rent: −$100 booked under "rent" on the 1st next to the grant (net +$50) + diary; overdue (below $0 after the rent) → Board −3 + "The pitch rent is overdue"',
+      rp.rent === -100 && rp.net === 50 && rp.rentLine && rp.late.b === -50 && rp.late.board === -3 && rp.late.line, JSON.stringify(rp));
     await page.evaluate(() => YAM.ui.locker.open());
     const lrMatch = await page.evaluate(() => ({ open: !document.getElementById('locker-room-view').hidden, kind: !!document.querySelector('#lr-head .k-match'),
       btn: document.getElementById('lr-proceed').textContent }));
@@ -1289,6 +1300,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const s = YAM.game, ui = YAM.ui;
       if (ui.locker.isOpen) ui.locker.close(); if (ui.planner.isOpen) ui.planner.close(); if (ui.briefing.isOpen) ui.briefing.close();
       s.phase = 'calendar'; s.calendar.date = '2002-12-02'; s.week = null; s.today = null; s.away = null; s.excusesOff = true;
+      if (s.kassaDue()) s.confirmKassa('normal');   // v3.15: December's cash desk out of the way
       s.weekState(); ui.show('dash'); ui.renderAll();
       ui.debug.open(); ui.debug.tab = 'god'; ui.debug.render();
     });
@@ -1387,6 +1399,138 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const w6b = await page.evaluate(() => ({ e: JSON.stringify(YAM.game.worldEvent), last: YAM.game.worldLast, wk: YAM.game.week?.start }));
     check('v3.14 deterministic picks: same week + squad → same playerIds (recomputed twice), and the saved event comes back unchanged after a reload',
       w1.same && w6a === w6b.e && JSON.parse(w6b.e).id === 'athletics' && w6b.last === '2002-12-02' && w6b.wk === '2002-12-02', JSON.stringify({ w6a, w6b }));
+    // v3.15 CASH DESK — (1) KASSA.EXE opens at the first stop of a new month (before the briefing / PLANNER.EXE) with last month's ledger
+    const k0 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui;
+      for (const v of ['locker', 'planner', 'briefing', 'kassa']) if (ui[v].isOpen) ui[v].layer.hidden = true;
+      ui.events.enabled = false; s.excusesOff = true; s.pendingEvent = null;
+      s.phase = 'calendar'; s.calendar.date = '2002-11-03'; s.week = null; s.today = null; s.away = null; s.worldEvent = null;   // Sunday (quiet) → Monday 4 Nov
+      s.weekState(); s.weekState().confirmed = true;
+      const ids = s.squad.map(p => p.id);
+      s.fees = { month: '2002-10', level: 'normal', amount: 10, started: true, status: Object.fromEntries(ids.map((id, i) => [id, i < 2 ? 'owed' : i === 2 ? 'half' : 'paid'])),
+        reminded: {}, reason: {}, carry: {}, next: {}, got: { [ids[2]]: 5 } };
+      s.ledger['2002-10'] = { fee: 120, grant: 50, donation: 20, rent: -100, event: -30 };
+      s.budget = 400; s.rep.parents = 50; s.save(); ui.show('dash'); ui.renderAll();
+      return { ids, label: document.getElementById('btn-sim').textContent };
+    });
+    await page.click('#btn-sim');   // [ CONTINUE ] → Monday 4 Nov: the month's first stop
+    const k1 = await page.evaluate(() => {
+      const t = [...document.querySelectorAll('#ks-report tr')].map(r => [r.dataset.cat, r.querySelector('td + td').textContent.trim()]);
+      return { date: YAM.game.calendar.date, kassa: YAM.ui.kassa.isOpen, brief: YAM.ui.briefing.isOpen, planner: YAM.ui.planner.isOpen, blk: YAM.ui.dayBlockers()[0],
+        z: +getComputedStyle(document.getElementById('kassa-view')).zIndex, rows: Object.fromEntries(t), radios: document.querySelectorAll('#ks-levels input[type=radio]').length,
+        checked: document.querySelector('#ks-levels input:checked')?.value, budget: document.getElementById('ks-report').textContent.includes('$400'), top: YAM.ui.topLayer()?.el.id,
+        title: document.getElementById('ks-title').textContent, parents: YAM.game.rep.parents };
+    });
+    await page.click('#ks-levels input[value="high"]');
+    await page.click('#ks-confirm');
+    const k2 = await page.evaluate(ids => { const s = YAM.game, f = s.fees;
+      return { kassa: YAM.ui.kassa.isOpen, brief: YAM.ui.briefing.isOpen, month: f.month, level: f.level, amount: f.amount, parents: s.rep.parents, owed: ids.every(id => f.status[id] === 'owed'),
+        carry: f.carry[ids[2]], due: s.feeDue(ids[2]), lost: s.diary.some(d => d.key === 'fee.lost' && d.date === '2002-10-31' && d.vars.n === 2), blk: YAM.ui.dayBlockers()[0] }; }, k0.ids);
+    await page.click('#mb-go');   // the briefing → PLANNER.EXE (Monday, week not planned)
+    const k3 = await page.evaluate(() => ({ planner: YAM.ui.planner.isOpen }));
+    check('v3.15 KASSA.EXE: the first stop of a new month opens the cash desk first (z 50, Esc layer), last month\'s ledger rows + total + budget, Low / Normal (default) / High; confirm → level + Parents −3 once, everyone owes, Oct unpaid lost (diary count), half carried; then briefing → PLANNER.EXE',
+      /CONTINUE|ПРОДОЛЖИТЬ/.test(k0.label) && k1.date === '2002-11-04' && k1.kassa && !k1.brief && !k1.planner && k1.blk === 'kassa' && k1.z === 50 && k1.top === 'kassa-view' && /KASSA/.test(k1.title)
+      && k1.rows.fee === '+$120' && k1.rows.grant === '+$50' && k1.rows.donation === '+$20' && k1.rows.rent === '−$100' && k1.rows.event === '−$30' && k1.rows.total === '+$60' && k1.budget
+      && k1.radios === 3 && k1.checked === 'normal' && !k2.kassa && k2.brief && k2.month === '2002-11' && k2.level === 'high' && k2.amount === 15 && k2.parents === k1.parents - 3 && k2.owed
+      && k2.carry === 5 && k2.due === 20 && k2.lost && k2.blk === 'briefing' && k3.planner, JSON.stringify({ k0: k0.label, k1, k2, k3 }));
+    // (3) the fee day = the first training of the month: briefing line, Fees panel, paid kids add 'fee' money, free [ Remind ]
+    await page.evaluate(() => { YAM.game.setWeekPlan('tue', 'match'); });
+    await page.click('#pl-confirm');
+    await page.click('#btn-sim');   // → Tuesday 5 Nov (training) — the briefing opens by itself
+    const f0 = await page.evaluate(() => ({ date: YAM.game.calendar.date, brief: YAM.ui.briefing.isOpen, agenda: document.getElementById('mb-agenda').textContent, started: YAM.game.fees.started,
+      fee0: YAM.game.ledger['2002-11']?.fee || 0 }));
+    await page.click('#mb-go'); await page.waitForTimeout(300);
+    const f1 = await page.evaluate(() => {
+      const s = YAM.game, f = s.fees, lk = s.dayState().locker, box = document.getElementById('lr-fees');
+      const paid = s.squad.filter(p => f.status[p.id] === 'paid'), here = s.squad.filter(p => !lk.absent[p.id]);
+      const owesHere = here.filter(p => s.feeOwes(p.id));
+      return { open: YAM.ui.locker.isOpen, panel: !box.hidden, rows: box.querySelectorAll('.lrf-row').length, n: s.squad.length, started: f.started,
+        paid: paid.length, paidAbsent: paid.some(p => lk.absent[p.id]), fee: s.ledger['2002-11']?.fee || 0, want: paid.reduce((a, p) => a + f.got[p.id], 0),
+        sum: box.querySelector('.lrf-head').textContent, btns: box.querySelectorAll('[data-remind]').length, owesHere: owesHere.map(p => p.id), firstOwes: owesHere[0]?.id || null };
+    });
+    if (f1.firstOwes) await page.click(`#lr-fees [data-remind="${f1.firstOwes}"]`);
+    const f2 = await page.evaluate(id => ({ rem: id ? !!YAM.game.fees.reminded[id] : true, label: id ? !!document.querySelector('#lr-fees .lrf-rem') : true, ap: YAM.game.ap }), f1.firstOwes);
+    check('v3.15 fee day (1st training of the month): briefing line, Fees panel in the Locker Room (one row per kid, ✓ / ✗), only present kids pay, paid fees booked under "fee", free [ Remind ] for present kids who owe',
+      f0.date === '2002-11-05' && f0.brief && /\$15/.test(f0.agenda) && !f0.started && f0.fee0 === 0 && f1.open && f1.panel && f1.rows === f1.n && f1.started && f1.paid > 0 && !f1.paidAbsent
+      && f1.fee === f1.want && f1.fee >= f1.paid * 15 && f1.btns === f1.owesHere.length && f2.rem && f2.label, JSON.stringify({ f0, f1, f2 }));
+    // (5) the fee talk: nomoney only for poor kids (fixed per month, saved); Waive → waived, morale +8, Squad +2, no rep penalty
+    const t0 = await page.evaluate(() => {
+      const s = YAM.game, f = s.fees, keep = JSON.stringify(f.reason), out = {};
+      out.reasons = s.squad.map(p => { delete f.reason[p.id]; return [p.wealth, s.feeReason(p.id)]; });
+      out.poorOnly = out.reasons.every(([w, r]) => (r === 'nomoney') === (w === 'poor'));
+      out.stable = s.squad.every(p => s.feeReason(p.id) === f.reason[p.id]);
+      f.reason = JSON.parse(keep);
+      // a present kid who owes, from a poor family (hidden — set for the test), 1 AP for the office
+      const lk = s.dayState().locker, kid = s.squad.find(p => !lk.absent[p.id] && p.archetype !== 'GK') || s.squad.find(p => !lk.absent[p.id]);
+      out.keepW = kid.wealth; kid.wealth = 'poor'; f.status[kid.id] = 'owed'; delete f.reason[kid.id]; s.weekState().ap = 1;
+      out.kid = kid.id; out.m0 = kid.dyn.morale = 50; out.rep0 = { ...s.rep };
+      YAM.ui.locker.layer.hidden = true;   // (the office talk also works over the room; closed for a clean dialogue)
+      return out;
+    });
+    await page.evaluate(id => YAM.ui.callIntoOffice(id), t0.kid);
+    const t1 = await page.evaluate(() => [...document.querySelectorAll('#talk-choices .talk-btn')].map(b => b.querySelector('.tb-label').textContent));
+    const feeIdx = await page.evaluate(() => [...document.querySelectorAll('#talk-choices .talk-btn')].findIndex(b => b.querySelector('.tb-label').textContent === L.t('office.btn.fee')));
+    await talk(feeIdx);
+    const t2 = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step, text: document.getElementById('talk-text')?.textContent || '', n: document.querySelectorAll('#talk-choices .talk-btn').length,
+      labels: [...document.querySelectorAll('#talk-choices .talk-btn .tb-label')].map(b => b.textContent) }));
+    await talk(0);   // Waive it this month
+    const t3 = await page.evaluate(([id, w]) => { const s = YAM.game, k = s.player(id), r = { st: s.fees.status[id], m: k.dyn.morale, rep: { ...s.rep }, reason: s.fees.reason[id],
+      closed: !s.pendingEvent, diary: s.diary.slice(-4).some(d => d.key === 'office.fee.waive.diary') ? 'office.fee.waive.diary' : s.diary[s.diary.length - 1].key, owes: s.feeOwes(id), ap: s.ap }; k.wealth = w; return r; }, [t0.kid, t0.keepW]);
+    check('v3.15 fee talk (office, no extra AP): "About the fee" only for a kid who owes; nomoney only for poor kids (seeded, saved per month); Waive → waived, morale +8, Squad +2, Board / Parents unchanged',
+      t0.poorOnly && t0.stable && t1.length === 5 && feeIdx === 3 && t2.step === 'fee' && t2.n === 2 && t3.st === 'waived' && t3.m === 58
+      && t3.rep.squad === Math.min(100, t0.rep0.squad + 2) && t3.rep.parents === t0.rep0.parents && t3.rep.board === t0.rep0.board && t3.reason === 'nomoney' && t3.closed
+      && t3.diary === 'office.fee.waive.diary' && !t3.owes && t3.ap === 0, JSON.stringify({ t0: { poorOnly: t0.poorOnly, stable: t0.stable, kid: t0.kid }, t1, feeIdx, t2, t3 }));
+    // (6) High lowers poor kids' payment rate vs Normal on the same seeds; (4) wealth: seeded per id, 20/60/20, no link to skills, hidden
+    const hw = await page.evaluate(() => {
+      const s = YAM.game, keep = { fees: s.fees, ledger: JSON.stringify(s.ledger), budget: s.budget, w: s.squad.map(p => p.wealth) }, out = {};
+      s.squad.forEach(p => { p.wealth = 'poor'; });
+      const rate = level => { let paid = 0, n = 0;
+        for (let i = 0; i < 12; i++) { const date = isoAdd('2002-11-05', i); s.calendar.date = date;
+          s.fees = { month: '2002-11', level, amount: FINANCE.FEES[level].fee, started: false, status: Object.fromEntries(s.squad.map(p => [p.id, 'owed'])), reminded: {}, reason: {}, carry: {}, next: {}, got: {} };
+          paid += s.collectFees(date, {}).length; n += s.squad.length; }
+        return paid / n; };
+      out.normal = +rate('normal').toFixed(2); out.high = +rate('high').toFixed(2); out.low = +rate('low').toFixed(2);
+      out.chances = [feeChance('poor', 'first', 'normal'), feeChance('poor', 'first', 'high'), feeChance('rich', 'reminded', 'low'), feeChance('middle', 'later', 'high')].map(v => +v.toFixed(3));
+      s.squad.forEach((p, i) => { p.wealth = keep.w[i]; }); s.fees = keep.fees; s.ledger = JSON.parse(keep.ledger); s.budget = keep.budget; s.calendar.date = '2002-11-05';
+      // wealth: same id → same value; distribution; independent of skills; old saves / AI / pool all have one
+      const ids = Array.from({ length: 4000 }, (_, i) => 'w' + i), ws = ids.map(id => Player.rollWealth(id));
+      out.share = WEALTH.KEYS.map(k => +(ws.filter(w => w === k).length / ids.length).toFixed(2));
+      out.det = ids.slice(0, 50).every((id, i) => Player.rollWealth(id) === ws[i]);
+      out.all = [...s.globalPlayers, ...s.league.teams.filter(t => !t.user).flatMap(t => s.league.roster(t, new Set()))].every(p => WEALTH.KEYS.includes(p.wealth) && p.wealth === Player.rollWealth(p.id));
+      const raw = JSON.parse(JSON.stringify(s.squad[0])); delete raw.wealth; out.migrate = new Player({ ...raw, tags: [] }).wealth === s.squad[0].wealth;
+      out.kept = new Player({ ...JSON.parse(JSON.stringify(s.squad[0])), wealth: 'rich', tags: [] }).wealth === 'rich';
+      const gp = s.globalPlayers, avg = w => { const l = gp.filter(p => p.wealth === w); return l.reduce((a, p) => a + p.overall, 0) / Math.max(1, l.length); };
+      out.gap = +Math.abs(avg('rich') - avg('poor')).toFixed(2);
+      YAM.ui.profile.open(s.squad[0].id); const txt = document.getElementById('pinfo-body').textContent; YAM.ui.profile.close();
+      out.hidden = !/rich|poor|wealth|богат|бедн|достат/i.test(txt);
+      YAM.ui.debug.open(); YAM.ui.debug.tab = 'db'; YAM.ui.debug.render(); out.debug = /WLTH/.test(document.getElementById('debug-body').textContent); YAM.ui.debug.close();
+      out.snap = JSON.stringify(s.squad.map(p => [p.id, p.wealth]));
+      s.save();
+      return out;
+    });
+    await page.reload();
+    await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    const hw2 = await page.evaluate(() => JSON.stringify(YAM.game.squad.map(p => [p.id, p.wealth])));
+    check('v3.15 High fee lowers poor kids\' payment rate vs Normal on the same seeds (Low raises it); chances: poor 40 → 24 %, rich reminded +10 pp capped at 100 %, middle later ×0.9',
+      hw.high < hw.normal && hw.low > hw.normal && hw.chances.join() === '0.4,0.24,1,0.405', JSON.stringify({ normal: hw.normal, high: hw.high, low: hw.low, chances: hw.chances }));
+    check('v3.15 wealth: seeded per id (same after save / reload, old saves migrate, a saved value is kept), ≈ 20 / 60 / 20 %, world + AI rosters covered, not tied to skill, shown only in DEBUG.EXE (WLTH)',
+      hw.det && hw.all && hw.migrate && hw.kept && hw.snap === hw2 && Math.abs(hw.share[0] - 0.2) <= 0.03 && Math.abs(hw.share[1] - 0.6) <= 0.03 && Math.abs(hw.share[2] - 0.2) <= 0.03
+      && hw.gap < 2 && hw.hidden && hw.debug, JSON.stringify({ share: hw.share, gap: hw.gap, det: hw.det, all: hw.all, migrate: hw.migrate, kept: hw.kept, hidden: hw.hidden, debug: hw.debug, same: hw.snap === hw2 }));
+    // follow-up: per-game world salt (saved, never recomputed) + ✦ in the TODAY week strip
+    const sl = await page.evaluate(() => {
+      const s = YAM.game, salt = s.worldSalt, out = { salt: typeof salt === 'string' && salt.length > 0 };
+      out.fromSquad = salt === GameState.worldSaltOf(s.squad) || !!s.expelled?.length;   // computed from the starting squad (a later kick-out does not change it)
+      const other = [...s.squad]; other.pop(); out.differs = GameState.worldSaltOf(other) !== GameState.worldSaltOf(s.squad);
+      const keep = { we: s.worldEvent, wl: s.worldLast };
+      s.worldEvent = keep.we; s.worldLast = keep.wl;
+      s.forceWorldEvent('olympiad'); YAM.ui.renderAll();
+      const day = s.worldEvent.days[0], cell = [...document.querySelectorAll('#today-box .td-wd')][WEEK.KEYS.indexOf(weekKey(day))];
+      out.mark = !!cell?.querySelector('.td-we') && cell.classList.contains('we') && cell.title.includes(L.t('world.tip.olympiad'));
+      out.only = document.querySelectorAll('#today-box .td-we').length === 1;
+      return out;
+    });
+    check('v3.14 follow-ups: world seed salted per academy (from the squad ids, saved), ✦ + the planner tooltip on event days in the TODAY week strip',
+      sl.salt && sl.fromSquad && sl.differs && sl.mark && sl.only, JSON.stringify(sl));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

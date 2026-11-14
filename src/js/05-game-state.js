@@ -20,7 +20,8 @@ class GameState {
     this.pendingEvent = null;      // v1.9: narrative event waiting for the coach's choice { id, date, cast, resume }
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
-    this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)   // v3.13: weekly plan / AP wallet / "while you were away"
+    this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)
+    this.worldSalt = null; this.ledger = {}; this.fees = null;   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
     this.globalPlayers = GameState.buildWorld(used);
@@ -298,7 +299,8 @@ class GameState {
     const md1 = this.calendar.events.find(e => e.type === 'match');
     if (this.phase === 'draft' || !this.squad.length || !md1 || start <= weekStartOf(md1.date)) return null;
     if (this.worldLast && isoAdd(this.worldLast, 7) === start) return null;
-    const r = seeded(start + '#world');
+    this.worldSalt ||= GameState.worldSaltOf(this.squad);   // v3.15: per-game variety, computed once and saved (never recomputed)
+    const r = seeded(start + '#world#' + this.worldSalt);
     if (r() >= WORLD.CHANCE) return null;
     this.worldEvent = this.buildWorldEvent(WORLD_EVENTS[Math.floor(r() * WORLD_EVENTS.length)], start, r);
     this.worldLast = start;
@@ -306,7 +308,9 @@ class GameState {
   }
   /** The day(s) and the kids of one event row (fixed for the week). Injured / banned / kept-home kids are not picked.
       With WORLD.WRONG one picked kid is swapped for another (a hint, not a proof); 'all' events have no wrong picks. */
-  buildWorldEvent(row, start, r = seeded(start + '#world#' + row.id)) {
+  /** v3.15: a stable hash of the squad's sorted ids (the academy's "fingerprint"). */
+  static worldSaltOf(squad) { return Math.floor(seeded(squad.map(p => p.id).sort().join(','))() * 2 ** 32).toString(36); }
+  buildWorldEvent(row, start, r = seeded(start + '#world#' + (this.worldSalt ||= GameState.worldSaltOf(this.squad)) + '#' + row.id)) {
     const days = row.days === 'mon-thu' ? [0, 1, 2, 3].map(i => isoAdd(start, i)) : [isoAdd(start, 1 + Math.floor(r() * 3))];
     const all = this.squad.filter(p => !(p.injuryDays > 0) && !(p.suspensionMatches > 0) && !(p.awayDays > 0)).sort((a, b) => a.id.localeCompare(b.id));
     let picked = all;
@@ -412,13 +416,16 @@ class GameState {
     const seasonStart = isoAdd(this.calendar.events[0]?.date || date, -SEASON.FIRST_MATCH_OFFSET);
     if (d.getUTCDate() === 1 && date > seasonStart) {   // no grant on the opening day of the season
       const grant = Math.max(0, Math.round(REP.BOARD_GRANT_BASE + (this.rep.board - 50) * REP.BOARD_GRANT_STEP));
-      if (grant) this.addMoney(grant);
+      if (grant) this.addMoney(grant, 'grant', false, date);
       this.addDiary({ date, key: grant ? 'rep.boardGrant' : 'rep.boardNone', vars: { m: '$' + grant }, cls: 'ev' });
+      this.addMoney(-FINANCE.RENT, 'rent', true, date);   // v3.15: pitch rent — forced, may go below $0
+      this.addDiary({ date, key: 'fin.rent', vars: { m: '$' + FINANCE.RENT }, cls: 'ev' });
+      if (this.budget < 0) { this.addRep('board', FINANCE.RENT_LATE_BOARD); this.addDiary({ date, key: 'fin.rentLate', cls: 'ev' }); }
     }
     if (d.getUTCDay() === 0) {
       if (this.rep.parents >= REP.PARENTS_HIGH) {
         const gift = rnd(10, 30) + (this.rep.parents - REP.PARENTS_HIGH);
-        this.addMoney(gift);
+        this.addMoney(gift, 'donation', false, date);
         this.addDiary({ date, key: 'rep.parentsGift', vars: { m: '$' + gift }, cls: 'ev' });
       } else if (this.rep.parents <= REP.PARENTS_LOW) {
         const kid = pick(this.squad.filter(p => p.available));
@@ -519,6 +526,10 @@ class GameState {
       p.absentToday = ['exhausted', 'skipped', 'overload'].includes(r) || r?.startsWith('world:') ? r : null;   // injured / banned / home are locked by their own status
       p.skipped_training = training && r === 'skipped';                   // feeds The Truant
       if (r) absent[p.id] = r;
+    }
+    if (training) {   // v3.15: fee collection among the kids who came (+ auto-sim reminds everyone who still owes)
+      d.feesPaid = this.collectFees(date, absent);
+      if (this.autoFees) for (const p of this.squad) if (!absent[p.id]) this.remindFee(p.id);
     }
     d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent), posRequest: this.rollPositionRequest(absent) };   // v3.6
     d.locker.capRequest = d.locker.request || d.locker.posRequest ? null : this.rollCaptainRequest(absent);   // v3.8: urgent kid requests come first
@@ -722,12 +733,96 @@ class GameState {
   /* ----- v1.9 economy ----- */
   canAfford(cost) { return this.budget >= cost; }
   /** Positive = income, negative = spending. Never goes below $0. Returns the amount actually moved. */
-  addMoney(delta, allowDebt = false) {   // v2.2: a forced payment may push the club into debt
+  /** v3.15: every money change is booked in the ledger: cat ∈ LEDGER_CATS ('event' by default), month of `date` (today).
+      allowDebt (v2.2): a forced payment may push the club below $0. (An old boolean second argument still means allowDebt.) */
+  addMoney(delta, cat = 'event', allowDebt = false, date = this.calendar?.date) {
+    if (typeof cat === 'boolean') { allowDebt = cat; cat = 'event'; }
     const before = this.budget;
     this.budget = Math.round(this.budget + delta);
     if (!allowDebt) this.budget = Math.max(Math.min(0, before), this.budget);
-    this.onBudget?.(this.budget - before);
-    return this.budget - before;
+    const d = this.budget - before;
+    if (d && date) {
+      const m = ((this.ledger ||= {})[date.slice(0, 7)] ||= {});
+      const c = LEDGER_CATS.includes(cat) ? cat : 'event';
+      m[c] = (m[c] || 0) + d;
+    }
+    this.onBudget?.(d);
+    return d;
+  }
+  /* ---------- v3.15 CASH DESK + MONTHLY FEES ---------- */
+  monthOf(date = this.calendar.date) { return date.slice(0, 7); }
+  /** KASSA.EXE is due at the first stop of a month (also old saves without fees). */
+  kassaDue() { return this.phase !== 'draft' && this.squad.length > 0 && ['calendar', 'matchday'].includes(this.phase) && this.fees?.month !== this.monthOf(); }
+  /** Last month's ledger totals for the cash desk: { month, rows: {cat: sum}, total } — null for the academy's first month. */
+  lastMonthReport() {
+    const d = new Date(this.monthOf() + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1);
+    const month = d.toISOString().slice(0, 7), m = this.ledger?.[month];
+    if (!m) return null;
+    const rows = Object.fromEntries(LEDGER_CATS.map(c => [c, m[c] || 0]));
+    return { month, rows, total: LEDGER_CATS.reduce((a, c) => a + rows[c], 0) };
+  }
+  /** Closes an older month's fees: unpaid 'owed' is lost (diary with a count), 'half' carries the rest into the next month. */
+  closeFees() {
+    const f = this.fees;
+    if (!f || f.closed) return {};
+    const carry = {};
+    let lost = 0;
+    for (const [id, st] of Object.entries(f.status || {})) {
+      if (!this.player(id)) continue;
+      if (st === 'owed' && f.started) lost++;
+      if (st === 'half') carry[id] = Math.max(0, this.feeDue(id) - (f.got?.[id] || 0));
+    }
+    const next = new Date(f.month + '-01T00:00:00Z'); next.setUTCMonth(next.getUTCMonth() + 1);
+    if (lost) this.addDiary({ date: isoAdd(next.toISOString().slice(0, 10), -1), key: 'fee.lost', vars: { n: lost }, cls: 'ev' });   // the month's last day
+    f.closed = true;
+    return carry;
+  }
+  /** [ CONFIRM ] in KASSA.EXE: this month's fee level (rep once), every kid owes; last month closed. */
+  confirmKassa(level = FINANCE.DEFAULT_LEVEL) {
+    if (!FINANCE.FEES[level]) level = FINANCE.DEFAULT_LEVEL;
+    const carry = this.closeFees(), L = FINANCE.FEES[level], month = this.monthOf();
+    for (const [k, v] of Object.entries(L.rep || {})) this.addRep(k, v);
+    this.fees = { month, level, amount: L.fee, started: false, status: Object.fromEntries(this.squad.map(p => [p.id, 'owed'])),
+      reminded: {}, reason: {}, carry, next: {}, got: {} };
+    this.addDiary({ date: this.calendar.date, key: 'fee.set.' + level, vars: { m: '$' + L.fee }, cls: 'ev' });
+    this.save();
+    return this.fees;
+  }
+  /** What this kid has to pay this month (his fee + a carried half from last month). */
+  feeDue(id) { const f = this.fees; return f ? f.amount + (f.carry?.[id] || 0) : 0; }
+  /** Does this kid still owe this month's fee (after the fee day)? */
+  feeOwes(id) { const f = this.fees; return !!f && f.month === this.monthOf() && f.started && ['owed', 'half'].includes(f.status?.[id]) && !(f.status[id] === 'half' && f.got?.[id]); }
+  /** Training day (runLocker): every PRESENT kid who owes rolls once — the fee day (1st training of the month after KASSA),
+      later reminded / not; office promises (next) and the first half of a two-part deal use a fixed chance. Seeded. */
+  collectFees(date, absent) {
+    const f = this.fees;
+    if (!f || f.closed || f.month !== this.monthOf(date)) return [];
+    const kind = f.started ? null : 'first', paid = [];
+    f.started = true;
+    for (const p of this.squad) {
+      const id = p.id;
+      if (absent[id] || !f.status[id]) continue;
+      const st = f.status[id], half = st === 'half' && !f.got[id];
+      if (st !== 'owed' && !half) continue;
+      const chance = half ? FINANCE.HALF_CHANCE : f.next[id] ?? feeChance(p.wealth, kind || (f.reminded[id] ? 'reminded' : 'later'), f.level);
+      delete f.reminded[id]; delete f.next[id];   // consumed by this roll
+      if (seeded(f.month + '#fee#' + id + '#' + date)() >= chance) continue;
+      const due = this.feeDue(id), amt = half ? Math.ceil(due / 2) : due;
+      this.addMoney(amt, 'fee', false, date);
+      if (half) f.got[id] = amt; else { f.status[id] = 'paid'; f.got[id] = amt; }
+      paid.push(id);
+    }
+    return paid;
+  }
+  /** Locker Room [ Remind ] (free): consumed by this kid's next roll. */
+  remindFee(id) { const f = this.fees; if (f && this.feeOwes(id)) { f.reminded[id] = true; this.save(); return true; } return false; }
+  /** Office talk about the fee: the reason is fixed per month (poor → nomoney; discipline ≤ 7 → spent 50 %; else forgot). */
+  feeReason(id) {
+    const f = this.fees, p = this.player(id);
+    if (!f || !p) return 'forgot';
+    if (!f.reason[id]) f.reason[id] = p.wealth === 'poor' ? 'nomoney'
+      : p.psych.discipline <= FINANCE.SPENT_DISC && seeded(f.month + '#feewhy#' + id)() < FINANCE.SPENT_SHARE ? 'spent' : 'forgot';
+    return f.reason[id];
   }
 
   addDiary(entry) {
@@ -742,7 +837,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -766,6 +861,9 @@ class GameState {
       this.away = Array.isArray(d.away) ? d.away : null;   // v3.13 "while you were away"
       this.worldEvent = d.worldEvent && typeof d.worldEvent === 'object' && Array.isArray(d.worldEvent.playerIds) && Array.isArray(d.worldEvent.days) ? d.worldEvent : null;   // v3.14 (missing → none this week)
       this.worldLast = typeof d.worldLast === 'string' ? d.worldLast : null;
+      this.worldSalt = typeof d.worldSalt === 'string' ? d.worldSalt : null;   // v3.15 (old saves: set on the next Monday roll)
+      this.ledger = d.ledger && typeof d.ledger === 'object' ? d.ledger : {};   // v3.15 (missing → {})
+      this.fees = d.fees && typeof d.fees === 'object' && d.fees.status ? { reminded: {}, reason: {}, carry: {}, next: {}, got: {}, ...d.fees } : null;
       this.expelled = Array.isArray(d.expelled) ? d.expelled : [];   // v2.9
       const r = d.rep || {};   // v2.8 (older saves start neutral)
       this.rep = { board: clamp(r.board ?? REP.START, 0, 100), parents: clamp(r.parents ?? REP.START, 0, 100), squad: clamp(r.squad ?? REP.START, 0, 100) };

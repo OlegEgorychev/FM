@@ -36,6 +36,7 @@ class MorningBriefing {
     const s = this.state;
     if (this.ui.modalLock) return;   // v3.5
     if (this.ui.events.active) { this.ui.events.open(); return; }
+    if (s.kassaDue() && (s.phase === 'matchday' || this.ui.isStopDay())) { this.ui.kassa.open(); return; }   // v3.15: the cash desk first
     this.ui.modal.close(); this.ui.profile.close();
     this.render();
     this.layer.hidden = false;
@@ -57,6 +58,8 @@ class MorningBriefing {
       const c = s.league.oppCondition(ctx.opp, new Set(s.squad.map(p => p.surname)));
       agenda += ' ' + L.t('mb.oppForm', { a: c.avg, t: c.tired });
     }
+    const f = s.fees;   // v3.15: the fee day (1st training of the month)
+    if (s.phase === 'calendar' && f && !f.started && f.month === s.monthOf(date) && s.isOurTraining(date)) agenda += ' ' + L.t('mb.feeDay', { m: '$' + f.amount });
     document.getElementById('mb-agenda').textContent = agenda;
     // v3.13: Monday — how this week's action points were made up
     const src = w.apSources || {}, apBox = document.getElementById('mb-ap');

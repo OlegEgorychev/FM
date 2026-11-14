@@ -21,6 +21,7 @@ class DebugConsole {
     add('PSYCH', 'GAIN', p => Object.values(p.gains || {}).reduce((a, b) => a + b, 0), null, 'v3.12 total points gained in training');
     add('PSYCH', 'CAPT', p => L.t('dbg.cap.' + (p.captainTrait || 'normal')), null, 'v3.7 hidden captain trait: leader (rally +morale) / anxious (stress, may break down) / normal');
     add('PSYCH', 'LDR', p => p.leadership, 20, 'v3.8 hidden leadership 1-20 (≥14 leader, ≤7 anxious): armband reactions, captain initiatives, resignation');
+    add('PSYCH', 'WLTH', p => p.wealth || '—', null, 'v3.15 hidden family wealth rich / middle / poor (seeded by id): fee payments, Rich Kid\'s Dad, Torn Boots');
     add('DYNAMIC', 'CON', p => Math.round(p.dyn.condition), 100, 'condition (energy)');
     add('DYNAMIC', 'SHP', p => Math.round(p.dyn.sharpness), 100, 'sharpness (match tone); < 50 → technical −2');
     add('DYNAMIC', 'MOR', p => Math.round(p.dyn.morale), 100, 'morale');

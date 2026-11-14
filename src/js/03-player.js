@@ -156,6 +156,9 @@ class Player {
     // inside the range of their stored v3.7 trait (or of a freshly rolled one), so every trait stays what it was.
     this.leadership = Number.isFinite(o.leadership) ? clamp(Math.round(o.leadership), 1, 20)
       : Player.rollLeadership(id, name, CAPTAIN_TRAITS.includes(o.captainTrait) ? o.captainTrait : Player.rollCaptainTrait(id, name, this.psych));
+    // v3.15: HIDDEN family wealth — seeded by the id only (no link to any skill), so old saves / AI rosters / the free-agent pool
+    // get the same value on every load; a saved valid value is kept. Only DEBUG.EXE shows it.
+    this.wealth = WEALTH.KEYS.includes(o.wealth) ? o.wealth : Player.rollWealth(id);
     if (tags) {
       this.captainReactionCooldown = Math.max(0, Math.round(o.captainReactionCooldown || 0));   // v3.8: days before an armband change moves his morale again
       this.benchStreak = Math.max(0, Math.round(o.benchStreak || 0));                           // v3.8: straight league matches fit but unused
@@ -220,6 +223,12 @@ class Player {
 
   /** v3.7: deterministic hidden captain trait, loosely tied to psychology (see CAPTAIN in 00-utils-data.js).
       High composure + passion/discipline → leader more likely; low composure → anxious more likely; the rest normal. */
+  /** v3.15: 'rich' | 'middle' | 'poor' (WEALTH.SHARE 20 / 60 / 20 %), seeded('wealth' + id). */
+  static rollWealth(id) {
+    let x = seeded('wealth' + id)();
+    for (let i = 0; i < WEALTH.KEYS.length; i++) if ((x -= WEALTH.SHARE[i]) < 0) return WEALTH.KEYS[i];
+    return WEALTH.KEYS[WEALTH.KEYS.length - 1];
+  }
   static rollCaptainTrait(id, name, psych = {}) {
     const C = CAPTAIN, comp = psych.composure ?? 10, drive = ((psych.passion ?? 10) + (psych.discipline ?? 10)) / 2;
     const lead = clamp(C.LEAD_BASE + (comp - 10) * C.LEAD_COMP + (drive - 10) * C.LEAD_DRIVE, C.TRAIT_MIN, C.TRAIT_MAX);

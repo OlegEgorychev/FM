@@ -1,0 +1,30 @@
+/* =========================================================
+   v3.15 — KASSA.EXE (cash desk), Locker Room "Fees" panel, TODAY ✦
+   ========================================================= */
+.win.kassawin{ width: min(760px, 100%); }
+.win.kassawin .titlebar{ background: linear-gradient(90deg, #3b4a12, #7a8a2e); }
+.ks-body{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px; }
+.ks-report, .ks-levels{ background: #fff; padding: 10px; border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); font-size: 13px; }
+.ks-h{ font: bold 11px/1.2 var(--mono); letter-spacing: 1px; text-transform: uppercase; color: #3b4a12; margin-bottom: 6px; }
+.ks-table{ width: 100%; border-collapse: collapse; font-size: 13px; }
+.ks-table td{ padding: 3px 4px; border-bottom: 1px dotted #c8c3b8; } .ks-table td + td{ text-align: right; font-family: var(--mono); }
+.ks-table tr.tot td{ border-top: 2px solid #111; border-bottom: none; font-weight: bold; }
+.ks-report b.pos{ color: #1d6a1d; } .ks-report b.neg{ color: #b3261e; }
+.ks-first{ margin: 0 0 8px; color: #444; }
+.ks-budget{ margin-top: 10px; } .ks-budget b{ font-family: var(--mono); font-size: 16px; }
+.ks-lvl{ display: grid; grid-template-columns: auto 1fr; column-gap: 6px; padding: 6px; margin-bottom: 4px; cursor: pointer; border: 1px solid #c8c3b8; }
+.ks-lvl input{ grid-row: span 2; } .ks-lvl small{ color: #555; }
+.ks-lvl.on{ background: #f6ead2; border-color: #8a5a00; }
+@media (max-width: 820px){ .ks-body{ grid-template-columns: 1fr; } }
+
+.lr-fees{ margin: 0 8px 4px; padding: 6px 8px; background: #fff; border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); font-size: 12px; max-height: 120px; overflow: auto; }
+.lr-fees[hidden]{ display: none; }
+.lrf-head{ display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; } .lrf-head b{ font: bold 11px/1 var(--mono); letter-spacing: 1px; } .lrf-head span{ color: #444; }
+.lrf-list{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px 10px; }
+.lrf-row{ display: flex; align-items: center; gap: 4px; white-space: nowrap; min-height: 22px; }
+.lrf-row i{ width: 14px; text-align: center; font-style: normal; font-weight: bold; }
+.lrf-row.st-paid i{ color: #1d6a1d; } .lrf-row.st-owed i{ color: #b3261e; } .lrf-row.st-waived i, .lrf-row.st-half i{ color: #8a5a00; }
+.lrf-row.away{ opacity: .55; }
+.lrf-btn{ margin-left: auto; padding: 1px 6px; font-size: 11px; } .lrf-rem{ margin-left: auto; color: #666; font-style: italic; }
+
+.td-wd{ position: relative; } .td-we{ position: absolute; top: 0; right: 1px; font-size: 9px; color: #ffcf5a; }

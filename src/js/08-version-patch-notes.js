@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.14';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.15';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.15', name: { en: 'The Cash Desk', ru: 'Касса' },
+    en: [
+      'KASSA.EXE opens at the first stop of every month: last month\'s cash book (fees, Board grant, donations, pitch rent, events) and this month\'s fee — low $5, normal $10 or high $15 per kid.',
+      'Fees are collected at trainings, starting with the first one of the month. Only kids who turn up can pay; the Locker Room shows who has paid, and a free [ Remind ] helps at the next training.',
+      'Every family is different, and you can\'t see how much money they have. Ask about the fee in the office: someone forgot it on the kitchen table, someone spent it at the kiosk, and someone\'s dad simply has no money this month. Waiving a fee never costs you anything.',
+      'The pitch rent ($100) is paid on the 1st of every month. If the cash box goes into the red, the Board notices.',
+      'World events now differ from one academy to the next, and the TODAY week strip marks event days with ✦.',
+    ],
+    ru: [
+      'В начале каждого месяца, на первой остановке, открывается KASSA.EXE: кассовая книга за прошлый месяц (взносы, грант Совета, пожертвования, аренда поля, события) и взнос на этот месяц — низкий $5, обычный $10 или высокий $15 с человека.',
+      'Взносы собирают на тренировках, начиная с первой в месяце. Сдать могут только пришедшие; в раздевалке видно, кто уже сдал, а бесплатное «Напомнить» помогает к следующей тренировке.',
+      'Семьи разные, и сколько у кого денег, тебе не видно. Спроси о взносе в кабинете: кто-то забыл деньги на кухонном столе, кто-то потратил их в ларьке, а у кого-то папе в этом месяце просто нечем платить. Освобождение от взноса никогда ничем не наказывается.',
+      'Аренда поля ($100) списывается 1-го числа каждого месяца. Если касса уходит в минус, Совет это замечает.',
+      'Мировые события теперь у каждой академии свои, а в полосе недели виджета «Сегодня» дни событий отмечены значком ✦.',
+    ] },
   { v: '3.14', name: { en: 'School Comes First', ru: 'Сначала школа' },
     en: [
       'About every other week the Monday news brings a school or city event: quarter tests, the city athletics meet, the district olympiad, a basketball tournament, an emergency teachers\' council. Never two weeks running, never in the first week of the season.',

@@ -25,7 +25,7 @@ class WeekPlanner {
     const s = this.state;
     if (this.ui.modalLock || s.phase !== 'calendar') return;
     if (this.ui.events.active) { this.ui.events.open(); return; }
-    if (this.ui.isStopDay() && !s.dayState().briefed) { this.ui.briefing.open(); return; }   // the briefing comes first
+    if (this.ui.isStopDay() && (s.kassaDue() || !s.dayState().briefed)) { this.ui.briefing.open(); return; }   // the cash desk (v3.15) and the briefing come first
     this.ui.modal.close();
     this.render();
     this.layer.hidden = false;

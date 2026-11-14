@@ -356,6 +356,16 @@
     </section>
   </div>
 
+  <!-- v3.15: KASSA.EXE — the cash desk (first stop of a month): last month's ledger + this month's fee -->
+  <div class="planner-layer kassa-layer" id="kassa-view" hidden>
+    <section class="win plannerwin kassawin open" role="dialog" aria-modal="true" aria-labelledby="ks-title">
+      <div class="titlebar"><span class="t-ico">&#36;</span><span class="t-txt" id="ks-title">KASSA.EXE</span><button class="tb-btn" id="ks-x" data-i18n-aria="ui.close">&times;</button></div>
+      <div class="ks-body"><div class="ks-report" id="ks-report"></div><div class="ks-levels" id="ks-levels" role="radiogroup"></div></div>
+      <div class="pl-foot"><span class="pl-sum" id="ks-note"></span><button class="btn go big" id="ks-confirm" type="button"></button></div>
+      <div class="statusbar"><span id="ks-status"></span></div>
+    </section>
+  </div>
+
   <!-- v3.13: PLANNER.EXE — the weekly plan (Monday, after the morning briefing) -->
   <div class="planner-layer" id="planner-view" hidden>
     <section class="win plannerwin open" role="dialog" aria-modal="true" aria-labelledby="pl-title">
@@ -373,6 +383,7 @@
       <div class="titlebar"><span class="t-ico">&#9636;</span><span class="t-txt" id="lr-title">LOCKER_ROOM.EXE</span><button class="tb-btn" id="lr-x" data-i18n-aria="ui.close">&times;</button></div>
       <div class="lr-head" id="lr-head"></div>
       <div class="lr-grid" id="lr-grid"></div>
+      <div class="lr-fees" id="lr-fees" hidden></div>
       <div class="lr-foot"><span class="lr-hint" data-i18n="lr.hint"></span><button class="btn go big" id="lr-proceed" type="button"></button></div>
       <div class="statusbar"><span id="lr-status"></span></div>
     </section>

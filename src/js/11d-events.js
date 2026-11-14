@@ -24,7 +24,11 @@ const NARRATIVE_EVENTS = [
       // the "talented kid" is drawn from the 6 highest potentials (hidden), never the snitch himself
       const pool = s.squad.filter(p => p !== snitch && !helped.has(p.id)).sort((a, b) => b.psych.potential - a.psych.potential || b.overall - a.overall).slice(0, 6);   // v3.11: 1–20 ties → overall
       if (!pool.length) return null;
-      return { snitch: snitch.id, kid: pick(pool).id };
+      // v3.15: a poor family's kid is twice as likely (hidden wealth) — still ONE Math.random, like pick()
+      const w = pool.map(p => p.wealth === 'poor' ? 2 : 1), tot = w.reduce((a, b) => a + b, 0);
+      let x = Math.random() * tot, i = 0;
+      while (i < pool.length - 1 && (x -= w[i]) >= 0) i++;
+      return { snitch: snitch.id, kid: pool[i].id };
     },
     execute(ctx) {
       const { snitch, kid } = ctx.cast;
@@ -46,7 +50,9 @@ const NARRATIVE_EVENTS = [
     id: 'dad', when: 'day',
     trigger: (s) => Math.random() < EVENTS_CFG.DAD_CHANCE && !s.squad.some(p => p.hasFlag('Promised_Start')),
     cast(s) {
-      const worst = [...s.squad].sort((a, b) => a.overall - b.overall)[0];   // hidden overall → the weakest kid
+      // v3.15: the son of a rich family (hidden wealth), the weakest of them; fallback middle, then anyone
+      const of = w => [...s.squad].filter(p => !w || p.wealth === w).sort((a, b) => a.overall - b.overall)[0];
+      const worst = of('rich') || of('middle') || of(null);   // hidden overall → the weakest kid
       return worst ? { kid: worst.id } : null;
     },
     execute(ctx) {
@@ -264,6 +270,22 @@ const NARRATIVE_EVENTS = [
         check:      () => { kid.dyn.morale = clamp(kid.dyn.morale + COACH.CHECK_MORALE, 0, 100); },
       };
       const s = ctx.state;
+      if (ctx.step === 'fee') {   // v3.15: about the fee — the reason is fixed for the month (no extra AP: the talk is already paid)
+        const why = s.feeReason(kid.id), f = s.fees, k = { k: { pid: kid.id } }, m = '$' + s.feeDue(kid.id);
+        const mor = d => { kid.dyn.morale = clamp(kid.dyn.morale + d, 0, 100); };
+        const choices = {
+          forgot: [{ key: 'office.fee.forgotOk', tone: 'gray', who: kid.id, run: () => { f.next[kid.id] = FINANCE.NEXT_CHANCE; return k; } }],
+          spent: [
+            { key: 'office.fee.forgive', tone: 'green', who: kid.id, run: () => { mor(FINANCE.FORGIVE_MORALE); f.status[kid.id] = 'waived'; return k; } },
+            { key: 'office.fee.tell', tone: 'gray', who: kid.id, run: () => { mor(FINANCE.TELL_MORALE); kid.psych.discipline = Math.min(20, kid.psych.discipline + FINANCE.TELL_DISC);
+              s.addRep('parents', FINANCE.TELL_PARENTS); f.next[kid.id] = FINANCE.NEXT_CHANCE; return k; } } ],
+          nomoney: [
+            { key: 'office.fee.waive', tone: 'green', who: kid.id, run: () => { mor(FINANCE.WAIVE_MORALE); s.addRep('squad', FINANCE.WAIVE_SQUAD); f.status[kid.id] = 'waived'; return k; } },
+            { key: 'office.fee.half', tone: 'gray', who: kid.id, run: () => { f.status[kid.id] = 'half'; return k; } } ],
+        }[why];
+        ctx.show({ face, name, role, text: L.t('office.fee.' + why, { k: name, m }), choices });
+        return;
+      }
       if (ctx.step === 'kickConfirm') {   // v2.9: the drastic option asks once more — it can't be undone
         ctx.show({ face, name, role, text: L.t('office.react.kickConfirm', { k: name }),
           choices: [
@@ -283,6 +305,7 @@ const NARRATIVE_EVENTS = [
           { key: 'office.btn.praise', tone: 'green', next: () => (kid.dyn.sharpness < COACH.PRAISE_LOW || kid.energy < COACH.PRAISE_LOW ? 'praiseBad' : 'praiseGood') },
           { key: 'office.btn.crit', tone: 'gray', next: 'crit' },
           { key: 'office.btn.check', tone: 'gray', next: 'check' },
+          ...(s.feeOwes(kid.id) ? [{ key: 'office.btn.fee', tone: 'gray', next: 'fee' }] : []),   // v3.15: only for a kid who owes
           { key: 'office.btn.kick', tone: 'red', blocked: s.expelBlock(kid.id), next: 'kickConfirm' },   // v2.9: destructive
         ] });
     },
@@ -598,9 +621,9 @@ class EventEngine {
   choose(choice) {
     const s = this.state, pe = s.pendingEvent;
     if (!pe || (choice.cost && !s.canAfford(choice.cost)) || choice.blocked) return;
-    if (choice.cost) s.addMoney(-choice.cost);
-    if (choice.gain) s.addMoney(choice.gain);
-    if (choice.debt) s.addMoney(-choice.debt, true);   // v2.2: forced payment, may go below $0
+    if (choice.cost) s.addMoney(-choice.cost, 'event');   // v3.15: ledger category
+    if (choice.gain) s.addMoney(choice.gain, 'event');
+    if (choice.debt) s.addMoney(-choice.debt, 'event', true);   // v2.2: forced payment, may go below $0
     const vars = choice.run?.() || {};
     if (choice.next) {                                 // v2.2 multi-step dialogue: same event, next step
       pe.step = typeof choice.next === 'function' ? choice.next() : choice.next;   // v2.4: a step can be rolled
