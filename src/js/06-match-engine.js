@@ -64,7 +64,7 @@ class MatchEngine {
   }
   /** v1.8: per-minute drain, base 30–40% / 90' scaled by baseStamina (20 → ×0.85, 10 → ×1.0, 1 → ×1.135). */
   static drainOf(p) { return rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90 * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015); }
-  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0, assists: 0 }; }
+  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, conceded: 0, yellow: 0, red: 0, assists: 0 }; }
 
   /* ---------- background play (v1.0) ----------
      Every minute, each player may also make an OFF-BALL pass or take on a man, resolved with the same
@@ -651,6 +651,7 @@ class MatchEngine {
 
     if (atk > dfn) {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
+      this.st(keeper).conceded++;   // v3.18.1: the keeper's line in the Notebook weighs goals against him too
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
       this.addEvent('goal', shooter, side, { ...(assist ? { assist: assist.name } : {}), ...(penalty ? { pen: true } : {}), ...(corner ? { corner: true } : {}) });

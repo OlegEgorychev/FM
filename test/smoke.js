@@ -1836,6 +1836,13 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const names = Object.values(TAGS).flatMap(t => [t.en[0], t.ru[0]]).map(x => x.toLowerCase());
       const keys = [...Object.keys(CLUE_SIGNALS).flatMap(g => [...Array(CLUES.PHRASES).keys()].map(i => `clue.${g}.${i}`)), ...[...Array(CLUES.NEUTRAL).keys()].map(i => 'clue.none.' + i)];
       out.texts = keys.every(k => I18N.en[k] && I18N.ru[k] && !names.some(n => (I18N.en[k] + I18N.ru[k]).toLowerCase().includes(n)));
+      // v3.18.1 keeper line: goals against count (0-8 with 2 saves is not "solid"); the engine books them on the keeper
+      const kn = (sv, c) => keeperNote({ saves: sv, conceded: c });
+      out.keeper = kn(2, 8) === 'note.gkRough' && kn(5, 4) === 'note.gkRough' && kn(2, 3) === 'note.gkShaky' && kn(4, 2) === 'note.gkMixed' && kn(4, 1) === 'note.gkBusy'
+        && kn(2, 0) === 'note.gkOk' && kn(0, 1) === 'note.gkBeaten' && kn(0, 0) === 'note.gkQuiet' && keeperNote({ saves: 2 }) === 'note.gkOk'
+        && ['gkRough', 'gkShaky', 'gkMixed', 'gkBeaten'].every(k => I18N.en['note.' + k] && I18N.ru['note.' + k]);
+      const row = s.league.table().find(x => x.team.user);
+      out.conceded = Object.values(s.seasonStats).reduce((a, st) => a + (st.conceded || 0), 0) === row.ga && row.ga > 0;   // (smoke swaps kids in and out: count every kid with season stats)
       s.save();
       return out;
     });

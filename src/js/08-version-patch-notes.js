@@ -2,8 +2,15 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.18';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.18.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.18.1', name: { en: 'Clues (fix)', ru: 'Зацепки (исправление)' },
+    en: [
+      'Fix: the coach\'s line about whoever played in goal now counts the goals he let in, not only his saves. A 0-8 with two saves is no longer "solid between the posts".',
+    ],
+    ru: [
+      'Исправлено: заметка тренера о том, кто стоял в воротах, теперь учитывает пропущенные голы, а не только сейвы. После 0:8 с двумя сейвами больше не пишут «надёжен в воротах».',
+    ] },
   { v: '3.18', name: { en: 'Clues', ru: 'Зацепки' },
     en: [
       'The coach\'s note no longer tells you the role. It describes one moment from the match ("Went into a 50-50 in midfield and came out with the ball"), and sometimes the coach reads it wrong.',

@@ -260,6 +260,7 @@ const CLUE_SIGNALS = {
   solo: { role: 'Selfish',    attrs: ['Dribble', 'Shoot'], stats: ['dribbleOk', 'shots'],    min: 1 },
 };
 const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}' } };   // v3.20 adds 'voice'
+const KEEPER_NOTE = { ROUGH: 4 };   // v3.18.1: goals let in from which the keeper's day reads as a rough one, whatever his saves
 /* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free. */
 const ROLES = { CHANGE_MORALE: -3 };
 const positionRequestChance = n => n < POS_HINT.MIN ? 0 : POS_HINT.CHANCE[n] ?? Math.min(POS_HINT.CAP, POS_HINT.CHANCE[6] + (n - 6) * POS_HINT.STEP);

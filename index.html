@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.18</title>
+<title>Youth Academy Manager v3.18.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -2570,6 +2570,7 @@ const CLUE_SIGNALS = {
   solo: { role: 'Selfish',    attrs: ['Dribble', 'Shoot'], stats: ['dribbleOk', 'shots'],    min: 1 },
 };
 const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}' } };   // v3.20 adds 'voice'
+const KEEPER_NOTE = { ROUGH: 4 };   // v3.18.1: goals let in from which the keeper's day reads as a rough one, whatever his saves
 /* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free. */
 const ROLES = { CHANGE_MORALE: -3 };
 const positionRequestChance = n => n < POS_HINT.MIN ? 0 : POS_HINT.CHANCE[n] ?? Math.min(POS_HINT.CAP, POS_HINT.CHANCE[6] + (n - 6) * POS_HINT.STEP);
@@ -2928,6 +2929,8 @@ Object.assign(I18N.en, {
   'nb.saves': 'Saves: {a} (season {b})', 'nb.apps': 'matches this season: {n}', 'nb.coachNote': "Coach's Note",
   'nb.legend': 'Season figures include today. Tackles = duels won / duels.', 'st.intercepts': 'Interceptions',
   'note.gkBusy': 'Kept us in the game with save after save.', 'note.gkOk': 'Solid between the posts.', 'note.gkQuiet': 'A quiet day for the keeper.',
+  'note.gkRough': 'A long, hard day in goal: shot after shot went past him.', 'note.gkShaky': 'Made the odd stop, but too much got past him.',
+  'note.gkMixed': 'Pulled off some big saves, but was still beaten more than once.', 'note.gkBeaten': 'Barely had anything to do, and the one that mattered went in.',
   'note.tired': 'He was running on empty, so these numbers are not his real level.',
   'note.oop': 'Played out of his natural position, so judge with care.',
   'note.role': 'These numbers already include his current role ({r}).',
@@ -2938,6 +2941,8 @@ Object.assign(I18N.ru, {
   'nb.saves': 'Сейвы: {a} (в сезоне {b})', 'nb.apps': 'матчей в сезоне: {n}', 'nb.coachNote': 'Заметка тренера',
   'nb.legend': 'Сезонные цифры включают этот матч. Отборы = выигранные единоборства / все единоборства.', 'st.intercepts': 'Перехваты',
   'note.gkBusy': 'Держал нас в игре сейв за сейвом.', 'note.gkOk': 'Надёжен в воротах.', 'note.gkQuiet': 'Спокойный день для вратаря.',
+  'note.gkRough': 'Долгий, тяжёлый день в воротах: мяч раз за разом залетал за спину.', 'note.gkShaky': 'Пару раз выручил, но пропустил слишком много.',
+  'note.gkMixed': 'Сделал несколько отличных сейвов, но всё равно пропустил не один.', 'note.gkBeaten': 'Работы почти не было, а единственный важный удар залетел.',
   'note.tired': 'Он был выжат, так что эти цифры не его настоящий уровень.',
   'note.oop': 'Играл не на своей позиции, оценивай осторожно.',
   'note.role': 'Цифры уже учитывают его текущую роль ({r}).',
@@ -6077,7 +6082,7 @@ class MatchEngine {
   }
   /** v1.8: per-minute drain, base 30–40% / 90' scaled by baseStamina (20 → ×0.85, 10 → ×1.0, 1 → ×1.135). */
   static drainOf(p) { return rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90 * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015); }
-  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, yellow: 0, red: 0, assists: 0 }; }
+  static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, conceded: 0, yellow: 0, red: 0, assists: 0 }; }
 
   /* ---------- background play (v1.0) ----------
      Every minute, each player may also make an OFF-BALL pass or take on a man, resolved with the same
@@ -6664,6 +6669,7 @@ class MatchEngine {
 
     if (atk > dfn) {
       this.st(shooter).goals++; this.st(shooter).onTarget++;
+      this.st(keeper).conceded++;   // v3.18.1: the keeper's line in the Notebook weighs goals against him too
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
       this.addEvent('goal', shooter, side, { ...(assist ? { assist: assist.name } : {}), ...(penalty ? { pen: true } : {}), ...(corner ? { corner: true } : {}) });
@@ -6813,8 +6819,15 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.18';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.18.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.18.1', name: { en: 'Clues (fix)', ru: 'Зацепки (исправление)' },
+    en: [
+      'Fix: the coach\'s line about whoever played in goal now counts the goals he let in, not only his saves. A 0-8 with two saves is no longer "solid between the posts".',
+    ],
+    ru: [
+      'Исправлено: заметка тренера о том, кто стоял в воротах, теперь учитывает пропущенные голы, а не только сейвы. После 0:8 с двумя сейвами больше не пишут «надёжен в воротах».',
+    ] },
   { v: '3.18', name: { en: 'Clues', ru: 'Зацепки' },
     en: [
       'The coach\'s note no longer tells you the role. It describes one moment from the match ("Went into a 50-50 in midfield and came out with the ball"), and sometimes the coach reads it wrong.',
@@ -8041,11 +8054,22 @@ function rateStyle(r) {
 function coachNote(p, s, flags = {}) {
   const out = [];
   if (flags.tired) out.push('note.tired');
-  if (flags.gk) out.push(s.saves >= 3 ? 'note.gkBusy' : s.saves ? 'note.gkOk' : 'note.gkQuiet');   // v3.0: he was in goal in THAT match
+  if (flags.gk) out.push(keeperNote(s));   // v3.0: he was in goal in THAT match
   if (flags.clue) out.push(flags.clue);
   if (flags.oop) out.push('note.oop');
   if (flags.psy) out.push(flags.psy);   // v3.7 a subtle captain-trait clue (vocal leader / nerves)
   return out;
+}
+
+/** v3.18.1: the keeper's line from saves AND goals he let in (before: saves only → "solid" after a 0-8 with 2 saves).
+    Old reports have no `conceded` → treated as 0 (the old wording). */
+function keeperNote(s) {
+  const sv = s.saves || 0, c = s.conceded || 0;
+  if (c >= KEEPER_NOTE.ROUGH) return 'note.gkRough';
+  if (c >= 2) return sv > c ? 'note.gkMixed' : 'note.gkShaky';
+  if (sv >= 3) return 'note.gkBusy';
+  if (sv) return 'note.gkOk';
+  return c ? 'note.gkBeaten' : 'note.gkQuiet';
 }
 
 /* =========================================================

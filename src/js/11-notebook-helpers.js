@@ -15,11 +15,22 @@ function rateStyle(r) {
 function coachNote(p, s, flags = {}) {
   const out = [];
   if (flags.tired) out.push('note.tired');
-  if (flags.gk) out.push(s.saves >= 3 ? 'note.gkBusy' : s.saves ? 'note.gkOk' : 'note.gkQuiet');   // v3.0: he was in goal in THAT match
+  if (flags.gk) out.push(keeperNote(s));   // v3.0: he was in goal in THAT match
   if (flags.clue) out.push(flags.clue);
   if (flags.oop) out.push('note.oop');
   if (flags.psy) out.push(flags.psy);   // v3.7 a subtle captain-trait clue (vocal leader / nerves)
   return out;
+}
+
+/** v3.18.1: the keeper's line from saves AND goals he let in (before: saves only → "solid" after a 0-8 with 2 saves).
+    Old reports have no `conceded` → treated as 0 (the old wording). */
+function keeperNote(s) {
+  const sv = s.saves || 0, c = s.conceded || 0;
+  if (c >= KEEPER_NOTE.ROUGH) return 'note.gkRough';
+  if (c >= 2) return sv > c ? 'note.gkMixed' : 'note.gkShaky';
+  if (sv >= 3) return 'note.gkBusy';
+  if (sv) return 'note.gkOk';
+  return c ? 'note.gkBeaten' : 'note.gkQuiet';
 }
 
 /* =========================================================
