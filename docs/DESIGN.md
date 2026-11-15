@@ -1,4 +1,4 @@
-# Youth Academy Manager — design notes (current: v3.17)
+# Youth Academy Manager — design notes (current: v3.19)
 
 Single-file game built from `src/` (see README / CLAUDE.md). EN/RU, Win98/CRT look, PT Sans (PT Mono in ReadMe). Static scanlines + soft vignette always on; rain/glare via "Screen effects" in the Start menu. Save: localStorage `yam_save_v1` (save format `v: 4` + `seasonStats`); last seen app version `yam_seen_version`.
 
@@ -13,7 +13,7 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 
 ## Systems (00-utils-data.js, 05-game-state.js)
 - Hidden attributes: see "Attribute system (v1.8)" below — never displayed outside DEBUG.EXE.
-- Roles (one per player, set in Notebook; v3.18: changing one that already played a match costs 3 morale): Aggressive (Tackle ×1.5; lost visible duel → foul + yellow, 2nd = red), Playmaker (Pass ×1.5, passes more), Selfish (Dribble/Shoot ×1.5, rarely passes).
+- Roles (v3.19: up to two per player with levels 1–3, earned in REVIEW.EXE after a win / draw, see "Growth"; v3.18: removing one that already played a match costs 3 morale): Aggressive (Tackle + Mark; lost visible duel → foul + yellow, 2nd = red), Playmaker (Pass, passes more), Selfish (Dribble/Shoot, rarely passes), Engine, Anchor, Finisher — rows in `ROLES_DEF`.
 - Energy: in-match live drain 30–40% over 90'; every roll × `fatigueMult(live energy)` (v3.4: 1 − 0.1·(1−x)², 1.00 → 0.90, see below); half-time +4; after match players keep real energy, unused subs +6; rest day +4. Squad 16 (11 + bench GK, DEF, MID, MID, FWD).
 - Formations (10): slot lines DEF/MID/ATT decide who contests each third; `presence()` → line superiority ±4 (normalised: 4-4-2 vs 4-4-2 = 0); out of natural line ×0.85.
 - Shouts: Attack/Defend ±3 to our attacking/defending rolls.
@@ -34,7 +34,7 @@ Loop: Dashboard (calendar) → matchday modal → Team Management → Match (hal
 ## Screens (12-ui.js)
 - Team Management: roster left, tactics board right; click/drag swaps; Smart Swap Highlighting (same position green, others dimmed but clickable).
 - Match: three columns — live roster & subs | scoreboard, pitch (`.cam-holder` size container), log, shouts, speed | assistant coach (`assistantMessages`) & live stats.
-- Notebook: 3 random players who played; "ok/total (rate%) (Season Avg)", colours >75% green / <40% red, `coachNote()` (11-notebook-helpers.js; v3.18: one clue, never a verdict — see "Clues").
+- Notebook: 3 random players who played; "ok/total (rate%) (Season Avg)", colours >75% green / <40% red, `coachNote()` (11-notebook-helpers.js; v3.18: one clue, never a verdict — see "Clues"). v3.19: no role buttons any more, only [ Remove ] per role.
 
 ## Known balance observations
 - v3.3: shouts retuned (`SHOUT`), fatigue is a smooth curve — see "Match engine balance (v3.3)" and v3.4.
@@ -344,3 +344,42 @@ No new roles, no change to role effects or engine balance (`test/balance.js` out
 - **Role-change cost**: `state.changeRole(id, tag|null, { free })` is the only path (`setTag` / `removeTag` delegate). `p.roleMatches` counts league matches he played with the current role (`trackRoles(everPlayed)` after every match), reset on change. First role or `roleMatches === 0` → free; otherwise `ROLES.CHANGE_MORALE` (−3) morale + diary `role.flip`. Cost shown on "Change to …" and on the roster ✕. `free: true` = v3.20 window after the "After the game" talk (no caller yet).
 - **v3.18.1 keeper line**: `MatchEngine.blankStats()` + `conceded` (booked on the keeper in goal for every goal against). `keeperNote(s)`: ≥ `KEEPER_NOTE.ROUGH` (4) let in → `gkRough`; 2–3 → `gkMixed` if saves > conceded, else `gkShaky`; ≤ 1 → old wording (`gkBusy` ≥ 3 saves, `gkOk`, `gkQuiet`) or `gkBeaten` (0 saves, 1 in). Before: saves only, so 2 saves in a 0-8 read "solid between the posts". Old reports without `conceded` keep the old wording.
 - **Smoke** (104, +2 checks with ~25 sub-assertions): real post-match Notebook (no role names EN + RU, stored clue per outfield card, unique phrasing, Clues blocks, read on open); WRONG 0 / 1, no duel clue at 0 tackles + 0 interceptions, neutral without evidence, ✓ rules, cap 8, old save, 📝 roster + board + Notebook clear, PLAYER_INFO read-only, Match Practice dedupe + clue, role-change cost + diary + free flag, all texts EN + RU without role names. The v3.17 interceptions check now asserts `clueEvidence('duel')`.
+
+## "Growth" — role picks after wins, levels and slots (v3.19)
+No change to the match maths without roles: `test/balance.js` (default) prints the same table as v3.18.1. All new randomness is `seeded()`.
+- **Roles as data** (00-utils-data): `ROLES_DEF` rows `{ id, tone, signal, boost, down, clash }`; texts `role.<id>` / `.d` (description, `{m}` = the level multipliers and `{d}` = the first flat downside, both filled from the row by `L.tagDesc`) / `.s` (short roster tag) in EN + RU. Engine hooks read the rows only: `roleAttrMult(p, attr, ctx)` in `MatchEngine.effParts` (boost × level, downsides flat, two roles on one composite multiply), `roleDrainMult` in `drainOf`, `down.weights` / `midShotMin` / `noShotPastLine` in `chooseAction`, `down.fwdPass` in `doPass` (target-zone threshold, same Math.random call), `roleHas(p, 'foulOnLostDuel')` for the Aggressive foul. `this.shotCtx` = 'box' / 'long' around the shot rolls in `resolveShot` (null for the blocker). Adding a role = one row + texts (+ one hook only for a new kind of effect). The old `TAGS` table is gone.
+
+  | id | signal | boost (level 3; scales 1 → 3) | downside (flat) | clash |
+  |---|---|---|---|---|
+  | Aggressive | duel | Tackle + Mark ×1.5 | beaten in a duel → foul + yellow | — |
+  | Playmaker | pass | Pass ×1.5 | pass weight ×2, dribble ×0.4 | Selfish |
+  | Selfish | solo | Dribble + Shoot ×1.5 | pass ×0.08, dribble ×1.6, shot ×1.8, midfield shot ≥ 22 | Playmaker |
+  | Engine | run | energy use ×0.8 | Dribble + Shoot ×0.95 | — |
+  | Anchor | screen | Mark ×1.35 (interceptions, blocks) | no shot from a zone beyond his line, dribble ×0.5, forward-pass chance ×0.7 | Finisher |
+  | Finisher | finish | Shoot ×1.3, only shots that are not long shots | Pass ×0.85, Tackle + Mark ×0.85 | Anchor |
+- **Levels / slots**: `p.roles = [{ id, level 1–3, m }]` (m = league matches he played with it since he got it), ≤ `ROLES.SLOTS` 2, no clashing pair (`Player.cleanRoles`). `ROLES.LEVEL_MULT` [1.2, 1.35, 1.5]: `roleLevelMult(base, level)` = 1 + (base − 1)·(LM[l] − 1)/0.5, so a ×1.5 role is 1.2 / 1.35 / 1.5, Engine's ×0.8 drain 0.92 / 0.86 / 0.8, Anchor 1.14 / 1.25 / 1.35, Finisher 1.12 / 1.21 / 1.3. `p.tags` is now a getter (role ids; undefined = not an academy kid, as before); `p.roleLevel(id)`. **Migration** (lazy, constructor): no `roles` → the old single role at `ROLES.MIGRATE_LEVEL` 2 with its v3.18 `roleMatches` as `m`. `p.banned` (roles banished from his REVIEW this season) cleared by `newSeason`.
+- **Role truth** (one mapping, extended): `CLUE_SIGNALS` got `run` (Engine: new composite `Motor` = 2·baseStamina + acceleration + speed, used only for the truth), `screen` (Anchor: Mark — the composite its boost multiplies), `finish` (Finisher: Shoot), each with `stats` (evidence) and `lots` (what counts as "a lot" in one match, for card weights) + 4 clue phrasings `clue.<signal>.0–3` EN + RU. `roleFits(p, id)` = the role's signal ∈ `trueSignals(p)`. 4000 generated kids: a signal is true for duel 31 / screen 33 / run 36 / finish 19 / pass 25 / solo 15 % (several can be true at once); DEF → duel / screen, MID → pass / run, FWD → finish / solo / run.
+- **Misfit = unchanged** ("a wrong one backfires"): there is no fit check in the engine and no extra penalty. A role multiplies his OWN composites (a weak composite ×1.5 stays weak) while its downside always applies (fouls, forced passes, never passing, no shots…). The new roles work the same way.
+- **REVIEW.EXE** (`ReviewView`, 11k-review.js, `#review-view`, `--z-phase`, CSS 29-review.css; in the Escape manager with `close: null`). `GameState.startReview(result, played, date, md)` runs in `onMatchEnd` (visual + Quick Sim): L → `lossStreak + 1`, no window; W / D → streak 0 and `state.review = { mode win|draw, date, md, pid, rating, stats, n, rerolled, banished, cards }` (saved). Man of the match = best `matchRating(stats)` (`REVIEW.RATING`: base 6 + goals 1, assists 0.6, on target 0.2, passes ±0.03/0.04, tackles 0.15, interceptions 0.12, dribbles 0.08/−0.05, saves 0.3, conceded −0.3, cards −0.3/−1.5; clamp 1–10) among our kids who played; tie → `seeded(date#motm)`.
+  - **Cards** (`reviewPool`): new role at level 1 (free slot, no clash with what he holds), +1 level (< 3), replace (slots full; the new role must not clash with the role he keeps; shows "instead of …"). Never a banished role, never a duplicate. `n` = 3 (win), 4 after `STREAK_FROM` 2+ losses in a row, 2 (draw). Weighted draw without repeats, `seeded(date#review#id)` (reroll: `#reroll`): weight = 1 + `EVIDENCE_W` 2 × min(1, his match stats for the role's signal / `lots`).
+  - **"He lit up when you mentioned it"** (win only, first set): `seeded(date#reviewlike#id)` < `LIKE_HINT` 0.3 → one card marked: a fitting role, or with `CLUES.WRONG` a random NON-fitting card (no candidate → no mark). Stored in `p.clues` as `{ source: 'review', ref: md, signal, textKey: 'clue.like.<signal>' }` (icon ☆, "Review after round N").
+  - **Actions**: card → applied (new / +1 / replace — replacing is free, no −3), diary `rv.new|up|swap`, window closes, the matchday closes. [ Reroll ] `REROLL_AP` 1 from the weekly wallet, win only, once. [ Skip ] morale +`SKIP_MORALE` 2, diary `rv.skip.diary`. [ Banish ] (not on a level-up card): role → `p.banned`, its card(s) leave the window, no refill, once; `seeded(date#reviewban#id)` < `BANISH_CLUE` 0.4 → a normal v3.18 clue (`rollClue(…, { salt: '#ban' })`, source 'review'). No OK / × button; Esc swallowed.
+  - **Flow**: `closeMatchday()` (Notebook's Return button reads "☆ Review the man of the match", the Dashboard button in the post phase) opens it while `reviewPending`; the matchday (= [ CONTINUE ]) stays closed until a choice. One entry (`ReviewView.open()`, mode from the saved review) so v3.20 can put the draw "listen" option / "After the game" in front. Auto: `ui.autoSim()` takes the first card; `window.YAM_AUTO_REVIEW` (smoke) makes `closeMatchday` take it; `ui.autoReview = false` tests the window.
+- **Notebook**: the Role / Change buttons are gone; each role has [ Remove "…" ] with its price: `roleChangeCost(p, free, roleId)` = −3 (`ROLES.CHANGE_MORALE`) once that role has played a league match (`trackRoles` → `m++`), free before (misclick protection right after REVIEW). Diary `role.drop`. Roster ✕ = the same. Intro text rewritten (roles are earned in REVIEW.EXE). Stat line "These numbers already include his current role (Playmaker 2, Engine 1)" from `pr.roles`.
+- **UI**: role chips carry level pips `●●○` (`tagChip(tag, id, removable, level, short)`); the Squad screen uses the short tags (`PLAY ●●○`), PLAYER_INFO lists every role + description. DEBUG.EXE: ROLES (`id:level fit|MISFIT`), BAN, FIT (true signals), MOT* (Motor composite).
+- **Balance** (`node test/balance.js 500 --roles --pairs 3`: 500 matches × 4 team pairs, mirrored; the side with roles vs the same squads without):
+
+  | Setup (level 3) | Win share |
+  |---|---|
+  | random fitting roles (≤ 2 per kid) vs none | 96.8% |
+  | random misfit roles vs none | 86.7% |
+  | Aggressive on its 4 best-fit kids | 73.5% (v3.18 strength, untouched) |
+  | Playmaker ×4 | 66.2% (v3.18) |
+  | Selfish ×4 | 93.9% (v3.18) |
+  | Engine ×4 | 46.3% |
+  | Anchor ×4 | 63.0% |
+  | Finisher ×4 | 63.2% |
+
+  First pass (Anchor/Finisher ×1.5, Engine downside ×0.9): Anchor 70.9%, Finisher 76.0%, Engine 43.7% → toned down to Anchor ×1.35 + the forward-pass downside (its "dribble less" alone turned out to be a buff for defenders: 53% with no boost at all), Finisher ×1.3, Engine downside ×0.95. Engine stays under 50% inside one match by design: its value is the energy he keeps for the next match (players keep their real end-of-match energy). Roles at level 3 are very strong in general (even misfits) — the old "Correct roles are strong" observation; levels 1–2 soften it for new roles.
+- **Smoke** (113, +9): win → REVIEW for the best-rated kid, blocked Return / CONTINUE, no OK / ×, Esc; reroll (1 AP, once, 0 AP disabled) + banish (once, no refill) + pick (diary, closes, next day, free remove); skip +2, draw 2 cards / no reroll / no mark, loss nothing; card rules over 200 rolled windows + weights + seeded; loss streak 4 cards / draw reset, like-mark truth / WRONG, banish clue; LEVEL_MULT in a seeded duel, Engine drain, Finisher box-only, two roles multiply; Notebook remove buttons + migration (load + reload) + cleanRoles + pips + DEBUG; texts EN + RU; a whole auto-sim season. Older checks: Notebook role clicks removed, `TAGS` → I18N names, v3.18 role-change check → removal rules. Smoke auto-play sets `YAM_AUTO_REVIEW`.
+

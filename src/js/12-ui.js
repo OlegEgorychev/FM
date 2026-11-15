@@ -34,6 +34,7 @@ class UIController {
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.planner = new WeekPlanner(this);        // v3.13: PLANNER.EXE (the weekly plan)
     this.kassa = new CashDesk(this);             // v3.15: KASSA.EXE (monthly fees)
+    this.reviewView = new ReviewView(this);      // v3.19: REVIEW.EXE (the pick after a win / draw)
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
     this.bind();
@@ -147,6 +148,7 @@ class UIController {
     if (x && typeof x === 'object' && 'talkReact' in x) return L.t('tt.react.' + x.talkReact);  // v3.9 diary
     if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pos' in x) return L.pos(x.pos);   // v3.6 diary
+    if (x && typeof x === 'object' && 'role' in x) return L.tag(x.role);   // v3.19 diary
     if (x && typeof x === 'object' && 'focus' in x) return L.t('lesson.focus.' + x.focus);   // v3.16 diary
     if (x && typeof x === 'object' && 'clue' in x) { const p = this.state.player(x.pid);   // v3.16: a v3.6 / v3.7 clue line without its "Match practice:" lead
       return L.t(x.clue, { k: p ? L.name(p.name) : '?' }).replace(/^[^:{}]{1,30}:\s*/, ''); }
@@ -268,6 +270,7 @@ class UIController {
        opened over the Locker Room closes without closing the room. Event dialogues swallow Esc (forced choice). */
     const layers = () => [
       { el: this.events.view.layer, close: null },
+      { el: this.reviewView.layer, close: null },   // v3.19: REVIEW.EXE closes only through a choice
       { el: this.modal.layer, close: () => this.modal.close() },
       { el: this.debug.layer, close: () => this.debug.close() },
       { el: this.summary.layer, close: () => this.summary.requestClose() },   // v3.5: no Esc-out before the team talk
@@ -399,8 +402,8 @@ class UIController {
     this.$('notes-body').addEventListener('click', e => {
       if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
       if (e.target.closest('#btn-nb-msum')) { this.summary.open(this.state.lastReport); return; }   // v3.9
-      const b = e.target.closest('[data-tag]'); if (!b || b.disabled) return;
-      this.state.setTag(b.dataset.id, b.dataset.tag);
+      const b = e.target.closest('[data-rmrole]'); if (!b || b.disabled) return;   // v3.19: the Notebook only takes roles away
+      this.state.removeRole(b.dataset.id, b.dataset.rmrole);
       this.renderNotebook(); this.renderTeam(); this.renderDash();
     });
   }
@@ -916,7 +919,14 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** v2.6: after a coach-initiated dialogue (office / roll call) the same day simply goes on. */
   afterManualEvent() { this.renderAll(); this.profile.tick(); if (this.locker?.isOpen) this.locker.maybeRequest(500); }   // v3.6: the next locker request waits its turn
   /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
-  autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
+  autoSim() {
+    const s = this.state;
+    if (s.phase === 'post' && s.reviewPending) { s.reviewPick(0); this.reviewView.close(); }   // v3.19: auto mode takes the first card
+    if (s.phase === 'calendar' && !this.events.active) this.runCalendar();
+  }
+  /** v3.19: REVIEW.EXE picks the first card by itself (smoke auto-play: window.YAM_AUTO_REVIEW; `ui.autoReview = false` to test the window). */
+  get autoReview() { return this._autoReview ?? !!window.YAM_AUTO_REVIEW; }
+  set autoReview(v) { this._autoReview = v; }
 
   /** v2.5: [ CALL INTO OFFICE ] — 1 action point, a short talk in the dialogue box. */
   /** v3.13 (replaces the v3.2 rule): why the coach can NOT call this kid in right now (i18n key), or null.
@@ -1126,6 +1136,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (!s.lastReport.instant) { this.summary.open(s.lastReport); return; }
       s.skipTeamTalk();
     }
+    if (s.reviewPending) {   // v3.19: REVIEW.EXE — the evening stop after a win / draw; [ CONTINUE ] waits for a choice
+      if (!this.autoReview) { this.reviewView.open(); this.renderDash(); return; }
+      s.reviewPick(0);   // auto-sim / smoke auto-play: the first card
+    }
+    s.review = null;   // (a review for a kid who left the squad is dropped)
+    this.reviewView.layer.hidden = true;
     const ev = s.nextMatchEvent();
     const rep = s.lastReport;
     this.cal.completeEvent(ev.id);
@@ -1208,7 +1224,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <span class="num">${p.number}</span>
         <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.clueBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×' + fatigueMult(e).toFixed(2) : ''}</span></div>
-        <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
+        <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live, null, true)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
     };
     const roster = this.$('roster');
@@ -1318,13 +1334,17 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
   /** v1.9: story flags (e.g. PROMISED START) — visible, unlike the hidden numbers. */
   flagChips(p) { return (p.flags || []).map(f => `<span class="tag flag" title="${esc(FLAGS[f][L.code][1])}">${f === 'Showcase' ? '\u25C9' : '$'} ${esc(FLAGS[f][L.code][0])}</span>`).join(''); }
-  tagChip(tag, id, removable) {
-    const tone = TAGS[tag]?.tone || 'neutral';
-    const cost = removable ? this.state.roleChangeCost(this.state.player(id)) : 0;   // v3.18
+  /** v3.19: role chip "PLAYMAKER ●●○" (level pips); level from the kid unless given. */
+  tagChip(tag, id, removable, level = null, short = false) {
+    const tone = ROLE_BY_ID[tag]?.tone || 'neutral', p = this.state.player(id), lv = level ?? p?.roleLevel?.(tag) ?? 0;
+    const cost = removable ? this.state.roleChangeCost(p, false, tag) : 0;   // v3.18
     const rm = cost ? L.t('squad.removeCost', { m: '\u2212' + Math.abs(cost) }) : L.t('squad.remove');
     const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(rm)}" title="${esc(rm)}">&times;</button>` : '';
-    return `<span class="tag ${tone}" title="${esc(L.tagDesc(tag))}">${esc(L.tag(tag))}${x}</span>`;
+    const pips = lv ? `<span class="pips" aria-label="${esc(L.t('rv.level', { l: lv }))}">${ReviewView.pips(lv)}</span>` : '';
+    return `<span class="tag ${tone}" title="${esc(L.tag(tag) + (lv ? ' · ' + L.t('rv.level', { l: lv }) : '') + ' — ' + L.tagDesc(tag))}">${esc(short ? L.t('role.' + tag + '.s') : L.tag(tag))}${pips}${x}</span>`;
   }
+  /** v3.19: "Playmaker 2, Engine 1" for the Notebook's stat line (old reports: the single v3.18 role). */
+  roleNames(pr) { return pr.roles ? pr.roles.map(r => L.tag(r.id) + ' ' + r.level).join(', ') : L.tag(pr.role); }
 
   /* ---------- MATCH ---------- */
   renderShouts() {
@@ -1546,6 +1566,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       players: shuffle(played).slice(0, 3).map(p => ({
         id: p.id, stats: { ...eng.st(p) },
         tired: eng.tired.has(p.id), oop: false, gk: eng.lineOf.get(p.id) === 'GK', role: (p.tags || [])[0] || null,   // v3.0
+        roles: rolesOf(p).map(r => ({ id: r.id, level: r.level })),   // v3.19: both slots + levels
       })),
     };
     // v3.7 hidden captain traits: what the coach SAW of the armband + subtle clues about the 3 sampled kids (words only, seeded)
@@ -1554,6 +1575,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     for (const pr of s.lastReport.players) { const k = psychClue(s.player(pr.id), ctx.md, capRep?.id); if (k) pr.psy = k; }
     s.recordMatchClues(s.lastReport, s.calendar.date);   // v3.18: one clue per Notebook kid (an episode, sometimes wrong)
     s.trackRoles(eng.everPlayed);   // v3.18: roles that played this match now cost morale to change
+    s.startReview(result, played.map(p => [p.id, { ...eng.st(p) }]), s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak)
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
@@ -1650,15 +1672,13 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (pr.gk || s.saves) lines.push(L.t('nb.saves', { a: s.saves, b: season.saves }));
       if (s.yellow || s.red) lines.push(L.t('notes.cards', { a: s.yellow, b: s.red }));
       lines.push(`${L.t('notes.energy', { a: Math.round(p.energy) })} · ${L.t('nb.apps', { n: season.apps })}`);
-      if (pr.role) lines.push(esc(L.t('note.role', { r: L.tag(pr.role) })));   // v3.18: a stat line, not part of the coach's note
+      if (pr.roles?.length || (!pr.roles && pr.role)) lines.push(esc(L.t('note.role', { r: this.roleNames(pr) })));   // v3.18: a stat line, not part of the coach's note
       const note = coachNote(p, s, pr).filter(k => k in I18N.en).map(k => L.t(k)).join(' ');
-      const cost = this.state.roleChangeCost(p);
-      const btns = TAG_KEYS.map(t => {
-        const has = p.tags.includes(t);
-        const key = has ? 'notes.noted' : p.tags.length ? 'notes.change' : 'notes.add';
-        const price = !has && cost ? `<em class="role-cost">${esc(L.t('role.cost', { m: '\u2212' + Math.abs(cost) }))}</em>` : '';   // v3.18
-        return `<button class="btn ${has ? 'done' : ''}" data-tag="${t}" data-id="${p.id}" ${has ? 'disabled' : ''} title="${esc(L.tagDesc(t))}">
-          ${L.t(key, { t: esc(L.tag(t)) })}${price}<small>${esc(L.tagDesc(t))}</small></button>`;
+      // v3.19: roles come only from REVIEW.EXE — the Notebook can only take one away (v3.18 cost; free until it has played a match)
+      const btns = rolesOf(p).map(r => {
+        const cost = this.state.roleChangeCost(p, false, r.id);
+        const price = `<em class="role-cost">${esc(cost ? L.t('role.cost', { m: '\u2212' + Math.abs(cost) }) : L.t('notes.removeFree'))}</em>`;
+        return `<button class="btn" data-rmrole="${r.id}" data-id="${p.id}" title="${esc(L.tagDesc(r.id))}">${L.t('notes.remove', { t: esc(L.tag(r.id)) })}${price}</button>`;
       }).join('');
       return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
@@ -1666,7 +1686,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>
-        <div class="tag-btns">${btns}</div>
+        <div class="rm-roles">${btns}</div>
         ${this.cluesBlock(p, CLUES.TIP)}
       </article>`;
     }).join('');
@@ -1677,7 +1697,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       ${others.map(p => `<details class="nb-kid" data-cluekid="${p.id}" data-pid="${p.id}"><summary><span class="num dark">${p.number}</span> ${esc(L.name(p.name))}
         <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${p.tags.map(t => this.tagChip(t, p.id, false)).join('')}${this.clueBadge(p)}</summary>
         ${this.cluesBlock(p)}</details>`).join('')}</fieldset>` : '';
-    const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t('notes.back')}</button></div>` : '';
+    const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t(this.state.reviewPending ? 'notes.backReview' : 'notes.back')}</button></div>` : '';
     body.innerHTML = `
       <div class="nb-head">
         <h2>${L.t('notes.head', { n: rep.md, o: esc(L.team(rep.opponent)) })}</h2>

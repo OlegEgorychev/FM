@@ -25,10 +25,13 @@ class DebugConsole {
     add('DYNAMIC', 'CON', p => Math.round(p.dyn.condition), 100, 'condition (energy)');
     add('DYNAMIC', 'SHP', p => Math.round(p.dyn.sharpness), 100, 'sharpness (match tone); < 50 → technical −2');
     add('DYNAMIC', 'MOR', p => Math.round(p.dyn.morale), 100, 'morale');
-    for (const k of Object.keys(COMPOSITE)) add('ENGINE', { Pass: 'PAS*', Mark: 'MRK*', Dribble: 'DRB*', Speed: 'PAC*', Tackle: 'TKL*', Shoot: 'SHT*', Save: 'SAV*' }[k], p => +p.rating(k).toFixed(1), 20, 'composite ' + k + ' = ' + Object.keys(COMPOSITE[k]).join('+'));
+    for (const k of Object.keys(COMPOSITE)) add('ENGINE', { Pass: 'PAS*', Mark: 'MRK*', Dribble: 'DRB*', Speed: 'PAC*', Tackle: 'TKL*', Shoot: 'SHT*', Save: 'SAV*', Motor: 'MOT*' }[k], p => +p.rating(k).toFixed(1), 20, 'composite ' + k + ' = ' + Object.keys(COMPOSITE[k]).join('+'));
     add('ENGINE', 'OVR', p => +p.overall.toFixed(1), 20, 'hidden overall (position composites) — v1.9 "worst player"');
     add('ENGINE', 'MOOD', p => +p.moodBonus.toFixed(1), null, 'morale × passion roll bonus');
-    add('ENGINE', 'ROLE', p => (p.tags || [])[0] || '—');
+    add('ENGINE', 'ROLES', p => rolesOf(p).map(r => `${r.id}:${r.level} ${roleFits(p, r.id) ? 'fit' : 'MISFIT'}`).join(' · ') || '—', null,
+      'v3.19 roles id:level + whether the hidden truth (trueSignals) backs it; BAN = banished from his REVIEW.EXE this season');
+    add('ENGINE', 'BAN', p => (p.banned || []).join(' ') || '—', null, 'v3.19 roles banished from his REVIEW.EXE this season');
+    add('ENGINE', 'FIT', p => trueSignals(p).join(' '), null, 'v3.18/v3.19 hidden true signals (pass duel solo run screen finish)');
     add('ENGINE', 'INJ', p => p.injuryDays || 0, null, 'v2.2 injury: calendar days left');
     add('ENGINE', 'SUS', p => p.suspensionMatches || 0, null, 'v2.2 suspension: matches left');
     add('ENGINE', 'HOME', p => p.awayDays || 0, null, 'v2.3 kept at home by a parent: days left');

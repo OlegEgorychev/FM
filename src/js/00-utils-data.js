@@ -64,6 +64,7 @@ const COMPOSITE = {
   Tackle:  { tackling: 2, strength: 1, positioning: 1 },      // defender in a 1v1 duel
   Shoot:   { shooting: 2, composure: 1 },
   Save:    { goalkeeping: 2, agility: 1, positioning: 1 },
+  Motor:   { baseStamina: 2, acceleration: 1, speed: 1 },     // v3.19: never rolled in a duel — only the Engine role's "fits him" truth (CLUE_SIGNALS.run)
 };
 const TECH = new Set(ATTR_GROUPS.technical);
 /* v1.9 CLUB ECONOMY + NARRATIVE EVENTS */
@@ -249,20 +250,74 @@ const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
 const POS_HINT = { OBSERVE_MAX: 2, MIN: 3, CHANCE: { 3: 0.25, 4: 0.40, 5: 0.55, 6: 0.75 }, STEP: 0.05, CAP: 0.85,
   COOLDOWN: 2, YES_MORALE: 5, ORDER_MORALE: -8, ORDER_DISC: 1 };
 /* v3.18 CLUES — the coach's notes describe an episode instead of naming a role.
-   CLUE_SIGNALS: signal → the role it points to (TAGS key), `attrs` = the engine composites that role multiplies (same hidden truth
+   CLUE_SIGNALS: signal → the role it points to (ROLES_DEF id), `attrs` = the engine composites that role multiplies (same hidden truth
    as the ×1.5 and its side effects), `stats` = match counters that show he actually did it (a clue never contradicts the card),
    `min` = how many of them are needed. A new signal = one line here + `clue.<signal>.0…PHRASES-1` texts (EN + RU).
    CLUES: WRONG = chance a clue points to another signal; MAX_PER_KID kept; PHRASES per signal; FIT_TIE = composites this
-   close to his best one also count as "true"; TIP = clues in the 📝 tooltip / under the role buttons. */
+   close to his best one also count as "true"; TIP = clues in the 📝 tooltip / under the role buttons.
+   v3.19: three more rows (run / screen / finish) for the new roles + `lots` = how many of `stats` in one match count as
+   "he did a lot of it" (REVIEW.EXE card weights). */
 const CLUE_SIGNALS = {
-  pass: { role: 'Playmaker',  attrs: ['Pass'],            stats: ['passOk'],                min: 2 },
-  duel: { role: 'Aggressive', attrs: ['Tackle', 'Mark'],  stats: ['tackles', 'intercepts'], min: 1 },
-  solo: { role: 'Selfish',    attrs: ['Dribble', 'Shoot'], stats: ['dribbleOk', 'shots'],    min: 1 },
+  pass:   { role: 'Playmaker',  attrs: ['Pass'],            stats: ['passOk'],                                      min: 2, lots: 14 },
+  duel:   { role: 'Aggressive', attrs: ['Tackle', 'Mark'],  stats: ['tackles', 'intercepts'],                       min: 1, lots: 6 },
+  solo:   { role: 'Selfish',    attrs: ['Dribble', 'Shoot'], stats: ['dribbleOk', 'shots'],                          min: 1, lots: 8 },
+  run:    { role: 'Engine',     attrs: ['Motor'],           stats: ['passOk', 'tackles', 'intercepts', 'dribbleOk'], min: 8, lots: 26 },
+  screen: { role: 'Anchor',     attrs: ['Mark'],            stats: ['intercepts'],                                  min: 1, lots: 4 },
+  finish: { role: 'Finisher',   attrs: ['Shoot'],           stats: ['onTarget'],                                    min: 1, lots: 3 },
 };
-const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}' } };   // v3.20 adds 'voice'
+const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606' } };   // v3.19 'review'; v3.20 adds 'voice'
 const KEEPER_NOTE = { ROUGH: 4 };   // v3.18.1: goals let in from which the keeper's day reads as a rough one, whatever his saves
-/* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free. */
-const ROLES = { CHANGE_MORALE: -3 };
+/* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free.
+   v3.19 GROWTH: p.roles = [{ id, level, m }] (m = league matches he played with it since he got it), at most SLOTS, levels 1–LEVELS.
+   LEVEL_MULT = the main multiplier by level for a ×1.5 role (level 3 = the v3.18 strength); any other main multiplier
+   scales the same way (roleLevelMult). Downsides never scale. Old single role → MIGRATE_LEVEL. */
+const ROLES = { CHANGE_MORALE: -3, SLOTS: 2, LEVELS: 3, LEVEL_MULT: [1.2, 1.35, 1.5], MIGRATE_LEVEL: 2 };
+/* v3.19 ROLES AS DATA — adding a role = one row + its texts (`role.<id>`, `role.<id>.d`, CLUE_SIGNALS row + `clue.<signal>.*`,
+   `clue.like.<signal>`) + (only if it needs a new kind of effect) one engine hook. Numbers are TEST values (test/balance.js --roles).
+   boost  = the MAIN effect, scales with the level: attrs × mult (ctx 'box' = only shots that are not long shots) | drain × (energy use)
+   down   = downsides, never scale: attrs {composite: ×}, weights {pass|dribble|shoot: ×} in chooseAction, midShotMin (Selfish:
+            shoot weight at least this in midfield), noShotPastLine (Anchor: no shot from a zone beyond his line),
+            fwdPass (Anchor: × the chance his pass goes forward), foulOnLostDuel (Aggressive)
+   signal = CLUE_SIGNALS key = the hidden "fits him" truth (11-notebook-helpers roleFit / trueSignals); clash = can't be held together. */
+const ROLES_DEF = [
+  { id: 'Aggressive', tone: 'bad',     signal: 'duel',   boost: { attrs: ['Tackle', 'Mark'], mult: 1.5 },  down: { foulOnLostDuel: true },                                  clash: [] },
+  { id: 'Playmaker',  tone: 'good',    signal: 'pass',   boost: { attrs: ['Pass'], mult: 1.5 },            down: { weights: { pass: 2, dribble: 0.4 } },                    clash: ['Selfish'] },
+  { id: 'Selfish',    tone: 'neutral', signal: 'solo',   boost: { attrs: ['Dribble', 'Shoot'], mult: 1.5 }, down: { weights: { pass: 0.08, dribble: 1.6, shoot: 1.8 }, midShotMin: 22 }, clash: ['Playmaker'] },
+  { id: 'Engine',     tone: 'good',    signal: 'run',    boost: { drain: 0.8 },                            down: { attrs: { Dribble: 0.95, Shoot: 0.95 } },                   clash: [] },
+  { id: 'Anchor',     tone: 'neutral', signal: 'screen', boost: { attrs: ['Mark'], mult: 1.35 },           down: { noShotPastLine: true, fwdPass: 0.7, weights: { dribble: 0.5 } },       clash: ['Finisher'] },
+  { id: 'Finisher',   tone: 'neutral', signal: 'finish', boost: { attrs: ['Shoot'], mult: 1.3, ctx: 'box' }, down: { attrs: { Pass: 0.85, Tackle: 0.85, Mark: 0.85 } },  clash: ['Anchor'] },
+];
+const ROLE_BY_ID = Object.fromEntries(ROLES_DEF.map(r => [r.id, r]));
+const ROLE_IDS = ROLES_DEF.map(r => r.id);
+/** Main multiplier at this level: `base` is the level-3 value; LEVEL_MULT [1.2, 1.35, 1.5] → ×1.5 role 1.2 / 1.35 / 1.5, ×0.8 drain 0.92 / 0.86 / 0.8. */
+function roleLevelMult(base, level) {
+  const LM = ROLES.LEVEL_MULT, top = LM[LM.length - 1], l = LM[clamp(Math.round(level) || 1, 1, LM.length) - 1];
+  return 1 + (base - 1) * (l - 1) / (top - 1);
+}
+/** His roles (academy kids; opponents and world kids have none). */
+const rolesOf = p => p?.roles || [];
+const roleClash = (a, b) => !!ROLE_BY_ID[a]?.clash.includes(b) || !!ROLE_BY_ID[b]?.clash.includes(a);
+/** Engine hook: every role's multiplier on one composite (boost × level, downsides flat; two roles on the same action multiply). */
+function roleAttrMult(p, attr, ctx = null) {
+  let m = 1;
+  for (const r of rolesOf(p)) {
+    const d = ROLE_BY_ID[r.id]; if (!d) continue;
+    if (d.boost.attrs?.includes(attr) && (!d.boost.ctx || d.boost.ctx === ctx)) m *= roleLevelMult(d.boost.mult, r.level);
+    if (d.down.attrs?.[attr]) m *= d.down.attrs[attr];
+  }
+  return m;
+}
+/** Engine hook: energy use multiplier (Engine). */
+function roleDrainMult(p) { let m = 1; for (const r of rolesOf(p)) { const d = ROLE_BY_ID[r.id]; if (d?.boost.drain) m *= roleLevelMult(d.boost.drain, r.level); } return m; }
+const roleHas = (p, flag) => rolesOf(p).some(r => ROLE_BY_ID[r.id]?.down[flag]);
+/* v3.19 REVIEW.EXE — the pick after a win (draw: the smaller pick, until v3.20). TEST values.
+   CARDS / CARDS_DRAW / CARDS_STREAK (after STREAK_FROM+ losses in a row), LIKE_HINT = chance of the "he lit up" mark (win, first set only),
+   BANISH_CLUE = chance a banish also writes a clue, REROLL_AP, SKIP_MORALE, EVIDENCE_W = extra card weight for the signal he showed
+   most this match (base 1 each). RATING = man of the match: base + Σ stat × weight (our kids who played; tie → seeded). */
+const REVIEW = { CARDS: 3, CARDS_DRAW: 2, CARDS_STREAK: 4, STREAK_FROM: 2, LIKE_HINT: 0.3, BANISH_CLUE: 0.4, REROLL_AP: 1, SKIP_MORALE: 2, EVIDENCE_W: 2,
+  RATING: { base: 6, goals: 1, assists: 0.6, onTarget: 0.2, passOk: 0.03, passFail: -0.04, tackles: 0.15, tacklesLost: -0.05, intercepts: 0.12,
+    dribbleOk: 0.08, dribbleFail: -0.05, saves: 0.3, conceded: -0.3, yellow: -0.3, red: -1.5 } };
+const matchRating = st => { let r = REVIEW.RATING.base; for (const k in REVIEW.RATING) if (k !== 'base') r += (st?.[k] || 0) * REVIEW.RATING[k]; return clamp(r, 1, 10); };
 const positionRequestChance = n => n < POS_HINT.MIN ? 0 : POS_HINT.CHANCE[n] ?? Math.min(POS_HINT.CAP, POS_HINT.CHANCE[6] + (n - 6) * POS_HINT.STEP);
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);

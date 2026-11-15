@@ -20,7 +20,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
   const errors = [];
-  await page.addInitScript(() => { window.YAM_SKIP_REPORTS = true; });   // v3.17: the training report has its own check (it would pause CONTINUE)
+  await page.addInitScript(() => { window.YAM_SKIP_REPORTS = true; window.YAM_AUTO_REVIEW = true; });   // v3.17: the training report has its own check (it would pause CONTINUE); v3.19: REVIEW.EXE takes the first card (own checks at the end)
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_/.test(m.text())) errors.push(m.text()); });
   page.on('dialog', d => { errors.push('native dialog: ' + d.message()); d.dismiss(); });
@@ -235,12 +235,12 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     // stored in p.clues, unique phrasing, a Clues block on every card, opening the Notebook marks them read
     const cl0 = await page.evaluate(() => {
       const s = YAM.game, rep = s.lastReport, ui = YAM.ui, code = L.code, txt = {};
-      const names = Object.values(TAGS).flatMap(t => [t.en[0], t.ru[0]]).map(x => x.toLowerCase());
+      const names = ROLE_IDS.flatMap(id => [I18N.en['role.' + id], I18N.ru['role.' + id]]).map(x => x.toLowerCase());   // v3.19: names live in I18N
       for (const c of ['en', 'ru']) { L.code = c; ui.renderNotebook(); txt[c] = [...document.querySelectorAll('#notes-body .coach-note')].map(x => x.textContent.toLowerCase()).join(' | '); }
       L.code = code; ui.renderNotebook();
       const out = rep.players.filter(pr => !pr.gk);
       return { clean: ['en', 'ru'].every(c => txt[c].length > 20 && !names.some(n => txt[c].includes(n))), txt: txt.en.slice(0, 160),
-        stored: out.every(pr => /^clue\.(pass|duel|solo|none)\.\d$/.test(pr.clue) && s.player(pr.id).clues.some(c => c.textKey === pr.clue && c.source === 'match' && c.ref === rep.md)),
+        stored: out.every(pr => /^clue\.(pass|duel|solo|run|screen|finish|none)\.\d$/.test(pr.clue) && s.player(pr.id).clues.some(c => c.textKey === pr.clue && c.source === 'match' && c.ref === rep.md)),
         uniq: new Set(out.map(pr => pr.clue)).size === out.length, blocks: document.querySelectorAll('#notes-body .card .nb-clues').length === 3,
         seen: rep.players.every(pr => !unseenClues(s.player(pr.id))) };
     });
@@ -265,7 +265,6 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await shot('5-profile');
     await page.keyboard.press('Escape');
     check('profile card: notebook right-click, season stats + note + 96px face', pc3.open && pc3.apps === 1 && pc3.age >= 13 && pc3.age <= 16 && pc3.txt && pc3.note && pc3.svg >= 90, JSON.stringify(pc3));
-    await page.click('#notes-body [data-tag]');
     await shot('4-notebook');
     await page.click('#btn-back');
     check('return to dashboard queues next matchday', await page.evaluate(() => YAM.game.phase === 'calendar' && YAM.ui.cal.nextEvent().md === 2));
@@ -1790,7 +1789,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       out.cap = k.clues.length === CLUES.MAX_PER_KID && k.clues[k.clues.length - 1].date === '2003-03-21';
       const raw = JSON.parse(JSON.stringify(k)); delete raw.clues; delete raw.roleMatches;
       const old = new Player({ ...raw, tags: [] }), rt = new Player({ ...JSON.parse(JSON.stringify(k)), tags: [] });
-      out.migrate = Array.isArray(old.clues) && old.clues.length === 0 && old.roleMatches === 0 && rt.clues.length === CLUES.MAX_PER_KID;
+      out.migrate = Array.isArray(old.clues) && old.clues.length === 0 && Array.isArray(old.roles) && rt.clues.length === CLUES.MAX_PER_KID;
       // 📝: a new clue shows on the roster row (+ the board dot for a starter) with a tooltip; opening his card in the Notebook clears it
       k.clues = keep.map(c => ({ ...c, seen: true }));
       const st = s.starters().find(p => p.archetype !== 'GK') || k;
@@ -1811,20 +1810,17 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       det.open = true; await new Promise(r => setTimeout(r, 50));
       out.gone = unseenClues(st) === 0 && !document.querySelector(`#roster .r-row[data-id="${st.id}"] .clue-badge`) && !document.querySelector(`#tac-board .pl[data-pid="${st.id}"] .clue-badge`);
       s.lastReport = keepRep; s.notebookUnlocked = keepUnl; s.phase = keepPh; ui.renderNotebook();
-      // role change: first role free; a change before his next match free; after a played match −3 morale + diary; free flag → 0
-      const r = sq[1], m0 = 60; r.tags = []; r.roleMatches = 0; r.dyn.morale = m0;
-      s.setTag(r.id, 'Playmaker'); out.first = r.dyn.morale === m0;
-      s.setTag(r.id, 'Selfish'); out.fix = r.dyn.morale === m0 && r.tags[0] === 'Selfish';
-      out.btnFree = s.roleChangeCost(r) === 0;
+      // v3.19: roles come from REVIEW.EXE; removing one is free before it has played a match, then −3 morale + diary; free flag → 0
+      const r = sq[1], m0 = 60; r.roles = [{ id: 'Playmaker', level: 1, m: 0 }]; r.dyn.morale = m0;
+      out.btnFree = s.roleChangeCost(r, false, 'Playmaker') === 0;
       s.trackRoles(new Set([r.id]));
-      out.btnCost = s.roleChangeCost(r) === ROLES.CHANGE_MORALE && s.roleChangeCost(r, true) === 0;
+      out.btnCost = s.roleChangeCost(r, false, 'Playmaker') === ROLES.CHANGE_MORALE && s.roleChangeCost(r, true, 'Playmaker') === 0;
       const dl = s.diary.length;
-      s.setTag(r.id, 'Aggressive');
-      out.paid = r.dyn.morale === m0 + ROLES.CHANGE_MORALE && s.diary.length === Math.min(80, dl + 1) && s.diary[s.diary.length - 1].key === 'role.flip'
+      s.removeRole(r.id, 'Playmaker');
+      out.paid = r.roles.length === 0 && r.dyn.morale === m0 + ROLES.CHANGE_MORALE && s.diary.length === Math.min(80, dl + 1) && s.diary[s.diary.length - 1].key === 'role.drop'
         && /\d/.test(ui.entryText({ ...s.diary[s.diary.length - 1], r: 0 }));
-      s.trackRoles(new Set([r.id])); s.removeTag(r.id, 'Aggressive');
-      out.removePaid = r.tags.length === 0 && r.dyn.morale === m0 + 2 * ROLES.CHANGE_MORALE;
-      out.freeFlag = (() => { r.tags = ['Playmaker']; r.roleMatches = 2; const m = r.dyn.morale; s.changeRole(r.id, 'Selfish', { free: true }); return r.dyn.morale === m; })();
+      out.freshFree = (() => { r.roles = [{ id: 'Engine', level: 1, m: 0 }]; const m = r.dyn.morale; s.removeRole(r.id, 'Engine'); return r.roles.length === 0 && r.dyn.morale === m; })();
+      out.freeFlag = (() => { r.roles = [{ id: 'Selfish', level: 2, m: 2 }]; const m = r.dyn.morale; s.removeRole(r.id, 'Selfish', { free: true }); return r.dyn.morale === m; })();
       // Match Practice: position line kept, + one role clue; two kids with the same hidden archetype never share a template that day
       const arch = ['DEF', 'MID', 'FWD'].find(a => s.squad.filter(p => p.archetype === a).length >= 2), pair = s.squad.filter(p => p.archetype === arch).slice(0, 2);
       const tg = pair.map(p => p.tag); pair.forEach(p => { p.tag = arch === 'FWD' ? 'DEF' : 'FWD'; });
@@ -1833,8 +1829,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
           && o[0].key !== o[1].key && o[0].clue.textKey !== o[1].clue.textKey; });
       pair.forEach((p, i) => { p.tag = tg[i]; });
       // every clue text exists in EN + RU and names no role
-      const names = Object.values(TAGS).flatMap(t => [t.en[0], t.ru[0]]).map(x => x.toLowerCase());
-      const keys = [...Object.keys(CLUE_SIGNALS).flatMap(g => [...Array(CLUES.PHRASES).keys()].map(i => `clue.${g}.${i}`)), ...[...Array(CLUES.NEUTRAL).keys()].map(i => 'clue.none.' + i)];
+      const names = ROLE_IDS.flatMap(id => [I18N.en['role.' + id], I18N.ru['role.' + id]]).map(x => x.toLowerCase());
+      const keys = [...Object.keys(CLUE_SIGNALS).map(g => 'clue.like.' + g), ...Object.keys(CLUE_SIGNALS).flatMap(g => [...Array(CLUES.PHRASES).keys()].map(i => `clue.${g}.${i}`)), ...[...Array(CLUES.NEUTRAL).keys()].map(i => 'clue.none.' + i)];
       out.texts = keys.every(k => I18N.en[k] && I18N.ru[k] && !names.some(n => (I18N.en[k] + I18N.ru[k]).toLowerCase().includes(n)));
       // v3.18.1 keeper line: goals against count (0-8 with 2 saves is not "solid"); the engine books them on the keeper
       const kn = (sv, c) => keeperNote({ saves: sv, conceded: c });
@@ -1842,12 +1838,254 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         && kn(2, 0) === 'note.gkOk' && kn(0, 1) === 'note.gkBeaten' && kn(0, 0) === 'note.gkQuiet' && keeperNote({ saves: 2 }) === 'note.gkOk'
         && ['gkRough', 'gkShaky', 'gkMixed', 'gkBeaten'].every(k => I18N.en['note.' + k] && I18N.ru['note.' + k]);
       const row = s.league.table().find(x => x.team.user);
-      out.conceded = Object.values(s.seasonStats).reduce((a, st) => a + (st.conceded || 0), 0) === row.ga && row.ga > 0;   // (smoke swaps kids in and out: count every kid with season stats)
+      out.conceded = Object.values(s.seasonStats).reduce((a, st) => a + (st.conceded || 0), 0) === row.ga && row.ga > 0;
+      if (!out.conceded) out.concededWhy = Object.values(s.seasonStats).reduce((a, st) => a + (st.conceded || 0), 0) + ' vs ' + row.ga + ' md ' + s.league.playedMatchdays();   // (smoke swaps kids in and out: count every kid with season stats)
       s.save();
       return out;
     });
-    check('v3.18 clues: WRONG = 0 → always a true signal, WRONG = 1 → never; 0 tackles/interceptions → never "duel"; nothing on the card → neutral; unique phrasing per event; ✓ only across different events; ≤ 8 per kid, old saves load; 📝 on roster + board with tooltip, PLAYER_INFO list read-only, gone after opening his card in the Notebook; role change free before a match, then −3 morale + diary; texts EN + RU without role names',
-      Object.entries(cl1).every(([k, v]) => k === 'mix' ? v > 0.05 && v < 0.4 : v === true), JSON.stringify(cl1));
+    check('v3.18 clues: WRONG = 0 → always a true signal, WRONG = 1 → never; 0 tackles/interceptions → never "duel"; nothing on the card → neutral; unique phrasing per event; ✓ only across different events; ≤ 8 per kid, old saves load; 📝 on roster + board with tooltip, PLAYER_INFO list read-only, gone after opening his card in the Notebook; role removal free before a match, then −3 morale + diary; texts EN + RU without role names',
+      Object.entries(cl1).every(([k, v]) => k === 'mix' ? v > 0.05 && v < 0.4 : k === 'concededWhy' || v === true), JSON.stringify(cl1));
+    // ===== v3.19 GROWTH: REVIEW.EXE after a win / draw, roles with levels + two slots, 3 new roles =====
+    {   // block scope: the v3.19 names never clash with older checks
+    const v319calm = () => page.evaluate(() => { const s = YAM.game, ui = YAM.ui; ui.autoReview = false; ui.events.enabled = false; s.excusesOff = true;
+      s.eventQueue = []; s.pendingEvent = null; ui.events.view?.layer && (ui.events.view.layer.hidden = true); ui.modal.close(); ui.profile.close(); ui.debug.close(); ui.locker.close?.(); });
+    const v319toPost = async (force = true) => {   // the next league match, played by Quick Sim (Force Win optional)
+      await v319calm();
+      await page.evaluate(() => { const s = YAM.game, ui = YAM.ui;
+        if (s.phase === 'post') { if (s.reviewPending) s.reviewPick(0); if (s.talkPending) s.applyTeamTalk('praise'); ui.closeMatchday(); }
+        if (s.phase === 'seasonEnd') ui.onDashAction();
+        if (s.phase === 'calendar') ui.autoSim(); });
+      await page.waitForFunction(() => YAM.game.phase === 'matchday' || (YAM.game.pendingEvent && !document.getElementById('talk-layer').hidden), null, { timeout: 30000 });
+      await page.evaluate(f => { const s = YAM.game, ui = YAM.ui; ui.modal.close(); ui.locker.close?.(); ui.briefing.close?.();
+        s.dayState().locker = { done: true, absent: {}, checked: [] }; s.cheats.forceWin = f; ui.onInstantSim(); }, force);
+      await page.waitForFunction(() => YAM.game.phase === 'post', null, { timeout: 10000 });
+      await page.evaluate(() => { YAM.ui.modal.close(); YAM.ui.summary.close?.(); });
+    };
+    const rvOpen = () => page.evaluate(() => !document.getElementById('review-view').hidden);
+
+    // 1. a win → REVIEW.EXE for the best-rated kid; [ CONTINUE ] / Return to Dashboard blocked until a choice; no OK / ×; Esc does nothing
+    await page.evaluate(() => { YAM.game.lossStreak = 0; });
+    await v319toPost(true);
+    const w1 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, e = ui.engine, rv = s.review;
+      const played = e.sides[0].all.filter(p => e.everPlayed.has(p.id) && s.player(p.id)), best = Math.max(...played.map(p => matchRating(e.st(p))));
+      const out = { res: s.lastReport.result, mode: rv?.mode, n: rv?.cards.length, best: !!rv && matchRating(e.st(s.player(rv.pid))) === best && played.some(p => p.id === rv.pid) };
+      ui.closeMatchday();
+      out.open = !document.getElementById('review-view').hidden; out.still = s.phase === 'post';
+      ui.onDashAction(); ui.continueDays();
+      out.blocked = s.phase === 'post' && s.reviewPending && !document.getElementById('review-view').hidden;
+      const L2 = document.getElementById('review-view');
+      out.noClose = !L2.querySelector('.tb-btn, #rv-x') && ![...L2.querySelectorAll('button')].some(b => /^\s*(ok|close|next|закрыть|далее)\s*$/i.test(b.textContent));
+      out.cards = L2.querySelectorAll('.rv-card').length; out.kid = L2.querySelector('#rv-kid').textContent.includes(L.name(s.player(rv.pid).name));
+      return out;
+    });
+    await page.keyboard.press('Escape');
+    w1.esc = await rvOpen();
+    await page.evaluate(() => YAM.ui.reviewView.close()); w1.closeNoop = await rvOpen();
+    await shot('19-review');
+    check('v3.19 win → REVIEW.EXE for the best match rating among our kids, 3 cards; Return / [ CONTINUE ] blocked until a choice; no OK / × button; Escape does not close it',
+      w1.res === 'W' && w1.mode === 'win' && w1.n === 3 && w1.best && w1.open && w1.still && w1.blocked && w1.noClose && w1.cards === 3 && w1.kid && w1.esc && w1.closeNoop, JSON.stringify(w1));
+
+    // 2. Reroll: 1 AP, once; disabled at 0 AP. Banish: role → p.banned, card removed (no refill), max 1. Then a card → applied, diary, window closes, next day.
+    const rr = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, w = s.weekState(); w.ap = 1; ui.reviewView.render();
+      const btn = document.getElementById('rv-reroll'), out = { en: !btn.disabled && !btn.hidden };
+      btn.click();
+      out.spent = w.ap === 0 && s.review.rerolled && s.review.cards.length === 3; out.dis = btn.disabled && !s.reviewReroll();
+      s.review.rerolled = false; w.ap = 0; ui.reviewView.render(); out.dis0 = btn.disabled && !s.reviewReroll();
+      w.ap = 1; s.review.rerolled = true; ui.reviewView.render();
+      const p = s.player(s.review.pid), i = s.review.cards.findIndex(c => c.type !== 'up'), role = s.review.cards[i]?.role;
+      if (i >= 0) document.querySelector(`#rv-cards [data-ban="${i}"]`).click();
+      out.ban = i < 0 || (p.banned.includes(role) && !s.review.cards.some(c => c.role === role) && s.review.cards.length === 2 && s.review.banished);
+      out.ban1 = !s.reviewBanish(0) && [...document.querySelectorAll('#rv-cards [data-ban]')].every(b => b.disabled) && document.querySelectorAll('#rv-cards .rv-card').length === s.review.cards.length;
+      out.banTwice = p.banned.filter(x => x === role).length <= 1;
+      const c = s.review.cards[0], before = JSON.stringify(p.roles), md = s.lastReport.md;
+      document.querySelector('#rv-cards [data-pick="0"]').click();
+      out.applied = c.type === 'new' ? p.roles.some(r => r.id === c.role && r.level === 1) : c.type === 'up' ? JSON.stringify(p.roles) !== before : p.roles.some(r => r.id === c.role) && !p.roles.some(r => r.id === c.replaces);
+      out.diary = s.diary.some(d => d.key === 'rv.' + c.type && d.vars?.k?.pid === p.id);
+      out.closed = document.getElementById('review-view').hidden && s.review === null && s.phase !== 'post' && ui.cal.nextEvent()?.md === md + 1;
+      out.free = c.type === 'up' || s.roleChangeCost(p, false, c.role) === 0;   // misclick protection until his next match
+      out.saved = JSON.parse(localStorage.getItem('yam_save_v1')).review === null;
+      return out;
+    });
+    check('v3.19 REVIEW: Reroll costs 1 AP, once per window, disabled at 0 AP; Banish → p.banned, card gone without refill, only once; a card applies at once (diary), the window closes, the matchday closes; a new role is free to remove until his next match',
+      Object.values(rr).every(Boolean), JSON.stringify(rr));
+
+    // 3. Skip → +2 morale; draw → 2 cards, no reroll, no mark; loss → nothing; Quick Sim and the visual match share the same path (onMatchEnd)
+    await v319toPost(true);
+    const sk = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, p = s.player(s.review.pid), m = p.dyn.morale = 50;
+      ui.closeMatchday(); document.getElementById('rv-skip').click();
+      return { morale: p.dyn.morale === m + REVIEW.SKIP_MORALE, closed: document.getElementById('review-view').hidden && s.phase !== 'post', diary: s.diary.some(d => d.key === 'rv.skip.diary') };
+    });
+    await v319toPost(false);
+    const dr = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, e = ui.engine, played = e.sides[0].all.filter(p => e.everPlayed.has(p.id)).map(p => [p.id, { ...e.st(p) }]);
+      const keep = { ...REVIEW }; REVIEW.LIKE_HINT = 1;
+      s.startReview('D', played, s.calendar.date, s.lastReport.md);
+      REVIEW.LIKE_HINT = keep.LIKE_HINT;
+      ui.closeMatchday();
+      const L2 = document.getElementById('review-view'), out = { open: !L2.hidden, mode: s.review?.mode === 'draw', n: L2.querySelectorAll('.rv-card').length === REVIEW.CARDS_DRAW,
+        noReroll: document.getElementById('rv-reroll').hidden && !s.reviewReroll(), noMark: !s.review.cards.some(c => c.like) && !L2.querySelector('.rv-like') };
+      const i = s.review.cards.findIndex(c => c.type !== 'up'); if (i >= 0) out.ban = s.reviewBanish(i); else out.ban = true;
+      document.getElementById('rv-skip').click(); out.skip = s.review === null && s.phase !== 'post';
+      return out;
+    });
+    await v319toPost(false);
+    const ls = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, e = ui.engine, played = e.sides[0].all.filter(p => e.everPlayed.has(p.id)).map(p => [p.id, { ...e.st(p) }]);
+      s.startReview('L', played, s.calendar.date, s.lastReport.md);
+      const none = s.review === null; ui.closeMatchday();
+      return { none, notOpen: document.getElementById('review-view').hidden, closed: s.phase !== 'post' };
+    });
+    check('v3.19 Skip → morale +2 and the window closes; a draw opens REVIEW.EXE with 2 cards, no reroll, no "he lit up" mark (skip + banish still work); a loss opens nothing',
+      Object.values(sk).every(Boolean) && Object.values(dr).every(Boolean) && Object.values(ls).every(Boolean), JSON.stringify({ sk, dr, ls }));
+
+    // 4. card rules (rolled over many dates + 4 cards): no "new" with full slots, no level-up at 3, no clashing pair, no banished role
+    const cr = await page.evaluate(() => {
+      const s = YAM.game, k = s.squad[2], keep = { roles: k.roles, banned: k.banned };
+      const setups = [[[], []], [[{ id: 'Playmaker', level: 3, m: 0 }], ['Engine']], [[{ id: 'Playmaker', level: 3, m: 0 }, { id: 'Engine', level: 1, m: 0 }], []],
+        [[{ id: 'Anchor', level: 2, m: 0 }, { id: 'Aggressive', level: 3, m: 0 }], ['Selfish', 'Finisher']], [[{ id: 'Finisher', level: 3, m: 0 }, { id: 'Selfish', level: 3, m: 0 }], ['Playmaker']]];
+      const bad = [];
+      setups.forEach(([roles, banned], j) => {
+        for (let d = 0; d < 40; d++) {
+          k.roles = roles.map(r => ({ ...r })); k.banned = [...banned];
+          const rv = { date: '2003-01-' + String(d + 1).padStart(2, '0'), md: 1, pid: k.id, n: 4, stats: { passOk: d, tackles: d % 5, intercepts: d % 3, dribbleOk: d % 7, shots: d % 4, onTarget: d % 2 } };
+          const cards = s.rollReviewCards(k, rv);
+          for (const c of cards) {
+            const held = k.roles.map(r => r.id);
+            const after = c.type === 'new' ? [...held, c.role] : c.type === 'swap' ? held.map(h => h === c.replaces ? c.role : h) : held;
+            if ((c.type === 'new' && held.length >= ROLES.SLOTS) || (c.type === 'up' && (k.roleLevel(c.role) >= ROLES.LEVELS || !held.includes(c.role)))
+              || (c.type === 'swap' && (held.length < ROLES.SLOTS || !held.includes(c.replaces))) || k.banned.includes(c.role) && c.type !== 'up'
+              || after.some(a => after.some(b => a !== b && roleClash(a, b))) || (c.type !== 'up' && held.includes(c.role))) bad.push(j + ':' + JSON.stringify(c));
+          }
+          if (new Set(cards.map(c => c.type + c.role + (c.replaces || ''))).size !== cards.length) bad.push(j + ':dup');
+          if (j === 4 && cards.some(c => c.type === 'up')) bad.push('up at 3');
+        }
+      });
+      const seeded1 = JSON.stringify(s.rollReviewCards(k, { date: '2003-02-01', md: 2, pid: k.id, n: 3, stats: {} })) === JSON.stringify(s.rollReviewCards(k, { date: '2003-02-01', md: 2, pid: k.id, n: 3, stats: {} }));
+      // weights: lots of passes → a pass role shows up more often (base weight 1 keeps everything possible)
+      k.roles = []; k.banned = [];
+      let pm = 0, pm0 = 0;
+      for (let d = 0; d < 200; d++) { const date = '2004-' + d;
+        if (s.rollReviewCards(k, { date, md: 1, pid: k.id, n: 1, stats: { passOk: 30 } })[0].role === 'Playmaker') pm++;
+        if (s.rollReviewCards(k, { date, md: 1, pid: k.id, n: 1, stats: {} })[0].role === 'Playmaker') pm0++; }
+      Object.assign(k, keep);
+      return { bad: bad.slice(0, 4), seeded1, pm, pm0 };
+    });
+    check('v3.19 card rules over 200 rolled windows: no "new role" with full slots, no level-up at 3, no Playmaker+Selfish / Anchor+Finisher, no banished role, no duplicates; seeded; a match full of passes weighs the pass role up (base 1 keeps every card possible)',
+      cr.bad.length === 0 && cr.seeded1 && cr.pm > cr.pm0 * 1.6 && cr.pm0 > 0, JSON.stringify(cr));
+
+    // 5. loss streak: 2+ losses in a row → the next win shows 4 cards; a draw resets it. "He lit up" = a clue (WRONG rules), banish clue (source 'review')
+    const st = await page.evaluate(() => {
+      const s = YAM.game, k = s.squad.find(p => p.position !== 'GK') || s.squad[3], played = [[k.id, { passOk: 20, tackles: 3, intercepts: 2, dribbleOk: 4, shots: 2, onTarget: 1 }]];
+      const keepR = { ...REVIEW }, keepW = CLUES.WRONG, keepRoles = k.roles, keepBan = k.banned, keepClues = k.clues;
+      const md = 30, out = {};
+      s.lossStreak = 0; k.roles = []; k.banned = [];
+      s.startReview('L', played, '2005-01-01', md); s.startReview('L', played, '2005-01-08', md);
+      out.streak = s.lossStreak === 2;
+      out.four = s.startReview('W', played, '2005-01-15', md).cards.length === REVIEW.CARDS_STREAK && s.lossStreak === 0;
+      s.startReview('L', played, '2005-01-22', md); s.startReview('L', played, '2005-01-29', md); s.startReview('D', played, '2005-02-05', md);
+      out.drawReset = s.lossStreak === 0 && s.startReview('W', played, '2005-02-12', md).cards.length === REVIEW.CARDS;
+      REVIEW.LIKE_HINT = 1; CLUES.WRONG = 0; k.clues = [];
+      let okFit = 0, n = 0;
+      for (let d = 1; d <= 20; d++) { const rv = s.startReview('W', played, '2005-03-' + String(d).padStart(2, '0'), md); const c = rv.cards.find(x => x.like);
+        if (c) { n++; if (roleFits(k, c.role)) okFit++; } }
+      out.like = n > 0 && okFit === n && k.clues.length > 0 && k.clues.every(c => c.source === 'review' && c.textKey === 'clue.like.' + c.signal);
+      CLUES.WRONG = 1; let wrong = 0, wn = 0;
+      for (let d = 1; d <= 20; d++) { const rv = s.startReview('W', played, '2005-04-' + String(d).padStart(2, '0'), md); const c = rv.cards.find(x => x.like);
+        if (c) { wn++; if (!roleFits(k, c.role)) wrong++; } }
+      out.wrong = wn > 0 && wrong === wn;
+      CLUES.WRONG = keepW; REVIEW.LIKE_HINT = 0; REVIEW.BANISH_CLUE = 1; k.clues = [];
+      const rv = s.startReview('W', played, '2005-05-01', md), bi = rv.cards.findIndex(c => c.type !== 'up');
+      out.banClue = bi >= 0 && s.reviewBanish(bi) && k.clues.length === 1 && k.clues[0].source === 'review' && !!I18N.en[k.clues[0].textKey] && YAM.ui.clueLine(k, k.clues[0]).includes('☆');
+      Object.assign(REVIEW, keepR); s.review = null; s.lossStreak = 0; k.roles = keepRoles; k.banned = keepBan; k.clues = keepClues;
+      return out;
+    });
+    check('v3.19 loss streak: after 2 losses in a row the next win shows 4 cards, a draw resets it; "he lit up" marks a fitting role (WRONG → a non-fitting one) and is stored as a clue (source review); a banish may write a clue too',
+      Object.values(st).every(Boolean), JSON.stringify(st));
+
+    // 6. levels: LEVEL_MULT 1.2 / 1.35 / 1.5 in a fixed seeded duel (level 1 weaker than level 3), downsides flat; Engine drain; Finisher only in the box
+    const lv = await page.evaluate(() => {
+      const s = YAM.game, e = YAM.ui.engine || null, k = s.squad.find(p => p.position !== 'GK'), keep = k.roles, R = Math.random;
+      const eng = e || { energy: new Map(), effParts: MatchEngine.prototype.effParts, rs: MatchEngine.prototype.rs, modParts: () => ({ cheat: 0, rep: 0, cap: 0, shout: 0, v: 0 }), captainStress: () => 0 };
+      Math.random = () => 0.5;
+      const duel = lvl => { k.roles = lvl ? [{ id: 'Playmaker', level: lvl, m: 0 }] : []; return MatchEngine.prototype.rs.call(eng, k, 'Pass', 0, 'atk'); };
+      const d0 = duel(0), d1 = duel(1), d2 = duel(2), d3 = duel(3);
+      k.roles = [{ id: 'Engine', level: 1, m: 0 }]; const dr1 = MatchEngine.drainOf(k); k.roles = [{ id: 'Engine', level: 3, m: 0 }]; const dr3 = MatchEngine.drainOf(k); k.roles = []; const dr0 = MatchEngine.drainOf(k);
+      k.roles = [{ id: 'Engine', level: 3, m: 0 }]; const engDown = roleAttrMult(k, 'Dribble') === ROLE_BY_ID.Engine.down.attrs.Dribble;
+      k.roles = [{ id: 'Engine', level: 1, m: 0 }]; const engDown1 = roleAttrMult(k, 'Dribble') === ROLE_BY_ID.Engine.down.attrs.Dribble;
+      k.roles = [{ id: 'Finisher', level: 3, m: 0 }]; const fin = roleAttrMult(k, 'Shoot', 'box') === ROLE_BY_ID.Finisher.boost.mult && roleAttrMult(k, 'Shoot', 'long') === 1 && roleAttrMult(k, 'Pass') === 0.85;
+      k.roles = [{ id: 'Aggressive', level: 3, m: 0 }, { id: 'Anchor', level: 3, m: 0 }]; const both = Math.abs(roleAttrMult(k, 'Mark') - 1.5 * ROLE_BY_ID.Anchor.boost.mult) < 1e-9;
+      Math.random = R; k.roles = keep;
+      return { tags: [d1.tag, d2.tag, d3.tag].map(x => +x.toFixed(2)).join(), order: d0.total < d1.total && d1.total < d2.total && d2.total < d3.total,
+        drain: Math.abs(dr1 / dr0 - 0.92) < 1e-9 && Math.abs(dr3 / dr0 - 0.8) < 1e-9, engDown, engDown1, fin, both };
+    });
+    check('v3.19 LEVEL_MULT: Playmaker level 1/2/3 = ×1.2/1.35/1.5 in a fixed seeded duel (level 1 < level 3); Engine drain ×0.92 → ×0.8, downsides never scale; Finisher only for shots in the box; two roles on one action multiply',
+      lv.tags === '1.2,1.35,1.5' && lv.order && lv.drain && lv.engDown && lv.engDown1 && lv.fin && lv.both, JSON.stringify(lv));
+
+    // 7. Notebook: no role-assign buttons; Remove role −3 after a played match (free right after REVIEW); old save: single role → level 2
+    const nb19 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, rep = s.lastReport, k = s.player(rep.players[0].id), keepPh = s.phase, keepUnl = s.notebookUnlocked;
+      s.phase = 'post'; s.notebookUnlocked = true; k.roles = [{ id: 'Anchor', level: 2, m: 1 }, { id: 'Engine', level: 1, m: 0 }]; k.dyn.morale = 50;
+      ui.show('notes'); ui.renderNotebook();
+      const body = document.getElementById('notes-body'), out = { noAssign: !body.querySelector('[data-tag]') && !/notes\.add|Role: “/.test(body.innerHTML),
+        rm: body.querySelectorAll(`[data-rmrole][data-id="${k.id}"]`).length === 2, pips: body.innerHTML.includes('●●○') };
+      body.querySelector(`[data-rmrole="Engine"][data-id="${k.id}"]`).click(); out.free = k.dyn.morale === 50 && k.roles.length === 1;
+      body.querySelector(`[data-rmrole="Anchor"][data-id="${k.id}"]`).click(); out.paid = k.dyn.morale === 50 + ROLES.CHANGE_MORALE && k.roles.length === 0;
+      out.hint = !/ONE role|ОДНУ роль/i.test(I18N.en['notes.hint'] + I18N.ru['notes.hint']) && /REVIEW\.EXE/.test(I18N.en['notes.hint']) && /REVIEW\.EXE/.test(I18N.ru['notes.hint']);
+      s.phase = keepPh; s.notebookUnlocked = keepUnl;
+      const raw = JSON.parse(JSON.stringify(k)); delete raw.roles; raw.roleMatches = 3;
+      const old = new Player({ ...raw, tags: ['Playmaker'] });
+      out.migrate = JSON.stringify(old.roles) === JSON.stringify([{ id: 'Playmaker', level: 2, m: 3 }]) && Array.isArray(old.banned);
+      const both = new Player({ ...raw, roles: [{ id: 'Playmaker', level: 9 }, { id: 'Selfish', level: 1 }, { id: 'Engine', level: 0 }], tags: [] });
+      out.clean = JSON.stringify(both.roles.map(r => r.id + r.level)) === '["Playmaker3","Engine1"]';
+      // squad screen + PLAYER_INFO + DEBUG: short tags with pips, ROLES column id:level fit/misfit
+      k.roles = [{ id: 'Playmaker', level: 2, m: 0 }]; ui.show('team'); ui.renderTeam();
+      out.roster = (document.querySelector(`#roster .r-row[data-id="${k.id}"] .r-tags`)?.textContent || '').includes(L.t('role.Playmaker.s') + '●●○');
+      ui.profile.open(k.id); out.pinfo = (document.getElementById('pinfo-body')?.textContent || '').includes('●●○'); ui.profile.close();
+      ui.debug.tab = 'db'; ui.debug.render(); const db = ui.debug.body;
+      out.debug = [...db.querySelectorAll('th')].some(t => t.textContent === 'ROLES') && /Playmaker:2 (fit|MISFIT)/.test(db.textContent);
+      return out;
+    });
+    await page.evaluate(() => { const s = YAM.game, d = JSON.parse(localStorage.getItem('yam_save_v1')); d.squad[0].tags = ['Selfish']; delete d.squad[0].roles; d.squad[0].roleMatches = 2; delete d.review; delete d.lossStreak; localStorage.setItem('yam_save_v1', JSON.stringify(d)); });
+    await page.reload();
+    await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    nb19.reload = await page.evaluate(() => { const k = YAM.game.squad[0]; return JSON.stringify(k.roles) === JSON.stringify([{ id: 'Selfish', level: 2, m: 2 }]) && YAM.game.lossStreak === 0 && YAM.game.review === null; });
+    check('v3.19 Notebook: no role-assign buttons, Remove per role (free right after REVIEW, −3 after a played match), new intro text; old save: a single role loads as level 2; roles cleaned (≤ 2, no clash, levels 1–3); roster / PLAYER_INFO pips, DEBUG ROLES',
+      Object.values(nb19).every(Boolean), JSON.stringify(nb19));
+
+    // 8. texts + role data: 6 roles, every name / description / short tag / clue in EN + RU; the new roles plug into the v3.18 truth
+    const tx = await page.evaluate(() => {
+      const keys = ROLE_IDS.flatMap(id => ['role.' + id, 'role.' + id + '.d', 'role.' + id + '.s']).concat(Object.keys(CLUE_SIGNALS).flatMap(g => ['clue.like.' + g, ...[0, 1, 2, 3].map(i => `clue.${g}.${i}`)]),
+        ['rv.lead.win', 'rv.lead.draw', 'rv.type.new', 'rv.type.up', 'rv.type.swap', 'rv.like', 'rv.ban', 'rv.reroll', 'rv.skip', 'rv.new', 'rv.up', 'rv.swap', 'rv.skip.diary', 'rv.ban.diary', 'role.drop', 'clue.src.review']);
+      return { n: ROLES_DEF.length === 6 && ['Engine', 'Anchor', 'Finisher'].every(id => ROLE_BY_ID[id] && CLUE_SIGNALS[ROLE_BY_ID[id].signal]?.role === id),
+        truth: ROLES_DEF.every(d => CLUE_SIGNALS[d.signal].role === d.id), missing: keys.filter(k => !I18N.en[k] || !I18N.ru[k]),
+        desc: !/\{m\}|\{d\}/.test(L.tagDesc('Anchor') + L.tagDesc('Engine')) && L.tagDesc('Playmaker').includes('1.2 / 1.35 / 1.5') };
+    });
+    check('v3.19 roles as data: 6 rows in ROLES_DEF, each tied to its CLUE_SIGNALS row (one truth); names, descriptions (numbers from the table), short tags, clues, "he lit up" lines and REVIEW texts in EN + RU',
+      tx.n && tx.truth && tx.missing.length === 0 && tx.desc, JSON.stringify(tx));
+
+    // 9. auto-sim plays a whole season with REVIEW (first card) without getting stuck
+    await v319calm();
+    await page.evaluate(() => { const s = YAM.game, ui = YAM.ui; if (s.phase === 'post') { if (s.reviewPending) s.reviewPick(0); if (s.talkPending) s.applyTeamTalk('praise'); ui.closeMatchday(); }
+      s.newSeason(s.season + 1); ui.cal.attach(s.calendar); ui.engine = null; ui.prepareMatch(); ui.renderAll();
+      window.__rv = { picks: 0, opened: 0 }; const pick = s.reviewPick.bind(s); s.reviewPick = i => { window.__rv.picks++; return pick(i); };
+      const op = ui.reviewView.open.bind(ui.reviewView); ui.reviewView.open = () => { window.__rv.opened++; return op(); }; });
+    let guard = 0, owed = 0;
+    while (guard++ < 25) {
+      const ph = await page.evaluate(() => YAM.game.phase);
+      if (ph === 'seasonEnd') break;
+      await page.evaluate(() => { YAM.ui.events.enabled = false; YAM.game.eventQueue = []; YAM.ui.autoSim(); });
+      await page.waitForFunction(() => ['matchday', 'seasonEnd'].includes(YAM.game.phase) || YAM.game.pendingEvent, null, { timeout: 30000 });
+      if (await page.evaluate(() => YAM.game.phase === 'seasonEnd')) break;
+      owed += await page.evaluate(() => { const s = YAM.game, ui = YAM.ui; ui.modal.close(); s.dayState().locker = { done: true, absent: {}, checked: [] }; ui.onInstantSim();
+        const o = s.reviewPending ? 1 : 0; ui.autoSim(); if (s.talkPending) s.applyTeamTalk('praise'); ui.closeMatchday(); return o; });
+    }
+    const as = await page.evaluate(() => ({ phase: YAM.game.phase, md: YAM.game.league.playedMatchdays(), picks: window.__rv.picks, opened: window.__rv.opened, review: YAM.game.review, roles: YAM.game.squad.reduce((a, p) => a + p.roles.length, 0) }));
+    check('v3.19 auto-sim: a whole season with REVIEW.EXE (auto mode takes the first card, never opens the window), no soft-lock',
+      as.phase === 'seasonEnd' && as.md === 18 && as.picks === owed && owed > 0 && as.opened === 0 && as.review === null && as.roles > 0, JSON.stringify({ ...as, owed, guard }));
+    }
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

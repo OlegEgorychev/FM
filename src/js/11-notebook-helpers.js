@@ -38,6 +38,8 @@ function keeperNote(s) {
    The hidden truth is the same one the match engine uses: a role multiplies its composites ×1.5 (Aggressive: Tackle + Mark,
    Playmaker: Pass, Selfish: Dribble + Shoot) and brings its side effects (fouls / forced passes / never passing). The role
    that fits = the one whose composites are his strongest — exactly when the ×1.5 pays and the side effects hurt least.
+   v3.19: the same truth covers the three new roles through their CLUE_SIGNALS rows — Engine (run: Motor = stamina×2 + pace),
+   Anchor (screen: Mark, the composite his ×1.5 multiplies), Finisher (finish: Shoot). No second mapping: ROLES_DEF.signal → here.
    ========================================================= */
 /** Composite from the RAW hidden skills (no sharpness dip): the long-term truth, not today's form. */
 function rawComposite(p, key) {
@@ -65,19 +67,21 @@ function clueEvidence(sig, stats) {
 /** One clue about one kid at one event. True with chance 1 − WRONG (seeded date#clue#id), otherwise a random OTHER signal —
     worded just as confidently. No evidence on today's card → a neutral line (signal null, never confirms anything).
     `used` = text keys already given at this event, so two kids never share a phrasing. */
-function rollClue(p, { date, source, ref, stats = null, used = new Set() }) {
-  const r = seeded(date + '#clue#' + p.id), truth = trueSignals(p);
+function rollClue(p, { date, source, ref, stats = null, used = new Set(), salt = '' }) {
+  const r = seeded(date + '#clue#' + p.id + salt), truth = trueSignals(p);   // v3.19: salt = a second clue on the same day (REVIEW.EXE)
   const others = Object.keys(CLUE_SIGNALS).filter(k => !truth.includes(k));
   let signal = r() < CLUES.WRONG && others.length ? others[Math.floor(r() * others.length)] : truth[Math.floor(r() * truth.length)];
   if (!clueEvidence(signal, stats)) signal = null;
   const base = signal ? 'clue.' + signal + '.' : 'clue.none.', n = signal ? CLUES.PHRASES : CLUES.NEUTRAL;
-  const start = Math.floor(seeded(date + '#cluetxt#' + p.id)() * n);
+  const start = Math.floor(seeded(date + '#cluetxt#' + p.id + salt)() * n);
   let i = 0;
   while (i < n - 1 && used.has(base + (start + i) % n)) i++;
   const textKey = base + (start + i) % n;
   used.add(textKey);
   return { date, source, ref, signal, textKey, seen: false };
 }
+/** v3.19: does this role fit him (its signal is one of his true signals)? DEBUG.EXE fit / misfit, the REVIEW "he lit up" mark. */
+const roleFits = (p, id) => !!ROLE_BY_ID[id] && trueSignals(p).includes(ROLE_BY_ID[id].signal);
 /** One event = source + ref (+ date: round numbers repeat every season). */
 const clueEvent = c => c.source + '|' + c.ref + '|' + c.date;
 /** ✓ confirmed: another clue with the same signal from a DIFFERENT event. Contradictions stay visible, nothing is resolved. */

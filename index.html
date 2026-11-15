@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.18.1</title>
+<title>Youth Academy Manager v3.19</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1840,6 +1840,58 @@ body.modal-lock #startmenu{ display: none; }
 .pinfo .nb-clues .cl-ok{ font-size: 10px; }
 .pinfo .nb-clues .nb-more summary{ color: var(--amber); }
 /* =========================================================
+   v3.19 "GROWTH" — REVIEW.EXE (the pick after a win), role level pips, Notebook remove buttons
+   ========================================================= */
+.review-layer{ position: absolute; inset: 0 0 38px 0; z-index: var(--z-phase); display: grid; place-items: center; padding: 12px;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.2) 0 2px, transparent 2px 4px), rgba(4,6,8,.74);
+  -webkit-backdrop-filter: blur(3px) grayscale(.5); backdrop-filter: blur(3px) grayscale(.5); }
+.review-layer[hidden]{ display: none; }
+.win.reviewwin{ position: relative; left: auto; top: auto; width: min(980px, 100%); max-height: 100%; display: flex; flex-direction: column;
+  background: var(--face); color: #111; border-radius: 0; border-color: var(--hi) var(--dark) var(--dark) var(--hi);
+  box-shadow: inset -1px -1px 0 var(--shadow), inset 1px 1px 0 #fff, 8px 10px 0 rgba(0,0,0,.45); }
+.win.reviewwin .titlebar{ border-radius: 0; margin: 2px 2px 0; background: linear-gradient(90deg, #4a2a06, #9a6a1e); }
+.rv-body{ display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 10px; padding: 10px; overflow: auto; min-height: 0; }
+.rv-kid{ display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 8px; background: #fff; border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); min-width: 0; }
+.rv-kid h3{ margin: 2px 0 0; font-size: 16px; display: flex; gap: 6px; align-items: center; }
+.rv-kid .rv-rating{ font: bold 12px/1 var(--mono); color: #4a2a06; }
+.rv-kid fieldset{ margin: 0; width: 100%; box-sizing: border-box; }
+.rv-roles{ border: 2px groove #d8d0b8; padding: 4px 6px 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.rv-roles legend{ padding: 0 4px; font-weight: bold; font-size: 12px; color: #13213a; }
+.rv-kid .rv-clues{ margin: 0; }
+.rv-kid .rv-clues li{ display: block; font-size: 12px; line-height: 16px; }
+.rv-kid .rv-clues li > span{ display: inline; width: auto; margin-right: 4px; }
+.rv-lead{ margin: 0 0 8px; font-size: 14px; }
+.rv-cards{ display: grid; grid-template-columns: repeat(var(--rv-n, 3), minmax(0, 1fr)); gap: 8px; }
+.rv-card{ display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rv-pick{ flex: 1; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; text-align: left; padding: 10px 9px; cursor: pointer; border-radius: 0;
+  font: 13px/1.35 var(--ui); color: #111; background: #f4efe2; border: 2px solid; border-color: #fff var(--shadow) var(--shadow) #fff; min-height: 170px; }
+.rv-pick:hover, .rv-pick:focus-visible{ background: #fff8e6; outline: 2px dashed #9a6a1e; outline-offset: -5px; }
+.rv-pick:active{ border-color: var(--shadow) #fff #fff var(--shadow); }
+.rv-type{ font: bold 10px/1 var(--mono); letter-spacing: 1px; text-transform: uppercase; padding: 2px 5px; color: #fff; background: #3d6a9a; }
+.rv-card.t-up .rv-type{ background: #3e6a3f; }
+.rv-card.t-swap .rv-type{ background: #8a4a1c; }
+.rv-name{ font-size: 17px; }
+.rv-pips{ font: 15px/1 var(--mono); letter-spacing: 2px; color: #9a6a1e; }
+.rv-repl{ font-size: 12px; color: #8a4a1c; }
+.rv-desc{ font-size: 12px; color: #3b372c; }
+.rv-like{ margin-top: auto; font: italic 12px/1.3 var(--ui); color: #1f3a5f; background: #fff59a; padding: 2px 5px; transform: rotate(-1deg); box-shadow: 1px 1px 0 rgba(0,0,0,.25); }
+.rv-ban{ align-self: flex-end; padding: 2px 8px; font-size: 11px; }
+.rv-empty{ grid-column: 1 / -1; margin: 18px 0; text-align: center; color: #555; font-style: italic; }
+.win.reviewwin .statusbar > span{ color: #333; font-size: 11px; }
+.rv-kid .tag.good{ background: #3e6a3f; color: #fff; border-color: #24401f; }
+.rv-kid .tag.bad{ background: #a63b30; color: #fff; border-color: #5e1d16; }
+.rv-kid .tag.neutral{ background: #7a6a3e; color: #fff; border-color: #463b1f; }
+.rv-foot{ display: flex; justify-content: flex-end; gap: 8px; padding: 6px 10px 8px; border-top: 1px solid #b8b3a8; }
+/* level pips on role chips (roster, Notebook, PLAYER_INFO, REVIEW) */
+.tag .pips{ margin-left: 5px; font: 10px/1 var(--mono); letter-spacing: 1px; opacity: .9; }
+.card .rm-roles{ display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+.card .rm-roles .btn small{ display: inline; margin-left: 4px; }
+@media (max-width: 760px){
+  .rv-body{ grid-template-columns: 1fr; }
+  .rv-cards{ grid-template-columns: 1fr; }
+  .rv-pick{ min-height: 0; }
+}
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -2240,6 +2292,19 @@ body.modal-lock #startmenu{ display: none; }
     </section>
   </div>
 
+  <!-- v3.19: REVIEW.EXE — the pick after a win / draw (no close button: only a choice closes it) -->
+  <div class="review-layer" id="review-view" hidden>
+    <section class="win reviewwin open" role="dialog" aria-modal="true" aria-labelledby="rv-title">
+      <div class="titlebar"><span class="t-ico">&#9734;</span><span class="t-txt" id="rv-title">REVIEW.EXE</span></div>
+      <div class="rv-body">
+        <aside class="rv-kid" id="rv-kid"></aside>
+        <div class="rv-main"><p class="rv-lead" id="rv-lead"></p><div class="rv-cards" id="rv-cards"></div></div>
+      </div>
+      <div class="rv-foot"><button class="btn" id="rv-reroll" type="button"></button><button class="btn" id="rv-skip" type="button"></button></div>
+      <div class="statusbar"><span id="rv-status"></span></div>
+    </section>
+  </div>
+
   <!-- v2.6: Locker room (who turned up today) -->
   <div class="locker-layer" id="locker-room-view" hidden>
     <section class="win lockerwin open" role="dialog" aria-modal="true" aria-labelledby="lr-title">
@@ -2374,6 +2439,7 @@ const COMPOSITE = {
   Tackle:  { tackling: 2, strength: 1, positioning: 1 },      // defender in a 1v1 duel
   Shoot:   { shooting: 2, composure: 1 },
   Save:    { goalkeeping: 2, agility: 1, positioning: 1 },
+  Motor:   { baseStamina: 2, acceleration: 1, speed: 1 },     // v3.19: never rolled in a duel — only the Engine role's "fits him" truth (CLUE_SIGNALS.run)
 };
 const TECH = new Set(ATTR_GROUPS.technical);
 /* v1.9 CLUB ECONOMY + NARRATIVE EVENTS */
@@ -2559,20 +2625,74 @@ const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
 const POS_HINT = { OBSERVE_MAX: 2, MIN: 3, CHANCE: { 3: 0.25, 4: 0.40, 5: 0.55, 6: 0.75 }, STEP: 0.05, CAP: 0.85,
   COOLDOWN: 2, YES_MORALE: 5, ORDER_MORALE: -8, ORDER_DISC: 1 };
 /* v3.18 CLUES — the coach's notes describe an episode instead of naming a role.
-   CLUE_SIGNALS: signal → the role it points to (TAGS key), `attrs` = the engine composites that role multiplies (same hidden truth
+   CLUE_SIGNALS: signal → the role it points to (ROLES_DEF id), `attrs` = the engine composites that role multiplies (same hidden truth
    as the ×1.5 and its side effects), `stats` = match counters that show he actually did it (a clue never contradicts the card),
    `min` = how many of them are needed. A new signal = one line here + `clue.<signal>.0…PHRASES-1` texts (EN + RU).
    CLUES: WRONG = chance a clue points to another signal; MAX_PER_KID kept; PHRASES per signal; FIT_TIE = composites this
-   close to his best one also count as "true"; TIP = clues in the 📝 tooltip / under the role buttons. */
+   close to his best one also count as "true"; TIP = clues in the 📝 tooltip / under the role buttons.
+   v3.19: three more rows (run / screen / finish) for the new roles + `lots` = how many of `stats` in one match count as
+   "he did a lot of it" (REVIEW.EXE card weights). */
 const CLUE_SIGNALS = {
-  pass: { role: 'Playmaker',  attrs: ['Pass'],            stats: ['passOk'],                min: 2 },
-  duel: { role: 'Aggressive', attrs: ['Tackle', 'Mark'],  stats: ['tackles', 'intercepts'], min: 1 },
-  solo: { role: 'Selfish',    attrs: ['Dribble', 'Shoot'], stats: ['dribbleOk', 'shots'],    min: 1 },
+  pass:   { role: 'Playmaker',  attrs: ['Pass'],            stats: ['passOk'],                                      min: 2, lots: 14 },
+  duel:   { role: 'Aggressive', attrs: ['Tackle', 'Mark'],  stats: ['tackles', 'intercepts'],                       min: 1, lots: 6 },
+  solo:   { role: 'Selfish',    attrs: ['Dribble', 'Shoot'], stats: ['dribbleOk', 'shots'],                          min: 1, lots: 8 },
+  run:    { role: 'Engine',     attrs: ['Motor'],           stats: ['passOk', 'tackles', 'intercepts', 'dribbleOk'], min: 8, lots: 26 },
+  screen: { role: 'Anchor',     attrs: ['Mark'],            stats: ['intercepts'],                                  min: 1, lots: 4 },
+  finish: { role: 'Finisher',   attrs: ['Shoot'],           stats: ['onTarget'],                                    min: 1, lots: 3 },
 };
-const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}' } };   // v3.20 adds 'voice'
+const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606' } };   // v3.19 'review'; v3.20 adds 'voice'
 const KEEPER_NOTE = { ROUGH: 4 };   // v3.18.1: goals let in from which the keeper's day reads as a rough one, whatever his saves
-/* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free. */
-const ROLES = { CHANGE_MORALE: -3 };
+/* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free.
+   v3.19 GROWTH: p.roles = [{ id, level, m }] (m = league matches he played with it since he got it), at most SLOTS, levels 1–LEVELS.
+   LEVEL_MULT = the main multiplier by level for a ×1.5 role (level 3 = the v3.18 strength); any other main multiplier
+   scales the same way (roleLevelMult). Downsides never scale. Old single role → MIGRATE_LEVEL. */
+const ROLES = { CHANGE_MORALE: -3, SLOTS: 2, LEVELS: 3, LEVEL_MULT: [1.2, 1.35, 1.5], MIGRATE_LEVEL: 2 };
+/* v3.19 ROLES AS DATA — adding a role = one row + its texts (`role.<id>`, `role.<id>.d`, CLUE_SIGNALS row + `clue.<signal>.*`,
+   `clue.like.<signal>`) + (only if it needs a new kind of effect) one engine hook. Numbers are TEST values (test/balance.js --roles).
+   boost  = the MAIN effect, scales with the level: attrs × mult (ctx 'box' = only shots that are not long shots) | drain × (energy use)
+   down   = downsides, never scale: attrs {composite: ×}, weights {pass|dribble|shoot: ×} in chooseAction, midShotMin (Selfish:
+            shoot weight at least this in midfield), noShotPastLine (Anchor: no shot from a zone beyond his line),
+            fwdPass (Anchor: × the chance his pass goes forward), foulOnLostDuel (Aggressive)
+   signal = CLUE_SIGNALS key = the hidden "fits him" truth (11-notebook-helpers roleFit / trueSignals); clash = can't be held together. */
+const ROLES_DEF = [
+  { id: 'Aggressive', tone: 'bad',     signal: 'duel',   boost: { attrs: ['Tackle', 'Mark'], mult: 1.5 },  down: { foulOnLostDuel: true },                                  clash: [] },
+  { id: 'Playmaker',  tone: 'good',    signal: 'pass',   boost: { attrs: ['Pass'], mult: 1.5 },            down: { weights: { pass: 2, dribble: 0.4 } },                    clash: ['Selfish'] },
+  { id: 'Selfish',    tone: 'neutral', signal: 'solo',   boost: { attrs: ['Dribble', 'Shoot'], mult: 1.5 }, down: { weights: { pass: 0.08, dribble: 1.6, shoot: 1.8 }, midShotMin: 22 }, clash: ['Playmaker'] },
+  { id: 'Engine',     tone: 'good',    signal: 'run',    boost: { drain: 0.8 },                            down: { attrs: { Dribble: 0.95, Shoot: 0.95 } },                   clash: [] },
+  { id: 'Anchor',     tone: 'neutral', signal: 'screen', boost: { attrs: ['Mark'], mult: 1.35 },           down: { noShotPastLine: true, fwdPass: 0.7, weights: { dribble: 0.5 } },       clash: ['Finisher'] },
+  { id: 'Finisher',   tone: 'neutral', signal: 'finish', boost: { attrs: ['Shoot'], mult: 1.3, ctx: 'box' }, down: { attrs: { Pass: 0.85, Tackle: 0.85, Mark: 0.85 } },  clash: ['Anchor'] },
+];
+const ROLE_BY_ID = Object.fromEntries(ROLES_DEF.map(r => [r.id, r]));
+const ROLE_IDS = ROLES_DEF.map(r => r.id);
+/** Main multiplier at this level: `base` is the level-3 value; LEVEL_MULT [1.2, 1.35, 1.5] → ×1.5 role 1.2 / 1.35 / 1.5, ×0.8 drain 0.92 / 0.86 / 0.8. */
+function roleLevelMult(base, level) {
+  const LM = ROLES.LEVEL_MULT, top = LM[LM.length - 1], l = LM[clamp(Math.round(level) || 1, 1, LM.length) - 1];
+  return 1 + (base - 1) * (l - 1) / (top - 1);
+}
+/** His roles (academy kids; opponents and world kids have none). */
+const rolesOf = p => p?.roles || [];
+const roleClash = (a, b) => !!ROLE_BY_ID[a]?.clash.includes(b) || !!ROLE_BY_ID[b]?.clash.includes(a);
+/** Engine hook: every role's multiplier on one composite (boost × level, downsides flat; two roles on the same action multiply). */
+function roleAttrMult(p, attr, ctx = null) {
+  let m = 1;
+  for (const r of rolesOf(p)) {
+    const d = ROLE_BY_ID[r.id]; if (!d) continue;
+    if (d.boost.attrs?.includes(attr) && (!d.boost.ctx || d.boost.ctx === ctx)) m *= roleLevelMult(d.boost.mult, r.level);
+    if (d.down.attrs?.[attr]) m *= d.down.attrs[attr];
+  }
+  return m;
+}
+/** Engine hook: energy use multiplier (Engine). */
+function roleDrainMult(p) { let m = 1; for (const r of rolesOf(p)) { const d = ROLE_BY_ID[r.id]; if (d?.boost.drain) m *= roleLevelMult(d.boost.drain, r.level); } return m; }
+const roleHas = (p, flag) => rolesOf(p).some(r => ROLE_BY_ID[r.id]?.down[flag]);
+/* v3.19 REVIEW.EXE — the pick after a win (draw: the smaller pick, until v3.20). TEST values.
+   CARDS / CARDS_DRAW / CARDS_STREAK (after STREAK_FROM+ losses in a row), LIKE_HINT = chance of the "he lit up" mark (win, first set only),
+   BANISH_CLUE = chance a banish also writes a clue, REROLL_AP, SKIP_MORALE, EVIDENCE_W = extra card weight for the signal he showed
+   most this match (base 1 each). RATING = man of the match: base + Σ stat × weight (our kids who played; tie → seeded). */
+const REVIEW = { CARDS: 3, CARDS_DRAW: 2, CARDS_STREAK: 4, STREAK_FROM: 2, LIKE_HINT: 0.3, BANISH_CLUE: 0.4, REROLL_AP: 1, SKIP_MORALE: 2, EVIDENCE_W: 2,
+  RATING: { base: 6, goals: 1, assists: 0.6, onTarget: 0.2, passOk: 0.03, passFail: -0.04, tackles: 0.15, tacklesLost: -0.05, intercepts: 0.12,
+    dribbleOk: 0.08, dribbleFail: -0.05, saves: 0.3, conceded: -0.3, yellow: -0.3, red: -1.5 } };
+const matchRating = st => { let r = REVIEW.RATING.base; for (const k in REVIEW.RATING) if (k !== 'base') r += (st?.[k] || 0) * REVIEW.RATING[k]; return clamp(r, 1, 10); };
 const positionRequestChance = n => n < POS_HINT.MIN ? 0 : POS_HINT.CHANCE[n] ?? Math.min(POS_HINT.CAP, POS_HINT.CHANCE[6] + (n - 6) * POS_HINT.STEP);
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
@@ -2681,13 +2801,7 @@ const RU_TEAMS = {
 };
 const POS_LABEL = { en: { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'FWD' }, ru: { GK: 'ВРТ', DEF: 'ЗАЩ', MID: 'ПЗ', FWD: 'НАП' } };
 
-/* Role tags — each one changes the match math (see MatchEngine.eff / chooseAction / commitFoul). */
-const TAGS = {
-  Aggressive: { tone: 'bad',     en: ['Aggressive', 'Tackle ×1.5. Loses a tackle → foul + yellow card.'], ru: ['Агрессивный', 'Отбор ×1.5. Проиграл единоборство — фол и жёлтая карточка.'] },
-  Playmaker:  { tone: 'good',    en: ['Playmaker', 'Pass ×1.5. Looks for a pass first.'],                ru: ['Плеймейкер', 'Пас ×1.5. В первую очередь ищет передачу.'] },
-  Selfish:    { tone: 'neutral', en: ['Selfish', 'Dribble & Shoot ×1.5. Almost never passes.'],         ru: ['Эгоист', 'Дриблинг и удар ×1.5. Почти никогда не пасует.'] },
-};
-const TAG_KEYS = Object.keys(TAGS);
+/* v3.19: role names / descriptions = I18N 'role.<id>' / 'role.<id>.d' (rows: ROLES_DEF in 00-utils-data.js). */
 
 const I18N = {
   en: {
@@ -2698,7 +2812,7 @@ const I18N = {
     'ui.newAcademy': 'New Academy (wipe save)', 'ui.fxOn': 'Screen effects: ON', 'ui.fxOff': 'Screen effects: OFF',
     'ui.switchLang': 'Язык: Русский', 'ui.lang': 'Switch to Russian',
     'office.title': 'COACH.EXE — Office', 'office.sub': 'Youth Academy · Sunday League, Division 3',
-    'office.memo': '<li>Ratings are hidden. Watch the radar and the log, trust your eyes.</li><li>Pick a formation on the Tactics board: numbers in a line win that third of the pitch.</li><li>After the match give lads a ROLE in the Notebook. It changes how they play.</li><li>Shout from the touchline and rotate the squad: under 50% energy = half strength.</li>',
+    'office.memo': '<li>Ratings are hidden. Watch the radar and the log, trust your eyes.</li><li>Pick a formation on the Tactics board: numbers in a line win that third of the pitch.</li><li>Win, and the man of the match earns a ROLE in REVIEW.EXE. It changes how he plays.</li><li>Shout from the touchline and rotate the squad: under 50% energy = half strength.</li>',
     'office.toSquad': 'Squad Sheet', 'office.toMatch': 'Go to Match Day &#9656;',
     'office.fixture': 'Fixture', 'office.record': 'Record', 'office.notes': 'Roles', 'office.pitch': 'Pitch', 'office.tired': 'Tired', 'office.formation': 'Formation',
     'office.recordVal': 'W{w} D{d} L{l} &nbsp;(GF {gf} / GA {ga})', 'office.tagsWritten': '{n} roles given',
@@ -2739,7 +2853,7 @@ const I18N = {
     'notes.title': 'NOTEBOOK.TXT — Post-Match', 'notes.saveHint': 'Roles apply from the next match', 'notes.locked': 'Locked.',
     'notes.lockedMsg': '&#128274; Nothing written yet.<br>Play a match to unlock the notebook.',
     'notes.head': 'MATCH #{n}: vs {o}',
-    'notes.hint': 'Three lads caught your eye. Each note is a clue: a moment from the match, not a verdict, and sometimes the coach reads it wrong. Two clues that agree from different days get a &#10003;. The role is your call: it changes how he plays next match, and a wrong one backfires.',
+    'notes.hint': 'Three lads caught your eye. Each note is a clue: a moment from the match, not a verdict, and sometimes the coach reads it wrong. Two clues that agree from different days get a &#10003;. Roles are earned now: after a win the man of the match picks one in REVIEW.EXE (after a draw, a smaller pick). Here you can only take a role away, and a wrong one still backfires.',
     'notes.status': 'Report for fixture #{n}. Roles apply from the next match.',
     'notes.pass': '{a} successful passes, {b} failed', 'notes.tackles': '{a} tackles won, {b} lost', 'notes.drib': '{a} dribbles past a man, {b} lost',
     'notes.shots': '{a} shots ({b} on target), {c} goals', 'notes.saves': '{a} saves', 'notes.cards': 'cards: {a} yellow, {b} red',
@@ -2761,7 +2875,7 @@ const I18N = {
     'ui.newAcademy': 'Новая академия (сброс)', 'ui.fxOn': 'Эффекты экрана: ВКЛ', 'ui.fxOff': 'Эффекты экрана: ВЫКЛ',
     'ui.switchLang': 'Language: English', 'ui.lang': 'Переключить на английский',
     'office.title': 'COACH.EXE — Кабинет', 'office.sub': 'Детская академия · Воскресная лига, 3-й дивизион',
-    'office.memo': '<li>Рейтинги скрыты. Смотри на радар и протокол, верь своим глазам.</li><li>Выбери схему на Тактической доске: численное преимущество в линии выигрывает эту треть поля.</li><li>После матча дай парням РОЛЬ в Блокноте. Она меняет их игру.</li><li>Кричи с бровки и делай ротацию: энергия ниже 50% — игра вполсилы.</li>',
+    'office.memo': '<li>Рейтинги скрыты. Смотри на радар и протокол, верь своим глазам.</li><li>Выбери схему на Тактической доске: численное преимущество в линии выигрывает эту треть поля.</li><li>Победа — и лучший игрок матча зарабатывает РОЛЬ в REVIEW.EXE. Она меняет его игру.</li><li>Кричи с бровки и делай ротацию: энергия ниже 50% — игра вполсилы.</li>',
     'office.toSquad': 'Список состава', 'office.toMatch': 'На матч &#9656;',
     'office.fixture': 'Матч', 'office.record': 'Итоги', 'office.notes': 'Роли', 'office.pitch': 'Поле', 'office.tired': 'Уставшие', 'office.formation': 'Схема',
     'office.recordVal': 'В{w} Н{d} П{l} &nbsp;(забито {gf} / пропущено {ga})', 'office.tagsWritten': 'ролей назначено: {n}',
@@ -2802,7 +2916,7 @@ const I18N = {
     'notes.title': 'NOTEBOOK.TXT — После матча', 'notes.saveHint': 'Роли действуют со следующего матча', 'notes.locked': 'Закрыто.',
     'notes.lockedMsg': '&#128274; Пока ничего не записано.<br>Сыграй матч, чтобы открыть блокнот.',
     'notes.head': 'МАТЧ №{n}: против {o}',
-    'notes.hint': 'Трое парней привлекли внимание. Каждая заметка — зацепка: эпизод из матча, а не приговор, и иногда тренер видит не то. Две совпавшие зацепки из разных дней получают &#10003;. Роль выбираешь ты: она изменит его игру в следующем матче, а ошибка выйдет боком.',
+    'notes.hint': 'Трое парней привлекли внимание. Каждая заметка — зацепка: эпизод из матча, а не приговор, и иногда тренер видит не то. Две совпавшие зацепки из разных дней получают &#10003;. Роли теперь зарабатывают: после победы лучший игрок матча выбирает её в REVIEW.EXE (после ничьей — выбор поменьше). Здесь роль можно только снять, а неподходящая по-прежнему выйдет боком.',
     'notes.status': 'Отчёт по матчу №{n}. Роли действуют со следующего матча.',
     'notes.pass': 'точных пасов: {a}, неточных: {b}', 'notes.tackles': 'отборов выиграно: {a}, проиграно: {b}', 'notes.drib': 'удачных обводок: {a}, потерь: {b}',
     'notes.shots': 'ударов: {a} (в створ: {b}), голов: {c}', 'notes.saves': 'сейвов: {a}', 'notes.cards': 'карточки: жёлтых {a}, красных {b}',
@@ -2984,7 +3098,7 @@ Object.assign(I18N.en, {
   'team.err.gkOnly': 'Only a goalkeeper can play in goal.', 'team.err.gkTwo': 'A second goalkeeper cannot play in the outfield.',
   'team.err.bench': 'Pick at least one player from the starting XI.',
   'modal.toMatch': '&#9917; To the Match &#9656;', 'modal.toTeam': 'Check the team', 'modal.later': 'Later',
-  'modal.ftTitle': 'Full-time', 'modal.ft': '<b>{h} {x} - {y} {a}</b><br>Other results are in. The Notebook is open: give roles to three lads.',
+  'modal.ftTitle': 'Full-time', 'modal.ft': '<b>{h} {x} - {y} {a}</b><br>Other results are in. The Notebook is open: read the clues about three lads.',
   'modal.toNotes': 'To Notebook &#9656;', 'modal.stay': 'Stay here', 'match.newEvents': '&#9660; New events',
   'dlg.nbLocked': 'The post-match Notebook opens after the final whistle<br>and closes when the matchday is closed.',
 });
@@ -3001,7 +3115,7 @@ Object.assign(I18N.ru, {
   'team.err.gkOnly': 'В ворота может встать только вратарь.', 'team.err.gkTwo': 'Второй вратарь не может играть в поле.',
   'team.err.bench': 'Выбери хотя бы одного игрока из основы.',
   'modal.toMatch': '&#9917; На матч &#9656;', 'modal.toTeam': 'Проверить команду', 'modal.later': 'Позже',
-  'modal.ftTitle': 'Финальный свисток', 'modal.ft': '<b>{h} {x} - {y} {a}</b><br>Остальные результаты тура известны. Блокнот открыт: дай роли трём парням.',
+  'modal.ftTitle': 'Финальный свисток', 'modal.ft': '<b>{h} {x} - {y} {a}</b><br>Остальные результаты тура известны. Блокнот открыт: почитай зацепки о трёх парнях.',
   'modal.toNotes': 'В Блокнот &#9656;', 'modal.stay': 'Остаться', 'match.newEvents': '&#9660; Новые события',
   'dlg.nbLocked': 'Блокнот открывается после финального свистка<br>и закрывается, когда тур завершён.',
 });
@@ -4224,6 +4338,102 @@ Object.assign(I18N.ru, {
   'role.cost': 'мораль {m}', 'squad.removeCost': 'Убрать роль (мораль {m})',
   'role.flip': 'Тренер опять передумал насчёт роли — {k} расстроен (мораль {m}).',
 });
+
+/* v3.19 "GROWTH": roles as data (ROLES_DEF), levels + two slots, REVIEW.EXE after a win / draw */
+Object.assign(I18N.en, {
+  'role.Aggressive.s': 'AGGR', 'role.Playmaker.s': 'PLAY', 'role.Selfish.s': 'SELF', 'role.Engine.s': 'ENGN', 'role.Anchor.s': 'ANCH', 'role.Finisher.s': 'FIN',
+  'role.Aggressive': 'Aggressive', 'role.Aggressive.d': 'Tackling & marking ×{m} by level. Beaten in a duel → foul + yellow card.',
+  'role.Playmaker': 'Playmaker', 'role.Playmaker.d': 'Passing ×{m} by level. Looks for a pass first, dribbles less.',
+  'role.Selfish': 'Selfish', 'role.Selfish.d': 'Dribble & shot ×{m} by level. Almost never passes.',
+  'role.Engine': 'Engine', 'role.Engine.d': 'Tires slower: energy use ×{m} by level, so he also starts the next match fresher. Dribbles and shots ×{d}.',
+  'role.Anchor': 'Anchor', 'role.Anchor.d': 'Interceptions & blocks ×{m} by level. Never joins the attack: no shots beyond his line, fewer runs and balls forward.',
+  'role.Finisher': 'Finisher', 'role.Finisher.d': 'Shots inside the box ×{m} by level. Passing ×{d}; waits up front (tackling & marking ×{d}).',
+  'clue.run.0': 'Still sprinting back in the 85th minute while the rest were walking.',
+  'clue.run.1': 'Covered every blade of grass: box to box and back again.',
+  'clue.run.2': 'Pressed their keeper, then caught their winger half a minute later.',
+  'clue.run.3': 'Looked as fresh at the final whistle as at kick-off.',
+  'clue.screen.0': 'Sat in front of our back line and cut out pass after pass.',
+  'clue.screen.1': 'Threw himself in front of a shot and got up as if nothing happened.',
+  'clue.screen.2': 'Never crossed halfway, but nothing came through his zone.',
+  'clue.screen.3': 'Saw their through ball coming two passes early and was already there.',
+  'clue.finish.0': 'Barely touched the ball, but every touch in the box ended up on target.',
+  'clue.finish.1': 'Hung around the far post all game and was there when it mattered.',
+  'clue.finish.2': 'Ice-cold one-on-one with the keeper: picked his corner and waited.',
+  'clue.finish.3': 'Didn\'t track back once, but their centre-backs never got to relax.',
+  'clue.like.pass': 'Lit up when we talked about finding the free man.',
+  'clue.like.duel': 'Lit up when we talked about winning the ball back.',
+  'clue.like.solo': 'Lit up when we talked about taking players on.',
+  'clue.like.run': 'Lit up when we talked about running all game.',
+  'clue.like.screen': 'Lit up when we talked about guarding the space in front of our defence.',
+  'clue.like.finish': 'Lit up when we talked about being in the box at the right moment.',
+  'clue.src.review': 'Review after round {r}',
+  'rv.lead.win': 'Man of the match: <b>{k}</b>. What does he work on next? Pick one card.',
+  'rv.lead.draw': 'A point today, and <b>{k}</b> stood out. A smaller step for him: pick one of {n}.',
+  'rv.rating': 'match rating {r}', 'rv.roles': 'Roles ({a}/{b})', 'rv.noRole': 'no role yet', 'rv.clues': 'Latest clues', 'rv.level': 'level {l}',
+  'rv.type.new': 'New role', 'rv.type.up': 'Level up', 'rv.type.swap': 'Replace', 'rv.replaces': 'instead of {r}',
+  'rv.like': 'He lit up when you mentioned it',
+  'rv.ban': 'Banish', 'rv.banTip': 'Never offer {r} to him again this season. One banish per window; the card is not replaced.',
+  'rv.banHeld': 'He already has this role: remove it in the Notebook instead.', 'rv.banUsed': 'Only one banish per window.',
+  'rv.reroll': '&#8635; Reroll [{n} AP]', 'rv.rerollTip': 'Three new cards for 1 action point ({a} left this week). Once per window.',
+  'rv.rerollUsed': 'Already rerolled in this window.', 'rv.rerollNoAp': 'No action points left this week.',
+  'rv.skip': 'Skip (+{n} morale)', 'rv.skipTip': 'No change this time. He takes it well: the coach didn\'t push him.',
+  'rv.empty': 'No cards left. Skip this time.',
+  'rv.status': 'Pick one card, or skip. This window closes only through a choice.',
+  'rv.new': 'After the match {k} took on a new role: {r}.', 'rv.up': '{k} grew into his role: {r} is now level {l}.',
+  'rv.swap': '{k} switched roles: {r} instead of {o}.', 'rv.skip.diary': 'After the match the coach left {k} as he was; he liked not being pushed.',
+  'rv.ban.diary': 'The coach crossed {r} off {k}\'s list for this season.',
+  'role.drop': 'The coach took {r} away from {k}: morale {m}.',
+  'notes.remove': 'Remove &ldquo;{t}&rdquo;', 'notes.removeFree': 'free until his next match',
+  'notes.backReview': '&#9734; Review the man of the match',
+  'pi.roleLbl': 'Roles:', 'pi.noRole': 'No role yet: roles are earned in REVIEW.EXE after a win.',
+});
+Object.assign(I18N.ru, {
+  'role.Aggressive.s': 'АГР', 'role.Playmaker.s': 'ПЛЕЙ', 'role.Selfish.s': 'ЭГО', 'role.Engine.s': 'МОТ', 'role.Anchor.s': 'ОПОР', 'role.Finisher.s': 'БОМБ',
+  'role.Aggressive': 'Агрессивный', 'role.Aggressive.d': 'Отбор и опека ×{m} по уровню. Проиграл единоборство — фол и жёлтая карточка.',
+  'role.Playmaker': 'Плеймейкер', 'role.Playmaker.d': 'Пас ×{m} по уровню. Сначала ищет передачу, реже обводит.',
+  'role.Selfish': 'Эгоист', 'role.Selfish.d': 'Дриблинг и удар ×{m} по уровню. Почти никогда не пасует.',
+  'role.Engine': 'Мотор', 'role.Engine.d': 'Устаёт медленнее: расход сил ×{m} по уровню, поэтому и к следующему матчу свежее. Дриблинг и удары ×{d}.',
+  'role.Anchor': 'Опорник', 'role.Anchor.d': 'Перехваты и блоки ×{m} по уровню. Не идёт в атаку: не бьёт из-за своей линии, реже убегает и отдаёт вперёд.',
+  'role.Finisher': 'Бомбардир', 'role.Finisher.d': 'Удары из штрафной ×{m} по уровню. Пас ×{d}; ждёт впереди (отбор и опека ×{d}).',
+  'clue.run.0': 'На 85-й минуте всё ещё бежал назад, когда остальные уже шли шагом.',
+  'clue.run.1': 'Выбегал всё поле: от штрафной до штрафной и обратно.',
+  'clue.run.2': 'Прессинговал их вратаря, а через полминуты уже догнал их крайнего.',
+  'clue.run.3': 'К финальному свистку выглядел таким же свежим, как в начале.',
+  'clue.screen.0': 'Стоял перед нашей обороной и срезал передачу за передачей.',
+  'clue.screen.1': 'Бросился под удар и поднялся как ни в чём не бывало.',
+  'clue.screen.2': 'Ни разу не перешёл центр, но через его зону не прошло ничего.',
+  'clue.screen.3': 'Увидел их разрезающую передачу за два паса и уже стоял там.',
+  'clue.finish.0': 'Почти не касался мяча, но каждое касание в штрафной — в створ.',
+  'clue.finish.1': 'Всю игру крутился у дальней штанги и оказался там, когда было нужно.',
+  'clue.finish.2': 'Один на один с вратарём — ледяное спокойствие: выбрал угол и подождал.',
+  'clue.finish.3': 'Ни разу не вернулся назад, но их центральные защитники так и не расслабились.',
+  'clue.like.pass': 'Оживился, когда заговорили о том, как найти свободного.',
+  'clue.like.duel': 'Оживился, когда заговорили об отборе мяча.',
+  'clue.like.solo': 'Оживился, когда заговорили об обводке.',
+  'clue.like.run': 'Оживился, когда заговорили о том, чтобы бегать весь матч.',
+  'clue.like.screen': 'Оживился, когда заговорили о зоне перед нашей обороной.',
+  'clue.like.finish': 'Оживился, когда заговорили о том, как оказаться в штрафной в нужный момент.',
+  'clue.src.review': 'Разбор после {r}-го тура',
+  'rv.lead.win': 'Лучший игрок матча: <b>{k}</b>. Над чем ему работать дальше? Выбери одну карточку.',
+  'rv.lead.draw': 'Сегодня ничья, и <b>{k}</b> выделялся. Шаг поменьше: выбери одну из {n}.',
+  'rv.rating': 'оценка за матч {r}', 'rv.roles': 'Роли ({a}/{b})', 'rv.noRole': 'роли пока нет', 'rv.clues': 'Последние зацепки', 'rv.level': 'уровень {l}',
+  'rv.type.new': 'Новая роль', 'rv.type.up': 'Уровень выше', 'rv.type.swap': 'Замена', 'rv.replaces': 'вместо: {r}',
+  'rv.like': 'Он оживился, когда ты об этом сказал',
+  'rv.ban': 'Вычеркнуть', 'rv.banTip': 'Больше не предлагать ему «{r}» в этом сезоне. Одно вычёркивание за окно, новая карточка не появится.',
+  'rv.banHeld': 'Эта роль у него уже есть — снять её можно в Блокноте.', 'rv.banUsed': 'Вычеркнуть можно только одну карточку за окно.',
+  'rv.reroll': '&#8635; Перетасовать [{n} ОД]', 'rv.rerollTip': 'Три новые карточки за 1 очко действий (на неделю осталось {a}). Один раз за окно.',
+  'rv.rerollUsed': 'В этом окне уже перетасовано.', 'rv.rerollNoAp': 'На этой неделе очков действий не осталось.',
+  'rv.skip': 'Пропустить (+{n} к морали)', 'rv.skipTip': 'В этот раз без изменений. Он воспримет это хорошо: тренер на него не давил.',
+  'rv.empty': 'Карточек не осталось. В этот раз — пропустить.',
+  'rv.status': 'Выбери карточку или пропусти. Окно закрывается только выбором.',
+  'rv.new': 'После матча {k} получил новую роль: {r}.', 'rv.up': '{k} вырос в своей роли: «{r}» теперь {l}-го уровня.',
+  'rv.swap': '{k} сменил роль: «{r}» вместо «{o}».', 'rv.skip.diary': 'После матча {k} остался без изменений — ему понравилось, что тренер не давил.',
+  'rv.ban.diary': '{k}: тренер вычеркнул «{r}» из его списка на этот сезон.',
+  'role.drop': '{k}: тренер снял роль «{r}» (мораль {m}).',
+  'notes.remove': 'Снять «{t}»', 'notes.removeFree': 'бесплатно до его следующего матча',
+  'notes.backReview': '&#9734; Разбор лучшего игрока матча',
+  'pi.roleLbl': 'Роли:', 'pi.noRole': 'Роли пока нет: роли зарабатывают в REVIEW.EXE после победы.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -4240,8 +4450,14 @@ class Lang {
   team(n) { return this.code === 'ru' ? (RU_TEAMS[n] || n) : n; }
   pos(p) { return p ? (POS_LABEL[this.code][p] || p) : '—'; }   // v3.0: untagged kid
   line(l) { return this.pos(LINE_POS[l]); }
-  tag(key) { return TAGS[key] ? TAGS[key][this.code][0] : key; }
-  tagDesc(key) { return TAGS[key] ? TAGS[key][this.code][1] : ''; }
+  tag(key) { return ROLE_BY_ID[key] ? this.t('role.' + key) : key; }            // v3.19: names / texts of ROLES_DEF rows live in I18N
+  /** v3.19: {m} = the main multiplier by level from ROLES_DEF ("1.2 / 1.35 / 1.5"), {d} = its first flat downside multiplier. */
+  tagDesc(key) {
+    const d = ROLE_BY_ID[key]; if (!d) return '';
+    const b = d.boost.mult ?? d.boost.drain, n = v => String(+v.toFixed(2));
+    const m = ROLES.LEVEL_MULT.map((_, i) => n(roleLevelMult(b, i + 1))).join(' / ');
+    return this.t('role.' + key + '.d', { m, d: n(Object.values(d.down.attrs || {})[0] ?? 1) });
+  }
   locale() { return this.code === 'ru' ? 'ru-RU' : 'en-GB'; }
 }
 const L = new Lang();
@@ -4482,8 +4698,10 @@ class Player {
     this.name = name;
     this.archetype = position;
     this.number = number;
-    if (tags) {                      // only the academy squad carries tags (+ v1.9 story flags)
-      this.tags = tags;
+    if (tags) {                      // only the academy squad carries roles (+ v1.9 story flags)
+      // v3.19 GROWTH: roles [{ id, level 1–3, m }] (≤ ROLES.SLOTS, no clashing pair); an old single role (`tags` + v3.18 roleMatches) → level 2
+      this.roles = Player.cleanRoles(o, tags);
+      this.banned = Array.isArray(o.banned) ? [...new Set(o.banned.filter(id => ROLE_BY_ID[id]))] : [];   // v3.19: roles banished from his REVIEW.EXE this season
       this.flags = Array.isArray(o.flags) ? o.flags.filter(f => FLAGS[f]) : [];
       this.injuryDays = Math.max(0, Math.round(o.injuryDays || 0));                // v2.2: calendar days out
       this.suspensionMatches = Math.max(0, Math.round(o.suspensionMatches || 0));  // v2.2: matches banned
@@ -4494,7 +4712,6 @@ class Player {
       this.absentToday = o.absentToday || null;
       // v3.18: the Notebook's clues [{ date, source 'match'|'training' (v3.20: 'voice'), ref, signal|null, textKey, seen }] + matches his current role has played
       this.clues = Array.isArray(o.clues) ? o.clues.filter(c => c && typeof c.textKey === 'string').map(c => ({ ...c, signal: CLUE_SIGNALS[c.signal] ? c.signal : null })).slice(-CLUES.MAX_PER_KID) : [];
-      this.roleMatches = Math.max(0, Math.round(o.roleMatches || 0));
       this.lessonClues = Math.max(0, Math.round(o.lessonClues || 0));   // v3.16: lesson clues given (alternates archetype ↔ leadership)
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
       this.positionHintCooldown = Math.max(0, Math.round(o.positionHintCooldown || 0));   // v3.6: matches before he may ask again
@@ -4536,6 +4753,21 @@ class Player {
     { const v = src.psych.potential;
       this.psych.potential = !Number.isFinite(v) ? GROWTH.DEFAULT : newRoom ? clamp(Math.round(v), GROWTH.MIN, GROWTH.MAX) : roomFromCeiling(v, this.overall); }
     this.refreshPortrait();
+  }
+  /** v3.19: role ids (v3.18 name; undefined for opponents / world kids = "not an academy kid"). Setting it = v3.18 single roles at MIGRATE_LEVEL. */
+  get tags() { return this.roles ? this.roles.map(r => r.id) : undefined; }
+  set tags(v) { if (Array.isArray(v)) this.roles = Player.cleanRoles({}, v); }
+  roleLevel(id) { return this.roles?.find(r => r.id === id)?.level || 0; }
+  /** v3.19: saved roles → valid list. Missing → the old single role (`tags`) at ROLES.MIGRATE_LEVEL, its v3.18 roleMatches kept. */
+  static cleanRoles(o, tags) {
+    const src = Array.isArray(o.roles) ? o.roles
+      : (Array.isArray(tags) ? tags : []).filter(id => ROLE_BY_ID[id]).slice(0, 1).map(id => ({ id, level: ROLES.MIGRATE_LEVEL, m: o.roleMatches || 0 }));
+    const out = [];
+    for (const r of src) {
+      if (!r || !ROLE_BY_ID[r.id] || out.length >= ROLES.SLOTS || out.some(x => x.id === r.id || roleClash(x.id, r.id))) continue;
+      out.push({ id: r.id, level: clamp(Math.round(r.level) || 1, 1, ROLES.LEVELS), m: Math.max(0, Math.round(r.m || 0)) });
+    }
+    return out;
   }
   /** v3.0: what the UI calls the position — the coach's tag for academy kids, the (scouted) role for opponents. */
   get position() { return this.tags ? this.tag : this.archetype; }
@@ -4995,6 +5227,7 @@ class GameState {
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
     this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)
+    this.review = null; this.lossStreak = 0;   // v3.19 REVIEW.EXE + losses in a row
     this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {};   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
@@ -5059,7 +5292,8 @@ class GameState {
     this.seasonStats = {};   // playerId → cumulative stats this season (+ apps)
     this.cheats = this.cheats || { forceWin: false };   // v1.8 DEBUG.EXE
     this.coachNotes = {};    // v1.5: playerId → last Notebook note the coach actually saw { md, keys, role }
-    for (const p of this.squad) p.energy = 100;   // summer break
+    for (const p of this.squad) { p.energy = 100; p.banned = []; }   // summer break; v3.19: banished REVIEW roles come back
+    this.review = null; this.lossStreak = 0;   // v3.19
     this.save();
   }
 
@@ -5236,27 +5470,139 @@ class GameState {
     }
   }
   dutiesOf(id) { return Object.keys(DUTIES).filter(d => this.duties?.[d] === id); }
-  setTag(id, tag) { if (TAGS[tag]) this.changeRole(id, tag); }
-  removeTag(id, tag) { const p = this.player(id); if (p?.tags.includes(tag)) this.changeRole(id, null); }
-  /** v3.18: morale cost of changing / removing his role now (0 = free): the first role, or one that has not played a match yet, is free. */
-  roleChangeCost(p, free = false) { return !free && p?.tags?.length && p.roleMatches > 0 ? ROLES.CHANGE_MORALE : 0; }
-  /** v3.18: the one place a role changes. tag = null removes it. free = true → no morale cost (v3.20: the window after
-      the "After the game" talk; nothing passes it yet). Returns the morale change applied. */
-  changeRole(id, tag, { free = false } = {}) {
-    const p = this.player(id);
-    if (!p || (tag && !TAGS[tag]) || (p.tags[0] || null) === (tag || null)) return 0;
-    const cost = this.roleChangeCost(p, free);
-    p.tags = tag ? [tag] : [];
-    p.roleMatches = 0;
+  /* ---------- v3.19 GROWTH: roles with levels, two slots; they come only from REVIEW.EXE ---------- */
+  /** Morale cost of removing this role now (0 = free): free until it has played a league match (a misclick in the latest
+      REVIEW, a migrated role that never played) or with `free` (v3.20: after the "After the game" talk; no caller yet). */
+  roleChangeCost(p, free = false, roleId = null) {
+    const r = roleId ? rolesOf(p).find(x => x.id === roleId) : rolesOf(p).find(x => x.m > 0);
+    return !free && r && r.m > 0 ? ROLES.CHANGE_MORALE : 0;
+  }
+  /** The Notebook's / roster's [ Remove role ] (v3.18 rules: −3 morale once the role has played a match). Returns the morale change. */
+  removeRole(id, roleId, { free = false } = {}) {
+    const p = this.player(id), r = rolesOf(p).find(x => x.id === roleId);
+    if (!r) return 0;
+    const cost = this.roleChangeCost(p, free, roleId);
+    p.roles = p.roles.filter(x => x !== r);
     if (cost) {
       p.dyn.morale = clamp(p.dyn.morale + cost, 0, 100);
-      this.addDiary({ date: this.calendar.date, key: 'role.flip', vars: { k: { pid: p.id }, m: cost }, cls: 'ev' });
+      this.addDiary({ date: this.calendar.date, key: 'role.drop', vars: { k: { pid: p.id }, r: { role: roleId }, m: cost }, cls: 'ev' });
     }
     this.save();
     return cost;
   }
-  /** v3.18: after every league match — his role has now "played" (the next change costs morale). */
-  trackRoles(playedIds) { for (const p of this.squad) if (p.tags.length && playedIds.has(p.id)) p.roleMatches++; }
+  removeTag(id, tag) { return this.removeRole(id, tag); }   // v3.18 name (roster ✕)
+  /** After every league match: each role of a kid who played has now "played" once more (removing it costs morale). */
+  trackRoles(playedIds) { for (const p of this.squad) if (playedIds.has(p.id)) for (const r of rolesOf(p)) r.m++; }
+
+  /* ---------- v3.19 REVIEW.EXE: 1 of 3 cards for the man of the match after a win (draw: 1 of 2) ---------- */
+  /** Every card he may be offered now: new role (free slot, no clash), +1 level (< LEVELS), replace (slots full; no clash with
+      the role he keeps). Banished roles never come back this season. */
+  reviewPool(p) {
+    const held = rolesOf(p), ids = held.map(r => r.id), out = [];
+    const fresh = ROLE_IDS.filter(id => !ids.includes(id) && !(p.banned || []).includes(id));
+    if (held.length < ROLES.SLOTS) for (const id of fresh) if (!ids.some(h => roleClash(h, id))) out.push({ type: 'new', role: id });
+    for (const r of held) if (r.level < ROLES.LEVELS) out.push({ type: 'up', role: r.id });
+    if (held.length >= ROLES.SLOTS) for (const r of held) for (const id of fresh) if (!ids.some(h => h !== r.id && roleClash(h, id))) out.push({ type: 'swap', role: id, replaces: r.id });
+    return out;
+  }
+  /** Card weight: base 1 + EVIDENCE_W × how much of his role's signal he showed this match (CLUE_SIGNALS stats / lots, capped at 1). */
+  static reviewWeight(card, stats) {
+    const sig = CLUE_SIGNALS[ROLE_BY_ID[card.role].signal];
+    return 1 + REVIEW.EVIDENCE_W * Math.min(1, sig.stats.reduce((a, k) => a + (stats?.[k] || 0), 0) / sig.lots);
+  }
+  /** rv.n weighted cards without repeats, seeded(date#review#id + salt). */
+  rollReviewCards(p, rv, salt = '') {
+    const r = seeded(rv.date + '#review#' + p.id + salt);
+    const pool = this.reviewPool(p).map(c => ({ c, w: GameState.reviewWeight(c, rv.stats) })), out = [];
+    while (out.length < rv.n && pool.length) {
+      let x = r() * pool.reduce((a, b) => a + b.w, 0), i = 0;
+      for (; i < pool.length - 1; i++) if ((x -= pool[i].w) < 0) break;
+      out.push(pool.splice(i, 1)[0].c);
+    }
+    return out;
+  }
+  /** "He lit up when you mentioned it": with LIKE_HINT one card gets the mark — a fitting role, or (CLUES.WRONG) a random other
+      card. It is a clue, so it also goes to p.clues (source 'review'). No fitting card and not a wrong roll → no mark. */
+  reviewLike(p, rv) {
+    const h = seeded(rv.date + '#reviewlike#' + p.id);
+    if (h() >= REVIEW.LIKE_HINT) return;
+    const idx = rv.cards.map((c, i) => i), fit = idx.filter(i => roleFits(p, rv.cards[i].role)), other = idx.filter(i => !fit.includes(i));
+    const from = h() < CLUES.WRONG ? other : fit;
+    if (!from.length) return;
+    const c = rv.cards[from[Math.floor(h() * from.length)]], signal = ROLE_BY_ID[c.role].signal;
+    c.like = true;
+    this.addClue(p, { date: rv.date, source: 'review', ref: rv.md, signal, textKey: 'clue.like.' + signal });
+  }
+  /** After our match (live + Quick Sim). played = [[id, stats]] of our kids who played. Loss → streak +1, no window;
+      win → 3 cards (4 after STREAK_FROM+ losses in a row), draw → 2 (no reroll, no mark). Win / draw reset the streak. */
+  startReview(result, played, date = this.calendar.date, md = null) {
+    const streak = this.lossStreak || 0;
+    this.lossStreak = result === 'L' ? streak + 1 : 0;
+    this.review = null;
+    if (result === 'L') return null;
+    const kids = played.filter(([id]) => this.player(id));
+    if (!kids.length) return null;
+    const best = Math.max(...kids.map(([, st]) => matchRating(st)));
+    const top = kids.filter(([, st]) => matchRating(st) >= best - 1e-9).map(([id]) => id).sort();
+    const pid = top.length > 1 ? top[Math.floor(seeded(date + '#motm')() * top.length)] : top[0];
+    const p = this.player(pid), mode = result === 'W' ? 'win' : 'draw';
+    const rv = { mode, date, md, pid, rating: +best.toFixed(1), stats: { ...kids.find(k => k[0] === pid)[1] },
+      n: mode === 'draw' ? REVIEW.CARDS_DRAW : streak >= REVIEW.STREAK_FROM ? REVIEW.CARDS_STREAK : REVIEW.CARDS,
+      rerolled: false, banished: false, cards: [] };
+    rv.cards = this.rollReviewCards(p, rv);
+    if (mode === 'win') this.reviewLike(p, rv);
+    this.review = rv;
+    return rv;
+  }
+  get reviewPending() { return !!this.review && !!this.player(this.review.pid); }
+  /** Close the window: the matchday can be closed now. */
+  endReview() { this.review = null; this.save(); }
+  /** Pick a card → apply it, one diary line, the window closes. */
+  reviewPick(i) {
+    const rv = this.review, p = rv && this.player(rv.pid), c = rv?.cards[i];
+    if (!p || !c) return false;
+    const vars = { k: { pid: p.id }, r: { role: c.role } };
+    if (c.type === 'new' && p.roles.length < ROLES.SLOTS) p.roles.push({ id: c.role, level: 1, m: 0 });
+    else if (c.type === 'up') { const r = p.roles.find(x => x.id === c.role); if (!r || r.level >= ROLES.LEVELS) return false; r.level++; vars.l = r.level; }
+    else if (c.type === 'swap') { const i2 = p.roles.findIndex(x => x.id === c.replaces); if (i2 < 0) return false; p.roles[i2] = { id: c.role, level: 1, m: 0 }; vars.o = { role: c.replaces }; }
+    else return false;
+    this.addDiary({ date: this.calendar.date, key: 'rv.' + c.type, vars, cls: 'ev' });
+    this.endReview();
+    return true;
+  }
+  /** [ Reroll ] (win only, once per window, REROLL_AP from the weekly wallet): 3 new cards, no new mark. */
+  canReroll() { const rv = this.review; return !!rv && rv.mode === 'win' && !rv.rerolled && this.ap >= REVIEW.REROLL_AP; }
+  reviewReroll() {
+    if (!this.canReroll()) return false;
+    for (let i = 0; i < REVIEW.REROLL_AP; i++) this.spendAP();
+    const rv = this.review;
+    rv.rerolled = true;
+    rv.cards = this.rollReviewCards(this.player(rv.pid), rv, '#reroll');
+    this.save();
+    return true;
+  }
+  /** [ Skip ]: no role change, morale +SKIP_MORALE ("the coach didn't push me"). */
+  reviewSkip() {
+    const rv = this.review, p = rv && this.player(rv.pid);
+    if (!p) return false;
+    p.dyn.morale = clamp(p.dyn.morale + REVIEW.SKIP_MORALE, 0, 100);
+    this.addDiary({ date: this.calendar.date, key: 'rv.skip.diary', vars: { k: { pid: p.id } }, cls: 'ev' });
+    this.endReview();
+    return true;
+  }
+  /** [ Banish ] one card's role from HIS pool for the season (not a role he holds); the window stays with the rest (no refill),
+      once per window. BANISH_CLUE: his reaction is a clue (v3.18 rules, source 'review'). */
+  reviewBanish(i) {
+    const rv = this.review, p = rv && this.player(rv.pid), c = rv?.cards[i];
+    if (!p || !c || rv.banished || c.type === 'up') return false;
+    p.banned.push(c.role);
+    rv.cards = rv.cards.filter(x => x.role !== c.role);
+    rv.banished = true;
+    this.addDiary({ date: this.calendar.date, key: 'rv.ban.diary', vars: { k: { pid: p.id }, r: { role: c.role } } });
+    if (seeded(rv.date + '#reviewban#' + p.id)() < REVIEW.BANISH_CLUE) this.addClue(p, rollClue(p, { date: rv.date, source: 'review', ref: rv.md, salt: '#ban' }));
+    this.save();
+    return true;
+  }
   /** v3.18: keep a clue in the kid's Notebook (last CLUES.MAX_PER_KID). */
   addClue(p, c) {
     if (!p || !c) return;
@@ -5932,7 +6278,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
-        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
+        lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
         budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
@@ -5967,7 +6313,7 @@ class GameState {
       this.eventQueue = Array.isArray(d.eventQueue) ? d.eventQueue.filter(q => q && q.id && q.due) : [];
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
-      this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
+      this.squad = d.squad.map(p => new Player({ ...p, tags: Array.isArray(p.tags) ? p.tags : [] }));   // v3.19: Player.cleanRoles migrates an old single role → level 2
       // v3.1: the world database (older saves get one: the rest of the 100 kids are generated around the squad)
       for (const p of this.squad) p.teamId = 'player_team';
       const rest = Array.isArray(d.pool) ? d.pool.map(p => new Player({ ...p, tags: [] }))
@@ -5995,6 +6341,8 @@ class GameState {
         this.phase = d.phase || 'calendar';
         this.lastReport = d.lastReport || null;
         this.notebookUnlocked = !!d.notebookUnlocked;
+        this.lossStreak = Math.max(0, Math.round(d.lossStreak || 0));   // v3.19
+        this.review = d.review && typeof d.review === 'object' && Array.isArray(d.review.cards) && this.player(d.review.pid) ? d.review : null;
         this.diary = Array.isArray(d.diary) ? d.diary : [];
         this.seasonStats = d.seasonStats && typeof d.seasonStats === 'object' ? d.seasonStats : {};
         this.coachNotes = d.coachNotes && typeof d.coachNotes === 'object' ? d.coachNotes : {};
@@ -6081,7 +6429,7 @@ class MatchEngine {
       entries: slots.map((s, i) => ({ ...s, p: team.players[i] })) };
   }
   /** v1.8: per-minute drain, base 30–40% / 90' scaled by baseStamina (20 → ×0.85, 10 → ×1.0, 1 → ×1.135). */
-  static drainOf(p) { return rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90 * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015); }
+  static drainOf(p) { return rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90 * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015) * roleDrainMult(p); }   // v3.19: Engine tires slower
   static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, conceded: 0, yellow: 0, red: 0, assists: 0 }; }
 
   /* ---------- background play (v1.0) ----------
@@ -6273,9 +6621,8 @@ class MatchEngine {
     const rating = p.rating ? p.rating(attr) : 10;
     const fat = fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);   // v3.3: smooth curve, no 50% / 30% steps
     // v3.0: no "out of position" penalty any more — only hidden stats and biometrics decide
-    const t = p.tags || [];
-    const tag = (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) || (t.includes('Playmaker') && attr === 'Pass')
-      || (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) ? 1.5 : 1;
+    // v3.19: every role from ROLES_DEF — main multiplier by level, downsides flat, two roles on one composite multiply
+    const tag = roleAttrMult(p, attr, this.shotCtx || null);
     const mood = p.moodBonus ?? 0;
     return { rating, fat, tag, mood, v: rating * fat * tag + mood };
   }
@@ -6515,11 +6862,12 @@ class MatchEngine {
     const dec = c.tactical?.decisions ?? 10;
     if (dec <= 7 && this.zone === 1) w.shoot += 6;
     if (dec >= 15) { w.pass *= 1.15; if (this.zone === 1) w.shoot *= 0.6; }
-    const t = c.tags || [];
-    if (t.includes('Playmaker')) { w.pass *= 2; w.dribble *= 0.4; }
-    if (t.includes('Selfish')) {
-      w.pass *= 0.08; w.dribble *= 1.6; w.shoot *= 1.8;
-      if (this.zone === 1) w.shoot = Math.max(w.shoot, 22);
+    // v3.19: role downsides from ROLES_DEF (Playmaker passes first, Selfish hardly passes, Anchor stays home) — never scaled by level
+    for (const r of rolesOf(c)) {
+      const d = ROLE_BY_ID[r.id]?.down; if (!d) continue;
+      if (d.weights) for (const k in d.weights) w[k] *= d.weights[k];
+      if (d.midShotMin && this.zone === 1) w.shoot = Math.max(w.shoot, d.midShotMin);
+      if (d.noShotPastLine && this.zone > (LINE_IDX[this.lineOf.get(c.id)] ?? 1)) w.shoot = 0;
     }
     let r = Math.random() * (w.pass + w.dribble + w.shoot);
     for (const [action, weight] of Object.entries(w)) { if ((r -= weight) < 0) return action; }
@@ -6538,9 +6886,10 @@ class MatchEngine {
   doPass() {
     const c = this.carrier, side = this.poss, opp = 1 - side, z = this.zone;
     let tz;
+    const fw = rolesOf(c).reduce((m, r) => m * (ROLE_BY_ID[r.id]?.down.fwdPass ?? 1), 1);   // v3.19: Anchor plays it safe (fewer balls forward)
     if (this.isGK(c)) tz = Math.random() < 0.7 ? 0 : 1;
-    else if (z === 0) tz = Math.random() < 0.65 ? 1 : 0;
-    else if (z === 1) tz = Math.random() < 0.6 ? 2 : 1;
+    else if (z === 0) tz = Math.random() < 0.65 * fw ? 1 : 0;
+    else if (z === 1) tz = Math.random() < 0.6 * fw ? 2 : 1;
     else tz = Math.random() < 0.7 ? 2 : 1;
     let mates = this.inZone(side, tz).filter(p => p !== c);
     if (!mates.length) { tz = 1; mates = this.active(side).filter(p => p !== c && !this.isGK(p)); }
@@ -6588,12 +6937,12 @@ class MatchEngine {
       this.setEv({ kind: 'dribble', a: c, d: def });
       this.log('', 'drOk', vars, side);
       if (side === 1 && def === this.captain()) this.captainMoment('mistake');   // v3.7: our captain beaten in a duel
-      if ((def.tags || []).includes('Aggressive')) this.commitFoul(def, c, side);
+      if (roleHas(def, 'foulOnLostDuel')) this.commitFoul(def, c, side);
     } else {
       const foul = Math.random() < SETPIECE.FOUL;
       this.tr('dribble', side, A, D, foul ? 'foul' : 'tackled');
       if (foul) {   // v3.0: a mistimed tackle — our ball, maybe a penalty
-        if ((def.tags || []).includes('Aggressive')) { this.commitFoul(def, c, side); return; }
+        if (roleHas(def, 'foulOnLostDuel')) { this.commitFoul(def, c, side); return; }
         this.setEv({ kind: 'foul', a: c, d: def, card: false });
         this.log('foul', 'eng.foulPlain', vars, 1 - side);
         this.setPiece(c, side);
@@ -6647,12 +6996,17 @@ class MatchEngine {
     const keeper = this.keeper(opp);
 
     let blocked = false;
+    this.shotCtx = long ? 'long' : 'box';   // v3.19: Finisher's ×1.5 counts only for shots that are not long shots
     if (!penalty && Math.random() < 0.2) {
-      const B = this.rs(blocker, 'Mark', opp, 'def'), S = this.rs(shooter, 'Shoot', side, 'atk');
+      this.shotCtx = null;   // the blocker's Mark is not a shot
+      const B = this.rs(blocker, 'Mark', opp, 'def');
+      this.shotCtx = long ? 'long' : 'box';
+      const S = this.rs(shooter, 'Shoot', side, 'atk');
       blocked = B.total > S.total;
       this.tr('block', side, S, B, blocked ? 'blocked' : 'through');
     }
     if (blocked) {
+      this.shotCtx = null;
       this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
       this.setEv({ kind: 'block', d: blocker });
@@ -6662,6 +7016,7 @@ class MatchEngine {
       return;
     }
     const A = this.rs(shooter, 'Shoot', side, 'atk', { bonus, long: long ? -5 : 0 });
+    this.shotCtx = null;
     const D = this.rs(keeper, 'Save', opp, 'def', { keeper: 4 });
     const atk = A.total, dfn = D.total;
     const vars = { a: shooter, k: keeper };
@@ -6819,8 +7174,23 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.18.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.19';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.19', name: { en: 'Growth', ru: 'Рост' },
+    en: [
+      'Roles are earned now. After a win REVIEW.EXE opens for the man of the match: pick 1 of 3 cards — a new role, +1 level of a role he has, or a replacement. [ CONTINUE ] waits for your choice (visual match and Quick Sim alike).',
+      'Reroll the cards for 1 AP (once), Skip (+2 morale), or Banish a role from his offers for the season. A card may carry "He lit up when you mentioned it" — a clue, so sometimes the coach misreads him. After 2+ defeats in a row the next win shows 4 cards; after a draw there is a smaller pick of 2.',
+      'Three new roles, each with a catch: Engine (tires slower, clumsier on the ball), Anchor (reads passes and blocks shots, never joins the attack), Finisher (deadly in the box, a poor passer who waits up front). Clues now cover them too.',
+      'Every kid has two role slots and levels 1–3 (level 3 = the old full strength). Playmaker + Selfish and Anchor + Finisher can\'t be held together.',
+      'The Notebook no longer hands out roles; it can only take one away (−3 morale once it has played a match, free right after a review). Old saves: a kid\'s single role becomes level 2.',
+    ],
+    ru: [
+      'Роли теперь зарабатывают. После победы открывается REVIEW.EXE для лучшего игрока матча: выбери 1 из 3 карточек — новая роль, +1 уровень имеющейся или замена. [ ПРОДОЛЖИТЬ ] ждёт выбора (и после обычного матча, и после быстрой симуляции).',
+      'Карточки можно перетасовать за 1 ОД (один раз), пропустить (+2 к морали) или вычеркнуть роль из его предложений до конца сезона. На карточке может быть пометка «Он оживился, когда ты об этом сказал» — это зацепка, и тренер иногда ошибается. После 2+ поражений подряд следующая победа даёт 4 карточки; после ничьей — выбор поменьше, из двух.',
+      'Три новые роли, у каждой своя цена: Мотор (устаёт медленнее, но неловок с мячом), Опорник (читает передачи и блокирует удары, но не идёт в атаку), Бомбардир (опасен в штрафной, но слабо пасует и ждёт впереди). Зацепки теперь подсказывают и их.',
+      'У каждого два слота ролей и уровни 1–3 (3-й = прежняя полная сила). Плеймейкер + Эгоист и Опорник + Бомбардир вместе не держатся.',
+      'Блокнот больше не раздаёт роли — только снимает (−3 к морали, если роль уже сыграла матч; сразу после разбора — бесплатно). Старые сохранения: единственная роль игрока становится 2-го уровня.',
+    ] },
   { v: '3.18.1', name: { en: 'Clues (fix)', ru: 'Зацепки (исправление)' },
     en: [
       'Fix: the coach\'s line about whoever played in goal now counts the goals he let in, not only his saves. A 0-8 with two saves is no longer "solid between the posts".',
@@ -8077,6 +8447,8 @@ function keeperNote(s) {
    The hidden truth is the same one the match engine uses: a role multiplies its composites ×1.5 (Aggressive: Tackle + Mark,
    Playmaker: Pass, Selfish: Dribble + Shoot) and brings its side effects (fouls / forced passes / never passing). The role
    that fits = the one whose composites are his strongest — exactly when the ×1.5 pays and the side effects hurt least.
+   v3.19: the same truth covers the three new roles through their CLUE_SIGNALS rows — Engine (run: Motor = stamina×2 + pace),
+   Anchor (screen: Mark, the composite his ×1.5 multiplies), Finisher (finish: Shoot). No second mapping: ROLES_DEF.signal → here.
    ========================================================= */
 /** Composite from the RAW hidden skills (no sharpness dip): the long-term truth, not today's form. */
 function rawComposite(p, key) {
@@ -8104,19 +8476,21 @@ function clueEvidence(sig, stats) {
 /** One clue about one kid at one event. True with chance 1 − WRONG (seeded date#clue#id), otherwise a random OTHER signal —
     worded just as confidently. No evidence on today's card → a neutral line (signal null, never confirms anything).
     `used` = text keys already given at this event, so two kids never share a phrasing. */
-function rollClue(p, { date, source, ref, stats = null, used = new Set() }) {
-  const r = seeded(date + '#clue#' + p.id), truth = trueSignals(p);
+function rollClue(p, { date, source, ref, stats = null, used = new Set(), salt = '' }) {
+  const r = seeded(date + '#clue#' + p.id + salt), truth = trueSignals(p);   // v3.19: salt = a second clue on the same day (REVIEW.EXE)
   const others = Object.keys(CLUE_SIGNALS).filter(k => !truth.includes(k));
   let signal = r() < CLUES.WRONG && others.length ? others[Math.floor(r() * others.length)] : truth[Math.floor(r() * truth.length)];
   if (!clueEvidence(signal, stats)) signal = null;
   const base = signal ? 'clue.' + signal + '.' : 'clue.none.', n = signal ? CLUES.PHRASES : CLUES.NEUTRAL;
-  const start = Math.floor(seeded(date + '#cluetxt#' + p.id)() * n);
+  const start = Math.floor(seeded(date + '#cluetxt#' + p.id + salt)() * n);
   let i = 0;
   while (i < n - 1 && used.has(base + (start + i) % n)) i++;
   const textKey = base + (start + i) % n;
   used.add(textKey);
   return { date, source, ref, signal, textKey, seen: false };
 }
+/** v3.19: does this role fit him (its signal is one of his true signals)? DEBUG.EXE fit / misfit, the REVIEW "he lit up" mark. */
+const roleFits = (p, id) => !!ROLE_BY_ID[id] && trueSignals(p).includes(ROLE_BY_ID[id].signal);
 /** One event = source + ref (+ date: round numbers repeat every season). */
 const clueEvent = c => c.source + '|' + c.ref + '|' + c.date;
 /** ✓ confirmed: another clue with the same signal from a DIFFERENT event. Contradictions stay visible, nothing is resolved. */
@@ -8213,7 +8587,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && p.tags.join(), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale), own && ui.officeBlock(p.id)].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && JSON.stringify(p.roles), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale), own && ui.officeBlock(p.id)].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -8238,8 +8612,8 @@ class ProfileCard {
 
     let roleHtml, noteHtml;
     if (own) {
-      const tag = p.tags[0];
-      roleHtml = (tag ? `${L.t('pi.roleLbl')} ${ui.tagChip(tag, p.id, false)}<small>${esc(L.tagDesc(tag))}</small>`
+      const roles = rolesOf(p);   // v3.19: up to two roles, "PLAYMAKER ●●○"
+      roleHtml = (roles.length ? `${L.t('pi.roleLbl')} ` + roles.map(r => `${ui.tagChip(r.id, p.id, false)}<small>${esc(L.tagDesc(r.id))}</small>`).join('')
         : `<span class="pi-none">${L.t('pi.noRole')}</span>`) + ui.flagChips(p);
       const n = s.coachNotes?.[p.id];
       noteHtml = n
@@ -8394,10 +8768,13 @@ class DebugConsole {
     add('DYNAMIC', 'CON', p => Math.round(p.dyn.condition), 100, 'condition (energy)');
     add('DYNAMIC', 'SHP', p => Math.round(p.dyn.sharpness), 100, 'sharpness (match tone); < 50 → technical −2');
     add('DYNAMIC', 'MOR', p => Math.round(p.dyn.morale), 100, 'morale');
-    for (const k of Object.keys(COMPOSITE)) add('ENGINE', { Pass: 'PAS*', Mark: 'MRK*', Dribble: 'DRB*', Speed: 'PAC*', Tackle: 'TKL*', Shoot: 'SHT*', Save: 'SAV*' }[k], p => +p.rating(k).toFixed(1), 20, 'composite ' + k + ' = ' + Object.keys(COMPOSITE[k]).join('+'));
+    for (const k of Object.keys(COMPOSITE)) add('ENGINE', { Pass: 'PAS*', Mark: 'MRK*', Dribble: 'DRB*', Speed: 'PAC*', Tackle: 'TKL*', Shoot: 'SHT*', Save: 'SAV*', Motor: 'MOT*' }[k], p => +p.rating(k).toFixed(1), 20, 'composite ' + k + ' = ' + Object.keys(COMPOSITE[k]).join('+'));
     add('ENGINE', 'OVR', p => +p.overall.toFixed(1), 20, 'hidden overall (position composites) — v1.9 "worst player"');
     add('ENGINE', 'MOOD', p => +p.moodBonus.toFixed(1), null, 'morale × passion roll bonus');
-    add('ENGINE', 'ROLE', p => (p.tags || [])[0] || '—');
+    add('ENGINE', 'ROLES', p => rolesOf(p).map(r => `${r.id}:${r.level} ${roleFits(p, r.id) ? 'fit' : 'MISFIT'}`).join(' · ') || '—', null,
+      'v3.19 roles id:level + whether the hidden truth (trueSignals) backs it; BAN = banished from his REVIEW.EXE this season');
+    add('ENGINE', 'BAN', p => (p.banned || []).join(' ') || '—', null, 'v3.19 roles banished from his REVIEW.EXE this season');
+    add('ENGINE', 'FIT', p => trueSignals(p).join(' '), null, 'v3.18/v3.19 hidden true signals (pass duel solo run screen finish)');
     add('ENGINE', 'INJ', p => p.injuryDays || 0, null, 'v2.2 injury: calendar days left');
     add('ENGINE', 'SUS', p => p.suspensionMatches || 0, null, 'v2.2 suspension: matches left');
     add('ENGINE', 'HOME', p => p.awayDays || 0, null, 'v2.3 kept at home by a parent: days left');
@@ -10032,6 +10409,89 @@ class CashDesk {
   }
 }
 /* =========================================================
+   v3.19 — REVIEW.EXE: the pick after a win (Vampire Survivors style)
+   The man of the match (best matchRating among our kids who played) gets 1 of 3 cards: a new role (free slot),
+   +1 level of a role he has, or a replacement (slots full). Draw = the smaller pick (2 cards, no reroll, no mark).
+   No OK / × button and Esc does nothing: the window closes only through a card, [ Skip ] (morale +2).
+   [ Reroll ] 1 AP once (win only), [ Banish ] one role from HIS pool for the season, once (no refill).
+   Opened by UIController.closeMatchday() — the stop after summary → Coach's Word → Notebook, before the next day.
+   open(mode) is the single entry point; v3.20 can put the "listen" option / "After the game" in front of it.
+   ========================================================= */
+class ReviewView {
+  constructor(ui) {
+    this.ui = ui;
+    this.layer = document.getElementById('review-view');
+    this.cards = document.getElementById('rv-cards');
+    this.cards.addEventListener('click', e => {
+      const ban = e.target.closest('[data-ban]'), pick = e.target.closest('[data-pick]');
+      if (ban && !ban.disabled) { if (this.state.reviewBanish(+ban.dataset.ban)) this.render(); return; }
+      if (pick && !pick.disabled && this.state.reviewPick(+pick.dataset.pick)) this.done();
+    });
+    document.getElementById('rv-reroll').addEventListener('click', () => { if (this.state.reviewReroll()) { this.render(); this.ui.renderBudget?.(); } });
+    document.getElementById('rv-skip').addEventListener('click', () => { if (this.state.reviewSkip()) this.done(); });
+  }
+  get isOpen() { return !this.layer.hidden; }
+  get state() { return this.ui.state; }
+
+  /** The one entry point (mode comes from the saved review: 'win' | 'draw'). Returns false when nothing is owed. */
+  open() {
+    if (!this.state.reviewPending) { this.layer.hidden = true; return false; }
+    this.ui.modal.close(); this.ui.profile.close();
+    this.render();
+    this.layer.hidden = false;
+    this.cards.querySelector('[data-pick]')?.focus();
+    return true;
+  }
+  /** Only the state can close it (a choice was made). */
+  close() { if (!this.state.reviewPending) this.layer.hidden = true; }
+  done() { this.layer.hidden = true; this.ui.closeMatchday(); }
+
+  /** Level pips: ●●○ (level 0 = ○○○). */
+  static pips(level) { return '●'.repeat(level) + '○'.repeat(Math.max(0, ROLES.LEVELS - level)); }
+
+  render() {
+    const s = this.state, rv = s.review, p = rv && s.player(rv.pid);
+    if (!p) return;
+    const ui = this.ui, name = esc(L.name(p.name)), win = rv.mode === 'win';
+    const roles = rolesOf(p);
+    const clues = [...(p.clues || [])].reverse().slice(0, CLUES.TIP);
+    document.getElementById('rv-kid').innerHTML = `
+      <span class="portrait lg" data-pid="${p.id}">${p.portraitSvg}</span>
+      <h3><span class="num dark">${p.number}</span>${name}</h3>
+      <div class="rv-pos"><span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span> <span class="rv-rating">${L.t('rv.rating', { r: rv.rating.toFixed(1) })}</span></div>
+      <fieldset class="rv-roles"><legend>${L.t('rv.roles', { a: roles.length, b: ROLES.SLOTS })}</legend>
+        ${roles.length ? roles.map(r => ui.tagChip(r.id, p.id, false)).join('') : `<span class="pi-none">${L.t('rv.noRole')}</span>`}</fieldset>
+      <fieldset class="rv-clues nb-clues"><legend>${L.t('rv.clues')}</legend>
+        ${clues.length ? `<ul>${clues.map(c => ui.clueLine(p, c)).join('')}</ul>` : `<p class="pi-none">${L.t('nb.cluesNone')}</p>`}</fieldset>`;
+    document.getElementById('rv-lead').innerHTML = L.t(win ? 'rv.lead.win' : 'rv.lead.draw', { k: name, n: rv.cards.length });
+    this.cards.style.setProperty('--rv-n', Math.max(2, rv.cards.length));
+    this.cards.innerHTML = rv.cards.length ? rv.cards.map((c, i) => {
+      const lvl = c.type === 'up' ? p.roleLevel(c.role) + 1 : 1, def = ROLE_BY_ID[c.role];
+      const banWhy = c.type === 'up' ? L.t('rv.banHeld') : rv.banished ? L.t('rv.banUsed') : L.t('rv.banTip', { r: L.tag(c.role) });
+      return `<div class="rv-card t-${c.type} tone-${def.tone}${c.like ? ' like' : ''}">
+        <button type="button" class="rv-pick" data-pick="${i}">
+          <small class="rv-type">${L.t('rv.type.' + c.type)}</small>
+          <b class="rv-name">${esc(L.tag(c.role))}</b>
+          <span class="rv-pips" aria-label="${esc(L.t('rv.level', { l: lvl }))}">${ReviewView.pips(lvl)}</span>
+          ${c.type === 'swap' ? `<em class="rv-repl">${L.t('rv.replaces', { r: esc(L.tag(c.replaces)) })}</em>` : ''}
+          <span class="rv-desc">${esc(L.tagDesc(c.role))}</span>
+          ${c.like ? `<i class="rv-like">✎ ${L.t('rv.like')}</i>` : ''}
+        </button>
+        <button type="button" class="rv-ban" data-ban="${i}" ${c.type === 'up' || rv.banished ? 'disabled' : ''} title="${esc(banWhy)}">&#10005; ${L.t('rv.ban')}</button>
+      </div>`;
+    }).join('') : `<p class="rv-empty">${L.t('rv.empty')}</p>`;
+    const rr = document.getElementById('rv-reroll');
+    rr.hidden = !win;
+    rr.disabled = !s.canReroll();
+    rr.innerHTML = L.t('rv.reroll', { n: REVIEW.REROLL_AP });
+    rr.title = rv.rerolled ? L.t('rv.rerollUsed') : s.ap < REVIEW.REROLL_AP ? L.t('rv.rerollNoAp') : L.t('rv.rerollTip', { a: s.ap });
+    const sk = document.getElementById('rv-skip');
+    sk.innerHTML = L.t('rv.skip', { n: REVIEW.SKIP_MORALE });
+    sk.title = L.t('rv.skipTip');
+    document.getElementById('rv-status').textContent = L.t('rv.status');
+  }
+}
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -10067,6 +10527,7 @@ class UIController {
     this.summary = new MatchSummary(this);       // v2.1: full-time scoreboard
     this.planner = new WeekPlanner(this);        // v3.13: PLANNER.EXE (the weekly plan)
     this.kassa = new CashDesk(this);             // v3.15: KASSA.EXE (monthly fees)
+    this.reviewView = new ReviewView(this);      // v3.19: REVIEW.EXE (the pick after a win / draw)
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
     this.bind();
@@ -10180,6 +10641,7 @@ class UIController {
     if (x && typeof x === 'object' && 'talkReact' in x) return L.t('tt.react.' + x.talkReact);  // v3.9 diary
     if (x && typeof x === 'object' && 'why' in x) return L.t('lr.short.' + x.why);  // v2.6 diary
     if (x && typeof x === 'object' && 'pos' in x) return L.pos(x.pos);   // v3.6 diary
+    if (x && typeof x === 'object' && 'role' in x) return L.tag(x.role);   // v3.19 diary
     if (x && typeof x === 'object' && 'focus' in x) return L.t('lesson.focus.' + x.focus);   // v3.16 diary
     if (x && typeof x === 'object' && 'clue' in x) { const p = this.state.player(x.pid);   // v3.16: a v3.6 / v3.7 clue line without its "Match practice:" lead
       return L.t(x.clue, { k: p ? L.name(p.name) : '?' }).replace(/^[^:{}]{1,30}:\s*/, ''); }
@@ -10301,6 +10763,7 @@ class UIController {
        opened over the Locker Room closes without closing the room. Event dialogues swallow Esc (forced choice). */
     const layers = () => [
       { el: this.events.view.layer, close: null },
+      { el: this.reviewView.layer, close: null },   // v3.19: REVIEW.EXE closes only through a choice
       { el: this.modal.layer, close: () => this.modal.close() },
       { el: this.debug.layer, close: () => this.debug.close() },
       { el: this.summary.layer, close: () => this.summary.requestClose() },   // v3.5: no Esc-out before the team talk
@@ -10432,8 +10895,8 @@ class UIController {
     this.$('notes-body').addEventListener('click', e => {
       if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
       if (e.target.closest('#btn-nb-msum')) { this.summary.open(this.state.lastReport); return; }   // v3.9
-      const b = e.target.closest('[data-tag]'); if (!b || b.disabled) return;
-      this.state.setTag(b.dataset.id, b.dataset.tag);
+      const b = e.target.closest('[data-rmrole]'); if (!b || b.disabled) return;   // v3.19: the Notebook only takes roles away
+      this.state.removeRole(b.dataset.id, b.dataset.rmrole);
       this.renderNotebook(); this.renderTeam(); this.renderDash();
     });
   }
@@ -10949,7 +11412,14 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** v2.6: after a coach-initiated dialogue (office / roll call) the same day simply goes on. */
   afterManualEvent() { this.renderAll(); this.profile.tick(); if (this.locker?.isOpen) this.locker.maybeRequest(500); }   // v3.6: the next locker request waits its turn
   /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
-  autoSim() { if (this.state.phase === 'calendar' && !this.events.active) this.runCalendar(); }
+  autoSim() {
+    const s = this.state;
+    if (s.phase === 'post' && s.reviewPending) { s.reviewPick(0); this.reviewView.close(); }   // v3.19: auto mode takes the first card
+    if (s.phase === 'calendar' && !this.events.active) this.runCalendar();
+  }
+  /** v3.19: REVIEW.EXE picks the first card by itself (smoke auto-play: window.YAM_AUTO_REVIEW; `ui.autoReview = false` to test the window). */
+  get autoReview() { return this._autoReview ?? !!window.YAM_AUTO_REVIEW; }
+  set autoReview(v) { this._autoReview = v; }
 
   /** v2.5: [ CALL INTO OFFICE ] — 1 action point, a short talk in the dialogue box. */
   /** v3.13 (replaces the v3.2 rule): why the coach can NOT call this kid in right now (i18n key), or null.
@@ -11159,6 +11629,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (!s.lastReport.instant) { this.summary.open(s.lastReport); return; }
       s.skipTeamTalk();
     }
+    if (s.reviewPending) {   // v3.19: REVIEW.EXE — the evening stop after a win / draw; [ CONTINUE ] waits for a choice
+      if (!this.autoReview) { this.reviewView.open(); this.renderDash(); return; }
+      s.reviewPick(0);   // auto-sim / smoke auto-play: the first card
+    }
+    s.review = null;   // (a review for a kid who left the squad is dropped)
+    this.reviewView.layer.hidden = true;
     const ev = s.nextMatchEvent();
     const rep = s.lastReport;
     this.cal.completeEvent(ev.id);
@@ -11241,7 +11717,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <span class="num">${p.number}</span>
         <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.clueBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×' + fatigueMult(e).toFixed(2) : ''}</span></div>
-        <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
+        <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live, null, true)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
     };
     const roster = this.$('roster');
@@ -11351,13 +11827,17 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
   /** v1.9: story flags (e.g. PROMISED START) — visible, unlike the hidden numbers. */
   flagChips(p) { return (p.flags || []).map(f => `<span class="tag flag" title="${esc(FLAGS[f][L.code][1])}">${f === 'Showcase' ? '\u25C9' : '$'} ${esc(FLAGS[f][L.code][0])}</span>`).join(''); }
-  tagChip(tag, id, removable) {
-    const tone = TAGS[tag]?.tone || 'neutral';
-    const cost = removable ? this.state.roleChangeCost(this.state.player(id)) : 0;   // v3.18
+  /** v3.19: role chip "PLAYMAKER ●●○" (level pips); level from the kid unless given. */
+  tagChip(tag, id, removable, level = null, short = false) {
+    const tone = ROLE_BY_ID[tag]?.tone || 'neutral', p = this.state.player(id), lv = level ?? p?.roleLevel?.(tag) ?? 0;
+    const cost = removable ? this.state.roleChangeCost(p, false, tag) : 0;   // v3.18
     const rm = cost ? L.t('squad.removeCost', { m: '\u2212' + Math.abs(cost) }) : L.t('squad.remove');
     const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(rm)}" title="${esc(rm)}">&times;</button>` : '';
-    return `<span class="tag ${tone}" title="${esc(L.tagDesc(tag))}">${esc(L.tag(tag))}${x}</span>`;
+    const pips = lv ? `<span class="pips" aria-label="${esc(L.t('rv.level', { l: lv }))}">${ReviewView.pips(lv)}</span>` : '';
+    return `<span class="tag ${tone}" title="${esc(L.tag(tag) + (lv ? ' · ' + L.t('rv.level', { l: lv }) : '') + ' — ' + L.tagDesc(tag))}">${esc(short ? L.t('role.' + tag + '.s') : L.tag(tag))}${pips}${x}</span>`;
   }
+  /** v3.19: "Playmaker 2, Engine 1" for the Notebook's stat line (old reports: the single v3.18 role). */
+  roleNames(pr) { return pr.roles ? pr.roles.map(r => L.tag(r.id) + ' ' + r.level).join(', ') : L.tag(pr.role); }
 
   /* ---------- MATCH ---------- */
   renderShouts() {
@@ -11579,6 +12059,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       players: shuffle(played).slice(0, 3).map(p => ({
         id: p.id, stats: { ...eng.st(p) },
         tired: eng.tired.has(p.id), oop: false, gk: eng.lineOf.get(p.id) === 'GK', role: (p.tags || [])[0] || null,   // v3.0
+        roles: rolesOf(p).map(r => ({ id: r.id, level: r.level })),   // v3.19: both slots + levels
       })),
     };
     // v3.7 hidden captain traits: what the coach SAW of the armband + subtle clues about the 3 sampled kids (words only, seeded)
@@ -11587,6 +12068,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     for (const pr of s.lastReport.players) { const k = psychClue(s.player(pr.id), ctx.md, capRep?.id); if (k) pr.psy = k; }
     s.recordMatchClues(s.lastReport, s.calendar.date);   // v3.18: one clue per Notebook kid (an episode, sometimes wrong)
     s.trackRoles(eng.everPlayed);   // v3.18: roles that played this match now cost morale to change
+    s.startReview(result, played.map(p => [p.id, { ...eng.st(p) }]), s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak)
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
@@ -11683,15 +12165,13 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (pr.gk || s.saves) lines.push(L.t('nb.saves', { a: s.saves, b: season.saves }));
       if (s.yellow || s.red) lines.push(L.t('notes.cards', { a: s.yellow, b: s.red }));
       lines.push(`${L.t('notes.energy', { a: Math.round(p.energy) })} · ${L.t('nb.apps', { n: season.apps })}`);
-      if (pr.role) lines.push(esc(L.t('note.role', { r: L.tag(pr.role) })));   // v3.18: a stat line, not part of the coach's note
+      if (pr.roles?.length || (!pr.roles && pr.role)) lines.push(esc(L.t('note.role', { r: this.roleNames(pr) })));   // v3.18: a stat line, not part of the coach's note
       const note = coachNote(p, s, pr).filter(k => k in I18N.en).map(k => L.t(k)).join(' ');
-      const cost = this.state.roleChangeCost(p);
-      const btns = TAG_KEYS.map(t => {
-        const has = p.tags.includes(t);
-        const key = has ? 'notes.noted' : p.tags.length ? 'notes.change' : 'notes.add';
-        const price = !has && cost ? `<em class="role-cost">${esc(L.t('role.cost', { m: '\u2212' + Math.abs(cost) }))}</em>` : '';   // v3.18
-        return `<button class="btn ${has ? 'done' : ''}" data-tag="${t}" data-id="${p.id}" ${has ? 'disabled' : ''} title="${esc(L.tagDesc(t))}">
-          ${L.t(key, { t: esc(L.tag(t)) })}${price}<small>${esc(L.tagDesc(t))}</small></button>`;
+      // v3.19: roles come only from REVIEW.EXE — the Notebook can only take one away (v3.18 cost; free until it has played a match)
+      const btns = rolesOf(p).map(r => {
+        const cost = this.state.roleChangeCost(p, false, r.id);
+        const price = `<em class="role-cost">${esc(cost ? L.t('role.cost', { m: '\u2212' + Math.abs(cost) }) : L.t('notes.removeFree'))}</em>`;
+        return `<button class="btn" data-rmrole="${r.id}" data-id="${p.id}" title="${esc(L.tagDesc(r.id))}">${L.t('notes.remove', { t: esc(L.tag(r.id)) })}${price}</button>`;
       }).join('');
       return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
@@ -11699,7 +12179,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>
-        <div class="tag-btns">${btns}</div>
+        <div class="rm-roles">${btns}</div>
         ${this.cluesBlock(p, CLUES.TIP)}
       </article>`;
     }).join('');
@@ -11710,7 +12190,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       ${others.map(p => `<details class="nb-kid" data-cluekid="${p.id}" data-pid="${p.id}"><summary><span class="num dark">${p.number}</span> ${esc(L.name(p.name))}
         <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${p.tags.map(t => this.tagChip(t, p.id, false)).join('')}${this.clueBadge(p)}</summary>
         ${this.cluesBlock(p)}</details>`).join('')}</fieldset>` : '';
-    const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t('notes.back')}</button></div>` : '';
+    const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t(this.state.reviewPending ? 'notes.backReview' : 'notes.back')}</button></div>` : '';
     body.innerHTML = `
       <div class="nb-head">
         <h2>${L.t('notes.head', { n: rep.md, o: esc(L.team(rep.opponent)) })}</h2>

@@ -21,6 +21,7 @@ class GameState {
     this.eventLog = [];            // v1.9: [{ id, date, season, choice, who }]
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
     this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)
+    this.review = null; this.lossStreak = 0;   // v3.19 REVIEW.EXE + losses in a row
     this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {};   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
@@ -85,7 +86,8 @@ class GameState {
     this.seasonStats = {};   // playerId → cumulative stats this season (+ apps)
     this.cheats = this.cheats || { forceWin: false };   // v1.8 DEBUG.EXE
     this.coachNotes = {};    // v1.5: playerId → last Notebook note the coach actually saw { md, keys, role }
-    for (const p of this.squad) p.energy = 100;   // summer break
+    for (const p of this.squad) { p.energy = 100; p.banned = []; }   // summer break; v3.19: banished REVIEW roles come back
+    this.review = null; this.lossStreak = 0;   // v3.19
     this.save();
   }
 
@@ -262,27 +264,139 @@ class GameState {
     }
   }
   dutiesOf(id) { return Object.keys(DUTIES).filter(d => this.duties?.[d] === id); }
-  setTag(id, tag) { if (TAGS[tag]) this.changeRole(id, tag); }
-  removeTag(id, tag) { const p = this.player(id); if (p?.tags.includes(tag)) this.changeRole(id, null); }
-  /** v3.18: morale cost of changing / removing his role now (0 = free): the first role, or one that has not played a match yet, is free. */
-  roleChangeCost(p, free = false) { return !free && p?.tags?.length && p.roleMatches > 0 ? ROLES.CHANGE_MORALE : 0; }
-  /** v3.18: the one place a role changes. tag = null removes it. free = true → no morale cost (v3.20: the window after
-      the "After the game" talk; nothing passes it yet). Returns the morale change applied. */
-  changeRole(id, tag, { free = false } = {}) {
-    const p = this.player(id);
-    if (!p || (tag && !TAGS[tag]) || (p.tags[0] || null) === (tag || null)) return 0;
-    const cost = this.roleChangeCost(p, free);
-    p.tags = tag ? [tag] : [];
-    p.roleMatches = 0;
+  /* ---------- v3.19 GROWTH: roles with levels, two slots; they come only from REVIEW.EXE ---------- */
+  /** Morale cost of removing this role now (0 = free): free until it has played a league match (a misclick in the latest
+      REVIEW, a migrated role that never played) or with `free` (v3.20: after the "After the game" talk; no caller yet). */
+  roleChangeCost(p, free = false, roleId = null) {
+    const r = roleId ? rolesOf(p).find(x => x.id === roleId) : rolesOf(p).find(x => x.m > 0);
+    return !free && r && r.m > 0 ? ROLES.CHANGE_MORALE : 0;
+  }
+  /** The Notebook's / roster's [ Remove role ] (v3.18 rules: −3 morale once the role has played a match). Returns the morale change. */
+  removeRole(id, roleId, { free = false } = {}) {
+    const p = this.player(id), r = rolesOf(p).find(x => x.id === roleId);
+    if (!r) return 0;
+    const cost = this.roleChangeCost(p, free, roleId);
+    p.roles = p.roles.filter(x => x !== r);
     if (cost) {
       p.dyn.morale = clamp(p.dyn.morale + cost, 0, 100);
-      this.addDiary({ date: this.calendar.date, key: 'role.flip', vars: { k: { pid: p.id }, m: cost }, cls: 'ev' });
+      this.addDiary({ date: this.calendar.date, key: 'role.drop', vars: { k: { pid: p.id }, r: { role: roleId }, m: cost }, cls: 'ev' });
     }
     this.save();
     return cost;
   }
-  /** v3.18: after every league match — his role has now "played" (the next change costs morale). */
-  trackRoles(playedIds) { for (const p of this.squad) if (p.tags.length && playedIds.has(p.id)) p.roleMatches++; }
+  removeTag(id, tag) { return this.removeRole(id, tag); }   // v3.18 name (roster ✕)
+  /** After every league match: each role of a kid who played has now "played" once more (removing it costs morale). */
+  trackRoles(playedIds) { for (const p of this.squad) if (playedIds.has(p.id)) for (const r of rolesOf(p)) r.m++; }
+
+  /* ---------- v3.19 REVIEW.EXE: 1 of 3 cards for the man of the match after a win (draw: 1 of 2) ---------- */
+  /** Every card he may be offered now: new role (free slot, no clash), +1 level (< LEVELS), replace (slots full; no clash with
+      the role he keeps). Banished roles never come back this season. */
+  reviewPool(p) {
+    const held = rolesOf(p), ids = held.map(r => r.id), out = [];
+    const fresh = ROLE_IDS.filter(id => !ids.includes(id) && !(p.banned || []).includes(id));
+    if (held.length < ROLES.SLOTS) for (const id of fresh) if (!ids.some(h => roleClash(h, id))) out.push({ type: 'new', role: id });
+    for (const r of held) if (r.level < ROLES.LEVELS) out.push({ type: 'up', role: r.id });
+    if (held.length >= ROLES.SLOTS) for (const r of held) for (const id of fresh) if (!ids.some(h => h !== r.id && roleClash(h, id))) out.push({ type: 'swap', role: id, replaces: r.id });
+    return out;
+  }
+  /** Card weight: base 1 + EVIDENCE_W × how much of his role's signal he showed this match (CLUE_SIGNALS stats / lots, capped at 1). */
+  static reviewWeight(card, stats) {
+    const sig = CLUE_SIGNALS[ROLE_BY_ID[card.role].signal];
+    return 1 + REVIEW.EVIDENCE_W * Math.min(1, sig.stats.reduce((a, k) => a + (stats?.[k] || 0), 0) / sig.lots);
+  }
+  /** rv.n weighted cards without repeats, seeded(date#review#id + salt). */
+  rollReviewCards(p, rv, salt = '') {
+    const r = seeded(rv.date + '#review#' + p.id + salt);
+    const pool = this.reviewPool(p).map(c => ({ c, w: GameState.reviewWeight(c, rv.stats) })), out = [];
+    while (out.length < rv.n && pool.length) {
+      let x = r() * pool.reduce((a, b) => a + b.w, 0), i = 0;
+      for (; i < pool.length - 1; i++) if ((x -= pool[i].w) < 0) break;
+      out.push(pool.splice(i, 1)[0].c);
+    }
+    return out;
+  }
+  /** "He lit up when you mentioned it": with LIKE_HINT one card gets the mark — a fitting role, or (CLUES.WRONG) a random other
+      card. It is a clue, so it also goes to p.clues (source 'review'). No fitting card and not a wrong roll → no mark. */
+  reviewLike(p, rv) {
+    const h = seeded(rv.date + '#reviewlike#' + p.id);
+    if (h() >= REVIEW.LIKE_HINT) return;
+    const idx = rv.cards.map((c, i) => i), fit = idx.filter(i => roleFits(p, rv.cards[i].role)), other = idx.filter(i => !fit.includes(i));
+    const from = h() < CLUES.WRONG ? other : fit;
+    if (!from.length) return;
+    const c = rv.cards[from[Math.floor(h() * from.length)]], signal = ROLE_BY_ID[c.role].signal;
+    c.like = true;
+    this.addClue(p, { date: rv.date, source: 'review', ref: rv.md, signal, textKey: 'clue.like.' + signal });
+  }
+  /** After our match (live + Quick Sim). played = [[id, stats]] of our kids who played. Loss → streak +1, no window;
+      win → 3 cards (4 after STREAK_FROM+ losses in a row), draw → 2 (no reroll, no mark). Win / draw reset the streak. */
+  startReview(result, played, date = this.calendar.date, md = null) {
+    const streak = this.lossStreak || 0;
+    this.lossStreak = result === 'L' ? streak + 1 : 0;
+    this.review = null;
+    if (result === 'L') return null;
+    const kids = played.filter(([id]) => this.player(id));
+    if (!kids.length) return null;
+    const best = Math.max(...kids.map(([, st]) => matchRating(st)));
+    const top = kids.filter(([, st]) => matchRating(st) >= best - 1e-9).map(([id]) => id).sort();
+    const pid = top.length > 1 ? top[Math.floor(seeded(date + '#motm')() * top.length)] : top[0];
+    const p = this.player(pid), mode = result === 'W' ? 'win' : 'draw';
+    const rv = { mode, date, md, pid, rating: +best.toFixed(1), stats: { ...kids.find(k => k[0] === pid)[1] },
+      n: mode === 'draw' ? REVIEW.CARDS_DRAW : streak >= REVIEW.STREAK_FROM ? REVIEW.CARDS_STREAK : REVIEW.CARDS,
+      rerolled: false, banished: false, cards: [] };
+    rv.cards = this.rollReviewCards(p, rv);
+    if (mode === 'win') this.reviewLike(p, rv);
+    this.review = rv;
+    return rv;
+  }
+  get reviewPending() { return !!this.review && !!this.player(this.review.pid); }
+  /** Close the window: the matchday can be closed now. */
+  endReview() { this.review = null; this.save(); }
+  /** Pick a card → apply it, one diary line, the window closes. */
+  reviewPick(i) {
+    const rv = this.review, p = rv && this.player(rv.pid), c = rv?.cards[i];
+    if (!p || !c) return false;
+    const vars = { k: { pid: p.id }, r: { role: c.role } };
+    if (c.type === 'new' && p.roles.length < ROLES.SLOTS) p.roles.push({ id: c.role, level: 1, m: 0 });
+    else if (c.type === 'up') { const r = p.roles.find(x => x.id === c.role); if (!r || r.level >= ROLES.LEVELS) return false; r.level++; vars.l = r.level; }
+    else if (c.type === 'swap') { const i2 = p.roles.findIndex(x => x.id === c.replaces); if (i2 < 0) return false; p.roles[i2] = { id: c.role, level: 1, m: 0 }; vars.o = { role: c.replaces }; }
+    else return false;
+    this.addDiary({ date: this.calendar.date, key: 'rv.' + c.type, vars, cls: 'ev' });
+    this.endReview();
+    return true;
+  }
+  /** [ Reroll ] (win only, once per window, REROLL_AP from the weekly wallet): 3 new cards, no new mark. */
+  canReroll() { const rv = this.review; return !!rv && rv.mode === 'win' && !rv.rerolled && this.ap >= REVIEW.REROLL_AP; }
+  reviewReroll() {
+    if (!this.canReroll()) return false;
+    for (let i = 0; i < REVIEW.REROLL_AP; i++) this.spendAP();
+    const rv = this.review;
+    rv.rerolled = true;
+    rv.cards = this.rollReviewCards(this.player(rv.pid), rv, '#reroll');
+    this.save();
+    return true;
+  }
+  /** [ Skip ]: no role change, morale +SKIP_MORALE ("the coach didn't push me"). */
+  reviewSkip() {
+    const rv = this.review, p = rv && this.player(rv.pid);
+    if (!p) return false;
+    p.dyn.morale = clamp(p.dyn.morale + REVIEW.SKIP_MORALE, 0, 100);
+    this.addDiary({ date: this.calendar.date, key: 'rv.skip.diary', vars: { k: { pid: p.id } }, cls: 'ev' });
+    this.endReview();
+    return true;
+  }
+  /** [ Banish ] one card's role from HIS pool for the season (not a role he holds); the window stays with the rest (no refill),
+      once per window. BANISH_CLUE: his reaction is a clue (v3.18 rules, source 'review'). */
+  reviewBanish(i) {
+    const rv = this.review, p = rv && this.player(rv.pid), c = rv?.cards[i];
+    if (!p || !c || rv.banished || c.type === 'up') return false;
+    p.banned.push(c.role);
+    rv.cards = rv.cards.filter(x => x.role !== c.role);
+    rv.banished = true;
+    this.addDiary({ date: this.calendar.date, key: 'rv.ban.diary', vars: { k: { pid: p.id }, r: { role: c.role } } });
+    if (seeded(rv.date + '#reviewban#' + p.id)() < REVIEW.BANISH_CLUE) this.addClue(p, rollClue(p, { date: rv.date, source: 'review', ref: rv.md, salt: '#ban' }));
+    this.save();
+    return true;
+  }
   /** v3.18: keep a clue in the kid's Notebook (last CLUES.MAX_PER_KID). */
   addClue(p, c) {
     if (!p || !c) return;
@@ -958,7 +1072,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
-        lastReport: this.lastReport, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
+        lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
         budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
@@ -993,7 +1107,7 @@ class GameState {
       this.eventQueue = Array.isArray(d.eventQueue) ? d.eventQueue.filter(q => q && q.id && q.due) : [];
       this.pendingEvent = d.pendingEvent && typeof d.pendingEvent === 'object' ? d.pendingEvent : null;
       this.eventLog = Array.isArray(d.eventLog) ? d.eventLog.slice(-60) : [];
-      this.squad = d.squad.map(p => new Player({ ...p, tags: (Array.isArray(p.tags) ? p.tags : []).filter(t => TAGS[t]).slice(0, 1) }));
+      this.squad = d.squad.map(p => new Player({ ...p, tags: Array.isArray(p.tags) ? p.tags : [] }));   // v3.19: Player.cleanRoles migrates an old single role → level 2
       // v3.1: the world database (older saves get one: the rest of the 100 kids are generated around the squad)
       for (const p of this.squad) p.teamId = 'player_team';
       const rest = Array.isArray(d.pool) ? d.pool.map(p => new Player({ ...p, tags: [] }))
@@ -1021,6 +1135,8 @@ class GameState {
         this.phase = d.phase || 'calendar';
         this.lastReport = d.lastReport || null;
         this.notebookUnlocked = !!d.notebookUnlocked;
+        this.lossStreak = Math.max(0, Math.round(d.lossStreak || 0));   // v3.19
+        this.review = d.review && typeof d.review === 'object' && Array.isArray(d.review.cards) && this.player(d.review.pid) ? d.review : null;
         this.diary = Array.isArray(d.diary) ? d.diary : [];
         this.seasonStats = d.seasonStats && typeof d.seasonStats === 'object' ? d.seasonStats : {};
         this.coachNotes = d.coachNotes && typeof d.coachNotes === 'object' ? d.coachNotes : {};

@@ -127,8 +127,10 @@ class Player {
     this.name = name;
     this.archetype = position;
     this.number = number;
-    if (tags) {                      // only the academy squad carries tags (+ v1.9 story flags)
-      this.tags = tags;
+    if (tags) {                      // only the academy squad carries roles (+ v1.9 story flags)
+      // v3.19 GROWTH: roles [{ id, level 1–3, m }] (≤ ROLES.SLOTS, no clashing pair); an old single role (`tags` + v3.18 roleMatches) → level 2
+      this.roles = Player.cleanRoles(o, tags);
+      this.banned = Array.isArray(o.banned) ? [...new Set(o.banned.filter(id => ROLE_BY_ID[id]))] : [];   // v3.19: roles banished from his REVIEW.EXE this season
       this.flags = Array.isArray(o.flags) ? o.flags.filter(f => FLAGS[f]) : [];
       this.injuryDays = Math.max(0, Math.round(o.injuryDays || 0));                // v2.2: calendar days out
       this.suspensionMatches = Math.max(0, Math.round(o.suspensionMatches || 0));  // v2.2: matches banned
@@ -139,7 +141,6 @@ class Player {
       this.absentToday = o.absentToday || null;
       // v3.18: the Notebook's clues [{ date, source 'match'|'training' (v3.20: 'voice'), ref, signal|null, textKey, seen }] + matches his current role has played
       this.clues = Array.isArray(o.clues) ? o.clues.filter(c => c && typeof c.textKey === 'string').map(c => ({ ...c, signal: CLUE_SIGNALS[c.signal] ? c.signal : null })).slice(-CLUES.MAX_PER_KID) : [];
-      this.roleMatches = Math.max(0, Math.round(o.roleMatches || 0));
       this.lessonClues = Math.max(0, Math.round(o.lessonClues || 0));   // v3.16: lesson clues given (alternates archetype ↔ leadership)
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
       this.positionHintCooldown = Math.max(0, Math.round(o.positionHintCooldown || 0));   // v3.6: matches before he may ask again
@@ -181,6 +182,21 @@ class Player {
     { const v = src.psych.potential;
       this.psych.potential = !Number.isFinite(v) ? GROWTH.DEFAULT : newRoom ? clamp(Math.round(v), GROWTH.MIN, GROWTH.MAX) : roomFromCeiling(v, this.overall); }
     this.refreshPortrait();
+  }
+  /** v3.19: role ids (v3.18 name; undefined for opponents / world kids = "not an academy kid"). Setting it = v3.18 single roles at MIGRATE_LEVEL. */
+  get tags() { return this.roles ? this.roles.map(r => r.id) : undefined; }
+  set tags(v) { if (Array.isArray(v)) this.roles = Player.cleanRoles({}, v); }
+  roleLevel(id) { return this.roles?.find(r => r.id === id)?.level || 0; }
+  /** v3.19: saved roles → valid list. Missing → the old single role (`tags`) at ROLES.MIGRATE_LEVEL, its v3.18 roleMatches kept. */
+  static cleanRoles(o, tags) {
+    const src = Array.isArray(o.roles) ? o.roles
+      : (Array.isArray(tags) ? tags : []).filter(id => ROLE_BY_ID[id]).slice(0, 1).map(id => ({ id, level: ROLES.MIGRATE_LEVEL, m: o.roleMatches || 0 }));
+    const out = [];
+    for (const r of src) {
+      if (!r || !ROLE_BY_ID[r.id] || out.length >= ROLES.SLOTS || out.some(x => x.id === r.id || roleClash(x.id, r.id))) continue;
+      out.push({ id: r.id, level: clamp(Math.round(r.level) || 1, 1, ROLES.LEVELS), m: Math.max(0, Math.round(r.m || 0)) });
+    }
+    return out;
   }
   /** v3.0: what the UI calls the position — the coach's tag for academy kids, the (scouted) role for opponents. */
   get position() { return this.tags ? this.tag : this.archetype; }

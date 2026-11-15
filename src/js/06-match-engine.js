@@ -63,7 +63,7 @@ class MatchEngine {
       entries: slots.map((s, i) => ({ ...s, p: team.players[i] })) };
   }
   /** v1.8: per-minute drain, base 30–40% / 90' scaled by baseStamina (20 → ×0.85, 10 → ×1.0, 1 → ×1.135). */
-  static drainOf(p) { return rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90 * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015); }
+  static drainOf(p) { return rnd(ENERGY.PLAY_MIN, ENERGY.PLAY_MAX) / 90 * (1.15 - (p.physical?.baseStamina ?? 10) * 0.015) * roleDrainMult(p); }   // v3.19: Engine tires slower
   static blankStats() { return { passOk: 0, passFail: 0, tackles: 0, tacklesLost: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, dribbleOk: 0, dribbleFail: 0, saves: 0, conceded: 0, yellow: 0, red: 0, assists: 0 }; }
 
   /* ---------- background play (v1.0) ----------
@@ -255,9 +255,8 @@ class MatchEngine {
     const rating = p.rating ? p.rating(attr) : 10;
     const fat = fatigueMult(this.energy?.get(p.id) ?? p.energy ?? 100);   // v3.3: smooth curve, no 50% / 30% steps
     // v3.0: no "out of position" penalty any more — only hidden stats and biometrics decide
-    const t = p.tags || [];
-    const tag = (t.includes('Aggressive') && (attr === 'Tackle' || attr === 'Mark')) || (t.includes('Playmaker') && attr === 'Pass')
-      || (t.includes('Selfish') && (attr === 'Dribble' || attr === 'Shoot')) ? 1.5 : 1;
+    // v3.19: every role from ROLES_DEF — main multiplier by level, downsides flat, two roles on one composite multiply
+    const tag = roleAttrMult(p, attr, this.shotCtx || null);
     const mood = p.moodBonus ?? 0;
     return { rating, fat, tag, mood, v: rating * fat * tag + mood };
   }
@@ -497,11 +496,12 @@ class MatchEngine {
     const dec = c.tactical?.decisions ?? 10;
     if (dec <= 7 && this.zone === 1) w.shoot += 6;
     if (dec >= 15) { w.pass *= 1.15; if (this.zone === 1) w.shoot *= 0.6; }
-    const t = c.tags || [];
-    if (t.includes('Playmaker')) { w.pass *= 2; w.dribble *= 0.4; }
-    if (t.includes('Selfish')) {
-      w.pass *= 0.08; w.dribble *= 1.6; w.shoot *= 1.8;
-      if (this.zone === 1) w.shoot = Math.max(w.shoot, 22);
+    // v3.19: role downsides from ROLES_DEF (Playmaker passes first, Selfish hardly passes, Anchor stays home) — never scaled by level
+    for (const r of rolesOf(c)) {
+      const d = ROLE_BY_ID[r.id]?.down; if (!d) continue;
+      if (d.weights) for (const k in d.weights) w[k] *= d.weights[k];
+      if (d.midShotMin && this.zone === 1) w.shoot = Math.max(w.shoot, d.midShotMin);
+      if (d.noShotPastLine && this.zone > (LINE_IDX[this.lineOf.get(c.id)] ?? 1)) w.shoot = 0;
     }
     let r = Math.random() * (w.pass + w.dribble + w.shoot);
     for (const [action, weight] of Object.entries(w)) { if ((r -= weight) < 0) return action; }
@@ -520,9 +520,10 @@ class MatchEngine {
   doPass() {
     const c = this.carrier, side = this.poss, opp = 1 - side, z = this.zone;
     let tz;
+    const fw = rolesOf(c).reduce((m, r) => m * (ROLE_BY_ID[r.id]?.down.fwdPass ?? 1), 1);   // v3.19: Anchor plays it safe (fewer balls forward)
     if (this.isGK(c)) tz = Math.random() < 0.7 ? 0 : 1;
-    else if (z === 0) tz = Math.random() < 0.65 ? 1 : 0;
-    else if (z === 1) tz = Math.random() < 0.6 ? 2 : 1;
+    else if (z === 0) tz = Math.random() < 0.65 * fw ? 1 : 0;
+    else if (z === 1) tz = Math.random() < 0.6 * fw ? 2 : 1;
     else tz = Math.random() < 0.7 ? 2 : 1;
     let mates = this.inZone(side, tz).filter(p => p !== c);
     if (!mates.length) { tz = 1; mates = this.active(side).filter(p => p !== c && !this.isGK(p)); }
@@ -570,12 +571,12 @@ class MatchEngine {
       this.setEv({ kind: 'dribble', a: c, d: def });
       this.log('', 'drOk', vars, side);
       if (side === 1 && def === this.captain()) this.captainMoment('mistake');   // v3.7: our captain beaten in a duel
-      if ((def.tags || []).includes('Aggressive')) this.commitFoul(def, c, side);
+      if (roleHas(def, 'foulOnLostDuel')) this.commitFoul(def, c, side);
     } else {
       const foul = Math.random() < SETPIECE.FOUL;
       this.tr('dribble', side, A, D, foul ? 'foul' : 'tackled');
       if (foul) {   // v3.0: a mistimed tackle — our ball, maybe a penalty
-        if ((def.tags || []).includes('Aggressive')) { this.commitFoul(def, c, side); return; }
+        if (roleHas(def, 'foulOnLostDuel')) { this.commitFoul(def, c, side); return; }
         this.setEv({ kind: 'foul', a: c, d: def, card: false });
         this.log('foul', 'eng.foulPlain', vars, 1 - side);
         this.setPiece(c, side);
@@ -629,12 +630,17 @@ class MatchEngine {
     const keeper = this.keeper(opp);
 
     let blocked = false;
+    this.shotCtx = long ? 'long' : 'box';   // v3.19: Finisher's ×1.5 counts only for shots that are not long shots
     if (!penalty && Math.random() < 0.2) {
-      const B = this.rs(blocker, 'Mark', opp, 'def'), S = this.rs(shooter, 'Shoot', side, 'atk');
+      this.shotCtx = null;   // the blocker's Mark is not a shot
+      const B = this.rs(blocker, 'Mark', opp, 'def');
+      this.shotCtx = long ? 'long' : 'box';
+      const S = this.rs(shooter, 'Shoot', side, 'atk');
       blocked = B.total > S.total;
       this.tr('block', side, S, B, blocked ? 'blocked' : 'through');
     }
     if (blocked) {
+      this.shotCtx = null;
       this.st(blocker).intercepts++;
       this.log('turn', 'block', { d: blocker }, opp);
       this.setEv({ kind: 'block', d: blocker });
@@ -644,6 +650,7 @@ class MatchEngine {
       return;
     }
     const A = this.rs(shooter, 'Shoot', side, 'atk', { bonus, long: long ? -5 : 0 });
+    this.shotCtx = null;
     const D = this.rs(keeper, 'Save', opp, 'def', { keeper: 4 });
     const atk = A.total, dfn = D.total;
     const vars = { a: shooter, k: keeper };

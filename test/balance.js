@@ -17,6 +17,10 @@
  * Table 1 — whole-match shouts.  Table 2 — game states: neutral until 60', then the team that leads by one
  *   (LEAD) or trails by one (CHASE) switches to a shout; we report how often the leader still wins / the
  *   trailer avoids defeat.
+ *   node test/balance.js --roles      v3.19: also the ROLES table (not default): a squad with random FITTING roles at level 3
+ *                                     (up to 2 per kid, no clashing pair) vs the same squads without roles, the same with
+ *                                     MISFIT roles, and every role alone at level 3 on the 4 outfield kids it fits best.
+ *                                     Mirrored like the shouts. No hard gate yet; a single role above 65% gets a warning.
  * Exit code 1 if the Attack-vs-Defense win share (wins / (wins + losses)) is outside 45–55%.
  */
 'use strict';
@@ -33,6 +37,7 @@ const PAIRS = parseInt(flag('--pairs'), 10) || 0;
 const JSON_OUT = argv.includes('--json');
 const LOG_FILE = flag('--log');
 const LOG = LOG_FILE ? { rows: [], matches: [] } : null;
+const ROLES_MODE = argv.includes('--roles');   // v3.19
 const TEAM_SEED = 5;   // a pair of equal-level (mod 0) 4-4-2 squads whose Neutral-vs-Neutral scoring ≈ the league average (~2.3)
 
 function mulberry32(a) {
@@ -45,10 +50,12 @@ function loadEngine(seed) {
   let gen = mulberry32(seed);
   SeededMath.random = () => gen();
   const ctx = vm.createContext({ Math: SeededMath, console, setInterval, clearInterval });
-  for (const f of ['00-utils-data.js', '03-player.js', '06-match-engine.js']) {
+  for (const f of ['00-utils-data.js', '03-player.js', '06-match-engine.js', '11-notebook-helpers.js']) {   // v3.19: + the role truth (definitions only)
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'js', f), 'utf8'), ctx, { filename: f });
   }
-  const api = vm.runInContext('({ MatchEngine, Player, formationSlots, LINE_POS, SHOUT: typeof SHOUT === "undefined" ? null : SHOUT, fatigueMult: typeof fatigueMult === "function" ? fatigueMult : null })', ctx);
+  const api = vm.runInContext('({ MatchEngine, Player, formationSlots, LINE_POS, SHOUT: typeof SHOUT === "undefined" ? null : SHOUT, fatigueMult: typeof fatigueMult === "function" ? fatigueMult : null,'
+    + ' ROLES_DEF: typeof ROLES_DEF === "undefined" ? null : ROLES_DEF, roleClash: typeof roleClash === "function" ? roleClash : null, trueSignals: typeof trueSignals === "function" ? trueSignals : null,'
+    + ' roleFit: typeof roleFit === "function" ? roleFit : null, seeded })', ctx);
   return Object.assign(api, { reseed: s => { gen = mulberry32(s); } });
 }
 
@@ -136,7 +143,46 @@ function runAll(teamSeed, n, seed, main = false) {
   const states = [];
   for (const mode of ['LEAD', 'CHASE']) for (const s of ['Neutral', 'Attack', 'Defense']) states.push(runState(E, A, B, mode, s, Math.round(n / 2), seed + 7));
   const fatigue = main ? [75, 60, 50, 40, 25].map(en => runFatigue(E, A, B, en, n, seed + 11)) : [];
-  return { setups, states, fatigue, E };
+  return { setups, states, fatigue, E, teams: [A, B] };
+}
+
+/* ---------- v3.19 roles: the side `xs` plays with `roleMap` (player → roles), the other side without ---------- */
+function runRoles(E, A, B, label, roleMap, n, seed) {
+  E.reseed(seed);
+  const r = { setup: label, n, w: 0, d: 0, l: 0, gf: 0, ga: 0, shF: 0, shA: 0, otF: 0, otA: 0 };
+  const all = [...A.players, ...B.players];
+  for (let i = 0; i < n; i++) {
+    const { home, away, xs } = fixture(i, A, B), withRoles = xs === 0 ? home : away;
+    all.forEach(p => { p.roles = withRoles.players.includes(p) ? (roleMap.get(p) || []).map(id => ({ id, level: 3, m: 0 })) : []; });
+    const eng = new E.MatchEngine(home, away, HOOKS, {});
+    eng.runInstant();
+    const ys = 1 - xs, gx = eng.sides[xs].score, gy = eng.sides[ys].score, tx = eng.teamTotals(xs), ty = eng.teamTotals(ys);
+    r.gf += gx; r.ga += gy; r.shF += tx.shots; r.shA += ty.shots; r.otF += tx.onTarget; r.otA += ty.onTarget;
+    if (gx > gy) r.w++; else if (gx === gy) r.d++; else r.l++;
+  }
+  all.forEach(p => { delete p.roles; });
+  r.winShare = r.w + r.l ? r.w / (r.w + r.l) : 0.5;
+  return r;
+}
+/** Role maps: fitting (his true signals, up to 2, no clash), misfit (roles whose signal is NOT true for him), and each role
+    alone on the 4 outfield kids with the best fit for its signal. Picks are seeded by the kid's id (no Math.random). */
+function roleSetups(E, A, B, n, seed) {
+  const outfield = [...A.players, ...B.players].filter(p => p.archetype !== 'GK');
+  const bySig = Object.fromEntries(E.ROLES_DEF.map(d => [d.signal, d.id]));
+  const pickSome = (p, ids, salt) => {
+    const r = E.seeded(p.id + '#balroles' + salt), list = [...ids].map(id => ({ id, k: r() })).sort((a, b) => a.k - b.k).map(x => x.id), out = [];
+    for (const id of list) if (out.length < 2 && !out.some(o => E.roleClash(o, id))) out.push(id);
+    return out;
+  };
+  const fit = new Map(outfield.map(p => [p, pickSome(p, E.trueSignals(p).map(s => bySig[s]), 'fit')]));
+  const misfit = new Map(outfield.map(p => [p, pickSome(p, E.ROLES_DEF.map(d => d.id).filter(id => !E.trueSignals(p).includes(E.ROLES_DEF.find(d => d.id === id).signal)), 'mis')]));
+  const rows = [runRoles(E, A, B, 'Fitting L3 vs none', fit, n, seed), runRoles(E, A, B, 'Misfit L3 vs none', misfit, n, seed + 1)];
+  E.ROLES_DEF.forEach((d, k) => {
+    const map = new Map();
+    for (const t of [A, B]) t.players.filter(p => p.archetype !== 'GK').sort((a, b) => E.roleFit(b)[d.signal] - E.roleFit(a)[d.signal]).slice(0, 4).forEach(p => map.set(p, [d.id]));
+    rows.push(runRoles(E, A, B, `${d.id} ×4 vs none`, map, n, seed + 2 + k));
+  });
+  return rows;
 }
 
 const pct = v => (v * 100).toFixed(1).padStart(5) + '%';
@@ -156,7 +202,16 @@ if (PAIRS) {
   pairs = sum;
 }
 
-if (JSON_OUT) console.log(JSON.stringify({ setups: main.setups, states: main.states, fatigue: main.fatigue, pairs }, null, 1));
+let roleRows = null;
+if (ROLES_MODE) {   // v3.19
+  const sets = [roleSetups(main.E, ...main.teams, N, SEED + 500)];
+  for (let k = 1; k <= PAIRS; k++) { const E = loadEngine(TEAM_SEED * 100 + k); sets.push(roleSetups(E, ...makeTeams(E), N, SEED + 500 + k)); }
+  roleRows = sets[0].map((r0, j) => { const r = { setup: r0.setup, n: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, shF: 0, shA: 0, otF: 0, otA: 0 };
+    for (const set of sets) for (const f of ['n', 'w', 'd', 'l', 'gf', 'ga', 'shF', 'shA', 'otF', 'otA']) r[f] += set[j][f];
+    r.winShare = r.w / (r.w + r.l); return r; });
+}
+
+if (JSON_OUT) console.log(JSON.stringify({ setups: main.setups, states: main.states, fatigue: main.fatigue, pairs, roles: roleRows }, null, 1));
 else {
   const head = 'Setup                | Win    Draw   Loss  | WinShare | GF/m  GA/m  Tot/m | ShF   ShA   | OnTgF OnTgA';
   console.log(`Balance: ${N} instant matches per setup, seed ${SEED}, team seed ${TEAM_SEED}, mirrored (first team's view)`);
@@ -166,6 +221,14 @@ else {
   if (pairs) { console.log(`\nAveraged over ${PAIRS} other random team pairs (${N} matches each)`); console.log(head); pairs.forEach(r => console.log(rowSetup(r))); }
   console.log('\nFatigue: squad starts at X% vs a fresh squad   | GF/m  GA/m  Diff');
   for (const r of main.fatigue) console.log(`${(r.energy + '%').padEnd(46)} | ${r.gf.toFixed(2).padStart(5)} ${r.ga.toFixed(2).padStart(5)} ${r.diff.toFixed(2).padStart(5)}`);
+  if (roleRows) {
+    console.log(`\nRoles (v3.19): the first team has the roles, the other none (${N} matches${PAIRS ? ` × ${PAIRS + 1} team pairs` : ''}, mirrored)`);
+    console.log(head); roleRows.forEach(r => console.log(rowSetup(r)));
+    const v318 = ['Aggressive', 'Playmaker', 'Selfish'];   // level 3 = the v3.18 strength by design (ROLES.LEVEL_MULT), not tuned here
+    for (const r of roleRows.slice(2)) if (r.winShare > 0.65) console.log(v318.some(id => r.setup.startsWith(id + ' '))
+      ? `note: ${r.setup} win share ${pct(r.winShare).trim()} > 65% (v3.18 role, level 3 = its old strength)`
+      : `WARNING: ${r.setup} win share ${pct(r.winShare).trim()} > 65% — tone its multiplier down`);
+  }
   if (LOG) console.log(`\nMatch log written: ${LOG_FILE} (+ .matches.csv)`);
   if (main.E.fatigueMult) console.log('\nfatigueMult: ' + [100, 75, 50, 25, 0].map(e => `${e}%→${main.E.fatigueMult(e).toFixed(3)}`).join('  '));
 }

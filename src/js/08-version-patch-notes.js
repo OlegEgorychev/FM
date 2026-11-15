@@ -2,8 +2,23 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.18.1';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.19';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.19', name: { en: 'Growth', ru: 'Рост' },
+    en: [
+      'Roles are earned now. After a win REVIEW.EXE opens for the man of the match: pick 1 of 3 cards — a new role, +1 level of a role he has, or a replacement. [ CONTINUE ] waits for your choice (visual match and Quick Sim alike).',
+      'Reroll the cards for 1 AP (once), Skip (+2 morale), or Banish a role from his offers for the season. A card may carry "He lit up when you mentioned it" — a clue, so sometimes the coach misreads him. After 2+ defeats in a row the next win shows 4 cards; after a draw there is a smaller pick of 2.',
+      'Three new roles, each with a catch: Engine (tires slower, clumsier on the ball), Anchor (reads passes and blocks shots, never joins the attack), Finisher (deadly in the box, a poor passer who waits up front). Clues now cover them too.',
+      'Every kid has two role slots and levels 1–3 (level 3 = the old full strength). Playmaker + Selfish and Anchor + Finisher can\'t be held together.',
+      'The Notebook no longer hands out roles; it can only take one away (−3 morale once it has played a match, free right after a review). Old saves: a kid\'s single role becomes level 2.',
+    ],
+    ru: [
+      'Роли теперь зарабатывают. После победы открывается REVIEW.EXE для лучшего игрока матча: выбери 1 из 3 карточек — новая роль, +1 уровень имеющейся или замена. [ ПРОДОЛЖИТЬ ] ждёт выбора (и после обычного матча, и после быстрой симуляции).',
+      'Карточки можно перетасовать за 1 ОД (один раз), пропустить (+2 к морали) или вычеркнуть роль из его предложений до конца сезона. На карточке может быть пометка «Он оживился, когда ты об этом сказал» — это зацепка, и тренер иногда ошибается. После 2+ поражений подряд следующая победа даёт 4 карточки; после ничьей — выбор поменьше, из двух.',
+      'Три новые роли, у каждой своя цена: Мотор (устаёт медленнее, но неловок с мячом), Опорник (читает передачи и блокирует удары, но не идёт в атаку), Бомбардир (опасен в штрафной, но слабо пасует и ждёт впереди). Зацепки теперь подсказывают и их.',
+      'У каждого два слота ролей и уровни 1–3 (3-й = прежняя полная сила). Плеймейкер + Эгоист и Опорник + Бомбардир вместе не держатся.',
+      'Блокнот больше не раздаёт роли — только снимает (−3 к морали, если роль уже сыграла матч; сразу после разбора — бесплатно). Старые сохранения: единственная роль игрока становится 2-го уровня.',
+    ] },
   { v: '3.18.1', name: { en: 'Clues (fix)', ru: 'Зацепки (исправление)' },
     en: [
       'Fix: the coach\'s line about whoever played in goal now counts the goals he let in, not only his saves. A 0-8 with two saves is no longer "solid between the posts".',
