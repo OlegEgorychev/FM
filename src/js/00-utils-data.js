@@ -182,8 +182,8 @@ const AP_OPTION = { TRUANT_DISC: 1, TRUANT_MORALE: 3, BOOTS_MORALE: 5, KNOCK_COS
 const NEWS = {
   COOLDOWN: 14,
   IMPORTANT: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'home.back', 'world.', 'fin.', 'fee.lost', 'rep.', 'week.', 'tr.plateau.',
-    'tr.improved', 'lesson.improved', 'lesson.cancel', 'lesson.clue', 'obs.', 'scout.', 'cb.', 'xi.auto'],
-  NEVER_MUTE: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'world.', 'fin.', 'fee.', 'rep.', 'week.'],
+    'tr.improved', 'lesson.improved', 'lesson.cancel', 'lesson.clue', 'obs.', 'scout.', 'cb.', 'xi.auto', 'af.complaint'],
+  NEVER_MUTE: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'world.', 'fin.', 'fee.', 'rep.', 'week.', 'af.complaint'],
 };
 const newsMatch = (key, list) => list.some(x => x[0] === '.' ? key.endsWith(x) : key.startsWith(x));
 /** News key of a diary entry: its template key + the ids of the kids it names (sorted), e.g. 'tr.hurt|k12'. */
@@ -265,7 +265,7 @@ const CLUE_SIGNALS = {
   screen: { role: 'Anchor',     attrs: ['Mark'],            stats: ['intercepts'],                                  min: 1, lots: 4 },
   finish: { role: 'Finisher',   attrs: ['Shoot'],           stats: ['onTarget'],                                    min: 1, lots: 3 },
 };
-const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606' } };   // v3.19 'review'; v3.20 adds 'voice'
+const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606', voice: '\u{1F5E3}' } };   // v3.19 'review'; v3.20 'voice' (AFTER_GAME.EXE)
 const KEEPER_NOTE = { ROUGH: 4 };   // v3.18.1: goals let in from which the keeper's day reads as a rough one, whatever his saves
 /* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free.
    v3.19 GROWTH: p.roles = [{ id, level, m }] (m = league matches he played with it since he got it), at most SLOTS, levels 1–LEVELS.
@@ -317,6 +317,39 @@ const roleHas = (p, flag) => rolesOf(p).some(r => ROLE_BY_ID[r.id]?.down[flag]);
 const REVIEW = { CARDS: 3, CARDS_DRAW: 2, CARDS_STREAK: 4, STREAK_FROM: 2, LIKE_HINT: 0.3, BANISH_CLUE: 0.4, REROLL_AP: 1, SKIP_MORALE: 2, EVIDENCE_W: 2,
   RATING: { base: 6, goals: 1, assists: 0.6, onTarget: 0.2, passOk: 0.03, passFail: -0.04, tackles: 0.15, tacklesLost: -0.05, intercepts: 0.12,
     dribbleOk: 0.08, dribbleFail: -0.05, saves: 0.3, conceded: -0.3, yellow: -0.3, red: -1.5 } };
+/* v3.20 AFTER_GAME.EXE — "After the game": after a loss the coach hears out kids and parents (3 remark cards, he picks 1);
+   after a draw he chooses: praise (the REVIEW draw mode) or listen (1 random remark). TEST values.
+   PARENT = chance one of the 3 speakers is a parent. Kids are taken from those involved in key moments (INVOLVE weights on the
+   match card: goals let in, shots off target, lost dribbles / duels, cards; ≥ INVOLVE_MIN = involved), then any kid who played.
+   Hidden reliability: kid = KID_BASE + (discipline + composure − 20) / 40 × KID_SPREAD, clamped KID_MIN–KID_MAX;
+   a parent about his own kid's role PARENT_OWN (pride), about a misfit PARENT_MISFIT. FORCE_REL (tests) overrides every one.
+   LISTEN_MORALE for the kid heard; a parent heard → Parents +PARENT_REP; Skip → Squad SKIP_SQUAD.
+   A parent's "wrong role" complaint left alone for COMPLAINT_MATCHES matches → Parents COMPLAINT_REP + a briefing line.
+   OTHER_MISFIT = chance a kid talking about a teammate who has a role talks about that role; W = type weights (×LOW / ×HIGH by leadership). */
+const AFTER = { PARENT: 0.4, SPEAKERS: 3, KID_BASE: 0.7, KID_SPREAD: 0.2, KID_MIN: 0.5, KID_MAX: 0.9, PARENT_OWN: 0.65, PARENT_MISFIT: 0.85,
+  FORCE_REL: null, LISTEN_MORALE: 3, PARENT_REP: 1, SKIP_SQUAD: -1, COMPLAINT_MATCHES: 3, COMPLAINT_REP: -2, OTHER_MISFIT: 0.5, PHRASES: 4,
+  INVOLVE: { conceded: 1, miss: 1, dribbleFail: 1, tacklesLost: 1, yellow: 2, red: 3 }, INVOLVE_MIN: 2,
+  W: { self: 1, other: 1, blame: 1, excuse: 1, low: { other: 2, excuse: 2 }, high: { blame: 3 }, parentOwn: 1, parentCoach: 1, misfitCoach: 2 } };
+/* Remark types as data: who says it, what kind of clue it writes, and about whom. */
+const AFTER_REMARKS = {
+  self:        { speaker: 'kid',    kind: 'role',       about: 'speaker' },
+  other:       { speaker: 'kid',    kind: 'role',       about: 'teammate' },   // or 'misfit' when the teammate has a role (OTHER_MISFIT)
+  blame:       { speaker: 'kid',    kind: 'leadership', about: 'speaker', claim: 'high' },
+  excuse:      { speaker: 'kid',    kind: 'leadership', about: 'speaker', claim: 'low' },
+  parentOwn:   { speaker: 'parent', kind: 'role',       about: 'child' },
+  parentCoach: { speaker: 'parent', kind: 'misfit',     about: 'child' },
+};
+/** Hidden reliability of a kid's remark (discipline + composure, 1–20 each). */
+const kidReliability = p => clamp(AFTER.KID_BASE + ((p.psych?.discipline ?? 10) + (p.psych?.composure ?? 10) - 20) / 40 * AFTER.KID_SPREAD, AFTER.KID_MIN, AFTER.KID_MAX);
+/** How much a kid was in the key moments of the match: his card (goals let in, shots off target, lost balls, lost duels)
+    + our cards from matchEvents. */
+function afterInvolvement(played, events = []) {
+  const I = AFTER.INVOLVE, inv = {};
+  for (const [id, st] of played) inv[id] = (st?.conceded || 0) * I.conceded + Math.max(0, (st?.shots || 0) - (st?.onTarget || 0)) * I.miss
+    + (st?.dribbleFail || 0) * I.dribbleFail + (st?.tacklesLost || 0) * I.tacklesLost;
+  for (const e of events || []) if (e.side === 0 && I[e.type] && e.playerId in inv) inv[e.playerId] += I[e.type];
+  return inv;
+}
 const matchRating = st => { let r = REVIEW.RATING.base; for (const k in REVIEW.RATING) if (k !== 'base') r += (st?.[k] || 0) * REVIEW.RATING[k]; return clamp(r, 1, 10); };
 const positionRequestChance = n => n < POS_HINT.MIN ? 0 : POS_HINT.CHANCE[n] ?? Math.min(POS_HINT.CAP, POS_HINT.CHANCE[6] + (n - 6) * POS_HINT.STEP);
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);

@@ -35,6 +35,7 @@ class UIController {
     this.planner = new WeekPlanner(this);        // v3.13: PLANNER.EXE (the weekly plan)
     this.kassa = new CashDesk(this);             // v3.15: KASSA.EXE (monthly fees)
     this.reviewView = new ReviewView(this);      // v3.19: REVIEW.EXE (the pick after a win / draw)
+    this.afterView = new AfterGameView(this);    // v3.20: AFTER_GAME.EXE (remarks after a loss, praise / listen after a draw)
     this.state.onBudget = d => this.renderBudget(d);
     this.setupCalendar();
     this.bind();
@@ -271,6 +272,7 @@ class UIController {
     const layers = () => [
       { el: this.events.view.layer, close: null },
       { el: this.reviewView.layer, close: null },   // v3.19: REVIEW.EXE closes only through a choice
+      { el: this.afterView.layer, close: null },    // v3.20: AFTER_GAME.EXE too
       { el: this.modal.layer, close: () => this.modal.close() },
       { el: this.debug.layer, close: () => this.debug.close() },
       { el: this.summary.layer, close: () => this.summary.requestClose() },   // v3.5: no Esc-out before the team talk
@@ -921,12 +923,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
   autoSim() {
     const s = this.state;
+    if (s.phase === 'post' && s.afterPending) { s.afterAuto(); this.afterView.close(); }   // v3.20: loss → first remark + keep, draw → praise
     if (s.phase === 'post' && s.reviewPending) { s.reviewPick(0); this.reviewView.close(); }   // v3.19: auto mode takes the first card
     if (s.phase === 'calendar' && !this.events.active) this.runCalendar();
   }
   /** v3.19: REVIEW.EXE picks the first card by itself (smoke auto-play: window.YAM_AUTO_REVIEW; `ui.autoReview = false` to test the window). */
   get autoReview() { return this._autoReview ?? !!window.YAM_AUTO_REVIEW; }
   set autoReview(v) { this._autoReview = v; }
+  /** v3.20: AFTER_GAME.EXE decides by itself (loss → first remark + keep, draw → praise); same smoke flag; `ui.autoAfter = false` to test the window. */
+  get autoAfter() { return this._autoAfter ?? !!window.YAM_AUTO_REVIEW; }
+  set autoAfter(v) { this._autoAfter = v; }
 
   /** v2.5: [ CALL INTO OFFICE ] — 1 action point, a short talk in the dialogue box. */
   /** v3.13 (replaces the v3.2 rule): why the coach can NOT call this kid in right now (i18n key), or null.
@@ -1136,6 +1142,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (!s.lastReport.instant) { this.summary.open(s.lastReport); return; }
       s.skipTeamTalk();
     }
+    if (s.afterPending) {   // v3.20: AFTER_GAME.EXE first (loss: remarks; draw: praise → REVIEW / listen); [ CONTINUE ] waits
+      if (!this.autoAfter) { this.afterView.open(); this.renderDash(); return; }
+      s.afterAuto();
+    }
+    s.after = null;
+    this.afterView.layer.hidden = true;
     if (s.reviewPending) {   // v3.19: REVIEW.EXE — the evening stop after a win / draw; [ CONTINUE ] waits for a choice
       if (!this.autoReview) { this.reviewView.open(); this.renderDash(); return; }
       s.reviewPick(0);   // auto-sim / smoke auto-play: the first card
@@ -1575,7 +1587,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     for (const pr of s.lastReport.players) { const k = psychClue(s.player(pr.id), ctx.md, capRep?.id); if (k) pr.psy = k; }
     s.recordMatchClues(s.lastReport, s.calendar.date);   // v3.18: one clue per Notebook kid (an episode, sometimes wrong)
     s.trackRoles(eng.everPlayed);   // v3.18: roles that played this match now cost morale to change
+    s.tickComplaints(s.calendar.date);   // v3.20: parents' "wrong role" complaints count this match (before tonight's talk)
     s.startReview(result, played.map(p => [p.id, { ...eng.st(p) }]), s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak)
+    s.startAfter(result, played.map(p => [p.id, { ...eng.st(p) }]), eng.matchEvents, s.calendar.date, ctx.md);   // v3.20: AFTER_GAME.EXE after a loss / draw
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
@@ -1608,7 +1622,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   clueLine(p, c) {
     const ok = clueConfirmed(p.clues, c), src = L.t('clue.src.' + c.source, { r: c.ref });
     return `<li class="clue${c.seen ? '' : ' new'}${ok ? ' ok' : ''}" data-sig="${c.signal || ''}"><span class="cl-d">${esc(fmtDate(c.date, { day: 'numeric', month: 'short' }))}</span>`
-      + `<span class="cl-src" title="${esc(src)}" aria-label="${esc(src)}">${CLUES.SOURCES[c.source] || '\u2022'}</span><span class="cl-t">${esc(L.t(c.textKey))}</span>`
+      + `<span class="cl-src" title="${esc(src)}" aria-label="${esc(src)}">${CLUES.SOURCES[c.source] || '\u2022'}</span><span class="cl-t">${esc(clueText(c))}</span>`
       + `${ok ? `<b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}</li>`;
   }
   /** Clues block, newest first; max → the rest folds into "All clues (n)". */
@@ -1623,7 +1637,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   /** 📝 when he has clues the coach has not opened yet; hover = the latest CLUES.TIP. */
   clueBadge(p) {
     if (!unseenClues(p)) return '';
-    const tip = [L.t('clue.badge'), ...[...p.clues].reverse().slice(0, CLUES.TIP).map(c => `${fmtDate(c.date, { day: 'numeric', month: 'short' })} ${CLUES.SOURCES[c.source] || ''} ${L.t(c.textKey)}`)].join('\n');
+    const tip = [L.t('clue.badge'), ...[...p.clues].reverse().slice(0, CLUES.TIP).map(c => `${fmtDate(c.date, { day: 'numeric', month: 'short' })} ${CLUES.SOURCES[c.source] || ''} ${clueText(c)}`)].join('\n');
     return `<span class="clue-badge" title="${esc(tip)}" aria-label="${esc(tip)}">\u{1F4DD}</span>`;
   }
   /** The three Notebook cards are on screen → their clues are read. */
@@ -1697,7 +1711,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       ${others.map(p => `<details class="nb-kid" data-cluekid="${p.id}" data-pid="${p.id}"><summary><span class="num dark">${p.number}</span> ${esc(L.name(p.name))}
         <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${p.tags.map(t => this.tagChip(t, p.id, false)).join('')}${this.clueBadge(p)}</summary>
         ${this.cluesBlock(p)}</details>`).join('')}</fieldset>` : '';
-    const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t(this.state.reviewPending ? 'notes.backReview' : 'notes.back')}</button></div>` : '';
+    const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t(this.state.afterPending ? 'notes.backAfter' : this.state.reviewPending ? 'notes.backReview' : 'notes.back')}</button></div>` : '';
     body.innerHTML = `
       <div class="nb-head">
         <h2>${L.t('notes.head', { n: rep.md, o: esc(L.team(rep.opponent)) })}</h2>

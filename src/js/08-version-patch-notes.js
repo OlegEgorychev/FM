@@ -2,8 +2,24 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.19';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.20';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.20', name: { en: 'After the game', ru: 'После игры' },
+    en: [
+      'A win gives strength, a loss gives understanding. After a defeat AFTER_GAME.EXE opens: three remarks from kids (and sometimes a mum or dad), you listen to one. [ CONTINUE ] waits for your choice.',
+      'What you hear goes into the Notebook as a 🗣 clue — "from Kolya", "Sasha\'s mum thinks". Kids blame others, parents are proud of their own: some remarks are simply wrong, and they sound just as sure.',
+      'After the talk you may rethink that kid\'s roles once, for free: remove one, swap one (one level lower), give him one, or keep things as they are.',
+      'A kid you listened to: +3 morale. A parent: Parents +1 — but if a parent says the role is wrong and nothing changes for 3 matches, you\'ll hear about it (Parents −2). "Not now, go home" costs Squad −1.',
+      'After a draw you choose: Praise (the smaller REVIEW pick) or Listen (one remark, no rethink).',
+    ],
+    ru: [
+      'Победа даёт силу, поражение — понимание. После поражения открывается окно «После игры»: три реплики от ребят (а иногда от мамы или папы), выслушать можно одну. [ ПРОДОЛЖИТЬ ] ждёт выбора.',
+      'Услышанное попадает в Блокнот как зацепка 🗣 — «со слов: Коля», «мама игрока Саша считает». Ребята валят на других, родители гордятся своими: часть реплик просто неверна — и звучит так же уверенно.',
+      'После разговора можно один раз бесплатно пересмотреть роли этого игрока: снять, заменить (на уровень ниже), дать роль или оставить как есть.',
+      'Выслушанный игрок: +3 к морали. Родитель: Родители +1 — но если родитель сказал, что роль не та, а за 3 матча ничего не поменялось, он об этом напомнит (Родители −2). «Не сейчас, по домам» — Команда −1.',
+      'После ничьей выбираешь: Похвалить (малый выбор REVIEW) или Выслушать (одна реплика, без пересмотра ролей).',
+    ],
+  },
   { v: '3.19', name: { en: 'Growth', ru: 'Рост' },
     en: [
       'Roles are earned now. After a win REVIEW.EXE opens for the man of the match: pick 1 of 3 cards — a new role, +1 level of a role he has, or a replacement. [ CONTINUE ] waits for your choice (visual match and Quick Sim alike).',

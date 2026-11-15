@@ -1,0 +1,37 @@
+/* =========================================================
+   v3.20 "AFTER THE GAME" — AFTER_GAME.EXE (reuses the REVIEW.EXE frame from 29-review.css)
+   ========================================================= */
+.win.afterwin .titlebar{ background: linear-gradient(90deg, #1c2c44, #4b6a8e); }
+.after-layer .af-wrap{ grid-template-columns: minmax(0, 1fr); }
+.after-layer[data-mode="loss-re"] .af-wrap{ grid-template-columns: 250px minmax(0, 1fr); }
+.af-lead{ min-height: 2.6em; cursor: default; }
+.after-layer.af-typing .af-lead{ cursor: pointer; }
+.after-layer.af-typing .af-lead::after{ content: '\2588'; animation: af-blink .8s steps(1) infinite; margin-left: 1px; }
+@keyframes af-blink{ 50%{ opacity: 0; } }
+.af-cards{ display: grid; grid-template-columns: repeat(var(--af-n, 3), minmax(0, 1fr)); gap: 8px; }
+.af-card{ display: flex; flex-direction: column; gap: 6px; align-items: flex-start; text-align: left; padding: 10px 9px; cursor: pointer; border-radius: 0; min-width: 0;
+  font: 13px/1.35 var(--ui); color: #111; background: #eef1f4; border: 2px solid; border-color: #fff var(--shadow) var(--shadow) #fff; min-height: 150px; }
+.af-card.parent{ background: #f4efe2; }
+.af-card:hover:not([disabled]), .af-card:focus-visible{ background: #fff; outline: 2px dashed #4b6a8e; outline-offset: -5px; }
+.af-card:active:not([disabled]){ border-color: var(--shadow) #fff #fff var(--shadow); }
+.af-card[disabled], .af-opt[disabled]{ cursor: default; color: #555; }
+.af-who{ display: flex; align-items: center; gap: 6px; font: bold 11px/1.2 var(--mono); color: #1c2c44; text-transform: uppercase; letter-spacing: .5px; }
+.af-gist{ font-size: 15px; line-height: 1.25; }
+.af-say{ font-size: 12px; color: #3b372c; font-style: italic; }
+.af-choice{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.af-opt{ display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 12px; cursor: pointer; border-radius: 0; font: 13px/1.35 var(--ui); color: #111;
+  background: #f4efe2; border: 2px solid; border-color: #fff var(--shadow) var(--shadow) #fff; }
+.af-opt b{ font-size: 16px; }
+.af-opt:hover:not([disabled]), .af-opt:focus-visible{ background: #fff8e6; outline: 2px dashed #9a6a1e; outline-offset: -5px; }
+.af-rethink{ display: flex; flex-direction: column; gap: 8px; }
+.af-grp{ border: 2px groove #d8d0b8; padding: 4px 6px 6px; margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.af-grp legend{ padding: 0 4px; font-weight: bold; font-size: 12px; color: #13213a; }
+.af-re{ font-size: 12px; }
+.af-keep{ display: flex; justify-content: flex-end; }
+.after-layer #af-foot:empty{ display: none; }
+@media (max-width: 760px){
+  .after-layer .af-wrap, .after-layer[data-mode="loss-re"] .af-wrap{ grid-template-columns: 1fr; }
+  .af-cards, .af-choice{ grid-template-columns: 1fr; }
+  .af-card{ min-height: 0; }
+}
+.after-layer .rv-kid[hidden]{ display: none; }

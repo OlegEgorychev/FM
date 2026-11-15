@@ -84,8 +84,19 @@ function rollClue(p, { date, source, ref, stats = null, used = new Set(), salt =
 const roleFits = (p, id) => !!ROLE_BY_ID[id] && trueSignals(p).includes(ROLE_BY_ID[id].signal);
 /** One event = source + ref (+ date: round numbers repeat every season). */
 const clueEvent = c => c.source + '|' + c.ref + '|' + c.date;
-/** ✓ confirmed: another clue with the same signal from a DIFFERENT event. Contradictions stay visible, nothing is resolved. */
-function clueConfirmed(list, c) { return !!c.signal && list.some(o => o !== c && o.signal === c.signal && clueEvent(o) !== clueEvent(c)); }
+/** What a clue claims: its signal, or (v3.20 voice clues) 'misfit:<role>' / 'lead:high|low'. */
+const clueClaim = c => c.signal || c.claim || null;
+/** ✓ confirmed: another clue with the same claim from a DIFFERENT event. Contradictions stay visible, nothing is resolved.
+    v3.20: a voice clue confirms / is confirmed by a match / training / review clue or a voice clue of another evening (same evening = same event). */
+function clueConfirmed(list, c) { const k = clueClaim(c); return !!k && list.some(o => o !== c && clueClaim(o) === k && clueEvent(o) !== clueEvent(c)); }
+/** v3.20: who said it ("from Kolya" / "Sasha's mum thinks") — stored only when somebody else spoke about him. */
+const clueBy = c => c.by?.name ? L.t(c.by.parent ? 'clue.by.' + c.by.parent : 'clue.by.kid', { k: L.name(c.by.name) }) : '';
+/** The clue's line as shown (v3.20: voice clues fill {s} = the signal's phrase, {r} = the role, plus who said it). */
+function clueText(c) {
+  if (c.source !== 'voice') return L.t(c.textKey);
+  const t = L.t(c.textKey, { s: c.signal ? L.t('af.sig.' + c.signal) : '', r: c.role ? L.tag(c.role) : '' }), by = clueBy(c);
+  return by ? by + ': ' + t : t;
+}
 const unseenClues = p => (p?.clues || []).filter(c => !c.seen).length;
 
 

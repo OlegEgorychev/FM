@@ -2086,6 +2086,310 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('v3.19 auto-sim: a whole season with REVIEW.EXE (auto mode takes the first card, never opens the window), no soft-lock',
       as.phase === 'seasonEnd' && as.md === 18 && as.picks === owed && owed > 0 && as.opened === 0 && as.review === null && as.roles > 0, JSON.stringify({ ...as, owed, guard }));
     }
+    // ===== v3.20 AFTER THE GAME: AFTER_GAME.EXE after a loss, praise / listen after a draw, voice clues =====
+    {   // block scope: the v3.20 names never clash with older checks
+    const v320calm = () => page.evaluate(() => { const s = YAM.game, ui = YAM.ui; ui.autoReview = false; ui.autoAfter = false;
+      if (!s.__spy) { s.__spy = true; const ac = s.addClue.bind(s); window.__clues = []; s.addClue = (p, c) => { window.__clues.push([p?.id, c?.source]); return ac(p, c); }; } ui.events.enabled = false; s.excusesOff = true;
+      s.eventQueue = []; s.pendingEvent = null; ui.events.view?.layer && (ui.events.view.layer.hidden = true); ui.modal.close(); ui.profile.close(); ui.debug.close(); ui.locker.close?.(); });
+    // the next league match by Quick Sim: 'win' = Force Win, 'loss' = the same bonus turned around for this one match (our kids' hidden truth untouched)
+    const v320toPost = async mode => {
+      for (let t = 0; t < 4; t++) {
+        await v320calm();
+        await page.evaluate(() => { const s = YAM.game, ui = YAM.ui;
+          if (s.phase === 'post') { s.afterAuto(); if (s.reviewPending) s.reviewPick(0); if (s.talkPending) s.applyTeamTalk('praise'); ui.closeMatchday(); }
+          if (s.phase === 'seasonEnd') ui.onDashAction();
+          if (s.phase === 'calendar') ui.autoSim(); });
+        await page.waitForFunction(() => YAM.game.phase === 'matchday' || (YAM.game.pendingEvent && !document.getElementById('talk-layer').hidden), null, { timeout: 30000 });
+        const res = await page.evaluate(m => { const s = YAM.game, ui = YAM.ui, ME = YAM.MatchEngine, orig = ME.prototype.modParts;
+          ui.modal.close(); ui.locker.close?.(); ui.briefing.close?.();
+          s.dayState().locker = { done: true, absent: {}, checked: [] }; s.cheats.forceWin = m === 'win';
+          if (m === 'loss') ME.prototype.modParts = function (side, role) { const o = orig.call(this, side, role), c = side === 0 ? -8 : 5; return { ...o, cheat: c, v: o.v + c }; };
+          try { ui.onInstantSim(); } finally { ME.prototype.modParts = orig; }
+          ui.modal.close(); ui.summary.close?.();
+          return s.lastReport?.result; }, mode);
+        if (mode !== 'loss' || res === 'L') return res;
+      }
+      return null;
+    };
+    const afOpen = () => page.evaluate(() => !document.getElementById('after-view').hidden);
+    const voiceN = 'p => window.__clues.filter(x => x[0] === p.id && x[1] === "voice").length';   // addClue calls (the 8-clue cap may drop an old voice clue)
+
+    // 1. a real loss → AFTER_GAME.EXE with 3 remark cards; Return / [ CONTINUE ] blocked; no OK / ×; Esc does nothing; buttons wait for the typewriter
+    const res1 = await v320toPost('loss');
+    const a1 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, af = s.after, L2 = document.getElementById('after-view');
+      const out = { res: s.lastReport.result === 'L', mode: af?.mode === 'loss', n: af?.remarks.length === AFTER.SPEAKERS, review: s.review === null };
+      ui.closeMatchday();
+      out.open = !L2.hidden; out.cards = L2.querySelectorAll('.af-card').length === 3; out.title = document.getElementById('af-title').textContent === L.t('af.title');
+      out.typing = L2.classList.contains('af-typing') && [...L2.querySelectorAll('button[data-act]')].every(b => b.disabled);
+      out.noOk = !L2.querySelector('.tb-btn') && ![...L2.querySelectorAll('button')].some(b => /^\s*(ok|close|next|закрыть|далее)\s*$/i.test(b.textContent));
+      const before = JSON.stringify(s.after);
+      L2.querySelector('.af-card').click(); out.clickNoop = JSON.stringify(s.after) === before;
+      ui.onDashAction(); ui.continueDays();
+      out.blocked = s.phase === 'post' && s.afterPending && !L2.hidden;
+      out.gist = [...L2.querySelectorAll('.af-gist')].every(g => g.textContent.trim().length > 5 && !/[{}%]|true|false/.test(g.textContent)) && [...L2.querySelectorAll('.af-say')].every(g => !/[{}]/.test(g.textContent));
+      return out;
+    });
+    await page.keyboard.press('Escape');
+    a1.esc = await afOpen();
+    await page.keyboard.press(' ');
+    a1.space = await page.evaluate(() => { const L2 = document.getElementById('after-view'); return !L2.hidden && !L2.classList.contains('af-typing') && [...L2.querySelectorAll('button[data-act]')].every(b => !b.disabled); });
+    await shot('20-after-game');
+    check('v3.20 a loss → AFTER_GAME.EXE "After the game", 3 remark cards; Return / [ CONTINUE ] blocked until a choice; no OK / × button; Escape does not close it; the cards wait for the typewriter (Space finishes it)',
+      Object.values(a1).every(Boolean), JSON.stringify({ res1, ...a1 }));
+
+    // 2. listen to a kid → exactly one 🗣 clue about the kid the remark is about (unchosen remarks write nothing), his morale +3; then the free rethink, once
+    const a2 = await page.evaluate(n => {
+      const s = YAM.game, ui = YAM.ui, af = s.after, vn = eval(n), i = af.remarks.findIndex(r => !r.parent), rm = af.remarks[i], kid = s.player(rm.pid), about = s.player(rm.about);
+      s.squad.forEach(p => { p.dyn.morale = 50; });
+      const v0 = s.squad.map(vn), rep0 = { ...s.rep };
+      document.querySelector(`#af-body .af-card[data-i="${i}"]`).click();
+      const diff = s.squad.map((p, j) => vn(p) - v0[j]), last = about.clues[about.clues.length - 1];
+      const box = document.getElementById('af-kid');
+      return { one: diff.reduce((a, b) => a + b, 0) === 1 && diff[s.squad.indexOf(about)] === 1, src: last.source === 'voice' && last.ref === af.md && last.date === af.date && !last.seen,
+        kind: last.kind === rm.kind && (rm.kind !== 'role' || last.signal === rm.signal), morale: kid.dyn.morale === 50 + AFTER.LISTEN_MORALE && s.squad.filter(p => p !== kid).every(p => p.dyn.morale === 50),
+        rep: s.rep.parents === rep0.parents && s.rep.squad === rep0.squad, stage: s.after?.stage === 'rethink' && s.afterKid?.id === about.id,
+        shown: !box.hidden && box.textContent.includes(L.name(about.name)) && !!document.querySelector('#af-body [data-do="keep"]'),
+        again: !s.afterPick(i) && !s.afterSkip(), icon: ui.clueLine(about, last).includes('\u{1F5E3}'),
+        by: rm.about === rm.pid ? !last.by : clueText(last).startsWith(L.t('clue.by.kid', { k: L.name(kid.name) })),
+        diary: s.diary.some(d => d.key === 'af.heard.kid' && d.vars?.k?.pid === kid.id) };
+    }, voiceN);
+    // the rethink itself: slots, clashing pairs and p.banned respected; swap = max(1, level − 1); free; once
+    const a3 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, p = s.afterKid;
+      p.roles = [{ id: 'Playmaker', level: 3, m: 4 }, { id: 'Engine', level: 1, m: 2 }]; p.banned = ['Anchor']; p.dyn.morale = 50; ui.afterView.render(); ui.afterView.finishTyping();
+      const o = s.rethinkOptions(p), btns = [...document.querySelectorAll('#af-body [data-act="rethink"]')];
+      const out = { remove: JSON.stringify(o.remove) === '["Playmaker","Engine"]' && btns.filter(b => b.dataset.do === 'remove').length === 2,
+        noBanned: !o.swap.some(x => x.to === 'Anchor') && !btns.some(b => b.dataset.to === 'Anchor'), noHeld: !o.swap.some(x => ['Playmaker', 'Engine'].includes(x.to)),
+        clash: o.swap.some(x => x.from === 'Playmaker' && x.to === 'Selfish') && !o.swap.some(x => x.from === 'Engine' && x.to === 'Selfish'),
+        noGive: o.give.length === 0 && !btns.some(b => b.dataset.do === 'give'), keep: btns.some(b => b.dataset.do === 'keep') };
+      document.querySelector('#af-body [data-do="swap"][data-role="Playmaker"][data-to="Finisher"]').click();
+      out.swap = JSON.stringify(p.roles.map(r => [r.id, r.level, r.m])) === '[["Finisher",2,0],["Engine",1,2]]' && p.dyn.morale === 50;
+      out.diary = s.diary.some(d => d.key === 'af.rd.swap' && d.vars?.k?.pid === p.id);
+      out.closed = document.getElementById('after-view').hidden && s.after === null && s.phase !== 'post';
+      out.once = !s.afterRethink('remove', 'Engine') && p.roles.length === 2;
+      out.saved = JSON.parse(localStorage.getItem('yam_save_v1')).after === null;
+      return out;
+    });
+    // remove / give at no cost (synthetic rethink stage — the same state path)
+    const a4 = await page.evaluate(() => {
+      const s = YAM.game, p = s.squad[3], fake = (kid) => { s.after = { mode: 'loss', date: s.calendar.date, md: 1, played: [], inv: {}, bench: [],
+        remarks: [{ pid: kid.id, parent: null, type: 'self', about: kid.id, kind: 'role', signal: 'pass', role: null, claim: null, ok: true, phr: 0 }], picked: 0, stage: 'rethink' }; };
+      p.roles = [{ id: 'Aggressive', level: 2, m: 6 }]; p.banned = ['Selfish']; p.dyn.morale = 40; fake(p);
+      const out = { removeFree: s.afterRethink('remove', 'Aggressive') && p.roles.length === 0 && p.dyn.morale === 40 && s.after === null };
+      fake(p);
+      const o = s.rethinkOptions(p);
+      out.giveOpts = o.give.length === ROLE_IDS.length - 1 && !o.give.includes('Selfish') && o.swap.length === 0 && o.remove.length === 0;
+      out.noBanned = !s.afterRethink('give', null, 'Selfish') && s.after !== null;
+      out.give = s.afterRethink('give', null, 'Anchor') && JSON.stringify(p.roles) === JSON.stringify([{ id: 'Anchor', level: 1, m: 0 }]) && p.dyn.morale === 40;
+      p.roles = [{ id: 'Engine', level: 1, m: 3 }]; fake(p);
+      out.swapMin1 = s.afterRethink('swap', 'Engine', 'Playmaker') && p.roles[0].id === 'Playmaker' && p.roles[0].level === 1 && p.dyn.morale === 40;
+      p.roles = []; p.banned = [];
+      return out;
+    });
+    check('v3.20 listen to a kid → exactly one clue (source "voice", 🗣, "from …" when about a teammate) about the kid the remark is about, unchosen remarks write nothing, his morale +3; then one free rethink: remove / swap (level max(1, level − 1)) / give at no morale cost, slots + clashing pairs + p.banned respected, offered once, then the matchday closes',
+      Object.values(a2).every(Boolean) && Object.values(a3).every(Boolean) && Object.values(a4).every(Boolean), JSON.stringify({ a2, a3, a4 }));
+
+    // 3. a parent heard → Parents +1 (no morale); Skip → Squad −1, nothing written; a win opens nothing
+    await v320toPost('loss');
+    const a5 = await page.evaluate(n => {
+      const s = YAM.game, ui = YAM.ui, vn = eval(n), af = s.after, kid = s.squad.find(p => af.played.includes(p.id));
+      af.remarks = [{ pid: kid.id, parent: 'dad', type: 'parentOwn', about: kid.id, kind: 'role', signal: 'duel', role: null, claim: null, ok: true, phr: 2 }];
+      kid.dyn.morale = 60; const rep0 = s.rep.parents, v0 = vn(kid);
+      const out = { pick: s.afterPick(0), rep: s.rep.parents === Math.min(100, rep0 + AFTER.PARENT_REP), morale: kid.dyn.morale === 60, clue: vn(kid) === v0 + 1,
+        by: clueText(kid.clues[kid.clues.length - 1]).startsWith(L.t('clue.by.dad', { k: L.name(kid.name) })), diary: s.diary.some(d => d.key === 'af.heard.dad') };
+      s.endAfter(); ui.closeMatchday();
+      return out;
+    }, voiceN);
+    await v320toPost('loss');
+    const a6 = await page.evaluate(n => {
+      const s = YAM.game, ui = YAM.ui, vn = eval(n), sq0 = s.rep.squad = 50, v0 = s.squad.map(vn);
+      ui.closeMatchday(); ui.afterView.finishTyping();
+      document.querySelector('#af-foot [data-act="skip"]').click();
+      return { squad: s.rep.squad === sq0 + AFTER.SKIP_SQUAD, none: s.squad.every((p, j) => vn(p) === v0[j]), closed: document.getElementById('after-view').hidden && s.after === null && s.phase !== 'post',
+        diary: s.diary.some(d => d.key === 'af.skip.diary') };
+    }, voiceN);
+    await v320toPost('win');
+    const a7 = await page.evaluate(() => { const s = YAM.game, ui = YAM.ui, out = { res: s.lastReport.result === 'W', none: s.after === null };
+      ui.closeMatchday(); out.notOpen = document.getElementById('after-view').hidden && !document.getElementById('review-view').hidden; return out; });
+    check('v3.20 a parent heard → Parents +1 and no morale change ("Dad of …" clue); "Not now, go home" → Squad −1, no clue, the window closes; a win opens no AFTER_GAME.EXE (REVIEW.EXE instead)',
+      Object.values(a5).every(Boolean) && Object.values(a6).every(Boolean) && Object.values(a7).every(Boolean), JSON.stringify({ a5, a6, a7 }));
+
+    // 4. a draw → one small window: Praise (REVIEW draw mode, 2 cards) or Listen (1 remark, no speaker choice, no rethink)
+    const drawPrep = () => page.evaluate(() => { const s = YAM.game, ui = YAM.ui, e = ui.engine;
+      if (s.reviewPending) s.reviewPick(0); ui.reviewView.layer.hidden = true;
+      const played = e.sides[0].all.filter(p => e.everPlayed.has(p.id)).map(p => [p.id, { ...e.st(p) }]);
+      s.startReview('D', played, s.calendar.date, s.lastReport.md); s.startAfter('D', played, e.matchEvents, s.calendar.date, s.lastReport.md); });
+    await drawPrep();
+    const d1 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, L2 = document.getElementById('after-view');
+      ui.closeMatchday();
+      const opts = [...L2.querySelectorAll('#af-body [data-act]')].map(b => b.dataset.act);
+      const out = { open: !L2.hidden, opts: JSON.stringify(opts) === '["praise","listen"]', noCards: !L2.querySelector('.af-card'), noSkip: !L2.querySelector('[data-act="skip"]'),
+        rvHidden: document.getElementById('review-view').hidden, typing: [...L2.querySelectorAll('button[data-act]')].every(b => b.disabled) };
+      ui.afterView.finishTyping();
+      L2.querySelector('[data-act="praise"]').click();
+      const R = document.getElementById('review-view');
+      out.praise = L2.hidden && s.after === null && !R.hidden && s.review?.mode === 'draw' && R.querySelectorAll('.rv-card').length === REVIEW.CARDS_DRAW && s.phase === 'post';
+      document.querySelector('#rv-cards [data-pick="0"]').click();
+      out.closed = R.hidden && s.phase !== 'post';
+      return out;
+    });
+    await v320toPost('win');
+    await drawPrep();
+    const d2 = await page.evaluate(n => {
+      const s = YAM.game, ui = YAM.ui, vn = eval(n), L2 = document.getElementById('after-view'), v0 = s.squad.map(vn);
+      ui.closeMatchday(); ui.afterView.finishTyping();
+      L2.querySelector('[data-act="listen"]').click();
+      const out = { one: s.after?.mode === 'listen' && s.after.remarks.length === 1 && L2.querySelectorAll('.af-card').length === 1, noSkip: !L2.querySelector('[data-act="skip"]'), noReview: s.review === null };
+      ui.afterView.finishTyping();
+      L2.querySelector('.af-card').click();
+      out.clue = s.squad.reduce((a, p, j) => a + vn(p) - v0[j], 0) === 1;
+      out.noRethink = s.after === null && L2.hidden && document.getElementById('review-view').hidden && s.phase !== 'post';
+      return out;
+    }, voiceN);
+    check('v3.20 a draw → praise / listen (no OK, buttons wait for the typewriter): Praise opens REVIEW.EXE in draw mode with 2 cards; Listen gives 1 remark (no speaker choice, no skip), its clue, no rethink, the matchday closes',
+      Object.values(d1).every(Boolean) && Object.values(d2).every(Boolean), JSON.stringify({ d1, d2 }));
+
+    // 5. speakers + hidden reliability over many rolled evenings (seeded, no Math.random): never a kid and his own parent;
+    //    "other" names a kid who played; kids from the key moments first; parent ≈ 40 %; reliability 1 → every clue true, 0 → none
+    const rl = await page.evaluate(() => {
+      const s = YAM.game, sq = s.squad, played = sq.slice(0, 11), roleIds = ROLE_IDS;
+      const keep = sq.map(p => JSON.stringify(p.roles));
+      sq.forEach((p, i) => { p.roles = i % 3 === 0 ? [] : [{ id: roleIds[i % roleIds.length], level: 1, m: 0 }]; });
+      const stats = played.map((p, i) => [p.id, { ...YAM.MatchEngine.blankStats(), shots: i < 4 ? 3 : 0, dribbleFail: i === 5 ? 2 : 0 }]);   // 5 kids involved
+      const involved = stats.filter(([, st]) => afterInvolvement([[0, st]])[0] >= AFTER.INVOLVE_MIN).map(([id]) => id);
+      const truth = rm => { const a = s.player(rm.about);
+        if (rm.kind === 'role') return trueSignals(a).includes(rm.signal);
+        if (rm.kind === 'misfit') return !roleFits(a, rm.role) && rolesOf(a).some(r => r.id === rm.role);
+        const b = leadershipTrait(a.leadership); return rm.claim === (b === 'leader' ? 'high' : b === 'anxious' ? 'low' : 'x'); };
+      const out = { pair: true, other: true, parent: 0, n: 0, kidsInvolved: true, three: true, allTrue: true, noneTrue: true, types: {}, seeded: true, rnd: 0, rel: true };
+      const rnd = Math.random; Math.random = () => { out.rnd++; return rnd(); };
+      try {
+        for (const force of [1, 0]) {
+          AFTER.FORCE_REL = force;
+          for (let i = 0; i < 150; i++) {
+            const af = s.startAfter('L', stats, [], isoAdd('2002-09-07', i * 3), 1);
+            const sp = af.remarks.map(r => r.pid), kids = af.remarks.filter(r => !r.parent);
+            if (new Set(sp).size !== sp.length) out.pair = false;
+            if (af.remarks.length !== 3) out.three = false;
+            for (const rm of af.remarks) {
+              out.types[rm.type] = (out.types[rm.type] || 0) + 1;
+              if (rm.type === 'other' && (!af.played.includes(rm.about) || rm.about === rm.pid)) out.other = false;
+              if (rm.parent && ![...af.played, ...af.bench].includes(rm.pid)) out.other = false;
+              if (rm.ok !== !!force) out.rel = false;
+              if (force && !truth(rm)) out.allTrue = false;
+              if (!force && truth(rm)) out.noneTrue = false;
+            }
+            if (force) { out.n++; if (af.remarks.some(r => r.parent)) out.parent++; }
+            if (kids.filter(r => involved.includes(r.pid)).length !== Math.min(kids.length, involved.length)) out.kidsInvolved = false;
+            if (JSON.stringify(s.startAfter('L', stats, [], isoAdd('2002-09-07', i * 3), 1).remarks) !== JSON.stringify(af.remarks)) out.seeded = false;
+          }
+        }
+      } finally { Math.random = rnd; AFTER.FORCE_REL = null; }
+      // the formula itself: kid 0.7 + (disc + comp − 20)/40 × 0.2, clamped 0.5–0.9; parents 0.65 / 0.85
+      const k = sq[0], d0 = k.psych.discipline, c0 = k.psych.composure;
+      k.psych.discipline = 10; k.psych.composure = 10; const mid = kidReliability(k); k.psych.discipline = 20; k.psych.composure = 20; const hi = kidReliability(k);
+      k.psych.discipline = 1; k.psych.composure = 1; const lo = kidReliability(k); k.psych.discipline = d0; k.psych.composure = c0;
+      out.formula = Math.abs(mid - 0.7) < 1e-9 && Math.abs(hi - 0.8) < 1e-9 && Math.abs(lo - 0.61) < 1e-9 && AFTER.PARENT_OWN === 0.65 && AFTER.PARENT_MISFIT === 0.85;
+      out.share = out.parent / out.n;
+      out.allTypes = ['self', 'other', 'blame', 'excuse', 'parentOwn', 'parentCoach'].every(t => out.types[t] > 0);
+      sq.forEach((p, i) => { p.roles = JSON.parse(keep[i]); });
+      s.after = null;
+      return out;
+    });
+    check('v3.20 remarks over 300 rolled evenings: 3 speakers, never a kid and his own parent, "other" names a teammate who played, a parent is of a kid who played / sat on the bench, kids from the key moments first, parent ≈ 40 %, all 6 types; seeded, no Math.random; reliability forced 1 → every remark true, 0 → none; kid formula 0.7 ± (disc + comp)',
+      rl.pair && rl.other && rl.three && rl.kidsInvolved && rl.allTrue && rl.noneTrue && rl.rel && rl.seeded && rl.rnd === 0 && rl.formula && rl.allTypes && rl.share > 0.25 && rl.share < 0.55, JSON.stringify(rl));
+
+    // 6. a parent's "wrong role" complaint: ignored for 3 matches → Parents −2 + an important briefing line; changing the role clears it; save + old save
+    const pc = await page.evaluate(() => {
+      const s = YAM.game, k = s.squad[2], fake = () => { s.after = { mode: 'loss', date: s.calendar.date, md: 5, played: [k.id], inv: {}, bench: [],
+        remarks: [{ pid: k.id, parent: 'mum', type: 'parentCoach', about: k.id, kind: 'misfit', signal: null, role: 'Aggressive', claim: 'misfit:Aggressive', ok: true, phr: 1 }], picked: null, stage: 'pick' }; };
+      k.roles = [{ id: 'Aggressive', level: 2, m: 3 }]; s.parentComplaints = []; s.rep.parents = 50; fake();
+      const out = { pick: s.afterPick(0) && s.rep.parents === 51 && s.parentComplaints.length === 1 && s.parentComplaints[0].role === 'Aggressive' };
+      const misfitClue = k.clues[k.clues.length - 1]; out.claim = misfitClue.claim === 'misfit:Aggressive' && clueText(misfitClue).includes(L.tag('Aggressive'));
+      s.endAfter(); s.save();
+      out.saved = JSON.parse(localStorage.getItem('yam_save_v1')).parentComplaints.length === 1;
+      s.tickComplaints(); s.tickComplaints(); out.wait = s.rep.parents === 51 && s.parentComplaints.length === 1;
+      s.away = []; s.tickComplaints();
+      const line = s.diary[s.diary.length - 1];
+      out.fired = s.rep.parents === 51 + AFTER.COMPLAINT_REP && s.parentComplaints.length === 0 && line.key === 'af.complaint.mum' && line.vars.k.pid === k.id;
+      out.important = newsMatch(line.key, NEWS.IMPORTANT) && newsMatch(line.key, NEWS.NEVER_MUTE) && MorningBriefing.awayLines(s).imp.some(e => e.key === 'af.complaint.mum');
+      out.text = YAM.ui.entryText({ ...line, r: 0 }).includes(L.name(k.name));
+      fake(); s.afterPick(0); s.endAfter(); s.removeRole(k.id, 'Aggressive');   // removing (paid or free) clears it
+      out.cleared = s.parentComplaints.length === 0;
+      k.roles = [{ id: 'Aggressive', level: 2, m: 3 }]; fake(); s.afterPick(0); s.endAfter(); s.changeRole(k.id, 'Aggressive', 'Engine', { free: true });
+      const r0 = s.rep.parents; s.tickComplaints(); s.tickComplaints(); s.tickComplaints();
+      out.swapClears = s.parentComplaints.length === 0 && s.rep.parents === r0;
+      k.roles = [];
+      return out;
+    });
+    await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('yam_save_v1')); delete d.parentComplaints; delete d.after; localStorage.setItem('yam_save_v1', JSON.stringify(d)); });
+    await page.reload();
+    await page.waitForFunction(() => window.YAM && window.YAM.ui);
+    pc.oldSave = await page.evaluate(() => Array.isArray(YAM.game.parentComplaints) && YAM.game.parentComplaints.length === 0 && YAM.game.after === null);
+    check('v3.20 parent\'s "wrong role" heard → Parents +1 + a complaint (saved); left alone for 3 matches → Parents −2 + an important, never-muted briefing line; removing / swapping the role clears it; an old save without complaints loads',
+      Object.values(pc).every(Boolean), JSON.stringify(pc));
+
+    // 7. voice clues follow the v3.18 rules: confirmed by a match / training / review clue or a voice clue of ANOTHER evening, never by one of the same evening; Notebook marks
+    const vc = await page.evaluate(() => {
+      const s = YAM.game, k = s.squad[4], keep = k.clues;
+      const v = (date, ref, extra) => ({ date, source: 'voice', ref, signal: null, textKey: 'clue.voice.role', kind: 'role', claim: null, role: null, by: null, seen: true, ...extra });
+      const a = v('2002-10-05', 5, { signal: 'pass' }), b = v('2002-10-05', 5, { signal: 'pass', by: { pid: 'x', name: k.name, parent: 'mum' } }), m = { date: '2002-10-05', source: 'match', ref: 5, signal: 'pass', textKey: 'clue.pass.0', seen: true };
+      k.clues = [a, b];
+      const out = { sameEvening: !clueConfirmed(k.clues, a) && !clueConfirmed(k.clues, b) };
+      k.clues = [a, m]; out.withMatch = clueConfirmed(k.clues, a) && clueConfirmed(k.clues, m);
+      const c = v('2002-10-12', 6, { signal: 'pass' }); k.clues = [a, c]; out.otherEvening = clueConfirmed(k.clues, a);
+      const f1 = v('2002-10-05', 5, { kind: 'misfit', claim: 'misfit:Engine', role: 'Engine', textKey: 'clue.voice.misfit' }), f2 = v('2002-10-19', 7, { kind: 'misfit', claim: 'misfit:Engine', role: 'Engine', textKey: 'clue.voice.misfit' });
+      const l1 = v('2002-10-05', 5, { kind: 'leadership', claim: 'lead:high', textKey: 'clue.voice.lead.high' });
+      k.clues = [f1, f2, l1]; out.misfit = clueConfirmed(k.clues, f1) && !clueConfirmed(k.clues, l1);
+      k.clues = [b]; s.save();
+      const d = JSON.parse(localStorage.getItem('yam_save_v1')), back = new Player({ ...d.squad.find(p => p.id === k.id), tags: [] });
+      out.load = back.clues[0].by?.parent === 'mum' && back.clues[0].kind === 'role' && back.clues[0].signal === 'pass';
+      const html = YAM.ui.clueLine(k, b);
+      out.mark = html.includes('\u{1F5E3}') && html.includes(esc(L.t('clue.by.mum', { k: L.name(k.name) }))) && html.includes(esc(L.t('clue.src.voice', { r: 5 })));
+      k.clues = keep;
+      return out;
+    });
+    check('v3.20 voice clues: same claim from a match clue or another evening → ✓ confirmed, never by a voice clue of the same evening; misfit / leadership claims too; saved with the speaker; 🗣 + "Sasha\'s mum thinks" + source in the Notebook line',
+      Object.values(vc).every(Boolean), JSON.stringify(vc));
+
+    // 8. texts: every AFTER_GAME string and clue in EN + RU, 4 phrasings per remark, a phrase per signal; RU keeps names in the nominative (no case endings added)
+    const tx = await page.evaluate(() => {
+      const types = ['self', 'other', 'otherMisfit', 'blame', 'excuse', 'parentOwn', 'parentCoach'];
+      const keys = types.flatMap(t => ['af.gist.' + t, ...[0, 1, 2, 3].map(i => `af.say.${t}.${i}`)]).concat(Object.keys(CLUE_SIGNALS).map(g => 'af.sig.' + g),
+        ['af.title', 'af.lead.loss', 'af.lead.draw', 'af.lead.listen', 'af.lead.rethink', 'af.skip', 'af.praise', 'af.listen', 'af.who.mum', 'af.who.dad', 'af.re.remove', 'af.re.swap', 'af.re.give', 'af.re.keep',
+          'af.heard.kid', 'af.heard.mum', 'af.heard.dad', 'af.skip.diary', 'af.rd.remove', 'af.rd.swap', 'af.rd.give', 'af.complaint.mum', 'af.complaint.dad', 'clue.src.voice', 'clue.by.kid', 'clue.by.mum', 'clue.by.dad',
+          'clue.voice.self', 'clue.voice.role', 'clue.voice.misfit', 'clue.voice.lead.high', 'clue.voice.lead.low', 'notes.backAfter']);
+      const ru = Object.keys(I18N.ru).filter(k => /^(af\.|clue\.voice|clue\.by)/.test(k)).map(k => I18N.ru[k]).join(' ');
+      return { missing: keys.filter(k => !I18N.en[k] || !I18N.ru[k]), noCase: !/\{[ktw]\}(а|у|е|ом|ой|ы)(?![а-яё])/.test(ru), noPct: !/%|достоверн|надёжн|ложн|reliab|\btrue\b|\bfalse\b/i.test(Object.keys(I18N.en).filter(k => /^af\./.test(k)).map(k => I18N.en[k]).join(' ') + ru),
+        source: CLUES.SOURCES.voice === '\u{1F5E3}' };
+    });
+    check('v3.20 texts: every AFTER_GAME.EXE line, remark (4 phrasings each), signal phrase and voice clue in EN + RU; no reliability wording; RU names stay in the nominative',
+      tx.missing.length === 0 && tx.noCase && tx.noPct && tx.source, JSON.stringify(tx));
+
+    // 9. auto-sim plays a whole season with AFTER_GAME.EXE (auto: first remark + keep after a loss, praise after a draw), never opens the window, no soft-lock
+    await v320calm();
+    await page.evaluate(() => { const s = YAM.game, ui = YAM.ui; ui.autoAfter = null; ui.autoReview = null; delete ui._autoAfter; delete ui._autoReview;
+      if (s.phase === 'post') { s.afterAuto(); if (s.reviewPending) s.reviewPick(0); if (s.talkPending) s.applyTeamTalk('praise'); ui.closeMatchday(); }
+      s.newSeason(s.season + 1); ui.cal.attach(s.calendar); ui.engine = null; ui.prepareMatch(); ui.renderAll();
+      window.__af = { auto: 0, opened: 0, L: 0, D: 0, voice: 0 }; const auto = s.afterAuto.bind(s); s.afterAuto = () => { if (s.after) window.__af.auto++; return auto(); };
+      const op = ui.afterView.open.bind(ui.afterView); ui.afterView.open = () => { window.__af.opened++; return op(); }; });
+    let guard = 0, owed = 0;
+    while (guard++ < 25) {
+      const ph = await page.evaluate(() => YAM.game.phase);
+      if (ph === 'seasonEnd') break;
+      await page.evaluate(() => { YAM.ui.events.enabled = false; YAM.game.eventQueue = []; YAM.ui.autoSim(); });
+      await page.waitForFunction(() => ['matchday', 'seasonEnd'].includes(YAM.game.phase) || YAM.game.pendingEvent, null, { timeout: 30000 });
+      if (await page.evaluate(() => YAM.game.phase === 'seasonEnd')) break;
+      owed += await page.evaluate(() => { const s = YAM.game, ui = YAM.ui; ui.modal.close(); s.dayState().locker = { done: true, absent: {}, checked: [] }; ui.onInstantSim();
+        const r = s.lastReport.result; if (r !== 'W') window.__af[r]++; const o = s.afterPending ? 1 : 0; ui.autoSim(); if (s.talkPending) s.applyTeamTalk('praise'); ui.closeMatchday(); return o; });
+    }
+    const as = await page.evaluate(() => ({ phase: YAM.game.phase, md: YAM.game.league.playedMatchdays(), ...window.__af, after: YAM.game.after, review: YAM.game.review,
+      voice: YAM.game.squad.reduce((a, p) => a + (p.clues || []).filter(c => c.source === 'voice').length, 0) }));
+    check('v3.20 auto-sim: a whole season with AFTER_GAME.EXE (auto: first remark + "Keep as is" after a loss, Praise after a draw), never opens the window, no soft-lock',
+      as.phase === 'seasonEnd' && as.md === 18 && as.auto === owed && owed === as.L + as.D && as.opened === 0 && as.after === null && as.review === null && (as.L === 0 || as.voice > 0), JSON.stringify({ ...as, owed, guard }));
+    }
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

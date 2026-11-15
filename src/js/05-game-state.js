@@ -22,6 +22,7 @@ class GameState {
     this.eventQueue = [];          // v2.2: scheduled events [{ id, due, matchDay, from }]
     this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)
     this.review = null; this.lossStreak = 0;   // v3.19 REVIEW.EXE + losses in a row
+    this.after = null; this.parentComplaints = [];   // v3.20 AFTER_GAME.EXE + parents' "wrong role" complaints
     this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {};   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
@@ -88,6 +89,7 @@ class GameState {
     this.coachNotes = {};    // v1.5: playerId → last Notebook note the coach actually saw { md, keys, role }
     for (const p of this.squad) { p.energy = 100; p.banned = []; }   // summer break; v3.19: banished REVIEW roles come back
     this.review = null; this.lossStreak = 0;   // v3.19
+    this.after = null; this.parentComplaints = [];   // v3.20
     this.save();
   }
 
@@ -277,6 +279,7 @@ class GameState {
     if (!r) return 0;
     const cost = this.roleChangeCost(p, free, roleId);
     p.roles = p.roles.filter(x => x !== r);
+    this.pruneComplaints();   // v3.20: a removed role ends a parent's complaint
     if (cost) {
       p.dyn.morale = clamp(p.dyn.morale + cost, 0, 100);
       this.addDiary({ date: this.calendar.date, key: 'role.drop', vars: { k: { pid: p.id }, r: { role: roleId }, m: cost }, cls: 'ev' });
@@ -360,6 +363,7 @@ class GameState {
     else if (c.type === 'up') { const r = p.roles.find(x => x.id === c.role); if (!r || r.level >= ROLES.LEVELS) return false; r.level++; vars.l = r.level; }
     else if (c.type === 'swap') { const i2 = p.roles.findIndex(x => x.id === c.replaces); if (i2 < 0) return false; p.roles[i2] = { id: c.role, level: 1, m: 0 }; vars.o = { role: c.replaces }; }
     else return false;
+    this.pruneComplaints();   // v3.20: a replaced role ends a parent's complaint
     this.addDiary({ date: this.calendar.date, key: 'rv.' + c.type, vars, cls: 'ev' });
     this.endReview();
     return true;
@@ -397,10 +401,190 @@ class GameState {
     this.save();
     return true;
   }
+  /* ---------- v3.20 AFTER_GAME.EXE: after a loss the coach hears out kids and parents (draw: praise or listen) ---------- */
+  /** After our match (live + Quick Sim), right after startReview. played = [[id, stats]] of our kids who played, events = matchEvents.
+      Loss → 3 remark cards; draw (when REVIEW has its cards) → the praise / listen choice first. Win → nothing. */
+  startAfter(result, played, events = [], date = this.calendar.date, md = null) {
+    this.after = null;
+    if (result === 'W' || (result === 'D' && !this.review)) return null;
+    const kids = played.filter(([id]) => this.player(id));
+    if (!kids.length) return null;
+    const ids = kids.map(([id]) => id);
+    const af = { mode: result === 'L' ? 'loss' : 'draw', date, md, played: ids, inv: afterInvolvement(kids, events),
+      bench: this.bench().filter(p => p.available && !ids.includes(p.id)).map(p => p.id), remarks: [], picked: null, stage: 'pick' };
+    if (af.mode === 'loss') af.remarks = this.rollRemarks(af);
+    this.after = af;
+    return af;
+  }
+  get afterPending() { return !!this.after; }
+  /** 3 speakers, seeded(date#after#): 2 kids + (PARENT) 1 parent, else a 3rd kid. Kids from those involved in the key moments
+      (afterInvolvement ≥ INVOLVE_MIN), then any kid who played; the parent of a kid who played or sat on the bench.
+      One speaker per kid: a kid and his own parent never both speak. */
+  rollRemarks(af) {
+    const r = seeded(af.date + '#after#');
+    const pick = a => a.length ? a[Math.floor(r() * a.length)] : null;
+    const mix = a => { a = [...a].sort(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const played = af.played.filter(id => this.player(id));
+    const involved = played.filter(id => (af.inv[id] || 0) >= AFTER.INVOLVE_MIN);
+    const order = [...mix(involved), ...mix(played.filter(id => !involved.includes(id)))];
+    const parent = r() < AFTER.PARENT, nKids = parent ? AFTER.SPEAKERS - 1 : AFTER.SPEAKERS;
+    const sp = order.slice(0, nKids).map(pid => ({ pid, parent: null }));
+    if (parent) {
+      const child = pick([...played, ...af.bench].filter(id => this.player(id) && !sp.some(x => x.pid === id)).sort());
+      if (child) sp.push({ pid: child, parent: r() < 0.5 ? 'mum' : 'dad' });
+      else if (order[nKids]) sp.push({ pid: order[nKids], parent: null });
+    }
+    return sp.map(x => this.rollRemark(af, x, r, played));
+  }
+  /** One remark: type (weighted, seeded from the evening's stream), then its hidden reliability, rolled on its own stream
+      seeded(date#voice#speakerId). A false remark points to a random OTHER signal / claims a misfit when the role fits /
+      misreads his leadership — and looks exactly as confident as a true one. */
+  rollRemark(af, sp, r, played) {
+    const kid = this.player(sp.pid), W = AFTER.W, mates = played.filter(id => id !== kid.id).sort();
+    let w;
+    if (sp.parent) {
+      const roles = rolesOf(kid);
+      w = { parentOwn: W.parentOwn, parentCoach: !roles.length ? 0 : roles.some(x => !roleFits(kid, x.id)) ? W.misfitCoach : W.parentCoach };
+    } else {
+      const band = leadershipTrait(kid.leadership), extra = band === 'anxious' ? W.low : band === 'leader' ? W.high : {};
+      w = { self: W.self, other: mates.length ? W.other : 0, blame: W.blame, excuse: W.excuse };
+      for (const k in extra) if (w[k]) w[k] *= extra[k];
+    }
+    let x = r() * Object.values(w).reduce((a, b) => a + b, 0), type = Object.keys(w)[0];
+    for (const k in w) { if (!w[k]) continue; type = k; if ((x -= w[k]) < 0) break; }
+    const target = type === 'other' ? this.player(mates[Math.floor(r() * mates.length)]) : null;
+    const v = seeded(af.date + '#voice#' + (sp.parent ? 'par:' : '') + kid.id);
+    const rel = AFTER.FORCE_REL ?? (sp.parent ? (type === 'parentCoach' ? AFTER.PARENT_MISFIT : AFTER.PARENT_OWN) : kidReliability(kid));
+    const ok = v() < rel, one = a => a[Math.floor(v() * a.length)];
+    const rm = { pid: kid.id, parent: sp.parent, type, about: (target || kid).id, kind: AFTER_REMARKS[type].kind, signal: null, role: null, claim: null, ok };
+    const about = this.player(rm.about);
+    if (type === 'other' && rolesOf(about).length && v() < AFTER.OTHER_MISFIT) rm.kind = 'misfit';
+    if (rm.kind === 'leadership') {   // blame → "a leader", excuse → "anxious"; a 'normal' kid's true word is about where he plays
+      const band = leadershipTrait(kid.leadership), real = band === 'leader' ? 'high' : band === 'anxious' ? 'low' : null;
+      if (ok && AFTER_REMARKS[type].claim !== real) { if (real) rm.type = real === 'high' ? 'blame' : 'excuse'; else { rm.type = 'self'; rm.kind = 'role'; } }
+      if (!ok && AFTER_REMARKS[type].claim === real) rm.type = real === 'high' ? 'excuse' : 'blame';
+      if (rm.kind === 'leadership') rm.claim = AFTER_REMARKS[rm.type].claim;
+    }
+    if (rm.kind === 'misfit') {   // true → a role that does not fit him; false → one that does
+      const held = rolesOf(about).map(x => x.id), pool = held.filter(id => roleFits(about, id) !== ok);
+      if (pool.length) { rm.role = one(pool); rm.claim = 'misfit:' + rm.role; }
+      else { rm.kind = 'role'; if (rm.type === 'parentCoach') rm.type = 'parentOwn'; }
+    }
+    if (rm.kind === 'role') {
+      const truth = trueSignals(about), others = Object.keys(CLUE_SIGNALS).filter(k => !truth.includes(k));
+      rm.signal = one(ok || !others.length ? truth : others);
+    }
+    rm.phr = Math.floor(v() * AFTER.PHRASES);
+    return rm;
+  }
+  /** Draw: [ Praise ] → the v3.19 REVIEW draw mode (2 cards). */
+  afterPraise() { if (this.after?.mode !== 'draw') return false; this.after = null; this.save(); return true; }
+  /** Draw: [ Listen ] → one random remark (no choice of speaker, no rethink); the praise is gone. */
+  afterListen() {
+    const af = this.after;
+    if (af?.mode !== 'draw') return false;
+    const all = this.rollRemarks(af);
+    if (!all.length) { this.after = null; this.save(); return false; }
+    af.remarks = [all[Math.floor(seeded(af.date + '#afterdraw')() * all.length)]];
+    af.mode = 'listen';
+    this.review = null;
+    this.save();
+    return true;
+  }
+  /** Listen to remark i → it becomes a clue about the kid it is about (source 'voice'); the speaker feels heard (morale / Parents);
+      a parent's "wrong role" starts a complaint. Loss → the free rethink stage; draw → done. */
+  afterPick(i) {
+    const af = this.after, rm = af?.remarks[i];
+    if (!rm || af.stage !== 'pick' || !['loss', 'listen'].includes(af.mode)) return false;
+    const kid = this.player(rm.pid), about = this.player(rm.about);
+    if (!kid || !about) return false;
+    const textKey = rm.kind === 'leadership' ? 'clue.voice.lead.' + rm.claim : rm.kind === 'misfit' ? 'clue.voice.misfit' : rm.parent || rm.about !== rm.pid ? 'clue.voice.role' : 'clue.voice.self';
+    const by = rm.parent || rm.about !== rm.pid ? { pid: kid.id, name: kid.name, parent: rm.parent || null } : null;
+    this.addClue(about, { date: af.date, source: 'voice', ref: af.md, signal: rm.kind === 'role' ? rm.signal : null, textKey,
+      kind: rm.kind, claim: rm.kind === 'role' ? null : rm.claim, role: rm.role, by });
+    if (rm.parent) this.addRep('parents', AFTER.PARENT_REP);
+    else kid.dyn.morale = clamp(kid.dyn.morale + AFTER.LISTEN_MORALE, 0, 100);
+    if (rm.type === 'parentCoach' && rm.role) {
+      this.parentComplaints = (this.parentComplaints || []).filter(c => c.pid !== about.id);
+      this.parentComplaints.push({ pid: about.id, role: rm.role, parent: rm.parent, n: 0, date: af.date });
+    }
+    this.addDiary({ date: this.calendar.date, key: rm.parent ? 'af.heard.' + rm.parent : 'af.heard.kid', vars: { k: { pid: kid.id } }, cls: 'ev' });
+    af.picked = i;
+    if (af.mode === 'loss') { af.stage = 'rethink'; this.save(); } else this.endAfter();
+    return true;
+  }
+  /** "Not now, go home": nothing learnt, nothing changed, the kids wanted to talk (Squad −1). Loss only, before a pick. */
+  afterSkip() {
+    const af = this.after;
+    if (af?.mode !== 'loss' || af.stage !== 'pick') return false;
+    this.addRep('squad', AFTER.SKIP_SQUAD);
+    this.addDiary({ date: this.calendar.date, key: 'af.skip.diary', cls: 'ev' });
+    this.endAfter();
+    return true;
+  }
+  /** The kid the chosen remark is about (rethink stage). */
+  get afterKid() { const af = this.after; return af?.stage === 'rethink' ? this.player(af.remarks[af.picked]?.about) : null; }
+  /** Free rethink offers for him: remove one role, swap one for another allowed role (slots, clashes, p.banned), or give one. */
+  rethinkOptions(p) {
+    const held = rolesOf(p), ids = held.map(r => r.id), ok = id => !ids.includes(id) && !(p.banned || []).includes(id);
+    return {
+      remove: ids,
+      swap: held.flatMap(r => ROLE_IDS.filter(id => ok(id) && !ids.some(h => h !== r.id && roleClash(h, id))).map(to => ({ from: r.id, to }))),
+      give: held.length ? [] : ROLE_IDS.filter(ok),
+    };
+  }
+  /** The one free rethink: 'remove' (role) / 'swap' (role → to) / 'give' (to) / 'keep'. Uses the v3.18 role-change path with free = true. */
+  afterRethink(action, role = null, to = null) {
+    const p = this.afterKid;
+    if (!p) return false;
+    const o = this.rethinkOptions(p);
+    if (action === 'remove' && o.remove.includes(role)) this.removeRole(p.id, role, { free: true });
+    else if (action === 'swap' && o.swap.some(x => x.from === role && x.to === to)) this.changeRole(p.id, role, to, { free: true });
+    else if (action === 'give' && o.give.includes(to)) this.changeRole(p.id, null, to, { free: true });
+    else if (action !== 'keep') return false;
+    if (action !== 'keep') this.addDiary({ date: this.calendar.date, key: 'af.rd.' + action, vars: { k: { pid: p.id }, r: { role: role || to }, o: { role: to || role } }, cls: 'ev' });
+    this.endAfter();
+    return true;
+  }
+  /** Auto modes (ui.autoSim, smoke auto-play): loss → the first remark + keep; draw → praise. */
+  afterAuto() {
+    const af = this.after;
+    if (!af) return;
+    if (af.mode === 'draw') { this.afterPraise(); return; }
+    if (af.stage === 'pick') this.afterPick(0);
+    if (this.after?.stage === 'rethink') this.afterRethink('keep');
+    if (this.after) this.endAfter();
+  }
+  endAfter() { this.after = null; this.save(); }
+  /** Give / swap a role (v3.20 rethink; free = no morale). Swap keeps the slot at max(1, level − 1); give = level 1. Returns the cost or null. */
+  changeRole(id, from, to, { free = false } = {}) {
+    const p = this.player(id), held = rolesOf(p), i = from ? held.findIndex(x => x.id === from) : -1;
+    if (!p || !ROLE_BY_ID[to] || held.some(x => x.id === to) || (p.banned || []).includes(to) || (from && i < 0)) return null;
+    if (held.some(x => x.id !== from && roleClash(x.id, to)) || (!from && held.length >= ROLES.SLOTS)) return null;
+    const cost = from ? this.roleChangeCost(p, free, from) : 0, r = { id: to, level: from ? Math.max(1, held[i].level - 1) : 1, m: 0 };
+    if (from) p.roles[i] = r; else p.roles.push(r);
+    if (cost) p.dyn.morale = clamp(p.dyn.morale + cost, 0, 100);
+    this.pruneComplaints();
+    this.save();
+    return cost;
+  }
+  /** A parent's complaint ends when the role is changed or removed (any path) or the kid has left. */
+  pruneComplaints() { this.parentComplaints = (this.parentComplaints || []).filter(c => rolesOf(this.player(c.pid)).some(r => r.id === c.role)); }
+  /** After every league match: a complaint left alone for COMPLAINT_MATCHES matches → Parents −2 + an important briefing line. */
+  tickComplaints(date = this.calendar.date) {
+    this.pruneComplaints();
+    this.parentComplaints = this.parentComplaints.filter(c => {
+      if (++c.n < AFTER.COMPLAINT_MATCHES) return true;
+      this.addRep('parents', AFTER.COMPLAINT_REP);
+      this.addDiary({ date, key: 'af.complaint.' + (c.parent || 'mum'), vars: { k: { pid: c.pid } }, cls: 'ev' });
+      return false;
+    });
+  }
   /** v3.18: keep a clue in the kid's Notebook (last CLUES.MAX_PER_KID). */
   addClue(p, c) {
     if (!p || !c) return;
-    (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, seen: false });
+    const v = c.source === 'voice' ? { kind: c.kind, claim: c.claim || null, role: c.role || null, by: c.by || null } : {};   // v3.20 voice clue extras
+    (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, ...v, seen: false });
     if (p.clues.length > CLUES.MAX_PER_KID) p.clues.splice(0, p.clues.length - CLUES.MAX_PER_KID);
   }
   /** v3.18: one clue per kid the Notebook covers after a match (checked against that match's numbers). pr.clue = its text. */
@@ -1072,7 +1256,7 @@ class GameState {
         v: 4, clubName: this.clubName, formation: this.formation, squad: this.squad, lineup: this.lineup,
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
-        lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
+        lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, after: this.after || null, parentComplaints: this.parentComplaints || [], notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
         budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
@@ -1137,6 +1321,8 @@ class GameState {
         this.notebookUnlocked = !!d.notebookUnlocked;
         this.lossStreak = Math.max(0, Math.round(d.lossStreak || 0));   // v3.19
         this.review = d.review && typeof d.review === 'object' && Array.isArray(d.review.cards) && this.player(d.review.pid) ? d.review : null;
+        this.after = d.after && typeof d.after === 'object' && ['loss', 'draw', 'listen'].includes(d.after.mode) && Array.isArray(d.after.remarks) ? d.after : null;   // v3.20
+        this.parentComplaints = Array.isArray(d.parentComplaints) ? d.parentComplaints.filter(c => c && this.player(c.pid) && ROLE_BY_ID[c.role]) : [];   // v3.20: old saves → []
         this.diary = Array.isArray(d.diary) ? d.diary : [];
         this.seasonStats = d.seasonStats && typeof d.seasonStats === 'object' ? d.seasonStats : {};
         this.coachNotes = d.coachNotes && typeof d.coachNotes === 'object' ? d.coachNotes : {};
