@@ -9,38 +9,69 @@ function rateStyle(r) {
   return '';
 }
 
-/** Coach's Note: looks at the strongest and weakest signal of THIS match and returns i18n keys.
-    It hints at a role without naming it (duels → Aggressive, passing → Playmaker, dribbling/goals → Selfish). */
-const NOTE_READ_MIN = 10;   // v3.17: interceptions + blocks in one match for the "reads the game" note
+/** Coach's Note (v3.18): no verdict, no role names, no advice. Lines: tired / keeper line, then ONE clue (an episode,
+    see rollClue — flags.clue = its text key), then out-of-position and the v3.7 psych hint. "Numbers already reflect his
+    current role" is a stat line on the card, not part of the note. */
 function coachNote(p, s, flags = {}) {
   const out = [];
   if (flags.tired) out.push('note.tired');
-  if (flags.gk) {   // v3.0: he was in goal in THAT match (no native positions)
-    out.push(s.saves >= 3 ? 'note.gkBusy' : s.saves ? 'note.gkOk' : 'note.gkQuiet');
-  } else {
-    const rate = (ok, fail, min) => (ok + fail >= min ? { r: ok / (ok + fail), n: ok + fail } : null);
-    const pass = rate(s.passOk, s.passFail, 6), duel = rate(s.tackles, s.tacklesLost, 4), drib = rate(s.dribbleOk, s.dribbleFail, 4);
-    const cands = [];
-    if (duel) cands.push({ key: duel.r >= 0.7 ? 'note.duelHigh' : duel.r < 0.4 ? 'note.duelLow' : null, w: Math.abs(duel.r - 0.55) * duel.n, good: duel.r >= 0.7 });
-    if (pass) cands.push({ key: pass.r >= 0.8 ? 'note.passHigh' : pass.r < 0.45 ? 'note.passLow' : null, w: Math.abs(pass.r - 0.62) * pass.n * 0.8, good: pass.r >= 0.8 });
-    if (drib) cands.push({ key: drib.r >= 0.65 ? 'note.dribHigh' : drib.r < 0.35 ? 'note.dribLow' : null, w: Math.abs(drib.r - 0.5) * drib.n, good: drib.r >= 0.65 });
-    if (s.goals > 0) cands.push({ key: 'note.scorer', w: 2 + s.goals * 2, good: true });
-    // v3.17: interceptions + blocks count too (23 of them used to end as "nothing stood out"); ≥ 10 ≈ the top 5% of outfield kids
-    if ((s.intercepts || 0) >= NOTE_READ_MIN) cands.push({ key: 'note.readHigh', w: s.intercepts * 0.5, good: true });
-    const hits = cands.filter(c => c.key).sort((a, b) => b.w - a.w);
-    const best = hits.find(c => c.good), worst = hits.find(c => !c.good);
-    if (best) out.push(best.key);
-    if (worst) out.push(worst.key);
-    if (!best && !worst) {
-      const touches = s.passOk + s.passFail + s.dribbleOk + s.dribbleFail + s.tackles + s.tacklesLost;
-      out.push(touches < 8 ? 'note.quiet' : 'note.steady');
-    }
-  }
+  if (flags.gk) out.push(s.saves >= 3 ? 'note.gkBusy' : s.saves ? 'note.gkOk' : 'note.gkQuiet');   // v3.0: he was in goal in THAT match
+  if (flags.clue) out.push(flags.clue);
   if (flags.oop) out.push('note.oop');
   if (flags.psy) out.push(flags.psy);   // v3.7 a subtle captain-trait clue (vocal leader / nerves)
-  if (flags.role) out.push('note.role');
   return out;
 }
+
+/* =========================================================
+   v3.18 CLUES — hints instead of answers (CLUE_SIGNALS / CLUES in 00-utils-data.js)
+   The hidden truth is the same one the match engine uses: a role multiplies its composites ×1.5 (Aggressive: Tackle + Mark,
+   Playmaker: Pass, Selfish: Dribble + Shoot) and brings its side effects (fouls / forced passes / never passing). The role
+   that fits = the one whose composites are his strongest — exactly when the ×1.5 pays and the side effects hurt least.
+   ========================================================= */
+/** Composite from the RAW hidden skills (no sharpness dip): the long-term truth, not today's form. */
+function rawComposite(p, key) {
+  const w = COMPOSITE[key]; let sum = 0, n = 0;
+  for (const k in w) { sum += (p.physical?.[k] ?? p.technical?.[k] ?? p.tactical?.[k] ?? p.psych?.[k] ?? 10) * w[k]; n += w[k]; }
+  return sum / n;
+}
+/** signal → how well its role's composites suit him (1–20). */
+function roleFit(p) {
+  const o = {};
+  for (const sig in CLUE_SIGNALS) { const a = CLUE_SIGNALS[sig].attrs; o[sig] = a.reduce((x, k) => x + rawComposite(p, k), 0) / a.length; }
+  return o;
+}
+/** His "true" signals: the best one + any within CLUES.FIT_TIE of it (several fitting roles all count as true). */
+function trueSignals(p) {
+  const f = roleFit(p), best = Math.max(...Object.values(f));
+  return Object.keys(f).filter(k => f[k] >= best - CLUES.FIT_TIE);
+}
+/** Did he do the thing the clue describes? `stats` = null (training) → no numbers on show, nothing to contradict. */
+function clueEvidence(sig, stats) {
+  if (!stats) return true;
+  const c = CLUE_SIGNALS[sig];
+  return c.stats.reduce((a, k) => a + (stats[k] || 0), 0) >= c.min;
+}
+/** One clue about one kid at one event. True with chance 1 − WRONG (seeded date#clue#id), otherwise a random OTHER signal —
+    worded just as confidently. No evidence on today's card → a neutral line (signal null, never confirms anything).
+    `used` = text keys already given at this event, so two kids never share a phrasing. */
+function rollClue(p, { date, source, ref, stats = null, used = new Set() }) {
+  const r = seeded(date + '#clue#' + p.id), truth = trueSignals(p);
+  const others = Object.keys(CLUE_SIGNALS).filter(k => !truth.includes(k));
+  let signal = r() < CLUES.WRONG && others.length ? others[Math.floor(r() * others.length)] : truth[Math.floor(r() * truth.length)];
+  if (!clueEvidence(signal, stats)) signal = null;
+  const base = signal ? 'clue.' + signal + '.' : 'clue.none.', n = signal ? CLUES.PHRASES : CLUES.NEUTRAL;
+  const start = Math.floor(seeded(date + '#cluetxt#' + p.id)() * n);
+  let i = 0;
+  while (i < n - 1 && used.has(base + (start + i) % n)) i++;
+  const textKey = base + (start + i) % n;
+  used.add(textKey);
+  return { date, source, ref, signal, textKey, seen: false };
+}
+/** One event = source + ref (+ date: round numbers repeat every season). */
+const clueEvent = c => c.source + '|' + c.ref + '|' + c.date;
+/** ✓ confirmed: another clue with the same signal from a DIFFERENT event. Contradictions stay visible, nothing is resolved. */
+function clueConfirmed(list, c) { return !!c.signal && list.some(o => o !== c && o.signal === c.signal && clueEvent(o) !== clueEvent(c)); }
+const unseenClues = p => (p?.clues || []).filter(c => !c.seen).length;
 
 
 /* =========================================================

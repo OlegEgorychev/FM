@@ -76,6 +76,7 @@ class UIController {
       for (const o of r.observed || []) {
         s.addDiary({ date, key: o.key, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.6 practice scouting
         if (o.capKey) s.addDiary({ date, key: o.capKey, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.7 vocal leader / nerves
+        if (o.clue) s.addDiary({ date, key: 'obs.clue', vars: { k: { pid: o.pid }, c: { clue: o.clue.textKey, pid: o.pid } }, cls: 'tr' });   // v3.18 role clue
       }
       const plan = { p: { plan: r.plan } };
       return r.skipped.length
@@ -389,6 +390,12 @@ class UIController {
     this.$('top-assists').addEventListener('click', openTeam);
     this.$('md-next').addEventListener('click', () => { this.tableMd = Math.min(this.state.league.matchdays, this.tableMd + 1); this.renderTable(); });
 
+    this.$('notes-body').addEventListener('toggle', e => {   // v3.18: opening a name in "the rest of the squad" = opening his card
+      const d = e.target.closest?.('details[data-cluekid]');
+      if (!d || !d.open || !this.state.markCluesSeen(d.dataset.cluekid)) return;
+      d.querySelector('summary .clue-badge')?.remove();
+      this.dropClueBadge(d.dataset.cluekid);
+    }, true);
     this.$('notes-body').addEventListener('click', e => {
       if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
       if (e.target.closest('#btn-nb-msum')) { this.summary.open(this.state.lastReport); return; }   // v3.9
@@ -570,7 +577,7 @@ class UIController {
     for (const id of new Set(Object.values(scenes))) this.$(id).classList.toggle('active', id === scenes[view]);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-    if (view === 'notes') this.$('tk-notes').classList.remove('alert');
+    if (view === 'notes') { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); }   // v3.18
     if (view === 'match') this.$('tk-match').classList.remove('alert');
     if (view === 'table') this.renderTable();
     if (view === 'dash') this.renderDash();
@@ -1199,7 +1206,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}${out ? ' unavail' : ''}" data-id="${p.id}"
           role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
-        <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
+        <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.clueBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×' + fatigueMult(e).toFixed(2) : ''}</span></div>
         <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
@@ -1230,6 +1237,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
     // board: the starting XI exactly as the match engine will read it (state.lineup, slot order)
     this.board.setup([{ entries: slots.map((sl, i) => ({ ...sl, p: s.player(s.lineup[i]) })) }], { board: true });
+    for (const d of this.$('tac-board').querySelectorAll('.pl[data-pid]')) { const b = this.clueBadge(s.player(d.dataset.pid)); if (b) d.insertAdjacentHTML('beforeend', b); }   // v3.18 📝
     this.board.highlight(this.selected, id => this.swapClass(s.player(id)));
     this.setSwapHover(this.swapHoverId);   // v3.10: re-apply (or drop, if nothing is selected any more) after the re-render
     const boardEl = this.$('tac-board');
@@ -1312,7 +1320,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   flagChips(p) { return (p.flags || []).map(f => `<span class="tag flag" title="${esc(FLAGS[f][L.code][1])}">${f === 'Showcase' ? '\u25C9' : '$'} ${esc(FLAGS[f][L.code][0])}</span>`).join(''); }
   tagChip(tag, id, removable) {
     const tone = TAGS[tag]?.tone || 'neutral';
-    const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(L.t('squad.remove'))}" title="${esc(L.t('squad.remove'))}">&times;</button>` : '';
+    const cost = removable ? this.state.roleChangeCost(this.state.player(id)) : 0;   // v3.18
+    const rm = cost ? L.t('squad.removeCost', { m: '\u2212' + Math.abs(cost) }) : L.t('squad.remove');
+    const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(rm)}" title="${esc(rm)}">&times;</button>` : '';
     return `<span class="tag ${tone}" title="${esc(L.tagDesc(tag))}">${esc(L.tag(tag))}${x}</span>`;
   }
 
@@ -1542,6 +1552,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const capRep = eng.captainReport();
     s.lastReport.capObs = captainObservation(capRep, ctx.md);
     for (const pr of s.lastReport.players) { const k = psychClue(s.player(pr.id), ctx.md, capRep?.id); if (k) pr.psy = k; }
+    s.recordMatchClues(s.lastReport, s.calendar.date);   // v3.18: one clue per Notebook kid (an episode, sometimes wrong)
+    s.trackRoles(eng.everPlayed);   // v3.18: roles that played this match now cost morale to change
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
@@ -1567,6 +1579,39 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     }
     // v2.1: full time → MATCH SUMMARY scoreboard first (a short beat so the final whistle lands on the pitch)
     setTimeout(() => { if (s.phase === 'post' && s.lastReport) this.summary.open(s.lastReport); }, 700);
+  }
+
+  /* ---------- v3.18 CLUES ---------- */
+  /** One clue line: date, source icon, text, ✓ confirmed (never hidden, never resolved). */
+  clueLine(p, c) {
+    const ok = clueConfirmed(p.clues, c), src = L.t('clue.src.' + c.source, { r: c.ref });
+    return `<li class="clue${c.seen ? '' : ' new'}${ok ? ' ok' : ''}" data-sig="${c.signal || ''}"><span class="cl-d">${esc(fmtDate(c.date, { day: 'numeric', month: 'short' }))}</span>`
+      + `<span class="cl-src" title="${esc(src)}" aria-label="${esc(src)}">${CLUES.SOURCES[c.source] || '\u2022'}</span><span class="cl-t">${esc(L.t(c.textKey))}</span>`
+      + `${ok ? `<b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}</li>`;
+  }
+  /** Clues block, newest first; max → the rest folds into "All clues (n)". */
+  cluesBlock(p, max = Infinity) {
+    const list = [...(p.clues || [])].reverse();
+    if (!list.length) return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><p class="pi-none">${L.t('nb.cluesNone')}</p></fieldset>`;
+    const top = list.slice(0, max), rest = list.slice(max);
+    return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><ul>${top.map(c => this.clueLine(p, c)).join('')}</ul>`
+      + (rest.length ? `<details class="nb-more"><summary>${L.t('nb.cluesAll', { n: list.length })}</summary><ul>${rest.map(c => this.clueLine(p, c)).join('')}</ul></details>` : '')
+      + '</fieldset>';
+  }
+  /** 📝 when he has clues the coach has not opened yet; hover = the latest CLUES.TIP. */
+  clueBadge(p) {
+    if (!unseenClues(p)) return '';
+    const tip = [L.t('clue.badge'), ...[...p.clues].reverse().slice(0, CLUES.TIP).map(c => `${fmtDate(c.date, { day: 'numeric', month: 'short' })} ${CLUES.SOURCES[c.source] || ''} ${L.t(c.textKey)}`)].join('\n');
+    return `<span class="clue-badge" title="${esc(tip)}" aria-label="${esc(tip)}">\u{1F4DD}</span>`;
+  }
+  /** The three Notebook cards are on screen → their clues are read. */
+  markNotebookSeen() {
+    const rep = this.state.lastReport;
+    for (const pr of rep?.players || []) if (this.state.markCluesSeen(pr.id)) this.dropClueBadge(pr.id);
+  }
+  /** Read → take his 📝 off the roster row and the board dot in place (no re-render). */
+  dropClueBadge(id) {
+    document.querySelectorAll(`#roster .r-row[data-id="${id}"] .clue-badge, #tac-board .pl[data-pid="${id}"] .clue-badge`).forEach(b => b.remove());
   }
 
   /* ---------- NOTEBOOK ---------- */
@@ -1605,12 +1650,15 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (pr.gk || s.saves) lines.push(L.t('nb.saves', { a: s.saves, b: season.saves }));
       if (s.yellow || s.red) lines.push(L.t('notes.cards', { a: s.yellow, b: s.red }));
       lines.push(`${L.t('notes.energy', { a: Math.round(p.energy) })} · ${L.t('nb.apps', { n: season.apps })}`);
-      const note = coachNote(p, s, pr).map(k => k === 'note.role' ? L.t(k, { r: L.tag(pr.role) }) : L.t(k)).join(' ');
+      if (pr.role) lines.push(esc(L.t('note.role', { r: L.tag(pr.role) })));   // v3.18: a stat line, not part of the coach's note
+      const note = coachNote(p, s, pr).filter(k => k in I18N.en).map(k => L.t(k)).join(' ');
+      const cost = this.state.roleChangeCost(p);
       const btns = TAG_KEYS.map(t => {
         const has = p.tags.includes(t);
         const key = has ? 'notes.noted' : p.tags.length ? 'notes.change' : 'notes.add';
+        const price = !has && cost ? `<em class="role-cost">${esc(L.t('role.cost', { m: '\u2212' + Math.abs(cost) }))}</em>` : '';   // v3.18
         return `<button class="btn ${has ? 'done' : ''}" data-tag="${t}" data-id="${p.id}" ${has ? 'disabled' : ''} title="${esc(L.tagDesc(t))}">
-          ${L.t(key, { t: esc(L.tag(t)) })}<small>${esc(L.tagDesc(t))}</small></button>`;
+          ${L.t(key, { t: esc(L.tag(t)) })}${price}<small>${esc(L.tagDesc(t))}</small></button>`;
       }).join('');
       return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
@@ -1619,8 +1667,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>
         <div class="tag-btns">${btns}</div>
+        ${this.cluesBlock(p, CLUES.TIP)}
       </article>`;
     }).join('');
+    // v3.18: everybody else who has clues — collapsed; opening a name = opening his card (marks his clues read)
+    const inCards = new Set(rep.players.map(pr => pr.id));
+    const others = this.state.squad.filter(p => !inCards.has(p.id) && p.clues?.length).sort((a, b) => unseenClues(b) - unseenClues(a) || a.number - b.number);
+    const otherHtml = others.length ? `<fieldset class="nb-others"><legend>${L.t('nb.otherClues')}</legend><p class="nb-legend">${L.t('nb.otherHint')}</p>
+      ${others.map(p => `<details class="nb-kid" data-cluekid="${p.id}" data-pid="${p.id}"><summary><span class="num dark">${p.number}</span> ${esc(L.name(p.name))}
+        <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${p.tags.map(t => this.tagChip(t, p.id, false)).join('')}${this.clueBadge(p)}</summary>
+        ${this.cluesBlock(p)}</details>`).join('')}</fieldset>` : '';
     const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t('notes.back')}</button></div>` : '';
     body.innerHTML = `
       <div class="nb-head">
@@ -1630,7 +1686,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       ${this.state.phase === 'post' ? `<p class="nb-talk${this.state.talkPending ? ' pending' : ''}">${L.t(this.state.talkPending ? 'tt.nbPending' : 'tt.nbDone')} <button class="btn" id="btn-nb-msum" type="button">${L.t('tt.nbOpen')}</button></p>` : ''}
       <p class="nb-hint">${L.t('notes.hint')}</p>
       <p class="nb-legend"><span style="${rateStyle(80)}">■ &gt; 75%</span> · <span style="${rateStyle(30)}">■ &lt; 40%</span> · ${L.t('nb.legend')}</p>
-      ${this.captainNoteHTML(rep)}<div class="cards">${cards}</div>${back}`;
+      ${this.captainNoteHTML(rep)}<div class="cards">${cards}</div>${otherHtml}${back}`;
     this.$('notes-status').textContent = L.t('notes.status', { n: rep.md });
   }
 }

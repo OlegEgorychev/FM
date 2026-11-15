@@ -2,8 +2,25 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.17';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.18';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.18', name: { en: 'Clues', ru: 'Зацепки' },
+    en: [
+      'The coach\'s note no longer tells you the role. It describes one moment from the match ("Went into a 50-50 in midfield and came out with the ball"), and sometimes the coach reads it wrong.',
+      'A clue never contradicts the numbers on the card. When there is nothing to go on, the note says so honestly.',
+      'Match Practice also gives one role clue per watched kid (the position hint stays as its own line), and two kids no longer get the same sentence on the same day.',
+      'Every kid keeps his last 8 clues in the Notebook (date, ⚽ match / 🏃 practice). Two clues that agree from different days are marked "✓ confirmed"; contradictions stay in plain sight. The rest of the squad is listed below the three cards.',
+      '📝 on the Squad screen and the tactics board = clues you haven\'t read yet (hover for the latest three). PLAYER_INFO.EXE shows the list too.',
+      'Changing or removing a role is free until it has played a match; after that it costs 3 morale and the diary notices.',
+    ],
+    ru: [
+      'Заметка тренера больше не называет роль. Она описывает один эпизод матча («Пошёл в стык в центре поля и вышел из него с мячом»), и иногда тренер видит не то.',
+      'Зацепка никогда не спорит с цифрами на карточке. Если зацепиться не за что, заметка так и говорит.',
+      'Игровая практика тоже даёт по одной зацепке на каждого, за кем следишь (подсказка о позиции остаётся отдельной строкой), и двум игрокам в один день больше не достаётся одна и та же фраза.',
+      'У каждого в Блокноте хранятся последние 8 зацепок (дата, ⚽ матч / 🏃 практика). Две совпавшие зацепки из разных дней помечены «✓ подтверждено»; противоречия остаются на виду. Остальные игроки — списком под тремя карточками.',
+      '📝 в составе и на тактической доске — непрочитанные зацепки (наведи курсор — покажет три последние). В PLAYER_INFO.EXE тот же список.',
+      'Сменить или убрать роль бесплатно, пока она не сыграла матч; потом это стоит 3 морали, и дневник это запомнит.',
+    ] },
   { v: '3.17', name: { en: 'Silence', ru: 'Тишина' },
     en: [
       'Fewer windows: the morning briefing only opens when there is something new. A rest day, a normal training or news you already read two weeks ago no longer stop you; everything is still in the diary.',

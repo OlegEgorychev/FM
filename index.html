@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.17</title>
+<title>Youth Academy Manager v3.18</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1795,6 +1795,51 @@ body.modal-lock #startmenu{ display: none; }
   .pl-top .pl-kassa .ks-table td + td{ white-space: nowrap; }
 }
 /* =========================================================
+   v3.18 "CLUES" — clue lists (Notebook, PLAYER_INFO.EXE), 📝 badge (roster + tactics board), role-change cost
+   ========================================================= */
+.nb-clues{ margin: 8px 0 4px 22px; min-width: 0; box-sizing: border-box; padding: 2px 8px 6px; border: 2px groove #d8d0b8; font: 13px/1.4 var(--ui); color: #2b2618; }
+.nb-clues legend{ padding: 0 4px; font-weight: bold; color: #13213a; }
+.nb-clues ul{ list-style: none; margin: 0; padding: 0; }
+.card .nb-clues li, .nb-clues li{ display: flex; gap: 6px; align-items: baseline; font-size: 13px; line-height: 18px; padding: 1px 0; }
+.card .nb-clues li::before{ content: none; }
+/* narrow Notebook cards / PLAYER_INFO: date + icon + text flow as one paragraph, the ✓ chip wraps after it */
+.card .nb-clues li, .pinfo .nb-clues li{ display: block; }
+.card .nb-clues li > span, .pinfo .nb-clues li > span{ display: inline; width: auto; margin-right: 4px; }
+.card .nb-clues .cl-ok, .pinfo .nb-clues .cl-ok{ display: inline-block; margin-left: 2px; }
+.nb-clues .cl-d{ flex: none; width: 46px; color: #6f6754; font-size: 12px; }
+.nb-clues .cl-src{ flex: none; width: 18px; text-align: center; }
+.nb-clues .cl-t{ flex: 1; font-style: italic; }
+.nb-clues .cl-ok{ flex: none; padding: 0 4px; font-size: 11px; color: #10200c; background: #8fae7f; border: 1px solid; border-color: #c4dcb8 #4c6a40 #4c6a40 #c4dcb8; white-space: nowrap; }
+.nb-clues li.new .cl-t{ font-weight: bold; }
+.nb-clues .nb-more summary{ cursor: pointer; font-size: 12px; color: #2c3a52; }
+.nb-clues .pi-none{ margin: 2px 0; }
+.card .btn .role-cost{ margin-left: 6px; font-style: normal; color: #a63b30; font-weight: bold; }
+
+/* the rest of the squad: one Win98 tree node per kid */
+.nb-others{ margin: 14px 0 8px; padding: 6px 10px 10px; background: #e9e4d3; color: #2b2618; border: 2px solid; border-color: #fff #8a8470 #8a8470 #fff; }
+.nb-others legend{ padding: 0 4px; background: #e9e4d3; font-weight: bold; color: #13213a; }
+.nb-others .nb-legend{ margin: 0 0 6px; color: #5e5a4c; }
+.nb-kid{ margin: 2px 0; }
+.nb-kid summary{ cursor: pointer; padding: 2px 4px; font: 13px/20px var(--ui); }
+.nb-kid summary:hover{ background: #dcd5c0; }
+.nb-kid summary .num{ display: inline-block; min-width: 20px; }
+.nb-kid summary .pos{ font-size: 11px; padding: 0 3px; margin: 0 4px; }
+.nb-kid .nb-clues{ margin-left: 18px; background: #f3eedc; }
+
+/* 📝 new clues — plain symbol, no animation */
+.clue-badge{ display: inline-block; margin-left: 4px; font-size: 12px; line-height: 1; cursor: help; vertical-align: 1px; }
+.pitch.board .pl .clue-badge{ position: absolute; top: -9px; right: -11px; margin: 0; font-size: 12px; padding: 1px; background: #fffbe6;
+  border: 1px solid #000; line-height: 12px; }
+
+/* PLAYER_INFO.EXE: same list, read-only, in the CRT panel style of the other fieldsets */
+.pinfo .nb-clues{ margin: 0; padding: 2px 8px 8px; font: inherit; color: inherit; border: 1px solid; border-color: var(--shadow) #fff #fff var(--shadow); }
+.pinfo .nb-clues legend{ font-weight: normal; color: #111; }
+.pinfo .nb-clues > ul, .pinfo .nb-clues > details, .pinfo .nb-clues > p{ padding: 4px 8px; }
+.pinfo .nb-clues li{ font-size: 12px; }
+.pinfo .nb-clues .cl-d{ color: var(--muted); font-size: 11px; }
+.pinfo .nb-clues .cl-ok{ font-size: 10px; }
+.pinfo .nb-clues .nb-more summary{ color: var(--amber); }
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width: 820px){
@@ -2513,6 +2558,20 @@ const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
    chance by streak 3 → 25 %, 4 → 40 %, 5 → 55 %, 6 → 75 %, then +5 % per match, capped at 85 %. One per day, seeded by date + id. */
 const POS_HINT = { OBSERVE_MAX: 2, MIN: 3, CHANCE: { 3: 0.25, 4: 0.40, 5: 0.55, 6: 0.75 }, STEP: 0.05, CAP: 0.85,
   COOLDOWN: 2, YES_MORALE: 5, ORDER_MORALE: -8, ORDER_DISC: 1 };
+/* v3.18 CLUES — the coach's notes describe an episode instead of naming a role.
+   CLUE_SIGNALS: signal → the role it points to (TAGS key), `attrs` = the engine composites that role multiplies (same hidden truth
+   as the ×1.5 and its side effects), `stats` = match counters that show he actually did it (a clue never contradicts the card),
+   `min` = how many of them are needed. A new signal = one line here + `clue.<signal>.0…PHRASES-1` texts (EN + RU).
+   CLUES: WRONG = chance a clue points to another signal; MAX_PER_KID kept; PHRASES per signal; FIT_TIE = composites this
+   close to his best one also count as "true"; TIP = clues in the 📝 tooltip / under the role buttons. */
+const CLUE_SIGNALS = {
+  pass: { role: 'Playmaker',  attrs: ['Pass'],            stats: ['passOk'],                min: 2 },
+  duel: { role: 'Aggressive', attrs: ['Tackle', 'Mark'],  stats: ['tackles', 'intercepts'], min: 1 },
+  solo: { role: 'Selfish',    attrs: ['Dribble', 'Shoot'], stats: ['dribbleOk', 'shots'],    min: 1 },
+};
+const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}' } };   // v3.20 adds 'voice'
+/* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free. */
+const ROLES = { CHANGE_MORALE: -3 };
 const positionRequestChance = n => n < POS_HINT.MIN ? 0 : POS_HINT.CHANCE[n] ?? Math.min(POS_HINT.CAP, POS_HINT.CHANCE[6] + (n - 6) * POS_HINT.STEP);
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
@@ -2679,7 +2738,7 @@ const I18N = {
     'notes.title': 'NOTEBOOK.TXT — Post-Match', 'notes.saveHint': 'Roles apply from the next match', 'notes.locked': 'Locked.',
     'notes.lockedMsg': '&#128274; Nothing written yet.<br>Play a match to unlock the notebook.',
     'notes.head': 'MATCH #{n}: vs {o}',
-    'notes.hint': 'Three lads caught your eye. Give each ONE role. It changes how he plays next match. Guess wrong and it backfires.',
+    'notes.hint': 'Three lads caught your eye. Each note is a clue: a moment from the match, not a verdict, and sometimes the coach reads it wrong. Two clues that agree from different days get a &#10003;. The role is your call: it changes how he plays next match, and a wrong one backfires.',
     'notes.status': 'Report for fixture #{n}. Roles apply from the next match.',
     'notes.pass': '{a} successful passes, {b} failed', 'notes.tackles': '{a} tackles won, {b} lost', 'notes.drib': '{a} dribbles past a man, {b} lost',
     'notes.shots': '{a} shots ({b} on target), {c} goals', 'notes.saves': '{a} saves', 'notes.cards': 'cards: {a} yellow, {b} red',
@@ -2742,7 +2801,7 @@ const I18N = {
     'notes.title': 'NOTEBOOK.TXT — После матча', 'notes.saveHint': 'Роли действуют со следующего матча', 'notes.locked': 'Закрыто.',
     'notes.lockedMsg': '&#128274; Пока ничего не записано.<br>Сыграй матч, чтобы открыть блокнот.',
     'notes.head': 'МАТЧ №{n}: против {o}',
-    'notes.hint': 'Трое парней привлекли внимание. Дай каждому ОДНУ роль — она изменит его игру в следующем матче. Ошибёшься — выйдет боком.',
+    'notes.hint': 'Трое парней привлекли внимание. Каждая заметка — зацепка: эпизод из матча, а не приговор, и иногда тренер видит не то. Две совпавшие зацепки из разных дней получают &#10003;. Роль выбираешь ты: она изменит его игру в следующем матче, а ошибка выйдет боком.',
     'notes.status': 'Отчёт по матчу №{n}. Роли действуют со следующего матча.',
     'notes.pass': 'точных пасов: {a}, неточных: {b}', 'notes.tackles': 'отборов выиграно: {a}, проиграно: {b}', 'notes.drib': 'удачных обводок: {a}, потерь: {b}',
     'notes.shots': 'ударов: {a} (в створ: {b}), голов: {c}', 'notes.saves': 'сейвов: {a}', 'notes.cards': 'карточки: жёлтых {a}, красных {b}',
@@ -2868,18 +2927,9 @@ Object.assign(I18N.en, {
   'nb.intercepts': 'Interceptions & blocks: {a} (season {b})', 'nb.shots': 'Shots: {a} (on target {b}), goals {c} · season goals {g}',
   'nb.saves': 'Saves: {a} (season {b})', 'nb.apps': 'matches this season: {n}', 'nb.coachNote': "Coach's Note",
   'nb.legend': 'Season figures include today. Tackles = duels won / duels.', 'st.intercepts': 'Interceptions',
-  'note.duelHigh': 'He was a rock in defence today, very aggressive in the challenge and he wins his duels.',
-  'note.duelLow': 'Got skinned too often one-on-one. A reckless role could cost us cards.',
-  'note.passHigh': 'Great vision, he controls the tempo and finds his man.',
-  'note.passLow': 'Gives the ball away too easily. I would not build our play through him.',
-  'note.dribHigh': 'Loves the ball at his feet and beats his man. Give him freedom to go alone.',
-  'note.dribLow': 'Loses the ball every time he tries to go it alone.',
-  'note.scorer': 'Has an eye for goal and wants to be the hero.',
   'note.gkBusy': 'Kept us in the game with save after save.', 'note.gkOk': 'Solid between the posts.', 'note.gkQuiet': 'A quiet day for the keeper.',
   'note.tired': 'He was running on empty, so these numbers are not his real level.',
   'note.oop': 'Played out of his natural position, so judge with care.',
-  'note.quiet': 'Hard to judge: he barely saw the ball today.',
-  'note.steady': 'An honest, steady game. Nothing stood out either way.',
   'note.role': 'These numbers already include his current role ({r}).',
 });
 Object.assign(I18N.ru, {
@@ -2887,18 +2937,9 @@ Object.assign(I18N.ru, {
   'nb.intercepts': 'Перехваты и блоки: {a} (в сезоне {b})', 'nb.shots': 'Удары: {a} (в створ {b}), голы {c} · голов в сезоне {g}',
   'nb.saves': 'Сейвы: {a} (в сезоне {b})', 'nb.apps': 'матчей в сезоне: {n}', 'nb.coachNote': 'Заметка тренера',
   'nb.legend': 'Сезонные цифры включают этот матч. Отборы = выигранные единоборства / все единоборства.', 'st.intercepts': 'Перехваты',
-  'note.duelHigh': 'Сегодня он был скалой в обороне: жёстко идёт в стык и выигрывает единоборства.',
-  'note.duelLow': 'Слишком часто его обыгрывали один в один. Безрассудная роль может стоить нам карточек.',
-  'note.passHigh': 'Отличное видение поля: он задаёт темп и находит своих.',
-  'note.passLow': 'Слишком легко теряет мяч. Я бы не строил игру через него.',
-  'note.dribHigh': 'Любит мяч в ногах и обыгрывает соперника. Дай ему свободу действовать самому.',
-  'note.dribLow': 'Теряет мяч каждый раз, когда пытается пройти сам.',
-  'note.scorer': 'Чувствует ворота и хочет быть героем.',
   'note.gkBusy': 'Держал нас в игре сейв за сейвом.', 'note.gkOk': 'Надёжен в воротах.', 'note.gkQuiet': 'Спокойный день для вратаря.',
   'note.tired': 'Он был выжат, так что эти цифры не его настоящий уровень.',
   'note.oop': 'Играл не на своей позиции, оценивай осторожно.',
-  'note.quiet': 'Трудно судить: он почти не видел мяча.',
-  'note.steady': 'Честная, ровная игра. Ничего не выделялось.',
   'note.role': 'Цифры уже учитывают его текущую роль ({r}).',
 });
 
@@ -3689,7 +3730,7 @@ Object.assign(I18N.ru, {
 Object.assign(I18N.en, {
   'obs.title': 'Under observation', 'obs.tip': 'Free (0 AP): mark up to 2 kids to watch closely in Match Practice. Nobody marked → you watch 1–2 random kids.',
   'obs.none': 'Nobody marked — you will watch whoever catches your eye.', 'obs.picked': 'You will keep an eye on them today.',
-  'obs.ok.0': 'Match practice: {k} looked completely at home in his current role.',
+  'obs.ok.0': 'Match practice: {k} looked completely at home in his current position.',
   'obs.ok.1': 'Match practice: {k} was right where he belongs — calm, sure of every step.',
   'obs.hint.GK.0': 'Match practice: {k} looked lost out on the pitch, but dived at every loose ball near the goal like it was his to save.',
   'obs.hint.GK.1': 'Match practice: {k} kept drifting back to the goalposts and shouting at the back line.',
@@ -4107,7 +4148,6 @@ Object.assign(I18N.en, {
   'ex.stayMatch.diary': '{k} had to stay for the match. He sulked all game; the others noticed.',
   'ev.ulti.e': 'Drop by his family this evening',
   'ev.ulti.e.diary': '{k} skipped training again. The coach dropped by his family in the evening: tea, a long talk, no fine.',
-  'note.readHigh': 'Read the game superbly: he kept cutting out their passes.',
   'mb.routine': 'Routine ({n})',
   'trr.title': 'Training report · {d}', 'trr.plan': 'Today\'s session: {p}.', 'trr.ok': '[ OK ]',
   'trr.came': '{a} of {t} came.', 'trr.cameAll': 'All {t} came.', 'trr.absent': '{k}: {w}.',
@@ -4122,13 +4162,62 @@ Object.assign(I18N.ru, {
   'ex.stayMatch.diary': '{k} остался на матч, но дулся всю игру; остальные это заметили.',
   'ev.ulti.e': 'Зайти вечером к его семье',
   'ev.ulti.e.diary': '{k} снова прогулял тренировку. Вечером тренер зашёл к его семье: чай, долгий разговор, без штрафа.',
-  'note.readHigh': 'Отлично читал игру: раз за разом перехватывал их передачи.',
   'mb.routine': 'Рутина ({n})',
   'trr.title': 'Итог тренировки · {d}', 'trr.plan': 'Сегодняшнее занятие: {p}.', 'trr.ok': '[ OK ]',
   'trr.came': 'Пришли {a} из {t}.', 'trr.cameAll': 'Пришли все {t}.', 'trr.absent': '{k}: {w}.',
   'trr.fees': 'Взносы сегодня: {n} ({m}).', 'trr.kicker': 'Тренировочное поле', 'trr.h': 'Как прошло',
   'pl.kassa': 'Касса · {m}',
   'fee.remindAll': 'Напомнить всем', 'fee.remindAllTip': 'Бесплатно: напоминание каждому, кто ещё не сдал взнос за месяц (кроме тех, кто платит в два приёма).',
+});
+
+/* v3.18 CLUES — episodes, never a role name or advice. clue.<signal>.0–3 (CLUES.PHRASES), clue.none.0–2 (CLUES.NEUTRAL). */
+Object.assign(I18N.en, {
+  'clue.pass.0': 'Twice played it forward first time while everyone else was still thinking.',
+  'clue.pass.1': 'Spotted a run nobody else saw and slid the ball straight into it.',
+  'clue.pass.2': 'Kept asking for the ball in tight spaces and always had the next pass ready.',
+  'clue.pass.3': 'Switched play across the whole pitch with one touch; their winger never got back.',
+  'clue.duel.0': 'Went into a 50-50 in midfield and came out with the ball.',
+  'clue.duel.1': 'Read their pass early, stepped in front of his man and took it.',
+  'clue.duel.2': 'Their big number 9 tried to bully him once. Only once.',
+  'clue.duel.3': 'Chased back forty metres to win it at the edge of our box.',
+  'clue.solo.0': 'Dragged the ball past three of them with a free man on the left.',
+  'clue.solo.1': 'Picked it up on halfway and just kept running at them.',
+  'clue.solo.2': 'Nutmegged their captain and tried it again a minute later.',
+  'clue.solo.3': 'Had a pass on, but went for goal himself instead.',
+  'clue.none.0': 'Hard to read him today; nothing I could put my finger on.',
+  'clue.none.1': 'Did his job, but no single moment stuck in my head.',
+  'clue.none.2': 'I was watching the others more; can\'t say much about him this time.',
+  'obs.clue': 'Match practice, {k}: {c}',
+  'nb.clues': 'Clues', 'nb.cluesAll': 'All clues ({n})', 'nb.cluesNone': 'No clues yet.',
+  'nb.otherClues': 'Clues about the rest of the squad', 'nb.otherHint': 'Open a name to read his clues.',
+  'clue.confirmed': '&#10003; confirmed', 'clue.src.match': 'Match, round {r}', 'clue.src.training': 'Match practice',
+  'clue.badge': 'New clues: open his card in the Notebook. Latest:',
+  'role.cost': '{m} morale', 'squad.removeCost': 'Remove role ({m} morale)',
+  'role.flip': 'The coach changed his mind about {k} again: another role, morale {m}.',
+});
+Object.assign(I18N.ru, {
+  'clue.pass.0': 'Дважды отдал вперёд в одно касание, пока остальные ещё соображали.',
+  'clue.pass.1': 'Увидел забегание, которого не заметил никто, и выкатил мяч точно туда.',
+  'clue.pass.2': 'Просил мяч в тесноте и всегда уже знал, куда отдаст дальше.',
+  'clue.pass.3': 'Одним касанием перевёл игру на другой фланг — их крайний так и не вернулся.',
+  'clue.duel.0': 'Пошёл в стык в центре поля и вышел из него с мячом.',
+  'clue.duel.1': 'Заранее прочитал их передачу, шагнул наперёд и забрал мяч.',
+  'clue.duel.2': 'Их здоровяк-девятка попробовал его продавить. Один раз.',
+  'clue.duel.3': 'Вернулся на сорок метров и отобрал мяч у самой нашей штрафной.',
+  'clue.solo.0': 'Протащил мяч мимо троих, хотя слева был свободный партнёр.',
+  'clue.solo.1': 'Подобрал мяч в центре и просто побежал на них.',
+  'clue.solo.2': 'Пробил их капитану между ног — и через минуту попробовал снова.',
+  'clue.solo.3': 'Мог отдать, но пошёл к воротам сам.',
+  'clue.none.0': 'Сегодня его трудно понять — ни за что не зацепиться.',
+  'clue.none.1': 'Отработал, но ни один момент не запомнился.',
+  'clue.none.2': 'Я больше смотрел на других, про него в этот раз сказать нечего.',
+  'obs.clue': 'Игровая практика, {k}: {c}',
+  'nb.clues': 'Зацепки', 'nb.cluesAll': 'Все зацепки ({n})', 'nb.cluesNone': 'Зацепок пока нет.',
+  'nb.otherClues': 'Зацепки по остальным', 'nb.otherHint': 'Открой имя, чтобы прочитать его зацепки.',
+  'clue.confirmed': '&#10003; подтверждено', 'clue.src.match': 'Матч, тур {r}', 'clue.src.training': 'Игровая практика',
+  'clue.badge': 'Новые зацепки: открой его карточку в Блокноте. Последние:',
+  'role.cost': 'мораль {m}', 'squad.removeCost': 'Убрать роль (мораль {m})',
+  'role.flip': 'Тренер опять передумал насчёт роли — {k} расстроен (мораль {m}).',
 });
 class Lang {
   static KEY = 'yam_lang';
@@ -4398,6 +4487,9 @@ class Player {
       this.plateau = Array.isArray(o.plateau) ? o.plateau.filter(g => typeof g === 'string') : [];   // v3.11: skill groups where the coach already noticed he stopped growing
       this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
       this.absentToday = o.absentToday || null;
+      // v3.18: the Notebook's clues [{ date, source 'match'|'training' (v3.20: 'voice'), ref, signal|null, textKey, seen }] + matches his current role has played
+      this.clues = Array.isArray(o.clues) ? o.clues.filter(c => c && typeof c.textKey === 'string').map(c => ({ ...c, signal: CLUE_SIGNALS[c.signal] ? c.signal : null })).slice(-CLUES.MAX_PER_KID) : [];
+      this.roleMatches = Math.max(0, Math.round(o.roleMatches || 0));
       this.lessonClues = Math.max(0, Math.round(o.lessonClues || 0));   // v3.16: lesson clues given (alternates archetype ↔ leadership)
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
       this.positionHintCooldown = Math.max(0, Math.round(o.positionHintCooldown || 0));   // v3.6: matches before he may ask again
@@ -5139,8 +5231,50 @@ class GameState {
     }
   }
   dutiesOf(id) { return Object.keys(DUTIES).filter(d => this.duties?.[d] === id); }
-  setTag(id, tag) { const p = this.player(id); if (p && TAGS[tag]) { p.tags = [tag]; this.save(); } }
-  removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
+  setTag(id, tag) { if (TAGS[tag]) this.changeRole(id, tag); }
+  removeTag(id, tag) { const p = this.player(id); if (p?.tags.includes(tag)) this.changeRole(id, null); }
+  /** v3.18: morale cost of changing / removing his role now (0 = free): the first role, or one that has not played a match yet, is free. */
+  roleChangeCost(p, free = false) { return !free && p?.tags?.length && p.roleMatches > 0 ? ROLES.CHANGE_MORALE : 0; }
+  /** v3.18: the one place a role changes. tag = null removes it. free = true → no morale cost (v3.20: the window after
+      the "After the game" talk; nothing passes it yet). Returns the morale change applied. */
+  changeRole(id, tag, { free = false } = {}) {
+    const p = this.player(id);
+    if (!p || (tag && !TAGS[tag]) || (p.tags[0] || null) === (tag || null)) return 0;
+    const cost = this.roleChangeCost(p, free);
+    p.tags = tag ? [tag] : [];
+    p.roleMatches = 0;
+    if (cost) {
+      p.dyn.morale = clamp(p.dyn.morale + cost, 0, 100);
+      this.addDiary({ date: this.calendar.date, key: 'role.flip', vars: { k: { pid: p.id }, m: cost }, cls: 'ev' });
+    }
+    this.save();
+    return cost;
+  }
+  /** v3.18: after every league match — his role has now "played" (the next change costs morale). */
+  trackRoles(playedIds) { for (const p of this.squad) if (p.tags.length && playedIds.has(p.id)) p.roleMatches++; }
+  /** v3.18: keep a clue in the kid's Notebook (last CLUES.MAX_PER_KID). */
+  addClue(p, c) {
+    if (!p || !c) return;
+    (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, seen: false });
+    if (p.clues.length > CLUES.MAX_PER_KID) p.clues.splice(0, p.clues.length - CLUES.MAX_PER_KID);
+  }
+  /** v3.18: one clue per kid the Notebook covers after a match (checked against that match's numbers). pr.clue = its text. */
+  recordMatchClues(rep, date = this.calendar.date) {
+    const used = new Set();
+    for (const pr of rep.players) {
+      const p = this.player(pr.id); if (!p || pr.gk) continue;   // the keeper is judged by his saves line
+      const c = rollClue(p, { date, source: 'match', ref: rep.md, stats: pr.stats, used });
+      pr.clue = c.textKey;
+      this.addClue(p, c);
+    }
+  }
+  /** v3.18: the Notebook card was opened → his clues are read (the 📝 badge goes). Returns true if anything changed. */
+  markCluesSeen(id) {
+    const p = this.player(id), list = (p?.clues || []).filter(c => !c.seen);
+    list.forEach(c => { c.seen = true; });
+    if (list.length) this.save();
+    return list.length > 0;
+  }
 
   /* ----- energy ----- */
   /** Rest day: condition +10, match sharpness fades −2 (floor 20), morale drifts 1 point toward 60. */
@@ -5388,9 +5522,14 @@ class GameState {
       const n = Math.min(pool.length, r() < 0.5 ? 1 : 2);
       while (who.length < n) who.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
     }
+    const used = new Set(), clueUsed = new Set();   // v3.18: two kids on one day never get the same template
     return who.map(p => {
-      const ok = isPlayingNaturalPosition(p, p.tag), v = Math.floor(seeded(date + '#obs#' + p.id)() * 2);
-      const o = { pid: p.id, ok, key: (ok ? 'obs.ok.' : 'obs.hint.' + p.archetype + '.') + v };
+      const ok = isPlayingNaturalPosition(p, p.tag), base = ok ? 'obs.ok.' : 'obs.hint.' + p.archetype + '.';
+      let v = Math.floor(seeded(date + '#obs#' + p.id)() * 2);
+      if (used.has(base + v)) v = 1 - v;
+      used.add(base + v);
+      const o = { pid: p.id, ok, key: base + v };
+      o.clue = rollClue(p, { date, source: 'training', ref: date, used: clueUsed });   // v3.18: + one role clue (same rules as a match)
       // v3.7: sometimes a natural vocal leader / a kid who freezes under pressure shows it (even without the armband)
       const c = seeded(date + '#obscap#' + p.id);
       if (p.captainTrait && p.captainTrait !== 'normal' && c() < CAPTAIN.PRACTICE_CLUE) o.capKey = 'obs.cap.' + p.captainTrait + '.' + Math.floor(c() * 2);
@@ -5547,6 +5686,7 @@ class GameState {
     // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
     const observed = training && plan === 'match'
       ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
+    for (const o of observed) this.addClue(this.player(o.pid), o.clue);   // v3.18
     const lesson = !training && date ? this.runLesson(date) : null;   // v3.16: the evening lesson (no CONTINUE stop)
     return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed, lesson };
   }
@@ -6673,8 +6813,25 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.17';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.18';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.18', name: { en: 'Clues', ru: 'Зацепки' },
+    en: [
+      'The coach\'s note no longer tells you the role. It describes one moment from the match ("Went into a 50-50 in midfield and came out with the ball"), and sometimes the coach reads it wrong.',
+      'A clue never contradicts the numbers on the card. When there is nothing to go on, the note says so honestly.',
+      'Match Practice also gives one role clue per watched kid (the position hint stays as its own line), and two kids no longer get the same sentence on the same day.',
+      'Every kid keeps his last 8 clues in the Notebook (date, ⚽ match / 🏃 practice). Two clues that agree from different days are marked "✓ confirmed"; contradictions stay in plain sight. The rest of the squad is listed below the three cards.',
+      '📝 on the Squad screen and the tactics board = clues you haven\'t read yet (hover for the latest three). PLAYER_INFO.EXE shows the list too.',
+      'Changing or removing a role is free until it has played a match; after that it costs 3 morale and the diary notices.',
+    ],
+    ru: [
+      'Заметка тренера больше не называет роль. Она описывает один эпизод матча («Пошёл в стык в центре поля и вышел из него с мячом»), и иногда тренер видит не то.',
+      'Зацепка никогда не спорит с цифрами на карточке. Если зацепиться не за что, заметка так и говорит.',
+      'Игровая практика тоже даёт по одной зацепке на каждого, за кем следишь (подсказка о позиции остаётся отдельной строкой), и двум игрокам в один день больше не достаётся одна и та же фраза.',
+      'У каждого в Блокноте хранятся последние 8 зацепок (дата, ⚽ матч / 🏃 практика). Две совпавшие зацепки из разных дней помечены «✓ подтверждено»; противоречия остаются на виду. Остальные игроки — списком под тремя карточками.',
+      '📝 в составе и на тактической доске — непрочитанные зацепки (наведи курсор — покажет три последние). В PLAYER_INFO.EXE тот же список.',
+      'Сменить или убрать роль бесплатно, пока она не сыграла матч; потом это стоит 3 морали, и дневник это запомнит.',
+    ] },
   { v: '3.17', name: { en: 'Silence', ru: 'Тишина' },
     en: [
       'Fewer windows: the morning briefing only opens when there is something new. A rest day, a normal training or news you already read two weeks ago no longer stop you; everything is still in the diary.',
@@ -7878,38 +8035,69 @@ function rateStyle(r) {
   return '';
 }
 
-/** Coach's Note: looks at the strongest and weakest signal of THIS match and returns i18n keys.
-    It hints at a role without naming it (duels → Aggressive, passing → Playmaker, dribbling/goals → Selfish). */
-const NOTE_READ_MIN = 10;   // v3.17: interceptions + blocks in one match for the "reads the game" note
+/** Coach's Note (v3.18): no verdict, no role names, no advice. Lines: tired / keeper line, then ONE clue (an episode,
+    see rollClue — flags.clue = its text key), then out-of-position and the v3.7 psych hint. "Numbers already reflect his
+    current role" is a stat line on the card, not part of the note. */
 function coachNote(p, s, flags = {}) {
   const out = [];
   if (flags.tired) out.push('note.tired');
-  if (flags.gk) {   // v3.0: he was in goal in THAT match (no native positions)
-    out.push(s.saves >= 3 ? 'note.gkBusy' : s.saves ? 'note.gkOk' : 'note.gkQuiet');
-  } else {
-    const rate = (ok, fail, min) => (ok + fail >= min ? { r: ok / (ok + fail), n: ok + fail } : null);
-    const pass = rate(s.passOk, s.passFail, 6), duel = rate(s.tackles, s.tacklesLost, 4), drib = rate(s.dribbleOk, s.dribbleFail, 4);
-    const cands = [];
-    if (duel) cands.push({ key: duel.r >= 0.7 ? 'note.duelHigh' : duel.r < 0.4 ? 'note.duelLow' : null, w: Math.abs(duel.r - 0.55) * duel.n, good: duel.r >= 0.7 });
-    if (pass) cands.push({ key: pass.r >= 0.8 ? 'note.passHigh' : pass.r < 0.45 ? 'note.passLow' : null, w: Math.abs(pass.r - 0.62) * pass.n * 0.8, good: pass.r >= 0.8 });
-    if (drib) cands.push({ key: drib.r >= 0.65 ? 'note.dribHigh' : drib.r < 0.35 ? 'note.dribLow' : null, w: Math.abs(drib.r - 0.5) * drib.n, good: drib.r >= 0.65 });
-    if (s.goals > 0) cands.push({ key: 'note.scorer', w: 2 + s.goals * 2, good: true });
-    // v3.17: interceptions + blocks count too (23 of them used to end as "nothing stood out"); ≥ 10 ≈ the top 5% of outfield kids
-    if ((s.intercepts || 0) >= NOTE_READ_MIN) cands.push({ key: 'note.readHigh', w: s.intercepts * 0.5, good: true });
-    const hits = cands.filter(c => c.key).sort((a, b) => b.w - a.w);
-    const best = hits.find(c => c.good), worst = hits.find(c => !c.good);
-    if (best) out.push(best.key);
-    if (worst) out.push(worst.key);
-    if (!best && !worst) {
-      const touches = s.passOk + s.passFail + s.dribbleOk + s.dribbleFail + s.tackles + s.tacklesLost;
-      out.push(touches < 8 ? 'note.quiet' : 'note.steady');
-    }
-  }
+  if (flags.gk) out.push(s.saves >= 3 ? 'note.gkBusy' : s.saves ? 'note.gkOk' : 'note.gkQuiet');   // v3.0: he was in goal in THAT match
+  if (flags.clue) out.push(flags.clue);
   if (flags.oop) out.push('note.oop');
   if (flags.psy) out.push(flags.psy);   // v3.7 a subtle captain-trait clue (vocal leader / nerves)
-  if (flags.role) out.push('note.role');
   return out;
 }
+
+/* =========================================================
+   v3.18 CLUES — hints instead of answers (CLUE_SIGNALS / CLUES in 00-utils-data.js)
+   The hidden truth is the same one the match engine uses: a role multiplies its composites ×1.5 (Aggressive: Tackle + Mark,
+   Playmaker: Pass, Selfish: Dribble + Shoot) and brings its side effects (fouls / forced passes / never passing). The role
+   that fits = the one whose composites are his strongest — exactly when the ×1.5 pays and the side effects hurt least.
+   ========================================================= */
+/** Composite from the RAW hidden skills (no sharpness dip): the long-term truth, not today's form. */
+function rawComposite(p, key) {
+  const w = COMPOSITE[key]; let sum = 0, n = 0;
+  for (const k in w) { sum += (p.physical?.[k] ?? p.technical?.[k] ?? p.tactical?.[k] ?? p.psych?.[k] ?? 10) * w[k]; n += w[k]; }
+  return sum / n;
+}
+/** signal → how well its role's composites suit him (1–20). */
+function roleFit(p) {
+  const o = {};
+  for (const sig in CLUE_SIGNALS) { const a = CLUE_SIGNALS[sig].attrs; o[sig] = a.reduce((x, k) => x + rawComposite(p, k), 0) / a.length; }
+  return o;
+}
+/** His "true" signals: the best one + any within CLUES.FIT_TIE of it (several fitting roles all count as true). */
+function trueSignals(p) {
+  const f = roleFit(p), best = Math.max(...Object.values(f));
+  return Object.keys(f).filter(k => f[k] >= best - CLUES.FIT_TIE);
+}
+/** Did he do the thing the clue describes? `stats` = null (training) → no numbers on show, nothing to contradict. */
+function clueEvidence(sig, stats) {
+  if (!stats) return true;
+  const c = CLUE_SIGNALS[sig];
+  return c.stats.reduce((a, k) => a + (stats[k] || 0), 0) >= c.min;
+}
+/** One clue about one kid at one event. True with chance 1 − WRONG (seeded date#clue#id), otherwise a random OTHER signal —
+    worded just as confidently. No evidence on today's card → a neutral line (signal null, never confirms anything).
+    `used` = text keys already given at this event, so two kids never share a phrasing. */
+function rollClue(p, { date, source, ref, stats = null, used = new Set() }) {
+  const r = seeded(date + '#clue#' + p.id), truth = trueSignals(p);
+  const others = Object.keys(CLUE_SIGNALS).filter(k => !truth.includes(k));
+  let signal = r() < CLUES.WRONG && others.length ? others[Math.floor(r() * others.length)] : truth[Math.floor(r() * truth.length)];
+  if (!clueEvidence(signal, stats)) signal = null;
+  const base = signal ? 'clue.' + signal + '.' : 'clue.none.', n = signal ? CLUES.PHRASES : CLUES.NEUTRAL;
+  const start = Math.floor(seeded(date + '#cluetxt#' + p.id)() * n);
+  let i = 0;
+  while (i < n - 1 && used.has(base + (start + i) % n)) i++;
+  const textKey = base + (start + i) % n;
+  used.add(textKey);
+  return { date, source, ref, signal, textKey, seen: false };
+}
+/** One event = source + ref (+ date: round numbers repeat every season). */
+const clueEvent = c => c.source + '|' + c.ref + '|' + c.date;
+/** ✓ confirmed: another clue with the same signal from a DIFFERENT event. Contradictions stay visible, nothing is resolved. */
+function clueConfirmed(list, c) { return !!c.signal && list.some(o => o !== c && o.signal === c.signal && clueEvent(o) !== clueEvent(c)); }
+const unseenClues = p => (p?.clues || []).filter(c => !c.seen).length;
 
 
 /* =========================================================
@@ -8031,7 +8219,7 @@ class ProfileCard {
         : `<span class="pi-none">${L.t('pi.noRole')}</span>`) + ui.flagChips(p);
       const n = s.coachNotes?.[p.id];
       noteHtml = n
-        ? `<div class="pi-note-h">${L.t('pi.noteFrom', { n: n.md, o: esc(L.team(n.opp || '')) })}</div><p>${esc(n.keys.map(k => k === 'note.role' ? L.t(k, { r: L.tag(n.role) }) : L.t(k)).join(' '))}</p>`
+        ? `<div class="pi-note-h">${L.t('pi.noteFrom', { n: n.md, o: esc(L.team(n.opp || '')) })}</div><p>${esc(n.keys.filter(k => k in I18N.en).map(k => k === 'note.role' ? L.t(k, { r: L.tag(n.role) }) : L.t(k)).join(' '))}</p>`
         : `<p class="pi-none">${L.t('pi.noNote')}</p>`;
     } else {
       roleHtml = `<span class="pi-none">${L.t('pi.scout')}</span>`;
@@ -8072,6 +8260,7 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
         <fieldset><legend>${L.t('pi.tags')}</legend><div class="pi-role">${roleHtml}</div></fieldset>
         <fieldset><legend>${L.t('pi.stats')}</legend>${table}</fieldset>
         <fieldset class="pi-note"><legend>${L.t('nb.coachNote')}</legend>${noteHtml}</fieldset>
+        ${own ? ui.cluesBlock(p) : ''}
       </div>`;
     document.getElementById('pinfo-status').textContent = L.t('pi.status.bar');
     const ob = document.getElementById('pinfo-office');   // v2.5: [ CALL INTO OFFICE ] (1 action point)
@@ -9896,6 +10085,7 @@ class UIController {
       for (const o of r.observed || []) {
         s.addDiary({ date, key: o.key, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.6 practice scouting
         if (o.capKey) s.addDiary({ date, key: o.capKey, vars: { k: { pid: o.pid } }, cls: 'tr' });   // v3.7 vocal leader / nerves
+        if (o.clue) s.addDiary({ date, key: 'obs.clue', vars: { k: { pid: o.pid }, c: { clue: o.clue.textKey, pid: o.pid } }, cls: 'tr' });   // v3.18 role clue
       }
       const plan = { p: { plan: r.plan } };
       return r.skipped.length
@@ -10209,6 +10399,12 @@ class UIController {
     this.$('top-assists').addEventListener('click', openTeam);
     this.$('md-next').addEventListener('click', () => { this.tableMd = Math.min(this.state.league.matchdays, this.tableMd + 1); this.renderTable(); });
 
+    this.$('notes-body').addEventListener('toggle', e => {   // v3.18: opening a name in "the rest of the squad" = opening his card
+      const d = e.target.closest?.('details[data-cluekid]');
+      if (!d || !d.open || !this.state.markCluesSeen(d.dataset.cluekid)) return;
+      d.querySelector('summary .clue-badge')?.remove();
+      this.dropClueBadge(d.dataset.cluekid);
+    }, true);
     this.$('notes-body').addEventListener('click', e => {
       if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
       if (e.target.closest('#btn-nb-msum')) { this.summary.open(this.state.lastReport); return; }   // v3.9
@@ -10390,7 +10586,7 @@ class UIController {
     for (const id of new Set(Object.values(scenes))) this.$(id).classList.toggle('active', id === scenes[view]);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-    if (view === 'notes') this.$('tk-notes').classList.remove('alert');
+    if (view === 'notes') { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); }   // v3.18
     if (view === 'match') this.$('tk-match').classList.remove('alert');
     if (view === 'table') this.renderTable();
     if (view === 'dash') this.renderDash();
@@ -11019,7 +11215,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}${out ? ' unavail' : ''}" data-id="${p.id}"
           role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
-        <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
+        <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.clueBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×' + fatigueMult(e).toFixed(2) : ''}</span></div>
         <span class="r-tags">${p.tags.length || p.flags?.length ? p.tags.map(t => this.tagChip(t, p.id, !live)).join('') + this.flagChips(p) : '<span class="empty">—</span>'}</span>
       </div>`;
@@ -11050,6 +11246,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
     // board: the starting XI exactly as the match engine will read it (state.lineup, slot order)
     this.board.setup([{ entries: slots.map((sl, i) => ({ ...sl, p: s.player(s.lineup[i]) })) }], { board: true });
+    for (const d of this.$('tac-board').querySelectorAll('.pl[data-pid]')) { const b = this.clueBadge(s.player(d.dataset.pid)); if (b) d.insertAdjacentHTML('beforeend', b); }   // v3.18 📝
     this.board.highlight(this.selected, id => this.swapClass(s.player(id)));
     this.setSwapHover(this.swapHoverId);   // v3.10: re-apply (or drop, if nothing is selected any more) after the re-render
     const boardEl = this.$('tac-board');
@@ -11132,7 +11329,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   flagChips(p) { return (p.flags || []).map(f => `<span class="tag flag" title="${esc(FLAGS[f][L.code][1])}">${f === 'Showcase' ? '\u25C9' : '$'} ${esc(FLAGS[f][L.code][0])}</span>`).join(''); }
   tagChip(tag, id, removable) {
     const tone = TAGS[tag]?.tone || 'neutral';
-    const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(L.t('squad.remove'))}" title="${esc(L.t('squad.remove'))}">&times;</button>` : '';
+    const cost = removable ? this.state.roleChangeCost(this.state.player(id)) : 0;   // v3.18
+    const rm = cost ? L.t('squad.removeCost', { m: '\u2212' + Math.abs(cost) }) : L.t('squad.remove');
+    const x = removable ? `<button type="button" data-untag="${esc(tag)}" data-id="${id}" aria-label="${esc(rm)}" title="${esc(rm)}">&times;</button>` : '';
     return `<span class="tag ${tone}" title="${esc(L.tagDesc(tag))}">${esc(L.tag(tag))}${x}</span>`;
   }
 
@@ -11362,6 +11561,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const capRep = eng.captainReport();
     s.lastReport.capObs = captainObservation(capRep, ctx.md);
     for (const pr of s.lastReport.players) { const k = psychClue(s.player(pr.id), ctx.md, capRep?.id); if (k) pr.psy = k; }
+    s.recordMatchClues(s.lastReport, s.calendar.date);   // v3.18: one clue per Notebook kid (an episode, sometimes wrong)
+    s.trackRoles(eng.everPlayed);   // v3.18: roles that played this match now cost morale to change
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
@@ -11387,6 +11588,39 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     }
     // v2.1: full time → MATCH SUMMARY scoreboard first (a short beat so the final whistle lands on the pitch)
     setTimeout(() => { if (s.phase === 'post' && s.lastReport) this.summary.open(s.lastReport); }, 700);
+  }
+
+  /* ---------- v3.18 CLUES ---------- */
+  /** One clue line: date, source icon, text, ✓ confirmed (never hidden, never resolved). */
+  clueLine(p, c) {
+    const ok = clueConfirmed(p.clues, c), src = L.t('clue.src.' + c.source, { r: c.ref });
+    return `<li class="clue${c.seen ? '' : ' new'}${ok ? ' ok' : ''}" data-sig="${c.signal || ''}"><span class="cl-d">${esc(fmtDate(c.date, { day: 'numeric', month: 'short' }))}</span>`
+      + `<span class="cl-src" title="${esc(src)}" aria-label="${esc(src)}">${CLUES.SOURCES[c.source] || '\u2022'}</span><span class="cl-t">${esc(L.t(c.textKey))}</span>`
+      + `${ok ? `<b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}</li>`;
+  }
+  /** Clues block, newest first; max → the rest folds into "All clues (n)". */
+  cluesBlock(p, max = Infinity) {
+    const list = [...(p.clues || [])].reverse();
+    if (!list.length) return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><p class="pi-none">${L.t('nb.cluesNone')}</p></fieldset>`;
+    const top = list.slice(0, max), rest = list.slice(max);
+    return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><ul>${top.map(c => this.clueLine(p, c)).join('')}</ul>`
+      + (rest.length ? `<details class="nb-more"><summary>${L.t('nb.cluesAll', { n: list.length })}</summary><ul>${rest.map(c => this.clueLine(p, c)).join('')}</ul></details>` : '')
+      + '</fieldset>';
+  }
+  /** 📝 when he has clues the coach has not opened yet; hover = the latest CLUES.TIP. */
+  clueBadge(p) {
+    if (!unseenClues(p)) return '';
+    const tip = [L.t('clue.badge'), ...[...p.clues].reverse().slice(0, CLUES.TIP).map(c => `${fmtDate(c.date, { day: 'numeric', month: 'short' })} ${CLUES.SOURCES[c.source] || ''} ${L.t(c.textKey)}`)].join('\n');
+    return `<span class="clue-badge" title="${esc(tip)}" aria-label="${esc(tip)}">\u{1F4DD}</span>`;
+  }
+  /** The three Notebook cards are on screen → their clues are read. */
+  markNotebookSeen() {
+    const rep = this.state.lastReport;
+    for (const pr of rep?.players || []) if (this.state.markCluesSeen(pr.id)) this.dropClueBadge(pr.id);
+  }
+  /** Read → take his 📝 off the roster row and the board dot in place (no re-render). */
+  dropClueBadge(id) {
+    document.querySelectorAll(`#roster .r-row[data-id="${id}"] .clue-badge, #tac-board .pl[data-pid="${id}"] .clue-badge`).forEach(b => b.remove());
   }
 
   /* ---------- NOTEBOOK ---------- */
@@ -11425,12 +11659,15 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (pr.gk || s.saves) lines.push(L.t('nb.saves', { a: s.saves, b: season.saves }));
       if (s.yellow || s.red) lines.push(L.t('notes.cards', { a: s.yellow, b: s.red }));
       lines.push(`${L.t('notes.energy', { a: Math.round(p.energy) })} · ${L.t('nb.apps', { n: season.apps })}`);
-      const note = coachNote(p, s, pr).map(k => k === 'note.role' ? L.t(k, { r: L.tag(pr.role) }) : L.t(k)).join(' ');
+      if (pr.role) lines.push(esc(L.t('note.role', { r: L.tag(pr.role) })));   // v3.18: a stat line, not part of the coach's note
+      const note = coachNote(p, s, pr).filter(k => k in I18N.en).map(k => L.t(k)).join(' ');
+      const cost = this.state.roleChangeCost(p);
       const btns = TAG_KEYS.map(t => {
         const has = p.tags.includes(t);
         const key = has ? 'notes.noted' : p.tags.length ? 'notes.change' : 'notes.add';
+        const price = !has && cost ? `<em class="role-cost">${esc(L.t('role.cost', { m: '\u2212' + Math.abs(cost) }))}</em>` : '';   // v3.18
         return `<button class="btn ${has ? 'done' : ''}" data-tag="${t}" data-id="${p.id}" ${has ? 'disabled' : ''} title="${esc(L.tagDesc(t))}">
-          ${L.t(key, { t: esc(L.tag(t)) })}<small>${esc(L.tagDesc(t))}</small></button>`;
+          ${L.t(key, { t: esc(L.tag(t)) })}${price}<small>${esc(L.tagDesc(t))}</small></button>`;
       }).join('');
       return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
@@ -11439,8 +11676,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>
         <div class="tag-btns">${btns}</div>
+        ${this.cluesBlock(p, CLUES.TIP)}
       </article>`;
     }).join('');
+    // v3.18: everybody else who has clues — collapsed; opening a name = opening his card (marks his clues read)
+    const inCards = new Set(rep.players.map(pr => pr.id));
+    const others = this.state.squad.filter(p => !inCards.has(p.id) && p.clues?.length).sort((a, b) => unseenClues(b) - unseenClues(a) || a.number - b.number);
+    const otherHtml = others.length ? `<fieldset class="nb-others"><legend>${L.t('nb.otherClues')}</legend><p class="nb-legend">${L.t('nb.otherHint')}</p>
+      ${others.map(p => `<details class="nb-kid" data-cluekid="${p.id}" data-pid="${p.id}"><summary><span class="num dark">${p.number}</span> ${esc(L.name(p.name))}
+        <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${p.tags.map(t => this.tagChip(t, p.id, false)).join('')}${this.clueBadge(p)}</summary>
+        ${this.cluesBlock(p)}</details>`).join('')}</fieldset>` : '';
     const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t('notes.back')}</button></div>` : '';
     body.innerHTML = `
       <div class="nb-head">
@@ -11450,7 +11695,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       ${this.state.phase === 'post' ? `<p class="nb-talk${this.state.talkPending ? ' pending' : ''}">${L.t(this.state.talkPending ? 'tt.nbPending' : 'tt.nbDone')} <button class="btn" id="btn-nb-msum" type="button">${L.t('tt.nbOpen')}</button></p>` : ''}
       <p class="nb-hint">${L.t('notes.hint')}</p>
       <p class="nb-legend"><span style="${rateStyle(80)}">■ &gt; 75%</span> · <span style="${rateStyle(30)}">■ &lt; 40%</span> · ${L.t('nb.legend')}</p>
-      ${this.captainNoteHTML(rep)}<div class="cards">${cards}</div>${back}`;
+      ${this.captainNoteHTML(rep)}<div class="cards">${cards}</div>${otherHtml}${back}`;
     this.$('notes-status').textContent = L.t('notes.status', { n: rep.md });
   }
 }

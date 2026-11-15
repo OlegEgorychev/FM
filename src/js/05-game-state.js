@@ -262,8 +262,50 @@ class GameState {
     }
   }
   dutiesOf(id) { return Object.keys(DUTIES).filter(d => this.duties?.[d] === id); }
-  setTag(id, tag) { const p = this.player(id); if (p && TAGS[tag]) { p.tags = [tag]; this.save(); } }
-  removeTag(id, tag) { const p = this.player(id); if (p) { p.tags = p.tags.filter(t => t !== tag); this.save(); } }
+  setTag(id, tag) { if (TAGS[tag]) this.changeRole(id, tag); }
+  removeTag(id, tag) { const p = this.player(id); if (p?.tags.includes(tag)) this.changeRole(id, null); }
+  /** v3.18: morale cost of changing / removing his role now (0 = free): the first role, or one that has not played a match yet, is free. */
+  roleChangeCost(p, free = false) { return !free && p?.tags?.length && p.roleMatches > 0 ? ROLES.CHANGE_MORALE : 0; }
+  /** v3.18: the one place a role changes. tag = null removes it. free = true → no morale cost (v3.20: the window after
+      the "After the game" talk; nothing passes it yet). Returns the morale change applied. */
+  changeRole(id, tag, { free = false } = {}) {
+    const p = this.player(id);
+    if (!p || (tag && !TAGS[tag]) || (p.tags[0] || null) === (tag || null)) return 0;
+    const cost = this.roleChangeCost(p, free);
+    p.tags = tag ? [tag] : [];
+    p.roleMatches = 0;
+    if (cost) {
+      p.dyn.morale = clamp(p.dyn.morale + cost, 0, 100);
+      this.addDiary({ date: this.calendar.date, key: 'role.flip', vars: { k: { pid: p.id }, m: cost }, cls: 'ev' });
+    }
+    this.save();
+    return cost;
+  }
+  /** v3.18: after every league match — his role has now "played" (the next change costs morale). */
+  trackRoles(playedIds) { for (const p of this.squad) if (p.tags.length && playedIds.has(p.id)) p.roleMatches++; }
+  /** v3.18: keep a clue in the kid's Notebook (last CLUES.MAX_PER_KID). */
+  addClue(p, c) {
+    if (!p || !c) return;
+    (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, seen: false });
+    if (p.clues.length > CLUES.MAX_PER_KID) p.clues.splice(0, p.clues.length - CLUES.MAX_PER_KID);
+  }
+  /** v3.18: one clue per kid the Notebook covers after a match (checked against that match's numbers). pr.clue = its text. */
+  recordMatchClues(rep, date = this.calendar.date) {
+    const used = new Set();
+    for (const pr of rep.players) {
+      const p = this.player(pr.id); if (!p || pr.gk) continue;   // the keeper is judged by his saves line
+      const c = rollClue(p, { date, source: 'match', ref: rep.md, stats: pr.stats, used });
+      pr.clue = c.textKey;
+      this.addClue(p, c);
+    }
+  }
+  /** v3.18: the Notebook card was opened → his clues are read (the 📝 badge goes). Returns true if anything changed. */
+  markCluesSeen(id) {
+    const p = this.player(id), list = (p?.clues || []).filter(c => !c.seen);
+    list.forEach(c => { c.seen = true; });
+    if (list.length) this.save();
+    return list.length > 0;
+  }
 
   /* ----- energy ----- */
   /** Rest day: condition +10, match sharpness fades −2 (floor 20), morale drifts 1 point toward 60. */
@@ -511,9 +553,14 @@ class GameState {
       const n = Math.min(pool.length, r() < 0.5 ? 1 : 2);
       while (who.length < n) who.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
     }
+    const used = new Set(), clueUsed = new Set();   // v3.18: two kids on one day never get the same template
     return who.map(p => {
-      const ok = isPlayingNaturalPosition(p, p.tag), v = Math.floor(seeded(date + '#obs#' + p.id)() * 2);
-      const o = { pid: p.id, ok, key: (ok ? 'obs.ok.' : 'obs.hint.' + p.archetype + '.') + v };
+      const ok = isPlayingNaturalPosition(p, p.tag), base = ok ? 'obs.ok.' : 'obs.hint.' + p.archetype + '.';
+      let v = Math.floor(seeded(date + '#obs#' + p.id)() * 2);
+      if (used.has(base + v)) v = 1 - v;
+      used.add(base + v);
+      const o = { pid: p.id, ok, key: base + v };
+      o.clue = rollClue(p, { date, source: 'training', ref: date, used: clueUsed });   // v3.18: + one role clue (same rules as a match)
       // v3.7: sometimes a natural vocal leader / a kid who freezes under pressure shows it (even without the armband)
       const c = seeded(date + '#obscap#' + p.id);
       if (p.captainTrait && p.captainTrait !== 'normal' && c() < CAPTAIN.PRACTICE_CLUE) o.capKey = 'obs.cap.' + p.captainTrait + '.' + Math.floor(c() * 2);
@@ -670,6 +717,7 @@ class GameState {
     // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
     const observed = training && plan === 'match'
       ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
+    for (const o of observed) this.addClue(this.player(o.pid), o.clue);   // v3.18
     const lesson = !training && date ? this.runLesson(date) : null;   // v3.16: the evening lesson (no CONTINUE stop)
     return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed, lesson };
   }

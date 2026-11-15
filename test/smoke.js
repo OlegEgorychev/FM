@@ -231,6 +231,21 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await page.click('.tk[data-view=notes]');
     const nb = await page.evaluate(() => ({ cards: document.querySelectorAll('.card').length, notes: document.querySelectorAll('.coach-note').length }));
     check('notebook: 3 cards with coach notes', nb.cards === 3 && nb.notes === 3);
+    // v3.18 clues in the real post-match Notebook: no role names in the coach's note (EN + RU), one clue per outfield card,
+    // stored in p.clues, unique phrasing, a Clues block on every card, opening the Notebook marks them read
+    const cl0 = await page.evaluate(() => {
+      const s = YAM.game, rep = s.lastReport, ui = YAM.ui, code = L.code, txt = {};
+      const names = Object.values(TAGS).flatMap(t => [t.en[0], t.ru[0]]).map(x => x.toLowerCase());
+      for (const c of ['en', 'ru']) { L.code = c; ui.renderNotebook(); txt[c] = [...document.querySelectorAll('#notes-body .coach-note')].map(x => x.textContent.toLowerCase()).join(' | '); }
+      L.code = code; ui.renderNotebook();
+      const out = rep.players.filter(pr => !pr.gk);
+      return { clean: ['en', 'ru'].every(c => txt[c].length > 20 && !names.some(n => txt[c].includes(n))), txt: txt.en.slice(0, 160),
+        stored: out.every(pr => /^clue\.(pass|duel|solo|none)\.\d$/.test(pr.clue) && s.player(pr.id).clues.some(c => c.textKey === pr.clue && c.source === 'match' && c.ref === rep.md)),
+        uniq: new Set(out.map(pr => pr.clue)).size === out.length, blocks: document.querySelectorAll('#notes-body .card .nb-clues').length === 3,
+        seen: rep.players.every(pr => !unseenClues(s.player(pr.id))) };
+    });
+    check('v3.18 Notebook: the coach\'s note is an episode with no role names (EN + RU), one stored clue per outfield card (unique phrasing), Clues block on each card, read once the Notebook is open',
+      cl0.clean && cl0.stored && cl0.uniq && cl0.blocks && cl0.seen, JSON.stringify(cl0));
     const pt = await page.evaluate(() => ({
       nb: [...document.querySelectorAll('.card .portrait.lg svg')].map(s => s.getBoundingClientRect().width),
       lr: document.querySelectorAll('#live-roster .portrait.sm svg').length,
@@ -1666,8 +1681,9 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       ui.engine = { sides: [{ name: 'Ashford Rovers', all: [a, c] }, { name: 'Canal Street Youth', all: [b, d, e] }] };
       out.names = [a, b, c, d, e].map(p => ui.logName(p));
       ui.engine = eng0;
-      out.note = coachNote({}, { passOk: 5, passFail: 3, tackles: 2, tacklesLost: 2, dribbleOk: 0, dribbleFail: 0, intercepts: 23, goals: 0, saves: 0 }, {});
-      out.noteLow = coachNote({}, { passOk: 5, passFail: 3, tackles: 2, tacklesLost: 2, dribbleOk: 0, dribbleFail: 0, intercepts: 4, goals: 0, saves: 0 }, {});
+      // v3.18: interceptions are evidence for a "duel" clue (the note no longer says "nothing stood out" after 23 of them)
+      out.note = clueEvidence('duel', { passOk: 5, passFail: 3, tackles: 0, tacklesLost: 2, dribbleOk: 0, dribbleFail: 0, intercepts: 23, goals: 0, saves: 0 });
+      out.noteLow = clueEvidence('duel', { passOk: 5, passFail: 3, tackles: 0, tacklesLost: 2, dribbleOk: 0, dribbleFail: 0, intercepts: 0, goals: 0, saves: 0 });
       return out;
     });
     await page.evaluate(() => { const s = YAM.game; s.weekState().ap = 1; const k = s.squad.find(p => p.archetype !== 'GK'); k.psych.discipline = 5; k.dyn.morale = 50; s.eventLog = []; YAM.ui.events.fire('ulti', undefined, { cast: { kid: k.id } }); });
@@ -1680,7 +1696,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('v3.17 bugs: match-day excuse says "Stay and play" (training days keep "Stay and train"); the assistant\'s truancy report has the [1 AP] family visit (discipline +1, morale +3, no ban); namesakes in the match log get an initial (and the club when even that clashes); 23 interceptions → "read the game" note',
       bg.matchStay && bg.trainStay && ul0.n === 3 && /AP|ОД/.test(ul0.tag) && !ul0.dis && ul1.ap === 0 && ul1.d === ul0.d + 1 && ul1.m === ul0.m + 3 && !ul1.sus && ul1.diary
       && /^\S\. /.test(bg.names[0]) && /^\S\. /.test(bg.names[1]) && bg.names[0] !== bg.names[1] && /\(/.test(bg.names[2]) && /\(/.test(bg.names[3]) && bg.names[2] !== bg.names[3] && !/[.(]/.test(bg.names[4])
-      && bg.note.includes('note.readHigh') && !bg.noteLow.includes('note.readHigh') && !bg.note.includes('note.steady'), JSON.stringify({ bg, ul0, ul1 }));
+      && bg.note === true && bg.noteLow === false, JSON.stringify({ bg, ul0, ul1 }));
     // (3) the match window at ~800 px: [ START MATCH ] visible (not under the pitch)
     await page.setViewportSize({ width: 800, height: 600 });
     await page.evaluate(() => { document.getElementById('win-match').classList.add('open'); });   // (no match today: just lay the window out)
@@ -1747,6 +1763,84 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('v3.17 [ Remind everyone ]: reminds every plain debtor (not half / waived / paid), free, then disabled; training report opens right after the training day (who came / why not, same window in report mode), [ OK ] → CONTINUE goes on and Tuesday\'s lines are not repeated',
       rm0.btn && !rm0.dis && rm1.owed && !rm1.others && rm1.dis && tr0.open && tr0.report && tr0.date === '2002-11-20' && /19/.test(tr0.title) && tr0.lines.length >= 1 && /\d+/.test(tr0.lines[0]) && tr0.news === 'none'
       && !tr1.report && tr1.date >= '2002-11-20' && !tr1.awayTue, JSON.stringify({ rm0, rm1, tr0, tr1 }));
+    // v3.18 CLUES: truth vs WRONG, no contradiction with stats, confirmation, cap + migration, role-change cost, 📝 badge
+    const cl1 = await page.evaluate(async () => {
+      const s = YAM.game, ui = YAM.ui, sq = s.squad.filter(p => p.archetype !== 'GK'), out = {}, W = CLUES.WRONG, days = [];
+      for (let i = 0; i < 40; i++) days.push('2003-0' + (1 + i % 9) + '-' + String(10 + i).slice(-2));
+      const roll = (stats = null) => sq.flatMap(p => days.map(d => ({ p, c: rollClue(p, { date: d, source: 'match', ref: 1, stats }) })));
+      CLUES.WRONG = 0; out.true0 = roll().every(({ p, c }) => trueSignals(p).includes(c.signal));
+      CLUES.WRONG = 1; out.wrong1 = roll().every(({ p, c }) => trueSignals(p).length === Object.keys(CLUE_SIGNALS).length || !trueSignals(p).includes(c.signal));
+      CLUES.WRONG = W;
+      const share = roll(); out.mix = share.filter(({ p, c }) => !trueSignals(p).includes(c.signal)).length / share.length;
+      // a kid with 0 tackles / 0 interceptions never gets a "duel" clue (whatever WRONG is); no evidence at all → neutral
+      const noDuel = { passOk: 6, passFail: 2, tackles: 0, tacklesLost: 3, intercepts: 0, dribbleOk: 2, dribbleFail: 1, shots: 1 };
+      out.noDuel = [0, W, 1].every(w => { CLUES.WRONG = w; return roll(noDuel).every(({ c }) => c.signal !== 'duel'); });
+      CLUES.WRONG = W;
+      out.neutral = roll(MatchEngine.blankStats()).every(({ c }) => c.signal === null && /^clue\.none\./.test(c.textKey));
+      // one event: unique phrasing for every kid
+      const used = new Set(); out.uniq = new Set(sq.slice(0, 3).map(p => rollClue(p, { date: '2003-02-01', source: 'match', ref: 9, used }).textKey)).size === Math.min(3, sq.length);
+      // confirmation: same signal from different events → both ✓; from the same event → no
+      const a = { date: '2002-10-05', source: 'match', ref: 3, signal: 'pass' }, b = { date: '2002-10-08', source: 'training', ref: '2002-10-08', signal: 'pass' };
+      const a2 = { ...a }, n = { ...a, signal: null }, n2 = { ...b, signal: null }, d = { ...b, signal: 'duel' };
+      out.confirm = clueConfirmed([a, b], a) && clueConfirmed([a, b], b) && !clueConfirmed([a, a2], a) && !clueConfirmed([a, a2], a2)
+        && !clueConfirmed([n, n2], n) && !clueConfirmed([a, d], a);
+      // cap + migration (old save without clues / roleMatches)
+      const k = sq[0], keep = k.clues.slice();
+      for (let i = 0; i < 12; i++) s.addClue(k, { date: '2003-03-' + (10 + i), source: 'training', ref: '2003-03-' + (10 + i), signal: 'solo', textKey: 'clue.solo.0' });
+      out.cap = k.clues.length === CLUES.MAX_PER_KID && k.clues[k.clues.length - 1].date === '2003-03-21';
+      const raw = JSON.parse(JSON.stringify(k)); delete raw.clues; delete raw.roleMatches;
+      const old = new Player({ ...raw, tags: [] }), rt = new Player({ ...JSON.parse(JSON.stringify(k)), tags: [] });
+      out.migrate = Array.isArray(old.clues) && old.clues.length === 0 && old.roleMatches === 0 && rt.clues.length === CLUES.MAX_PER_KID;
+      // 📝: a new clue shows on the roster row (+ the board dot for a starter) with a tooltip; opening his card in the Notebook clears it
+      k.clues = keep.map(c => ({ ...c, seen: true }));
+      const st = s.starters().find(p => p.archetype !== 'GK') || k;
+      st.clues = (st.clues || []).map(c => ({ ...c, seen: true }));
+      s.addClue(st, { date: '2003-03-30', source: 'training', ref: '2003-03-30', signal: 'pass', textKey: 'clue.pass.1' });
+      ui.renderTeam();
+      const badge = document.querySelector(`#roster .r-row[data-id="${st.id}"] .clue-badge`);
+      out.badge = !!badge && badge.title.includes(L.t('clue.pass.1')) && !!document.querySelector(`#tac-board .pl[data-pid="${st.id}"] .clue-badge`)
+        && document.querySelectorAll('#roster .clue-badge').length === s.squad.filter(p => unseenClues(p)).length;
+      const pi = ui.profile; pi.open?.(st.id); await new Promise(r => setTimeout(r, 50));
+      out.pinfo = !!document.querySelector('#pinfo-body .nb-clues li') && unseenClues(st) === 1;   // read-only: does not mark them read
+      pi.close?.();
+      const keepRep = s.lastReport, keepUnl = s.notebookUnlocked, keepPh = s.phase;
+      s.lastReport = { ...keepRep, players: keepRep.players.filter(pr => pr.id !== st.id) }; s.notebookUnlocked = true; s.phase = 'post';
+      ui.renderNotebook();
+      const det = document.querySelector(`#notes-body details[data-cluekid="${st.id}"]`);
+      out.nbBadge = !!det?.querySelector('summary .clue-badge');
+      det.open = true; await new Promise(r => setTimeout(r, 50));
+      out.gone = unseenClues(st) === 0 && !document.querySelector(`#roster .r-row[data-id="${st.id}"] .clue-badge`) && !document.querySelector(`#tac-board .pl[data-pid="${st.id}"] .clue-badge`);
+      s.lastReport = keepRep; s.notebookUnlocked = keepUnl; s.phase = keepPh; ui.renderNotebook();
+      // role change: first role free; a change before his next match free; after a played match −3 morale + diary; free flag → 0
+      const r = sq[1], m0 = 60; r.tags = []; r.roleMatches = 0; r.dyn.morale = m0;
+      s.setTag(r.id, 'Playmaker'); out.first = r.dyn.morale === m0;
+      s.setTag(r.id, 'Selfish'); out.fix = r.dyn.morale === m0 && r.tags[0] === 'Selfish';
+      out.btnFree = s.roleChangeCost(r) === 0;
+      s.trackRoles(new Set([r.id]));
+      out.btnCost = s.roleChangeCost(r) === ROLES.CHANGE_MORALE && s.roleChangeCost(r, true) === 0;
+      const dl = s.diary.length;
+      s.setTag(r.id, 'Aggressive');
+      out.paid = r.dyn.morale === m0 + ROLES.CHANGE_MORALE && s.diary.length === Math.min(80, dl + 1) && s.diary[s.diary.length - 1].key === 'role.flip'
+        && /\d/.test(ui.entryText({ ...s.diary[s.diary.length - 1], r: 0 }));
+      s.trackRoles(new Set([r.id])); s.removeTag(r.id, 'Aggressive');
+      out.removePaid = r.tags.length === 0 && r.dyn.morale === m0 + 2 * ROLES.CHANGE_MORALE;
+      out.freeFlag = (() => { r.tags = ['Playmaker']; r.roleMatches = 2; const m = r.dyn.morale; s.changeRole(r.id, 'Selfish', { free: true }); return r.dyn.morale === m; })();
+      // Match Practice: position line kept, + one role clue; two kids with the same hidden archetype never share a template that day
+      const arch = ['DEF', 'MID', 'FWD'].find(a => s.squad.filter(p => p.archetype === a).length >= 2), pair = s.squad.filter(p => p.archetype === arch).slice(0, 2);
+      const tg = pair.map(p => p.tag); pair.forEach(p => { p.tag = arch === 'FWD' ? 'DEF' : 'FWD'; });
+      out.practice = [...Array(12).keys()].every(i => { const date = '2003-04-' + (10 + i), o = s.practiceObservations(date, s.squad, pair.map(p => p.id));
+        return o.length === 2 && o.every(x => x.key.startsWith('obs.hint.' + arch + '.') && x.clue?.source === 'training' && x.clue.ref === date && x.clue.signal)
+          && o[0].key !== o[1].key && o[0].clue.textKey !== o[1].clue.textKey; });
+      pair.forEach((p, i) => { p.tag = tg[i]; });
+      // every clue text exists in EN + RU and names no role
+      const names = Object.values(TAGS).flatMap(t => [t.en[0], t.ru[0]]).map(x => x.toLowerCase());
+      const keys = [...Object.keys(CLUE_SIGNALS).flatMap(g => [...Array(CLUES.PHRASES).keys()].map(i => `clue.${g}.${i}`)), ...[...Array(CLUES.NEUTRAL).keys()].map(i => 'clue.none.' + i)];
+      out.texts = keys.every(k => I18N.en[k] && I18N.ru[k] && !names.some(n => (I18N.en[k] + I18N.ru[k]).toLowerCase().includes(n)));
+      s.save();
+      return out;
+    });
+    check('v3.18 clues: WRONG = 0 → always a true signal, WRONG = 1 → never; 0 tackles/interceptions → never "duel"; nothing on the card → neutral; unique phrasing per event; ✓ only across different events; ≤ 8 per kid, old saves load; 📝 on roster + board with tooltip, PLAYER_INFO list read-only, gone after opening his card in the Notebook; role change free before a match, then −3 morale + diary; texts EN + RU without role names',
+      Object.entries(cl1).every(([k, v]) => k === 'mix' ? v > 0.05 && v < 0.4 : v === true), JSON.stringify(cl1));
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');

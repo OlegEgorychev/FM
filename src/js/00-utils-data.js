@@ -248,6 +248,20 @@ const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
    chance by streak 3 → 25 %, 4 → 40 %, 5 → 55 %, 6 → 75 %, then +5 % per match, capped at 85 %. One per day, seeded by date + id. */
 const POS_HINT = { OBSERVE_MAX: 2, MIN: 3, CHANCE: { 3: 0.25, 4: 0.40, 5: 0.55, 6: 0.75 }, STEP: 0.05, CAP: 0.85,
   COOLDOWN: 2, YES_MORALE: 5, ORDER_MORALE: -8, ORDER_DISC: 1 };
+/* v3.18 CLUES — the coach's notes describe an episode instead of naming a role.
+   CLUE_SIGNALS: signal → the role it points to (TAGS key), `attrs` = the engine composites that role multiplies (same hidden truth
+   as the ×1.5 and its side effects), `stats` = match counters that show he actually did it (a clue never contradicts the card),
+   `min` = how many of them are needed. A new signal = one line here + `clue.<signal>.0…PHRASES-1` texts (EN + RU).
+   CLUES: WRONG = chance a clue points to another signal; MAX_PER_KID kept; PHRASES per signal; FIT_TIE = composites this
+   close to his best one also count as "true"; TIP = clues in the 📝 tooltip / under the role buttons. */
+const CLUE_SIGNALS = {
+  pass: { role: 'Playmaker',  attrs: ['Pass'],            stats: ['passOk'],                min: 2 },
+  duel: { role: 'Aggressive', attrs: ['Tackle', 'Mark'],  stats: ['tackles', 'intercepts'], min: 1 },
+  solo: { role: 'Selfish',    attrs: ['Dribble', 'Shoot'], stats: ['dribbleOk', 'shots'],    min: 1 },
+};
+const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}' } };   // v3.20 adds 'voice'
+/* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free. */
+const ROLES = { CHANGE_MORALE: -3 };
 const positionRequestChance = n => n < POS_HINT.MIN ? 0 : POS_HINT.CHANCE[n] ?? Math.min(POS_HINT.CAP, POS_HINT.CHANCE[6] + (n - 6) * POS_HINT.STEP);
 const arrivalSkipChance = p => clamp((20 - ((p.psych?.discipline ?? 10) + LOCKER.DISC_GRACE)) / 20, 0, 1);
 const skipChance = p => Math.max(0, (TRAINING.SKIP_FROM - (p.psych?.discipline ?? 10)) * TRAINING.SKIP_STEP);
