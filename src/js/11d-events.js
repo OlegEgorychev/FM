@@ -62,11 +62,20 @@ const NARRATIVE_EVENTS = [
       ctx.show({
         face: PortraitGenerator.silhouette(), name: L.t('talk.parentName', { s: L.name(kid.surname) }), role: L.t('talk.roleParent'),
         text: L.t('ev.dad.text', { k: L.name(kid.name) }),
+        // v3.22 MONEY OFFERS: the refusal is the FIRST button (dad / scout / pool) — a first-button player must not collect money
+        // blindly; test/policy.js checks it (`first` refuses, gate: first's budget ≤ reference + $200)
         choices: [
-          { key: 'ev.dad.a', tone: 'green', gain: EVENTS_CFG.DAD_GIFT, who: kid.id,
-            run: () => { if (!kid.hasFlag('Promised_Start')) kid.flags.push('Promised_Start'); return { k: { pid: kid.id } }; } },
           { key: 'ev.dad.b', tone: 'gray', who: kid.id,
             run: () => { kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.DAD_REFUSE_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+          { key: 'ev.dad.a', tone: 'green', gain: EVENTS_CFG.DAD_GIFT, who: kid.id,
+            run: () => {
+              if (!kid.hasFlag('Promised_Start')) kid.flags.push('Promised_Start');
+              kid.promiseBy = 'dad'; kid.promiseChoice = null;
+              const s = ctx.state;   // v3.22: the rumour spreads at once
+              s.addRep('squad', EVENTS_CFG.DAD_RUMOUR_SQUAD);
+              s.addDiary({ date: ctx.date, key: 'ev.dad.rumour.diary', vars: {}, cls: 'ev' });
+              return { k: { pid: kid.id } };
+            } },
         ],
       });
     },
@@ -128,10 +137,10 @@ const NARRATIVE_EVENTS = [
       ctx.show({
         face: PortraitGenerator.silhouette('#1f4f8a'), name: L.t('talk.scoutName'), role: L.t('talk.roleScout'),
         text: L.t('ev.scout.text', { g: EVENTS_CFG.SCOUT_GIFT }),
-        choices: [
+        choices: [   // v3.22: refusal first (see dad)
+          { key: 'ev.scout.b', tone: 'gray', run: () => ({}) },
           { key: 'ev.scout.a', tone: 'green', gain: EVENTS_CFG.SCOUT_GIFT,
             run: () => { ctx.schedule('scoutvisit', { days: EVENTS_CFG.SCOUT_DAYS, matchDay: true }); return {}; } },
-          { key: 'ev.scout.b', tone: 'gray', run: () => ({}) },
         ],
       });
     },
@@ -186,11 +195,16 @@ const NARRATIVE_EVENTS = [
       ctx.show({
         face: PortraitGenerator.silhouette('#3a6b2a'), name: L.t('talk.parentName', { s: L.name(winner.surname) }), role: L.t('talk.rolePub'),
         text: L.t('ev.pool.text', { k: L.name(winner.name), g: EVENTS_CFG.POOL_GIFT }),
-        choices: [
-          { key: 'ev.pool.a', tone: 'green', gain: EVENTS_CFG.POOL_GIFT, who: winner.id,
-            run: () => { ctx.schedule('poolloss', { days: EVENTS_CFG.POOL_DAYS, cast: { kid: ctx.cast.loser.id } }); return { k: { pid: winner.id } }; } },
+        choices: [   // v3.22: refusal first (see dad)
           { key: 'ev.pool.b', tone: 'gray', who: winner.id,
             run: () => { winner.dyn.morale = clamp(winner.dyn.morale + EVENTS_CFG.POOL_REFUSE_MORALE, 0, 100); return { k: { pid: winner.id } }; } },
+          { key: 'ev.pool.a', tone: 'green', gain: EVENTS_CFG.POOL_GIFT, who: winner.id,
+            run: () => {
+              ctx.schedule('poolloss', { days: EVENTS_CFG.POOL_DAYS, cast: { kid: ctx.cast.loser.id } });
+              const r = seeded(ctx.date + '#poolleak#' + winner.id);   // v3.22: the Board may find out (independent of the losing dad)
+              if (r() < EVENTS_CFG.POOL_LEAK_CHANCE) ctx.schedule('poolleak', { days: rndR(r, ...EVENTS_CFG.POOL_LEAK_DAYS) });
+              return { k: { pid: winner.id } };
+            } },
         ],
       });
     },
@@ -211,7 +225,7 @@ const NARRATIVE_EVENTS = [
         text: L.t('ev.poolloss.text', { k: L.name(kid.name), d: EVENTS_CFG.HOME_DAYS }),
         choices: [
           { key: 'ev.poolloss.a', tone: 'gray', who: kid.id,
-            run: () => { if (!kid.hasFlag('Promised_Start')) kid.flags.push('Promised_Start'); kid.promiseBy = 'pool'; return { k: { pid: kid.id } }; } },
+            run: () => { if (!kid.hasFlag('Promised_Start')) kid.flags.push('Promised_Start'); kid.promiseBy = 'pool'; kid.promiseChoice = null; return { k: { pid: kid.id } }; } },
           { key: 'ev.poolloss.b', tone: 'red', who: kid.id,
             run: () => {
               kid.awayDays = Math.max(kid.awayDays, EVENTS_CFG.HOME_DAYS);
@@ -553,6 +567,100 @@ const NARRATIVE_EVENTS = [
         ] });
     },
   },
+  /* ---------- v3.22 THE PUB POOL GETS FOUND OUT — silent (no dialogue): an important briefing line + diary ---------- */
+  {
+    id: 'poolleak', when: 'scheduled', silent: true,
+    trigger: () => false,
+    apply(s, date) {
+      s.addRep('board', EVENTS_CFG.POOL_LEAK_BOARD);
+      s.addRep('parents', EVENTS_CFG.POOL_LEAK_PARENTS);
+      s.eventLog.push({ id: 'poolleak', date, season: s.season, choice: 'ev.poolleak' });
+      if (s.eventLog.length > 60) s.eventLog.shift();
+      s.addDiary({ date, key: 'ev.poolleak.diary', vars: {}, cls: 'ev' });   // '.diary' = an IMPORTANT, never-muted briefing line
+    },
+  },
+
+  /* ---------- v3.22 THE PROMISE CARD — kick-off, locker room (dad's paid start or the pool dad's promise). No OK: keep or break ---------- */
+  {
+    id: 'promise', when: 'manual',
+    trigger: () => false,
+    cast: () => null,   // fired by LockerRoom.maybeRequest / createEngine with { kid }
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast, name = L.name(kid.name), pool = kid.promiseBy === 'pool';
+      const starter = s.isStarter(kid.id), out = starter ? null : s.lineSwapSlot(kid)?.q;
+      const tail = starter ? L.t('ev.promise.inXI', { k: name }) : out ? L.t('ev.promise.drops', { d: L.name(out.name) }) : '';
+      ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.rolePromise'),
+        text: L.t(pool ? 'ev.promise.textPool' : 'ev.promise.text', { k: name }) + (tail ? ' ' + tail : ''),
+        choices: [
+          { key: (pool ? 'ev.promise.keepPool' : 'ev.promise.keep') + (out ? 'Swap' : ''), vars: { k: name }, tone: 'green', who: kid.id,   // …Swap: the diary names who dropped out
+            run: () => {
+              kid.promiseChoice = 'keep';
+              const d = s.promiseStart(kid);
+              if (d) d.dyn.morale = clamp(d.dyn.morale + EVENTS_CFG.PROMISE_DISPLACED_MORALE, 0, 100);
+              if (!pool) s.addRep('parents', EVENTS_CFG.DAD_KEPT_PARENTS);   // the other parents notice (not for the pool dad: no money)
+              return { k: { pid: kid.id }, ...(d ? { d: { pid: d.id } } : {}) };
+            } },
+          { key: pool ? 'ev.promise.breakPool' : 'ev.promise.break', vars: { k: name }, tone: 'red', who: kid.id,
+            ...(pool ? {} : { debt: EVENTS_CFG.DAD_REFUND, cat: 'donation' }),   // full refund (may push the club below $0)
+            run: () => {
+              kid.promiseChoice = 'break';
+              s.promiseBench(kid);
+              if (pool) {   // the losing dad keeps his son at home
+                kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.POOL_BROKEN_MORALE, 0, 100);
+                kid.awayDays = Math.max(kid.awayDays, EVENTS_CFG.HOME_DAYS);
+              } else {
+                kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.PROMISE_BROKEN_MORALE, 0, 100);
+                s.addRep('parents', EVENTS_CFG.DAD_BROKEN_PARENTS);   // the father complains to the other parents
+              }
+              return { k: { pid: kid.id }, d: EVENTS_CFG.HOME_DAYS };
+            } },
+        ] });
+    },
+  },
+
+  /* ---------- v3.22 THE SCOUT COMES BACK — 28–42 days after the showcase he wants the best kid who played (scheduled) ---------- */
+  {
+    id: 'scoutpoach', when: 'scheduled',
+    trigger: () => false,
+    cast: () => null,   // only the scheduled kid; gone from the squad → skipped silently
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast, name = L.name(kid.name);
+      const face = PortraitGenerator.silhouette('#1f4f8a'), who = L.t('talk.scoutName'), role = L.t('talk.roleScoutPoach');
+      const leave = () => {   // the scout takes him: the removal path of the office's "expel", without its penalties
+        s.expel(kid.id, { to: 'big_club' });
+        return { k: { name: kid.name } };
+      };
+      if (ctx.step === 'stay' || ctx.step === 'leave') {   // the family's answer, decided once (saved step) and shown before moving on
+        const stay = ctx.step === 'stay';
+        ctx.show({ face, name: who, role: L.t('talk.rolePhone'), text: L.t('ev.scoutpoach.' + ctx.step, { k: name }),
+          choices: [{ key: 'ev.scoutpoach.' + ctx.step + 'Ok', tone: 'gray', who: kid.id, ...(stay ? {} : { gain: EVENTS_CFG.POACH_FEE }),
+            run: () => {
+              if (stay) { kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.POACH_TALK_STAY_MORALE, 0, 100); return { k: { pid: kid.id } }; }
+              s.addRep('squad', EVENTS_CFG.POACH_LET_SQUAD);   // Parents +0: the family decided, not the coach
+              return leave();
+            } }] });
+        return;
+      }
+      const blk = s.expelBlock(kid.id);   // never below the squad minimum / without a keeper
+      ctx.show({ face, name: who, role, text: L.t('ev.scoutpoach.text', { k: name }),
+        choices: [   // refusal first, like every money offer
+          { key: 'ev.scoutpoach.a', vars: { k: name }, tone: 'gray', who: kid.id,
+            run: () => {
+              kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.POACH_REFUSE_MORALE, 0, 100);
+              s.addRep('parents', EVENTS_CFG.POACH_REFUSE_PARENTS);
+              return { k: { pid: kid.id } };
+            } },
+          { key: 'ev.scoutpoach.b', tone: 'green', ap: 1, who: kid.id,
+            next: () => (blk || seeded(ctx.date + '#poachtalk#' + kid.id)() < clamp(0.5 + (kid.dyn.morale - 50) / 100, 0.2, 0.8) ? 'stay' : 'leave') },
+          { key: 'ev.scoutpoach.c', tone: 'green', gain: EVENTS_CFG.POACH_FEE, who: kid.id, blocked: blk ? 'ev.scoutpoach.blk' : null,
+            run: () => {
+              s.addRep('parents', EVENTS_CFG.POACH_LET_PARENTS);
+              s.addRep('squad', EVENTS_CFG.POACH_LET_SQUAD);
+              return leave();
+            } },
+        ] });
+    },
+  },
 ];
 
 class EventEngine {
@@ -582,7 +690,8 @@ class EventEngine {
   roll(date, { resume = true, cont = false } = {}) {   // v2.5: resume=false in the day loop; v3.13: cont = a [ CONTINUE ] run goes on afterwards
     if (this.active) return false;
     const due = this.takeDue(date, false);
-    if (due && this.fire(due.id, date, { resume, cont, cast: due.cast })) return true;
+    if (due && this.find(due.id)?.silent) this.find(due.id).apply(this.state, date);   // v3.22: no dialogue (poolleak)
+    else if (due && this.fire(due.id, date, { resume, cont, cast: due.cast })) return true;
     if (!this.enabled) return false;
     const s = this.state, last = [...s.eventLog].reverse().find(e => this.find(e.id)?.when !== 'manual');   // the coach's own talks don't count
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
@@ -634,7 +743,7 @@ class EventEngine {
     if (choice.ap) s.weekState().ap -= choice.ap;   // v3.16: [1 AP] options spend from the weekly wallet
     if (choice.cost) s.addMoney(-choice.cost, 'event');   // v3.15: ledger category
     if (choice.gain) s.addMoney(choice.gain, 'event');
-    if (choice.debt) s.addMoney(-choice.debt, 'event', true);   // v2.2: forced payment, may go below $0
+    if (choice.debt) s.addMoney(-choice.debt, choice.cat || 'event', true);   // v2.2: forced payment, may go below $0 (v3.22: own ledger category)
     const vars = choice.run?.() || {};
     if (choice.next) {                                 // v2.2 multi-step dialogue: same event, next step
       pe.step = typeof choice.next === 'function' ? choice.next() : choice.next;   // v2.4: a step can be rolled
@@ -701,7 +810,7 @@ class DialogueView {
         + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '');
       const why = c.blocked ? L.t(c.blocked) : broke ? L.t('talk.short', { b: money(s.budget), c: c.cost }) : noAp ? L.t('talk.noAp') : '';
       return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` data-short="1" disabled aria-disabled="true" title="${esc(why)}"` : ''}>
-        <span class="tb-label">${esc(L.t(c.key))}</span>${tag}
+        <span class="tb-label">${esc(L.t(c.key, c.vars || {}))}</span>${tag}
         ${short ? `<small class="tb-why">${esc(why)}</small>` : ''}</button>`;
     }).join('');
     this.layer.hidden = false;

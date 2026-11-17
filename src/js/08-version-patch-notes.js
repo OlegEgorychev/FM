@@ -2,8 +2,26 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.21';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.22';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.22', name: { en: 'Money with strings', ru: 'Деньги с условиями' },
+    en: [
+      'Money offers now open with the refusal (the rich dad, the scout, the pub pool). Saying no is a fair option: the rich dad\'s son takes it far better than before.',
+      'Taking the rich dad\'s money gets talked about at once: word in the locker room is that a starting spot can be bought.',
+      'A promised start is your decision now. On match day the locker room shows the promise card before kick-off: start the kid (someone drops to the bench, the other parents notice) or leave him out and give all the money back.',
+      'The scout comes back. Some weeks after a showcase he wants one of your kids for his academy: keep him, talk to the family [1 AP], or let him go.',
+      'Pub money can get out: the Board may hear that the club took betting money.',
+      'For developers: a `greedy` scripted coach and new money gates in `test/policy.js`.',
+    ],
+    ru: [
+      'В денежных предложениях первая кнопка теперь — отказ (богатый отец, скаут, тотализатор в пабе). Отказ — честный вариант: сын богатого отца переносит его куда легче, чем раньше.',
+      'Взял деньги богатого отца — об этом сразу шепчутся: в раздевалке говорят, что место в старте можно купить.',
+      'Обещанный старт теперь твоё решение. В день матча в раздевалке перед свистком появляется карточка обещания: выпустить игрока (кто-то сядет в запас, другие родители заметят) или не выпускать и вернуть все деньги.',
+      'Скаут возвращается. Через несколько недель после смотрин он хочет забрать одного из ребят в свою академию: оставить, поговорить с семьёй [1 ОД] или отпустить.',
+      'Деньги из паба могут всплыть: Совет может узнать, что клуб взял деньги с тотализатора.',
+      'Для разработки: скриптовый тренер `greedy` и новые денежные проверки в `test/policy.js`.',
+    ],
+  },
   { v: '3.21', name: { en: 'Cohesion', ru: 'Сыгранность' },
     en: [
       'Training matters now. The team has one Cohesion level: it grows with trainings the kids actually attend and fades in every week without them. You only ever see a word — from "falling apart" to "like clockwork" — in PLANNER.EXE, the Monday briefing and the Match Summary.',

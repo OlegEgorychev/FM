@@ -983,7 +983,7 @@ class GameState {
     return null;
   }
   /** Permanently removes a kid: squad, XI (best bench replacement), notes, queued events, today's locker, last report. */
-  expel(id) {
+  expel(id, { to = 'free_agent' } = {}) {   // v3.22: to = 'big_club' when the scout takes him (no rep penalties live here)
     const p = this.player(id);
     if (!p || this.expelBlock(id)) return false;
     const slot = this.lineup.indexOf(id);
@@ -991,7 +991,7 @@ class GameState {
     if (slot >= 0) {
       const bench = this.squad.filter(x => !this.lineup.includes(x.id));
       const want = slot === 0 ? 'GK' : LINE_POS[this.slots()[slot].line];
-      const score = b => (b.available ? 1000 : 0) + (b.position === want ? 100 : 0) + b.overall;   // v3.0: by the coach's tags
+      const score = b => (b.available ? 1000 : 0) + (b.position === want ? 100 : 0) + b.overall - (b.hasFlag('Promised_Start') ? 5000 : 0);   // v3.0: by the coach's tags; v3.22: a promised kid only by the card
       const best = bench.sort((a, b) => score(b) - score(a))[0];
       this.lineup[slot] = best.id;
     }
@@ -1003,7 +1003,8 @@ class GameState {
     if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null;
       if ([lk.capRequest?.pid, lk.capRequest?.mate, lk.capRequest?.hint].includes(id)) lk.capRequest = null; }   // v3.8
     if (this.worldEvent) this.worldEvent.playerIds = this.worldEvent.playerIds.filter(x => x !== id);   // v3.14
-    p.teamId = 'free_agent';   // v3.1: he stays in the world database (future transfers)
+    p.teamId = to;   // v3.1: he stays in the world database (future transfers)
+    p.flags = p.flags.filter(f => f !== 'Promised_Start'); p.promiseBy = null; p.promiseChoice = null;
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
     this.save();
     return true;
@@ -1078,31 +1079,68 @@ class GameState {
       (same position first). Returns [{ out, in }] so the UI can tell the coach. */
   /** v2.3: scout showcase — flagged kids must be in the XI (they replace the weakest starter of their line). */
   ensureShowcaseXI() {
-    const slots = this.slots();
     for (const p of this.squad.filter(x => x.hasFlag('Showcase') && x.available && !this.isStarter(x.id))) {
-      const idx = this.lineup.map((id, i) => ({ i, q: this.player(id) }))
-        .filter(({ i, q }) => i > 0 && p.position !== 'GK' && !q.hasFlag('Showcase'))
-        .sort((a, b) => (LINE_POS[slots[b.i].line] === p.position) - (LINE_POS[slots[a.i].line] === p.position) || a.q.overall - b.q.overall)[0]
-        || (p.position === 'GK' && !this.player(this.lineup[0]).hasFlag('Showcase') ? { i: 0 } : null);
+      const idx = this.lineSwapSlot(p);
       if (idx) this.lineup[idx.i] = p.id;
     }
     this.save();
   }
+  /** v2.3 → v3.22 (shared by the showcase and the promise card): the XI slot kid `p` would take — the weakest starter of his
+      line (his tag), never a Showcase kid; a keeper only takes the keeper's slot. { i, q } (q = who drops out) or null. */
+  lineSwapSlot(p) {
+    const slots = this.slots();
+    return this.lineup.map((id, i) => ({ i, q: this.player(id) }))
+      .filter(({ i, q }) => i > 0 && q && p.position !== 'GK' && !q.hasFlag('Showcase'))
+      .sort((a, b) => (LINE_POS[slots[b.i].line] === p.position) - (LINE_POS[slots[a.i].line] === p.position) || a.q.overall - b.q.overall)[0]
+      || (p.position === 'GK' && !this.player(this.lineup[0])?.hasFlag('Showcase') ? { i: 0, q: this.player(this.lineup[0]) } : null);
+  }
+  /** v2.2 → v3.22: the best available bench kid for XI slot i (same position first). A kid with a pending Promised_Start is
+      never picked: only the coach puts him in (the promise card). `except` = an id to leave out. */
+  bestBenchFor(i, except = null) {
+    const slots = this.slots(), want = i === 0 ? 'GK' : LINE_POS[slots[i].line];
+    const score = b => (b.position === want ? 100 : 0) + (i === 0 ? (b.position === 'GK' ? 1000 : 0) : (b.position === 'GK' ? -1000 : 0)) + b.overall;   // v3.0: tags, not hidden roles
+    return this.bench().filter(b => b.available && b.id !== except && !b.hasFlag('Promised_Start')).sort((a, b) => score(b) - score(a))[0] || null;
+  }
   ensureAvailableXI() {
-    const slots = this.slots(), changes = [];
+    const changes = [];
     this.lineup.forEach((id, i) => {
       const p = this.player(id);
       if (!p || p.available) return;
-      const bench = this.bench().filter(b => b.available);
-      const want = i === 0 ? 'GK' : LINE_POS[slots[i].line];
-      const score = b => (b.position === want ? 100 : 0) + (i === 0 ? (b.position === 'GK' ? 1000 : 0) : (b.position === 'GK' ? -1000 : 0)) + b.overall;   // v3.0: tags, not hidden roles
-      const best = bench.sort((a, b) => score(b) - score(a))[0];
+      const best = this.bestBenchFor(i);
       if (!best) return;
       this.lineup[i] = best.id;
       changes.push({ out: p, in: best });
     });
     if (changes.length) this.save();
     return changes;
+  }
+  /* ---------- v3.22 "MONEY WITH STRINGS": the promise card ---------- */
+  /** The kid whose kick-off promise card is still owed today (present and available, no answer yet), or null. */
+  promiseCardKid() {
+    if (this.phase !== 'matchday') return null;
+    return this.squad.find(p => p.hasFlag('Promised_Start') && !p.promiseChoice && p.available) || null;
+  }
+  /** Keep: he starts (the weakest starter of his line drops out). Returns the displaced kid or null. */
+  promiseStart(p) {
+    if (this.isStarter(p.id)) return null;
+    const idx = this.lineSwapSlot(p);
+    if (!idx) return null;
+    this.lineup[idx.i] = p.id;
+    return idx.q || null;
+  }
+  /** Break: he sits out (the best available bench kid of his line takes the slot). */
+  promiseBench(p) {
+    const i = this.lineup.indexOf(p.id);
+    if (i < 0) return null;
+    const b = this.bestBenchFor(i, p.id);
+    if (b) this.lineup[i] = b.id;
+    return b;
+  }
+  /** At kick-off the card's answer stands even if the lineup was edited afterwards (keep → in the XI, break → out). */
+  ensurePromiseXI() {
+    for (const p of this.squad.filter(x => x.hasFlag('Promised_Start') && x.promiseChoice && x.available)) {
+      if (p.promiseChoice === 'keep') this.promiseStart(p); else this.promiseBench(p);
+    }
   }
   /** v1.8: after a match — sharpness from minutes (full game +12, sub +6, unused −2); morale from the result,
       goals and red cards, amplified by passion (0.6×–1.4×). */

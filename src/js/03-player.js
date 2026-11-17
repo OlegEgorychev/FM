@@ -136,6 +136,7 @@ class Player {
       this.suspensionMatches = Math.max(0, Math.round(o.suspensionMatches || 0));  // v2.2: matches banned
       this.awayDays = Math.max(0, Math.round(o.awayDays || 0));                    // v2.3: kept at home by a parent (days)
       this.promiseBy = o.promiseBy || null;
+      this.promiseChoice = ['keep', 'break'].includes(o.promiseChoice) ? o.promiseChoice : null;   // v3.22: the coach's answer on the kick-off promise card
       this.plateau = Array.isArray(o.plateau) ? o.plateau.filter(g => typeof g === 'string') : [];   // v3.11: skill groups where the coach already noticed he stopped growing
       this.tag = POS_ORDER[o.tag] !== undefined ? o.tag : (o.archetype ? null : (POS_ORDER[o.position] !== undefined ? o.position : null));   // v3.0 coach's assignment
       this.absentToday = o.absentToday || null;

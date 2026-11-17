@@ -989,7 +989,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const pol = this.autoPolicy, ok = i => !!options[i] && options[i].enabled !== false;
     const first = options.findIndex((o, i) => ok(i));
     let i = first < 0 ? 0 : first;
-    if (pol && pol !== 'first') { const r = UIController.POLICY_PICK[windowId]?.(options, this.state); if (r != null && ok(r)) i = r; }
+    if (pol && pol !== 'first') {   // v3.22: greedy overrides a few windows, everything else as reference
+      const fn = (pol === 'greedy' && UIController.POLICY_GREEDY[windowId]) || UIController.POLICY_PICK[windowId];
+      const r = fn?.(options, this.state); if (r != null && ok(r)) i = r;
+    }
     if (windowId === 'kassa' && pol === 'first') i = Math.max(0, options.findIndex(o => o.def));   // "as it is": CONFIRM with the preselected level
     this.noteChoice(windowId, i, options, null);
     return i;
@@ -1001,6 +1004,20 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     review: o => { const i = o.findIndex(x => x.confirmed); return i < 0 ? 0 : i; },   // a role his confirmed clues point to, else the first card
     after: () => 0,   // the first remark (draw: praise)
     rethink: o => o.findIndex(x => x.key === 'keep'),
+    // v3.22 money offers: refuse the dad and the pool, take the scout's kit money and the showcase; poach → talk to the family (1 AP), else keep
+    'talk:dad': o => o.findIndex(x => x.key === 'ev.dad.b'),
+    'talk:pool': o => o.findIndex(x => x.key === 'ev.pool.b'),
+    'talk:scout': o => o.findIndex(x => x.key === 'ev.scout.a'),
+    'talk:scoutvisit': o => o.findIndex(x => x.key === 'ev.scoutvisit.a'),
+    'talk:scoutpoach': o => { const t = o.findIndex(x => x.key === 'ev.scoutpoach.b'); return o[t]?.enabled !== false ? t : o.findIndex(x => x.key === 'ev.scoutpoach.a'); },
+    'talk:promise': () => 0,   // keep
+  };
+  /** v3.22 `greedy`: takes every money offer, keeps every promise, accepts the showcase, lets a poached kid go. */
+  static POLICY_GREEDY = {
+    'talk:dad': o => o.findIndex(x => x.key === 'ev.dad.a'),
+    'talk:pool': o => o.findIndex(x => x.key === 'ev.pool.a'),
+    'talk:scoutpoach': o => o.findIndex(x => x.key === 'ev.scoutpoach.c'),
+    'talk:poolloss': o => o.findIndex(x => x.key === 'ev.poolloss.a'),   // promise the start (then keep it)
   };
   /** v3.21 DEBUG attention metrics: every answered choice window (human click or policy pick). dt = ms from "ready" (text typed /
       window shown) to the click, null when unknown (policy picks). first = the first enabled button (or the preselected default). */
@@ -1135,7 +1152,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
 
   /** v2.2: after a match — served bans tick down, deal benches end, red cards = 1-match ban, some knocks become injuries. */
   applyAvailabilityAfterMatch(eng, ctx) {
-    const s = this.state, date = s.calendar.date;
+    const s = this.state, date = s.calendar.date, shown = [];
     for (const p of s.squad) {
       if (p.suspensionMatches > 0 && !eng.everPlayed.has(p.id)) p.suspensionMatches--;
       if (p.hasFlag('Benched')) p.flags = p.flags.filter(f => f !== 'Benched');
@@ -1146,8 +1163,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         const hurt = Math.random() < EVENTS_CFG.SHOWCASE_INJURY * (p.energy < ENERGY.TIRED ? 2 : 1);
         if (hurt) p.injuryDays = Math.max(p.injuryDays, rnd(...EVENTS_CFG.SHOWCASE_DAYS));
         s.addDiary({ date, key: hurt ? 'scout.hurt' : 'scout.done', vars: { k: { pid: p.id }, d: p.injuryDays }, cls: 'ev' });
+        shown.push(p);
       }
     }
+    this.schedulePoach(shown, date);   // v3.22
     for (const p of eng.sides[0].all) {
       const own = s.player(p.id); if (!own) continue;
       if (eng.st(p).red) {
@@ -1160,6 +1179,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       }
     }
   }
+  /** v3.22: the delayed bill for the scout's $500 — he comes back for the best showcased kid who played (hidden overall),
+      POACH_DAYS later with POACH_CHANCE (seeded by the date); at most once per season. */
+  schedulePoach(shown, date) {
+    const s = this.state;
+    if (!shown.length || s.eventQueue.some(q => q.id === 'scoutpoach') || s.eventLog.some(e => e.id === 'scoutpoach' && e.season === s.season)) return;
+    const r = seeded(date + '#poach');
+    if (r() >= EVENTS_CFG.POACH_CHANCE) return;
+    const kid = [...shown].sort((a, b) => b.overall - a.overall)[0];
+    this.events.schedule('scoutpoach', { from: date, days: rndR(r, ...EVENTS_CFG.POACH_DAYS), by: 'scoutvisit', cast: { kid: kid.id } });
+  }
   /** v3.0: exclusive duties as small badges (C / PK / CK). */
   dutyBadges(p) { return this.state.dutiesOf(p.id).map(d => `<span class="duty-badge d-${d}" title="${esc(L.t('duty.' + d))}">${L.t('duty.short.' + d)}</span>`).join(''); }
   /** v2.2: red cross (injured, days left) / red card (suspended, matches left) / deal lock. */
@@ -1170,21 +1199,25 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     return `<span class="st-badge ${r}" title="${esc(L.t('st.' + r, { n }))}">${{ inj: '\u271A', sus: '<i></i>', home: '\u2302', deal: '$', absent: '?' }[r]}${n}</span>`;
   }
 
-  /** v1.9: Promised_Start is checked at kick-off — kept quietly, or broken (morale crash + the parent wants money back). */
+  /** v1.9 → v3.22: the promise is decided on the kick-off card (LOCKER_ROOM / createEngine), never by the lineup on its own.
+      Here, at kick-off, the flag is cleared and the answer logged. A promised kid who could not play (injured / suspended / away /
+      absent) never got a card: the father takes the money back, but no morale or Parents penalty (not the coach's fault). */
   checkPromises() {
     const s = this.state;
     for (const p of s.squad.filter(x => x.hasFlag('Promised_Start'))) {
+      const pool = p.promiseBy === 'pool', choice = p.promiseChoice;
       p.flags = p.flags.filter(f => f !== 'Promised_Start');
-      const kept = s.isStarter(p.id), pool = p.promiseBy === 'pool';
-      p.promiseBy = null;
-      let refund = 0;
-      if (!kept && pool) {   // v2.3: the dad who lost at the pub keeps his son at home
-        p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.POOL_BROKEN_MORALE, 0, 100);
-        p.awayDays = Math.max(p.awayDays, EVENTS_CFG.HOME_DAYS);
-      } else if (!kept) { p.dyn.morale = clamp(p.dyn.morale + EVENTS_CFG.PROMISE_BROKEN_MORALE, 0, 100); refund = -s.addMoney(-EVENTS_CFG.DAD_REFUND); }
-      const key = kept ? 'ev.promise.kept' : pool ? 'ev.promise.brokenPool' : 'ev.promise.broken';
-      s.addDiary({ date: s.calendar.date, key, vars: { k: { pid: p.id }, m: '$' + refund, d: EVENTS_CFG.HOME_DAYS }, cls: 'ev' });
-      if (this.engine) this.engine.log(kept ? 'coach' : 'turn', kept ? 'ev.promise.kept' : pool ? 'ev.promise.brokenPool' : 'ev.promise.brokenLog', { k: p, m: '$' + refund, d: EVENTS_CFG.HOME_DAYS }, 0);
+      p.promiseBy = null; p.promiseChoice = null;
+      const vars = { k: { pid: p.id }, m: '$' + EVENTS_CFG.DAD_REFUND, d: EVENTS_CFG.HOME_DAYS };
+      let key, type = 'turn';
+      if (choice === 'keep') { key = 'ev.promise.kept'; type = 'coach'; s.addDiary({ date: s.calendar.date, key, vars, cls: 'ev' }); }
+      else if (choice === 'break') key = pool ? 'ev.promise.brokenPool' : 'ev.promise.brokenLog';   // the card's diary line is already written
+      else {
+        key = pool ? 'ev.promise.excusedPool' : 'ev.promise.excused';
+        if (!pool) vars.m = '$' + -s.addMoney(-EVENTS_CFG.DAD_REFUND, 'donation', true);
+        s.addDiary({ date: s.calendar.date, key, vars, cls: 'ev' });
+      }
+      if (this.engine) this.engine.log(type, key, { k: p, m: vars.m, d: EVENTS_CFG.HOME_DAYS }, 0);
     }
     s.save();
   }
@@ -1480,7 +1513,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       const tired = s.starters().filter(p => p.energy < ENERGY.TIRED);
       if (tired.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.tiredWarn', vars: { n: { list: tired } }, side: 0, r: 0 });
       const promised = s.squad.filter(p => p.hasFlag('Promised_Start'));   // v1.9
-      for (const p of promised) this.appendLog({ minute: 0, type: s.isStarter(p.id) ? 'coach' : 'turn', key: s.isStarter(p.id) ? 'ev.promise.ok' : 'ev.promise.warn', vars: { k: p }, side: 0, r: 0 });
+      for (const p of promised.filter(x => x.promiseChoice))   // v3.22: the card's answer (no line before it is given)
+        this.appendLog({ minute: 0, type: p.promiseChoice === 'keep' ? 'coach' : 'turn', key: p.promiseChoice === 'keep' ? 'ev.promise.ok' : 'ev.promise.warn', vars: { k: p }, side: 0, r: 0 });
       const oop = s.outOfPosition().map(o => o.p);
       if (oop.length) this.appendLog({ minute: 0, type: 'turn', key: 'match.oopWarn', vars: { n: { list: oop } }, side: 0, r: 0 });
     }
@@ -1556,7 +1590,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.state.phase !== 'matchday') { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return null; }
     if (this.events.active) { this.events.open(); return null; }   // v2.2: answer the match-day dilemma first
     if (!this.state.dayState().locker?.done) { this.locker.open(); return null; }   // v2.6: roll call before kick-off
+    const pk = this.state.promiseCardKid();                         // v3.22: the promise card must be answered (visual + Quick Sim)
+    if (pk) { this.events.fire('promise', this.state.calendar.date, { cast: { kid: pk.id } }); return null; }
     this.state.ensureShowcaseXI();                                  // v2.3: the scout's three start
+    this.state.ensurePromiseXI();                                   // v3.22: the card's answer stands (keep → in, break → out)
     const fixes = this.state.ensureAvailableXI();                   // v2.2: nobody injured / suspended kicks off
     if (fixes.length) { this.renderTeam(); this.prepareMatch(); }
     const missing = this.state.starters().filter(p => !p.available).map(p => p.id);   // v2.6: not enough kids turned up → short-handed

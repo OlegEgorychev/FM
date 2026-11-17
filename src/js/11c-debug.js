@@ -172,7 +172,10 @@ class DebugConsole {
     } else if (id.startsWith('fire:')) {
       if (eng || ui.events.active || ui.cal.running) { this.msg = L.t('dbg.busy'); this.render(); return; }
       this.close();
-      ui.events.fire(id.slice(5));
+      const eid = id.slice(5), ev = ui.events.find(eid);
+      if (ev?.silent) { ev.apply(s, s.calendar.date); s.save(); ui.renderAll(); return; }   // v3.22: poolleak (no dialogue)
+      const top = eid === 'scoutpoach' ? [...s.squad].sort((a, b) => b.overall - a.overall)[0] : null;   // v3.22: the queue normally names him
+      ui.events.fire(eid, s.calendar.date, top ? { cast: { kid: top.id } } : {});
       return;
     }
     s.save();

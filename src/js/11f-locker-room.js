@@ -68,6 +68,8 @@ class LockerRoom {
         return { id: 'cap' + cr.kind, r: cr, cast: cr.kind === 'resign' ? { kid: cr.pid, ...(here(cr.hint) ? { hint: cr.hint } : {}) } : { kid: cr.pid, mate: cr.mate } };
       cr.done = true;
     }
+    const pk = s.promiseCardKid();   // v3.22: the promise card — after the roll call, before Proceed
+    if (pk && !lk.absent[pk.id]) return { id: 'promise', r: { pid: pk.id }, cast: { kid: pk.id } };
     return null;
   }
   get requestPending() { return !!this.pendingRequest; }

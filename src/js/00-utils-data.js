@@ -69,8 +69,13 @@ const COMPOSITE = {
 const TECH = new Set(ATTR_GROUPS.technical);
 /* v1.9 CLUB ECONOMY + NARRATIVE EVENTS */
 const ECONOMY = { START: 500 };
-const EVENTS_CFG = { COOLDOWN: 6, BOOTS_CHANCE: 0.05, DAD_CHANCE: 0.05, BOOTS_COST: 150, DAD_GIFT: 300, DAD_REFUND: 150,
-  DAD_REFUSE_MORALE: -20, PROMISE_BROKEN_MORALE: -30, BOOTS_AGILITY: -2,
+const EVENTS_CFG = { COOLDOWN: 6, BOOTS_CHANCE: 0.05, DAD_CHANCE: 0.05, BOOTS_COST: 150, DAD_GIFT: 300, DAD_REFUND: 300,
+  DAD_REFUSE_MORALE: -5, PROMISE_BROKEN_MORALE: -30, BOOTS_AGILITY: -2,
+  // v3.22 "Money with strings" (test values): the dad's rumour, the promise card at kick-off, the scout's poach, the pool leak
+  DAD_RUMOUR_SQUAD: -2, PROMISE_DISPLACED_MORALE: -6, DAD_KEPT_PARENTS: -2, DAD_BROKEN_PARENTS: -3,
+  POACH_DAYS: [28, 42], POACH_CHANCE: 0.7, POACH_REFUSE_MORALE: -10, POACH_REFUSE_PARENTS: -2, POACH_TALK_STAY_MORALE: 5,
+  POACH_FEE: 150, POACH_LET_PARENTS: 3, POACH_LET_SQUAD: -2,
+  POOL_LEAK_CHANCE: 0.5, POOL_LEAK_DAYS: [5, 14], POOL_LEAK_BOARD: -4, POOL_LEAK_PARENTS: -2,
   // v2.2
   BUS_CHANCE: 0.2, BUS_COST: 50, BUS_CONDITION: 0.3,                       // away match days only; jog = condition ×0.7
   KNOCK_CHANCE: 0.04, CLINIC_COST: 200, CLINIC_DAYS: 3, ICE_DAYS: 14,
@@ -140,8 +145,8 @@ const cohBand = c => COH.BANDS.find(b => (c ?? COH.START) >= b.min).key;
 /** Duel bonus for a side with cohesion c (null / undefined = neutral, so engines built without cohesion are unchanged). */
 const cohBonus = c => { if (c == null) return 0; const x = (clamp(c, 0, 100) - 50) / 50; return x * (x < 0 ? COH.MAX : COH.MAX_UP); };
 /* v3.21 POLICY HARNESS (ui.autoSim({ policy }), test/policy.js) — how each scripted coach plans his week. */
-const POLICY = { NAMES: ['first', 'empty', 'reference', 'overload'],
-  DAYS: { first: [], empty: [], reference: ['tue', 'thu'], overload: ['mon', 'tue', 'wed', 'thu', 'fri'] } };
+const POLICY = { NAMES: ['first', 'empty', 'reference', 'overload', 'greedy'],   // v3.22: + greedy (takes every money offer)
+  DAYS: { first: [], empty: [], reference: ['tue', 'thu'], overload: ['mon', 'tue', 'wed', 'thu', 'fri'], greedy: ['tue', 'thu'] } };
 /* v3.13 ATTENDANCE CURVE — chance to turn up for the k-th training of the week (index 0…4), only from the 3rd one.
    chance = curve[k] + (discipline − 10)/10 × DISC − (energy < TIRED ? TIRED_PEN : 0), clamped MIN–MAX; seeded(date + '#load#' + id). */
 const ATTEND_CURVE = [1, 1, 0.7, 0.5, 0.3];
