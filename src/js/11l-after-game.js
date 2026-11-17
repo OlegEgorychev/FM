@@ -16,6 +16,8 @@ class AfterGameView {
       const b = e.target.closest('button[data-act]');
       if (!b || b.disabled) return;
       const s = this.state, a = b.dataset.act;
+      const all = [...this.layer.querySelectorAll('button[data-act]')];   // v3.21 attention: first button? time since the lead was typed
+      this.ui.noteChoice('after', all.indexOf(b), all.map(x => ({ enabled: !x.disabled })), this.readyAt ? performance.now() - this.readyAt : null);
       let ok = false;
       if (a === 'pick') ok = s.afterPick(+b.dataset.i);
       else if (a === 'skip') ok = s.afterSkip();
@@ -62,6 +64,7 @@ class AfterGameView {
   }
   setWaiting(on) {
     this.layer.classList.toggle('af-typing', on);
+    this.readyAt = on ? null : performance.now();   // v3.21 attention
     this.layer.querySelectorAll('button[data-act]').forEach(b => { b.disabled = on || b.dataset.off === '1'; });
     if (!on) this.layer.querySelector('button[data-act]:not([disabled])')?.focus();
   }

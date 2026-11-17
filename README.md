@@ -25,6 +25,7 @@ src/css/NN-*.css      ← styles, concatenated in file-name order
 src/js/NN-*.js        ← code, concatenated in file-name order (shared global scope)
 build.js              ← builds src/ → index.html (no dependencies)
 test/smoke.js         ← quick test: a full matchday in the browser, ~10 seconds
+test/policy.js        ← v3.21: scripted coaches (first button / empty weeks / careful / overload) play 8 weeks; balance gates
 docs/DESIGN.md        ← design notes: mechanics, formulas, balance
 CLAUDE.md             ← instructions for the AI assistant (how to make changes)
 ```

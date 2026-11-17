@@ -121,10 +121,27 @@ const YARD = { SHOW: 14, MAX: 2, WRONG: 0.2,
 /* v3.13 WEEKLY PLAN + WEEKLY ACTION POINTS (replaces the v2.5 1 AP/day). All numbers are test values.
    Monday: ap = min(AP_MAX, AP_BASE + carry + WIN_BONUS if the last match was won); carry = min(CARRY_MAX, AP left on Sunday).
    AP pay only for the coach's own actions (office, roll call); trainings are free (0–MAX_TRAININGS, Mon–Fri).
-   Sunday review: 0 trainings → Board / Parents EMPTY_*; ≥ HEAVY_FROM trainings → Parents HEAVY_PARENTS. */
+   Sunday review: 0 trainings → Board / Parents EMPTY_*; ≥ HEAVY_FROM trainings → Parents HEAVY_PARENTS.
+   v3.21: the k-th empty week in a row (state.week.emptyStreak) → Board / Parents EMPTY_* × k, capped at EMPTY_CAP each;
+   any training with at least one kid present resets the streak. */
 const WEEK = { AP_BASE: 4, AP_MAX: 7, CARRY_MAX: 2, WIN_BONUS: 1, MAX_TRAININGS: 5, DEFAULT_REGIME: 'match', DEFAULT_DAYS: ['tue', 'thu'],
-  WARN_HEAVY: 3, WARN_OVER: 4, EMPTY_BOARD: -2, EMPTY_PARENTS: -2, HEAVY_FROM: 4, HEAVY_PARENTS: -2,
+  WARN_HEAVY: 3, WARN_OVER: 4, EMPTY_BOARD: -2, EMPTY_PARENTS: -2, EMPTY_CAP: -6, HEAVY_FROM: 4, HEAVY_PARENTS: -2,
   KEYS: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], PLAN_KEYS: ['mon', 'tue', 'wed', 'thu', 'fri'] };
+/* v3.21 COHESION — one team value 0–100 (state.cohesion), all numbers are TEST values.
+   Sunday: C ← clamp(C × DECAY + GAIN × T_eff, 0, 100), T_eff = Σ (kids who trained / squad size) over the week's trainings, ≤ T_CAP.
+   Equilibrium ≈ 0 / 40 / 80 / 100 for 0 / 1 / 2 / 3 full trainings; from 50 with empty weeks 35 → 25 → 17 → 12.
+   Match: (C − 50) / 50 × MAX (below 50) / × MAX_UP (above 50) on PASS duels only (the passer + receiver side, and the reading / intercepting side) — never shots,
+   dribbles, tackles or the keeper. AI clubs: a fixed AI (they train Tue / Thu; their weeks are not simulated).
+   Knocks: our kids' in-match knock chance × (1 + max(0, 50 − C) / KNOCK_DIV). BANDS = lower bounds of the band words (no numbers in the UI).
+   LOW = the Monday briefing / Match Summary cause line below this value. */
+const COH = { START: 50, DECAY: 0.7, GAIN: 12, T_CAP: 3, MAX: 2.0, MAX_UP: 0.7, AI: 60, KNOCK_DIV: 100, LOW: 35,
+  BANDS: [{ min: 80, key: 'clock' }, { min: 60, key: 'good' }, { min: 40, key: 'normal' }, { min: 20, key: 'weak' }, { min: 0, key: 'apart' }] };
+const cohBand = c => COH.BANDS.find(b => (c ?? COH.START) >= b.min).key;
+/** Duel bonus for a side with cohesion c (null / undefined = neutral, so engines built without cohesion are unchanged). */
+const cohBonus = c => { if (c == null) return 0; const x = (clamp(c, 0, 100) - 50) / 50; return x * (x < 0 ? COH.MAX : COH.MAX_UP); };
+/* v3.21 POLICY HARNESS (ui.autoSim({ policy }), test/policy.js) — how each scripted coach plans his week. */
+const POLICY = { NAMES: ['first', 'empty', 'reference', 'overload'],
+  DAYS: { first: [], empty: [], reference: ['tue', 'thu'], overload: ['mon', 'tue', 'wed', 'thu', 'fri'] } };
 /* v3.13 ATTENDANCE CURVE — chance to turn up for the k-th training of the week (index 0…4), only from the 3rd one.
    chance = curve[k] + (discipline − 10)/10 × DISC − (energy < TIRED ? TIRED_PEN : 0), clamped MIN–MAX; seeded(date + '#load#' + id). */
 const ATTEND_CURVE = [1, 1, 0.7, 0.5, 0.3];
@@ -204,7 +221,7 @@ const FINANCE = { RENT: 100, RENT_LATE_BOARD: -3,
   FEES: { low: { fee: 5, pp: 0.10, rep: { parents: 2 } }, normal: { fee: 10 }, high: { fee: 15, mult: { poor: 0.6, middle: 0.9 }, rep: { parents: -3 } } },
   FEE_LEVELS: ['low', 'normal', 'high'], DEFAULT_LEVEL: 'normal',
   PAY: { first: { rich: 0.95, middle: 0.80, poor: 0.40 }, reminded: { rich: 1, middle: 0.90, poor: 0.50 }, later: { rich: 0.50, middle: 0.45, poor: 0.25 } },
-  NEXT_CHANCE: 0.9, HALF_CHANCE: 1, SPENT_DISC: 7, SPENT_SHARE: 0.5,
+  NEXT_CHANCE: 0.9, HALF_CHANCE: 1, MIN_TRAININGS: 4, LOW_TRAINING_PAY: 0.5, SPENT_DISC: 7, SPENT_SHARE: 0.5,
   FORGIVE_MORALE: 5, TELL_MORALE: -8, TELL_DISC: 1, TELL_PARENTS: 2, WAIVE_MORALE: 8, WAIVE_SQUAD: 2 };
 /** Chance to pay one fee roll: the wealth table for the kind of roll, then the month's level modifier, clamped 0–1. */
 const feeChance = (wealth, kind, level) => {

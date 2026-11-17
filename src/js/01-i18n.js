@@ -1786,3 +1786,36 @@ Object.assign(I18N.ru, {
   'clue.voice.self': 'Говорит, что лучше бы ему {s}.', 'clue.voice.role': 'ему бы {s}.', 'clue.voice.misfit': 'роль «{r}» ему не подходит.',
   'clue.voice.lead.high': 'После поражения взял вину на себя.', 'clue.voice.lead.low': 'После поражения искал оправдания.',
 });
+/* ---------- v3.21 "Cohesion": band words (never numbers), the cause lines, empty-week streak, fees, DEBUG ---------- */
+Object.assign(I18N.en, {
+  'coh.band.apart': 'falling apart', 'coh.band.weak': 'weak', 'coh.band.normal': 'normal', 'coh.band.good': 'good', 'coh.band.clock': 'like clockwork',
+  'coh.line': 'Cohesion: <b>{b}</b>', 'coh.tip': 'How well the boys play together. It grows with trainings the kids actually attend and fades in weeks without them. It shows in the passing.',
+  'coh.low.0': 'Passes aren\'t connecting — the boys haven\'t played together for a while.',
+  'coh.low.1': 'The passing has gone ragged: they hardly know where a teammate will be.',
+  'coh.low.2': 'The boys look like strangers on the pitch — too long without playing together.',
+  'coh.cause': 'Little training this month showed in the passing.',
+  'coh.diary.up': 'The boys are playing together better — cohesion: {b}.', 'coh.diary.down': 'The team is losing its touch — cohesion: {b}.',
+  'week.empty2': 'The gym stood empty again — the second week in a row. The board and the parents are asking questions.',
+  'week.empty3': 'Another empty week ({n} in a row). People in town say the academy has stopped training.',
+  'fee.lowTraining': 'Parents ask what they\'re paying for: hardly any trainings this month.',
+  'dbg.coh': 'COH', 'dbg.cohTip': 'v3.21 team cohesion 0–100 (players see only the band word)',
+  'dbg.att': 'Attention', 'dbg.att.week': 'this week', 'dbg.att.season': 'season',
+  'dbg.att.row': '{w}: {c} clicks{pw} · first button {f} · median {m} after the text · under 0.5 s {x}', 'dbg.att.pw': ' ({n}/week)', 'dbg.att.none': '{w}: no choices yet',
+  'dbg.streak': 'empty weeks in a row',
+});
+Object.assign(I18N.ru, {
+  'coh.band.apart': 'развалена', 'coh.band.weak': 'слабая', 'coh.band.normal': 'обычная', 'coh.band.good': 'хорошая', 'coh.band.clock': 'как часы',
+  'coh.line': 'Сыгранность: <b>{b}</b>', 'coh.tip': 'Насколько ребята понимают друг друга на поле. Растёт от тренировок, на которые дети приходят, и тает в неделю без них. Видна по передачам.',
+  'coh.low.0': 'Передачи не идут — ребята давно не играли вместе.',
+  'coh.low.1': 'Пас разладился: ребята не знают, где окажется партнёр.',
+  'coh.low.2': 'На поле ребята как чужие — слишком давно не играли вместе.',
+  'coh.cause': 'Мало тренировались — это было видно по передачам.',
+  'coh.diary.up': 'Ребята стали лучше понимать друг друга — сыгранность: {b}.', 'coh.diary.down': 'Команда теряет игру — сыгранность: {b}.',
+  'week.empty2': 'Зал снова пустовал — вторую неделю подряд. У правления и родителей появились вопросы.',
+  'week.empty3': 'Ещё одна пустая неделя (подряд — {n}). В городе говорят, что академия перестала тренироваться.',
+  'fee.lowTraining': 'Родители спрашивают, за что платят: тренировок в этом месяце почти нет.',
+  'dbg.coh': 'COH', 'dbg.cohTip': 'v3.21 сыгранность команды 0–100 (игрок видит только слово)',
+  'dbg.att': 'Внимание', 'dbg.att.week': 'эта неделя', 'dbg.att.season': 'сезон',
+  'dbg.att.row': '{w}: нажатий {c}{pw} · первая кнопка {f} · медиана {m} после текста · быстрее 0,5 с {x}', 'dbg.att.pw': ' ({n}/нед.)', 'dbg.att.none': '{w}: выборов пока нет',
+  'dbg.streak': 'пустых недель подряд',
+});

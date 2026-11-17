@@ -39,7 +39,7 @@ class WeekPlanner {
     if (this.ui.events.active) { this.ui.events.open(); return; }
     // v3.17: an unconfirmed week = Monday's one window (briefing + cash desk + plan). Re-planning later keeps the old order.
     if (s.weekState().confirmed && this.ui.isStopDay() && (s.kassaDue() || !s.dayState().briefed)) { this.ui.briefing.open(); return; }
-    if (this.layer.hidden) this.feeLevel = FINANCE.DEFAULT_LEVEL;
+    if (this.layer.hidden) { this.feeLevel = FINANCE.DEFAULT_LEVEL; this.shownAt = performance.now(); this.plan0 = JSON.stringify(s.weekState().plan); }   // v3.21 attention
     this.ui.modal.close(); this.ui.briefing.close(); this.ui.kassa.layer.hidden = true;
     this.render();
     this.layer.hidden = false;
@@ -55,9 +55,10 @@ class WeekPlanner {
     const s = this.state, w = s.weekState(), monday = !w.confirmed && s.phase === 'calendar', date = s.calendar.date;
     const box = document.getElementById('pl-brief'), kb = document.getElementById('pl-kassa');
     const a = monday ? MorningBriefing.awayLines(s, date) : { imp: [], rout: [] }, world = monday ? MorningBriefing.worldNews(s, date) : [];
+    const coh = monday ? MorningBriefing.cohNews(s, date) : [];   // v3.21: "Passes aren't connecting…" (cohesion low)
     this.shown = [...a.imp, ...a.rout];
-    box.hidden = !this.shown.length && !world.length;
-    box.innerHTML = box.hidden ? '' : world.map(n => `<div class="pl-world">&#10022; ${esc(n)}</div>`).join('')
+    box.hidden = !this.shown.length && !world.length && !coh.length;
+    box.innerHTML = box.hidden ? '' : coh.map(n => `<div class="pl-cohlow">${esc(n)}</div>`).join('') + world.map(n => `<div class="pl-world">&#10022; ${esc(n)}</div>`).join('')
       + (this.shown.length ? `<details class="pl-sec"${a.imp.length ? ' open' : ''}><summary>${esc(L.t('mb.away'))} (${this.shown.length})</summary><ul class="pl-away">${MorningBriefing.awayHTML(this.ui, a)}</ul></details>` : '');
     const cash = monday && s.kassaDue();
     kb.hidden = !cash;
@@ -97,7 +98,8 @@ class WeekPlanner {
     document.getElementById('pl-title').textContent = 'PLANNER.EXE — ' + L.t('pl.week', { d: fmtDate(w.start, { day: 'numeric', month: 'short' }) });
     document.getElementById('pl-head').innerHTML = `<span class="pl-ap" title="${esc(L.t('ap.tip'))}">${L.t('pl.ap', { n: w.ap, line: esc(MorningBriefing.apLine(src)) })}</span>
       <span class="pl-apleft">${L.t('pl.apLeft', { n: w.ap })}</span>
-      <span class="pl-note">${L.t('pl.note', { m: WEEK.MAX_TRAININGS })}</span>`;
+      <span class="pl-note">${L.t('pl.note', { m: WEEK.MAX_TRAININGS })}</span>
+      <span class="pl-coh coh-${cohBand(s.cohesion)}" title="${esc(L.t('coh.tip'))}">${L.t('coh.line', { b: L.t('coh.band.' + cohBand(s.cohesion)) })}</span>`;   // v3.21: words only
     const warn = WeekPlanner.warnKey(n);
     document.getElementById('pl-sum').innerHTML = `${L.t('pl.count', { n })}${warn ? ` <b class="${warn === 'pl.warn.over' ? 'over' : ''}">${esc(L.t(warn))}</b>` : n ? '' : ` <b>${esc(L.t('pl.warn.empty'))}</b>`}`;
     document.getElementById('pl-confirm').innerHTML = L.t('pl.confirm');
@@ -130,6 +132,8 @@ class WeekPlanner {
     const s = this.state;
     if (this.ui.events.active) return;
     if (!s.weekState().confirmed) {   // v3.17: Monday's one window — the cash desk and the briefing are confirmed with the plan
+      // v3.21 attention: "first button" = CONFIRM with the plan (and the fee) exactly as the window opened
+      this.ui.noteChoice('plan', 0, [{}], this.shownAt ? performance.now() - this.shownAt : null, JSON.stringify(s.weekState().plan) === this.plan0 && (this.feeLevel || FINANCE.DEFAULT_LEVEL) === FINANCE.DEFAULT_LEVEL);
       if (s.phase === 'calendar' && s.kassaDue()) s.confirmKassa(this.feeLevel || FINANCE.DEFAULT_LEVEL);
       s.dayState().briefed = true;
       if (this.shown) s.markNews(this.shown);

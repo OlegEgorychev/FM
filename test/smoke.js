@@ -162,7 +162,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       && `${ms.homeRows}-${ms.awayRows}` === ms.score && ms.board === ms.score, JSON.stringify(ms));
     // v3.4: match log — every duel with its terms (they add up to the total), CSV / JSON export buttons
     const lg = await page.evaluate(() => {
-      const g = YAM.ui.lastMatchLog, sum = x => x.stat + x.mood + x.rand + Object.values(x.flat).reduce((a, b) => a + b, 0) + x.shout + x.rep + x.cap + x.cheat;
+      const g = YAM.ui.lastMatchLog, sum = x => x.stat + x.mood + x.rand + Object.values(x.flat).reduce((a, b) => a + b, 0) + x.shout + x.rep + x.cap + (x.coh || 0) + x.cheat;   // v3.21: + cohesion
       const csv = MatchEngine.traceCsv(g.trace, g.teams.map(t => t.name)).split('\n');
       return { n: g.trace.length, sums: g.trace.every(t => Math.abs(sum(t.A) - t.A.total) < 0.05 && Math.abs(sum(t.D) - t.D.total) < 0.05),
         goals: g.trace.filter(t => t.out === 'goal').length, score: g.teams[0].score + g.teams[1].score, kinds: [...new Set(g.trace.map(t => t.kind))].length,
@@ -1267,7 +1267,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       Object.values(apf.out).every(Boolean), JSON.stringify(apf));
     // v3.13: a 5-training week → 'overload' absences from the 3rd training (seeded, not truancy, no roll call), Sunday: Parents −2
     const ov = await page.evaluate(() => {
-      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, today: s.today, ex: s.excusesOff, rep: { ...s.rep }, we: s.worldEvent, wl: s.worldLast, kids: s.squad.map(p => [p.energy, p.psych.discipline, p.injuryDays, p.suspensionMatches, p.awayDays, p.dyn.morale]) };
+      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, today: s.today, ex: s.excusesOff, rep: { ...s.rep }, we: s.worldEvent, wl: s.worldLast, coh: s.cohesion, kids: s.squad.map(p => [p.energy, p.psych.discipline, p.injuryDays, p.suspensionMatches, p.awayDays, p.dyn.morale]) };
       s.calendar.date = '2003-03-03'; s.week = null; s.today = null; s.excusesOff = true;
       s.weekState(); s.worldEvent = null;   // v3.14: no school / city event in this synthetic week
       for (const k of WEEK.PLAN_KEYS) s.setWeekPlan(k, 'tech'); s.confirmWeek();
@@ -1290,7 +1290,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
         attendChance({ psych: { discipline: 1 }, energy: 10 }, 4), attendChance({ psych: { discipline: 10 }, energy: 80 }, 0)].map(v => +v.toFixed(3));
       const done = s.week.trainingsDone;
       s.squad.forEach((p, i) => { [p.energy, p.psych.discipline, p.injuryDays, p.suspensionMatches, p.awayDays, p.dyn.morale] = keep.kids[i]; p.absentToday = null; p.skipped_training = false; });
-      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.excusesOff = keep.ex; s.worldEvent = keep.we; s.worldLast = keep.wl;
+      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.excusesOff = keep.ex; s.worldEvent = keep.we; s.worldLast = keep.wl; s.cohesion = keep.coh;
       return { per, heavy, ch, done, label: L.t('lr.short.overload') };
     });
     check('v3.13 attendance curve: 5 trainings → no overload on the 1st–2nd, \'overload\' absences on the 3rd–5th (curve 0.7/0.5/0.3 ± discipline / tiredness, clamp 0.05), seeded, unavailable, no skipped_training / truant / roll call; Sunday ≥ 4 trainings → Parents −2',
@@ -1300,7 +1300,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       JSON.stringify(ov));
     // v3.13: a week with no training at all → Sunday (through the real daily hook): Board −2, Parents −2, "the gym stood empty"
     const ew = await page.evaluate(() => {
-      const s = YAM.game, ui = YAM.ui, keep = { date: s.calendar.date, week: s.week, today: s.today, rep: { ...s.rep }, we: s.worldEvent, wl: s.worldLast, kids: s.squad.map(p => [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays]) };
+      const s = YAM.game, ui = YAM.ui, keep = { date: s.calendar.date, week: s.week, today: s.today, rep: { ...s.rep }, we: s.worldEvent, wl: s.worldLast, coh: s.cohesion, kids: s.squad.map(p => [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays]) };
       s.calendar.date = '2003-03-10'; s.week = null; s.today = null; s.rep.parents = 50; s.rep.board = 50;
       s.weekState(); s.worldEvent = null; s.confirmWeek();   // empty plan (v3.14: and no world event)
       const b0 = s.rep.board, p0 = s.rep.parents, R = Math.random; Math.random = () => 0.5;
@@ -1309,7 +1309,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       Math.random = R;
       const r = { tr, board: s.rep.board - b0, parents: s.rep.parents - p0, diary: s.diary.some(d => d.key === 'week.empty' && d.date === '2003-03-16'), text: L.t('week.empty'), both: !!(I18N.en['week.empty'] && I18N.ru['week.empty'] && I18N.en['pl.warn.heavy'] && I18N.ru['pl.warn.over']) };
       s.squad.forEach((p, i) => { [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays] = keep.kids[i]; });
-      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.worldEvent = keep.we; s.worldLast = keep.wl;
+      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.worldEvent = keep.we; s.worldLast = keep.wl; s.cohesion = keep.coh;
       return r;
     });
     check('v3.13 Sunday review: 0 trainings all week → Board −2, Parents −2, diary "The gym stood empty all week" (EN + RU)',
@@ -1503,7 +1503,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       s.squad.forEach(p => { p.wealth = 'poor'; });
       const rate = level => { let paid = 0, n = 0;
         for (let i = 0; i < 12; i++) { const date = isoAdd('2002-11-05', i); s.calendar.date = date;
-          s.fees = { month: '2002-11', level, amount: FINANCE.FEES[level].fee, started: false, status: Object.fromEntries(s.squad.map(p => [p.id, 'owed'])), reminded: {}, reason: {}, carry: {}, next: {}, got: {} };
+          s.fees = { month: '2002-11', level, amount: FINANCE.FEES[level].fee, started: false, status: Object.fromEntries(s.squad.map(p => [p.id, 'owed'])), reminded: {}, reason: {}, carry: {}, next: {}, got: {}, trn: FINANCE.MIN_TRAININGS };   // v3.21: a month with enough trainings (the level is measured, not the training rule)
           paid += s.collectFees(date, {}).length; n += s.squad.length; }
         return paid / n; };
       out.normal = +rate('normal').toFixed(2); out.high = +rate('high').toFixed(2); out.low = +rate('low').toFixed(2);
@@ -2389,6 +2389,184 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       voice: YAM.game.squad.reduce((a, p) => a + (p.clues || []).filter(c => c.source === 'voice').length, 0) }));
     check('v3.20 auto-sim: a whole season with AFTER_GAME.EXE (auto: first remark + "Keep as is" after a loss, Praise after a draw), never opens the window, no soft-lock',
       as.phase === 'seasonEnd' && as.md === 18 && as.auto === owed && owed === as.L + as.D && as.opened === 0 && as.after === null && as.review === null && (as.L === 0 || as.voice > 0), JSON.stringify({ ...as, owed, guard }));
+    }
+    // ===== v3.21 COHESION: team value, pass-duel hook, empty-week streak, band words, DEBUG attention, policy auto-sim =====
+    {   // block scope
+    const v321calm = () => page.evaluate(() => { const s = YAM.game, ui = YAM.ui; ui.autoPolicy = null; ui.events.enabled = false; s.excusesOff = true;
+      s.eventQueue = []; s.pendingEvent = null; ui.events.view?.layer && (ui.events.view.layer.hidden = true); ui.modal.close(); ui.profile.close(); ui.debug.close(); ui.locker.close?.();
+      if (s.phase === 'post') { s.afterAuto(); if (s.reviewPending) s.reviewPick(0); if (s.talkPending) s.applyTeamTalk('praise'); ui.closeMatchday(); }
+      if (s.phase === 'seasonEnd') ui.onDashAction(); });
+    await v321calm();
+    // 1. Sunday formula through the real daily hook: an empty week → C × 0.7; two full trainings → C × 0.7 + 12 × T_eff (rises)
+    const c1 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, keep = { date: s.calendar.date, week: s.week, today: s.today, rep: { ...s.rep }, coh: s.cohesion, we: s.worldEvent, wl: s.worldLast, fees: s.fees,
+        kids: s.squad.map(p => [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays, p.suspensionMatches, p.psych.discipline]) };
+      const week = (mon, days) => {
+        s.calendar.date = mon; s.week = null; s.today = null; s.weekState(); s.worldEvent = null;
+        const free = WEEK.PLAN_KEYS.filter((k, i) => !s.matchOn(isoAdd(mon, i)));   // (the match weekday moves with the season)
+        for (const k of free.slice(0, days)) s.setWeekPlan(k, 'cardio'); s.confirmWeek();
+        s.squad.forEach(p => { p.injuryDays = 0; p.awayDays = 0; p.suspensionMatches = 0; p.psych.discipline = 20; p.energy = 100; });
+        const c0 = s.cohesion;
+        for (let i = 0; i < 7; i++) { const d = isoAdd(mon, i); s.calendar.date = d; s.today = null; ui.cal.dailyHooks[0](d); }
+        return { c0, c: s.cohesion, teff: s.week.teff, present: s.week.present };
+      };
+      const R = Math.random, b = isoAdd(weekStartOf(s.calendar.date), 7), money = { budget: s.budget, ledger: JSON.stringify(s.ledger || {}), dn: s.diary.length };   // weeks inside this season
+      Math.random = () => 0.5;
+      s.cohesion = 50; const e = week(b, 0);
+      s.cohesion = 50; const t = week(isoAdd(b, 7), 2);
+      s.cohesion = 50; const e2 = week(isoAdd(b, 14), 0), e3 = week(isoAdd(b, 21), 0), e4 = week(isoAdd(b, 28), 0);
+      s.budget = money.budget; s.ledger = JSON.parse(money.ledger); s.diary.length = money.dn;
+      Math.random = R;
+      s.squad.forEach((p, i) => { [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays, p.suspensionMatches, p.psych.discipline] = keep.kids[i]; p.absentToday = null; p.skipped_training = false; });
+      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.cohesion = keep.coh; s.worldEvent = keep.we; s.worldLast = keep.wl; s.fees = keep.fees; s.save();
+      const near = (a, b) => Math.abs(a - b) < 1e-9;
+      return { e, t, seq: [e2.c, e3.c, e4.c].map(v => +v.toFixed(1)),
+        ok: { empty: near(e.c, 35) && e.teff === 0, train: t.teff > 1.8 && t.teff <= 2 && near(t.c, 50 * 0.7 + 12 * t.teff) && t.c > 50,
+          decay: near(e2.c, 35) && near(e3.c, 24.5) && near(e4.c, 17.15) } };
+    });
+    check('v3.21 cohesion (Sunday, real daily hook): an empty week 50 → 35 (× 0.7), two full trainings → 50 × 0.7 + 12 × T_eff (> 50), empty weeks 50 → 35 → 24.5 → 17.2',
+      Object.values(c1.ok).every(Boolean), JSON.stringify(c1));
+    // 2. the match hook: C = 0 vs C = 100, seeded — pass / passFwd duels carry ±bonus on both sides, every other duel kind 0; no cohesion = no term
+    const c2 = await page.evaluate(() => {
+      const s = YAM.game, lg = s.league, t = lg.teams.find(x => !x.user), us = s.starters(), them = lg.roster(t, new Set()).slice(0, 11), R = Math.random;
+      const play = coh => { let a = 7; Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let x = a; x = Math.imul(x ^ (x >>> 15), x | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+        const e = new MatchEngine({ name: 'U', formation: s.formation, players: us }, { name: t.name, formation: t.formation, players: them }, { onUpdate() {}, onEnd() {}, onLog() {} }, { md: 1, ...(coh ? { cohesion: coh } : {}) });
+        e.runInstant(); Math.random = R; return e; };
+      const e = play([0, 100]), n = play(null), lo = cohBonus(0), hi = cohBonus(100), PASS = ['pass', 'passFwd'];
+      const passes = e.trace.filter(x => PASS.includes(x.kind)), other = e.trace.filter(x => !PASS.includes(x.kind));
+      const csv = MatchEngine.traceCsv(e.trace.slice(0, 3), ['U', 'T']);
+      return { n: passes.length, other: other.length, kinds: [...new Set(other.map(x => x.kind))].join(' '), lo, hi,
+        ok: { pass: passes.length > 20 && passes.every(x => Math.abs(x.A.coh - (x.side === 0 ? lo : hi)) < 1e-9 && Math.abs(x.D.coh - (x.side === 0 ? hi : lo)) < 1e-9),
+          shots: other.length > 5 && other.some(x => /shot|Shot|header|penalty|freekick/.test(x.kind)) && other.every(x => x.A.coh === 0 && x.D.coh === 0),
+          signs: lo < 0 && hi > 0 && Math.abs(lo + COH.MAX) < 1e-9 && Math.abs(hi - COH.MAX_UP) < 1e-9, none: n.trace.every(x => x.A.coh === 0 && x.D.coh === 0),
+          csv: csv.split('\n')[0].includes('atk_coh') && csv.split('\n')[0].includes('def_coh'), log: Array.isArray(e.logData({}).cohesion) && e.knockMult === 1.5 && n.knockMult === 1 } };
+    });
+    check('v3.21 match hook: C = 0 vs C = 100 (seeded) → every pass / passFwd duel has the bonus on both sides (passer + receiver vs interceptor), shots / dribbles / blocks / the keeper none; no cohesion → no term; CSV + JSON log carry it; knock ×1.5 at C = 0',
+      Object.values(c2.ok).every(Boolean), JSON.stringify(c2));
+    // 3. empty weeks in a row: −2, −4, −6, −6 (cap) for Board and Parents; a training with a kid in it resets the streak
+    const c3 = await page.evaluate(() => {
+      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, today: s.today, rep: { ...s.rep }, coh: s.cohesion, we: s.worldEvent, fees: s.fees, diaryN: s.diary.length,
+        kids: s.squad.map(p => [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays, p.suspensionMatches, p.psych.discipline]) };
+      const R = Math.random; Math.random = () => 0.5;
+      s.week = null; const out = [];
+      const week = (mon, days) => {
+        s.calendar.date = mon; s.today = null; s.weekState(); s.worldEvent = null;
+        for (const k of WEEK.PLAN_KEYS.filter((k, i) => !s.matchOn(isoAdd(mon, i))).slice(0, days)) s.setWeekPlan(k, 'cardio'); s.confirmWeek();
+        s.squad.forEach(p => { p.injuryDays = 0; p.awayDays = 0; p.suspensionMatches = 0; p.psych.discipline = 20; p.energy = 100; });
+        for (let i = 0; i < 6; i++) { const d = isoAdd(mon, i); s.calendar.date = d; s.today = null; s.dayRoutine(d); }
+        const sun = isoAdd(mon, 6); s.calendar.date = sun; s.rep.board = 50; s.rep.parents = 50;
+        const r = s.weekReview(sun); out.push({ r, b: s.rep.board - 50, p: s.rep.parents - 50, k: s.week.emptyStreak, key: s.diary.at(-1)?.key });
+      };
+      const b = isoAdd(weekStartOf(keep.date), 7), money = { budget: s.budget, ledger: JSON.stringify(s.ledger || {}) };   // weeks inside this season
+      [0, 7, 14, 21].forEach(k => week(isoAdd(b, k), 0));
+      week(isoAdd(b, 28), 1); week(isoAdd(b, 35), 0);
+      s.budget = money.budget; s.ledger = JSON.parse(money.ledger);
+      Math.random = R;
+      s.squad.forEach((p, i) => { [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays, p.suspensionMatches, p.psych.discipline] = keep.kids[i]; p.absentToday = null; p.skipped_training = false; });
+      Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.cohesion = keep.coh; s.worldEvent = keep.we; s.fees = keep.fees; s.diary.length = keep.diaryN; s.save();
+      const keys = ['week.empty', 'week.empty2', 'week.empty3'];
+      return { out, ok: out.slice(0, 4).map(x => x.b).join() === '-2,-4,-6,-6' && out.slice(0, 4).map(x => x.p).join() === '-2,-4,-6,-6'
+        && out[4].r !== 'empty' && out[4].k === 0 && out[4].b === 0 && out[5].b === -2 && out[5].k === 1
+        && out.map(x => x.key).filter(k => /^week\.empty/.test(k)).join() === 'week.empty,week.empty2,week.empty3,week.empty3,week.empty'
+        && keys.every(k => I18N.en[k] && I18N.ru[k]) };
+    });
+    check('v3.21 empty-week streak: Board / Parents −2, −4, −6, −6 (capped), the diary line escalates; a training with a kid present resets it (next empty week −2 again)', c3.ok, JSON.stringify(c3.out));
+    // 4. the band word (no digits) in PLANNER.EXE (top line + Monday block), the Monday briefing and the Match Summary (+ the cause line)
+    const c4 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, w = s.weekState(), keep = { coh: s.cohesion, conf: w.confirmed, date: s.calendar.date };
+      s.cohesion = 22;
+      ui.planner.render(); const plHead = document.querySelector('#pl-head .pl-coh')?.textContent || '';
+      w.confirmed = false; ui.planner.render(); const plBrief = document.getElementById('pl-brief').textContent; w.confirmed = keep.conf;
+      s.calendar.date = w.start; ui.briefing.report = null; ui.briefing.render();
+      const mbAp = document.querySelector('#mb-ap .mb-coh')?.textContent || '', mbNews = document.getElementById('mb-news').textContent; s.calendar.date = keep.date;
+      const rep = { ...(s.lastReport || {}), md: 3, opponent: s.league.teams.find(t => !t.user).name, venue: 'home', gf: 0, ga: 2, result: 'L', events: [], totals: [{}, {}], coh: 22, talk: 'praise' };
+      ui.summary.open(rep); const ms = document.querySelector('#msum-body .ms-coh, .ms-coh')?.textContent || '', cause = document.querySelector('.ms-cause')?.textContent || '';
+      ui.summary.open({ ...rep, result: 'W', gf: 2, ga: 0 }); const causeW = !!document.querySelector('.ms-cause');
+      ui.summary.open({ ...rep, coh: 85 }); const ms85 = document.querySelector('.ms-coh')?.textContent || '', cause85 = !!document.querySelector('.ms-cause');
+      ui.summary.close(); s.cohesion = keep.coh; ui.planner.layer.hidden = true; ui.briefing.close(); ui.renderAll();
+      const weak = L.t('coh.band.weak'), lows = [0, 1, 2].map(i => L.t('coh.low.' + i));
+      const bands = COH.BANDS.map(b => b.key), words = bands.every(k => I18N.en['coh.band.' + k] && I18N.ru['coh.band.' + k]);
+      const n = d => Math.floor(isoDays('2000-01-03', d) / 7) % 3, d0 = weekStartOf(keep.date);
+      return { plHead, plBrief: plBrief.slice(0, 90), mbAp, ms, cause, ms85,
+        ok: { planner: plHead.includes(weak) && !/\d/.test(plHead), monday: lows.some(x => plBrief.includes(x)), briefing: mbAp.includes(weak) && !/\d/.test(mbAp) && lows.some(x => mbNews.includes(x)),
+          summary: ms.includes(weak) && !/\d/.test(ms) && cause === L.t('coh.cause') && !causeW && ms85.includes(L.t('coh.band.clock')) && !cause85,
+          words, ru: ['развалена', 'слабая', 'обычная', 'хорошая', 'как часы'].every((x, i) => I18N.ru['coh.band.' + ['apart', 'weak', 'normal', 'good', 'clock'][i]] === x),
+          noRepeat: n(d0) !== n(isoAdd(d0, 7)) && n(isoAdd(d0, 7)) !== n(isoAdd(d0, 14)), noNum: lows.concat(L.t('coh.cause')).every(x => !/\d|%/.test(x)) } };
+    });
+    check('v3.21 the cause is visible: the band word (EN + RU, no digits) in PLANNER.EXE, the Monday block / briefing (+ "Passes aren\'t connecting…" below 35, never the same phrasing two weeks running) and the Match Summary (+ the cause line only for a non-win below 35)',
+      Object.values(c4.ok).every(Boolean), JSON.stringify(c4));
+    // 5. DEBUG.EXE: COH, TRN-SKIP (was SKIP%), the Attention block (clicks, first-button share, median after the text, < 0.5 s)
+    const c5 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, keep = JSON.stringify(s.stats || {});
+      s.stats = {};
+      s.noteAttention({ first: true, dt: 300 }); s.noteAttention({ first: false, dt: 1200 }); s.noteAttention({ first: true, dt: null });
+      const a = s.attentionSummary('week'), se = s.attentionSummary('season');
+      ui.debug.tab = 'db'; ui.debug.open();
+      const head = [...document.querySelectorAll('#debug-body th[data-col]')].map(th => th.textContent), coh = document.getElementById('dbg-coh')?.textContent, att = document.getElementById('dbg-att')?.textContent || '';
+      ui.debug.close(); s.stats = JSON.parse(keep); s.save();
+      return { a, se, head: head.filter(h => /SKIP/.test(h)), coh, att: att.slice(0, 160),
+        ok: a.clicks === 3 && Math.abs(a.first - 2 / 3) < 1e-9 && Math.abs(a.median - 0.75) < 1e-9 && a.fast === 0.5 && a.timed === 2 && se.clicks === 3
+          && head.includes('TRN-SKIP') && !head.includes('SKIP%') && String(Math.round(s.cohesion)) === coh && /67%/.test(att) && /0\.75 s/.test(att) && /50%/.test(att) };
+    });
+    check('v3.21 DEBUG.EXE: COH (the number), TRN-SKIP (renamed from SKIP%), the Attention block — clicks, first-button share, median time after the text, share under 0.5 s (state.stats.attention)', c5.ok, JSON.stringify(c5));
+    // 6. an old save without cohesion / emptyStreak / stats.attention loads (C = 50)
+    const c6 = await page.evaluate(() => {
+      const raw = localStorage.getItem('yam_save_v1'), d = JSON.parse(raw);
+      delete d.cohesion; delete d.stats; if (d.week) { delete d.week.emptyStreak; delete d.week.teff; delete d.week.present; }
+      localStorage.setItem('yam_save_v1', JSON.stringify(d));
+      const g = new YAM.game.constructor(), w = g.weekState();
+      localStorage.setItem('yam_save_v1', raw);
+      return { coh: g.cohesion, streak: w.emptyStreak, teff: w.teff, stats: JSON.stringify(g.stats), sum: g.attentionSummary('week'), phase: g.phase };
+    });
+    check('v3.21 old save without cohesion / emptyStreak / stats loads: C = 50, streak 0, T_eff from the trainings done, attention lazy',
+      c6.coh === 50 && c6.streak === 0 && Number.isFinite(c6.teff) && c6.stats === '{}' && c6.sum === null && c6.phase !== 'draft', JSON.stringify(c6));
+    // 7. autoSim({ policy: 'first' }) plays 4 weeks without getting stuck (empty weeks, no reminders, no fee without a training);
+    //    autoSim() without a policy is the old one (Tue + Thu, no autoPolicy)
+    await v321calm();
+    const p0 = await page.evaluate(() => { const s = YAM.game; YAM.ui.events.enabled = true; s.excusesOff = false;
+      const fee = Object.values(s.ledger || {}).reduce((a, m) => a + (m.fee || 0), 0); return { md: s.league.playedMatchdays(), coh: s.cohesion, fee, trn: s.diary.filter(e => /^cal\.training/.test(e.key)).length }; });
+    let stuck = 0;
+    for (let i = 0; i < 60; i++) {
+      const st = await page.evaluate(() => ({ phase: YAM.game.phase, md: YAM.game.league.playedMatchdays() }));
+      if (st.md >= p0.md + 4 && st.phase === 'calendar') break;
+      if (st.phase === 'seasonEnd') break;
+      await page.evaluate(() => YAM.ui.autoSim({ policy: 'first' }));
+      try { await page.waitForFunction(() => !YAM.ui.cal.running && !YAM.ui.events.view.autoT && (YAM.game.phase !== 'calendar' || !YAM.game.pendingEvent), null, { timeout: 20000, polling: 20 }); }
+      catch (e) { stuck++; break; }
+    }
+    const p1 = await page.evaluate(() => { const s = YAM.game, ui = YAM.ui, w = s.weekState();
+      const fee = Object.values(s.ledger || {}).reduce((a, m) => a + (m.fee || 0), 0);
+      return { md: s.league.playedMatchdays(), phase: s.phase, coh: s.cohesion, fee, trn: s.diary.filter(e => /^cal\.training/.test(e.key)).length, planned: s.trainingsPlanned(), pol: ui.autoPolicy,
+        att: s.attentionSummary('season') }; });
+    const p2 = await page.evaluate(() => { const s = YAM.game, ui = YAM.ui, calls = [], w = s.weekState();
+      w.confirmed = false; for (const k of WEEK.PLAN_KEYS) w.plan[k] = null;   // an unplanned week: the old auto-sim fills it with Tue + Thu
+      s.setWeekPlan = (k, r) => { calls.push(k + ':' + r); return GameState.prototype.setWeekPlan.call(s, k, r); };
+      ui.events.enabled = false; s.excusesOff = true; s.eventQueue = []; ui.autoSim(); ui.cal.stop(); delete s.setWeekPlan;
+      return { pol: ui.autoPolicy, calls: calls.slice(0, 2).join() }; });
+    check('v3.21 autoSim({ policy: "first" }) plays 4 weeks (match days, post-match windows, events through policyPick) without getting stuck: no trainings, no fee money, cohesion falls; autoSim() without a policy = the old Tue + Thu',
+      !stuck && p1.md >= p0.md + 4 && p1.trn === p0.trn && p1.fee === p0.fee && p1.coh < p0.coh && p1.att?.clicks > 0 && p2.pol === null
+      && p2.calls === 'tue:match,thu:match', JSON.stringify({ p0, p1, p2, stuck }));
+    await page.evaluate(() => { YAM.ui.autoPolicy = null; YAM.ui.cal.stop(); });
+    // 8. the fee rule: a month that cannot reach 4 trainings → every fee chance × 0.5 + one diary line
+    const c8 = await page.evaluate(() => {
+      const s = YAM.game, keep = { date: s.calendar.date, week: s.week, today: s.today, fees: s.fees, budget: s.budget, ledger: JSON.stringify(s.ledger), diaryN: s.diary.length, we: s.worldEvent };
+      const d0 = new Date(s.calendar.date + 'T00:00:00Z'); d0.setUTCMonth(d0.getUTCMonth() + 2); d0.setUTCDate(1);
+      const m1 = d0.toISOString().slice(0, 10), month = m1.slice(0, 7), next = new Date(d0); next.setUTCMonth(next.getUTCMonth() + 1);
+      let mon = m1; while (weekKey(mon) !== 'mon') mon = isoAdd(mon, 1);   // the month's first Monday
+      let last = mon; while (isoAdd(last, 8).startsWith(month)) last = isoAdd(last, 7);   // its last Monday whose Tuesday is in the month
+      const fees = trn => ({ month, level: 'normal', amount: 10, started: true, status: Object.fromEntries(s.squad.map(p => [p.id, 'owed'])), reminded: {}, reason: {}, carry: {}, next: {}, got: {}, trn });
+      const wk = (m, n) => { s.calendar.date = m; s.week = null; s.today = null; s.weekState(); s.worldEvent = null;
+        for (const k of WEEK.PLAN_KEYS.filter((k, i) => i >= 1 && !s.matchOn(isoAdd(m, i))).slice(0, n)) s.setWeekPlan(k, 'match'); s.confirmWeek(); };
+      wk(mon, 2); s.fees = fees(0); const early = s.lowTrainingMonth(isoAdd(mon, 1));   // two a week, weeks left → fine
+      wk(last, 1); s.fees = fees(0); const lowLate = s.lowTrainingMonth(isoAdd(last, 1));   // nothing so far, this week's one at most → under 4
+      s.fees = fees(4); const okLate = s.lowTrainingMonth(isoAdd(last, 1));   // 4 already (today included) → fine
+      const id = s.squad[0].id, day = isoAdd(last, 1); s.fees = fees(0); s.fees.next[id] = 0.6;   // a fixed chance: 0.6 → 0.3 under the rule
+      const x = seeded(month + '#fee#' + id + '#' + day)(), absent = Object.fromEntries(s.squad.filter(p => p.id !== id).map(p => [p.id, 'x']));
+      const paid = s.collectFees(day, absent).includes(id), line = s.diary.some(e => e.key === 'fee.lowTraining' && e.date === day);
+      s.calendar.date = keep.date; s.week = keep.week; s.today = keep.today; s.fees = keep.fees; s.budget = keep.budget; s.ledger = JSON.parse(keep.ledger); s.diary.length = keep.diaryN; s.worldEvent = keep.we; s.save();
+      return { month, mon, last, early, lowLate, okLate, x: +x.toFixed(3), paid, line, ok: !early && lowLate && !okLate && paid === (x < 0.3) && line && !!I18N.ru['fee.lowTraining'] };
+    });
+    check('v3.21 fees: a month projected under 4 trainings (done + rest of this week + this week\'s pace) → fee chances × 0.5 + diary "Parents ask what they\'re paying for"', c8.ok, JSON.stringify(c8));
     }
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));

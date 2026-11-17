@@ -23,6 +23,7 @@ class GameState {
     this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)
     this.review = null; this.lossStreak = 0;   // v3.19 REVIEW.EXE + losses in a row
     this.after = null; this.parentComplaints = [];   // v3.20 AFTER_GAME.EXE + parents' "wrong role" complaints
+    this.cohesion = COH.START; this.stats = {};   // v3.21 team cohesion + DEBUG attention metrics
     this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {};   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
@@ -619,13 +620,17 @@ class GameState {
   /** The current week (Mon–Sun), created lazily when the calendar enters a new week (never rolls backwards). */
   weekState() {
     const start = weekStartOf(this.calendar.date), w = this.week;
-    if (w && w.start >= start) { w.lessons ||= GameState.noLessons(); return w; }   // v3.16: lazy migration → no lessons
+    if (w && w.start >= start) {
+      w.lessons ||= GameState.noLessons();   // v3.16: lazy migration → no lessons
+      if (w.teff == null) { w.teff = Math.min(COH.T_CAP, w.trainingsDone || 0); w.present = !!w.trainingsDone; w.emptyStreak ||= 0; }   // v3.21: old saves (done = full)
+      return w;
+    }
     const prev = w && isoAdd(w.start, 7) === start ? w : null;
     const carry = prev ? Math.min(WEEK.CARRY_MAX, Math.max(0, prev.ap)) : 0;
     const win = this.lastResult() === 'W' ? WEEK.WIN_BONUS : 0;
     const ap = Math.min(WEEK.AP_MAX, WEEK.AP_BASE + carry + win);
     this.week = { start, plan: Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null])), lessons: GameState.noLessons(), confirmed: false, ap, carry, trainingsDone: 0,
-      apSources: { base: WEEK.AP_BASE, carry, win, total: ap } };
+      apSources: { base: WEEK.AP_BASE, carry, win, total: ap }, teff: 0, present: false, emptyStreak: w?.emptyStreak || 0 };   // v3.21: cohesion input + empty-week streak
     if (!this.plannableDays().length) {   // nothing left to plan (the season opens on a Sunday): a stub week, no AP to carry
       Object.assign(this.week, { confirmed: true, ap: 0, carry: 0, apSources: { base: 0, carry: 0, win: 0, total: 0 } });
     }
@@ -781,21 +786,57 @@ class GameState {
     return true;
   }
   confirmWeek() { this.weekState().confirmed = true; this.save(); }
-  /** Sunday (daily hook): an empty gym or an overloaded week upsets the factions. */
+  /** Sunday (daily hook): an empty gym or an overloaded week upsets the factions.
+      v3.21: the team's cohesion is recalculated first; the k-th empty week in a row costs Board / Parents 2k (capped). */
   weekReview(date) {
     const w = this.weekState(), first = this.calendar.events[0] && isoAdd(this.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
     if (weekKey(date) !== 'sun' || weekStartOf(date) !== w.start || (first && w.start < first)) return null;
-    if (!w.trainingsDone) {
-      this.addRep('board', WEEK.EMPTY_BOARD); this.addRep('parents', WEEK.EMPTY_PARENTS);
-      this.addDiary({ date, key: 'week.empty', cls: 'ev' });
+    this.updateCohesion(date);
+    if (!w.present) {   // no training with a kid in it this week
+      const k = w.emptyStreak = (w.emptyStreak || 0) + 1;
+      this.addRep('board', Math.max(WEEK.EMPTY_CAP, WEEK.EMPTY_BOARD * k)); this.addRep('parents', Math.max(WEEK.EMPTY_CAP, WEEK.EMPTY_PARENTS * k));
+      this.addDiary({ date, key: k >= 3 ? 'week.empty3' : k === 2 ? 'week.empty2' : 'week.empty', vars: { n: k }, cls: 'ev' });
       return 'empty';
     }
+    w.emptyStreak = 0;
     if (w.trainingsDone >= WEEK.HEAVY_FROM) {
       this.addRep('parents', WEEK.HEAVY_PARENTS);
       this.addDiary({ date, key: 'week.heavy', vars: { n: w.trainingsDone }, cls: 'ev' });
       return 'heavy';
     }
     return null;
+  }
+  /** v3.21: Sunday — C ← clamp(C × DECAY + GAIN × T_eff, 0, 100); a diary line only when the band word changes. */
+  updateCohesion(date = this.calendar.date) {
+    const w = this.weekState(), before = this.cohesion ?? COH.START, band0 = cohBand(before);
+    this.cohesion = clamp(before * COH.DECAY + COH.GAIN * Math.min(COH.T_CAP, w.teff || 0), 0, 100);
+    const band = cohBand(this.cohesion);
+    if (band !== band0) this.addDiary({ date, key: 'coh.diary.' + (this.cohesion > before ? 'up' : 'down'), vars: { b: { coh: band } }, cls: 'ev' });
+    return this.cohesion;
+  }
+  /** v3.21 DEBUG attention metrics (lazy): one answered choice window — first button?, ms from "ready" to the click (null = unknown). */
+  noteAttention({ first = false, dt = null } = {}) {
+    const st = (this.stats ||= {}), a = (st.attention ||= {}), wk = this.calendar?.date ? weekStartOf(this.calendar.date) : null;
+    if (!a.season || a.season.season !== this.season) a.season = { season: this.season, weeks: [], clicks: 0, first: 0, dts: [] };
+    if (!a.week || a.week.start !== wk) a.week = { start: wk, clicks: 0, first: 0, dts: [] };
+    if (wk && !a.season.weeks.includes(wk)) a.season.weeks.push(wk);
+    for (const b of [a.week, a.season]) {
+      b.clicks++; if (first) b.first++;
+      if (Number.isFinite(dt)) { b.dts.push(Math.round(dt)); if (b.dts.length > 300) b.dts.shift(); }
+    }
+  }
+  /** v3.21: { clicks, perWeek, first (share), median (s), fast (share < 0.5 s) } of the current week / season, or null. */
+  attentionSummary(which) {
+    const a = this.stats?.attention, b = a?.[which];
+    if (!b || (which === 'week' && b.start !== weekStartOf(this.calendar.date)) || (which === 'season' && b.season !== this.season)) return null;
+    const d = [...b.dts].sort((x, y) => x - y), med = d.length ? (d.length % 2 ? d[(d.length - 1) / 2] : (d[d.length / 2 - 1] + d[d.length / 2]) / 2) : null;
+    return { clicks: b.clicks, perWeek: which === 'season' ? b.clicks / Math.max(1, b.weeks.length) : b.clicks, first: b.clicks ? b.first / b.clicks : 0,
+      median: med == null ? null : med / 1000, fast: d.length ? d.filter(x => x < 500).length / d.length : null, timed: d.length };
+  }
+  /** v3.21 (policy `reference`): does any of this kid's ✓ confirmed clues point at this role's signal? */
+  static roleConfirmed(p, roleId) {
+    const sig = ROLE_BY_ID[roleId]?.signal, list = p?.clues || [];
+    return !!sig && list.some(c => c.signal === sig && clueConfirmed(list, c));
   }
   /* ---------- v2.8 faction reputation ---------- */
   addRep(key, delta) { if (this.rep && key in this.rep) this.rep[key] = clamp(Math.round(this.rep[key] + delta), 0, 100); }
@@ -984,7 +1025,8 @@ class GameState {
     let attended = 0;
     if (training) { const lk = this.runLocker(true, date || this.calendar.date); lk.done = true; }   // auto-sim: arrivals are rolled without the view
     else this.clearDayStatus();
-    if (training && date && weekStartOf(date) === this.weekState().start) this.week.trainingsDone++;   // v3.13: Sunday review
+    const thisWeek = training && date && weekStartOf(date) === this.weekState().start;
+    if (thisWeek) this.week.trainingsDone++;   // v3.13: Sunday review
     const wc = training ? this.worldRow(this.worldEventOn(date || this.calendar.date)?.id)?.effect.condition || 0 : 0;   // v3.14: tests week — tired trainees
     for (const p of this.squad) {
       const present = training && p.available;   // v2.6: only kids who came to the locker room train
@@ -1009,6 +1051,10 @@ class GameState {
         p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
       }
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
+    }
+    if (thisWeek && attended) {   // v3.21 cohesion: the share of the squad that trained; a kid present ends the empty-week streak
+      this.week.teff = (this.week.teff || 0) + attended / Math.max(1, this.squad.length);
+      this.week.present = true; this.week.emptyStreak = 0;
     }
     this.tickInjuries();
     this.league?.aiDay(!!date && isTrainingDay(date));   // v3.4: AI clubs rest / train on the same calendar (v3.13: always Tue / Thu)
@@ -1198,12 +1244,16 @@ class GameState {
     if (!f || f.closed || f.month !== this.monthOf(date)) return [];
     const kind = f.started ? null : 'first', paid = [];
     f.started = true;
+    f.trn = (f.trn || 0) + 1;   // v3.21: this month's trainings (today included)
+    const low = this.lowTrainingMonth(date);
+    if (low && !f.lowNoted) { f.lowNoted = true; this.addDiary({ date, key: 'fee.lowTraining', cls: 'ev' }); }
     for (const p of this.squad) {
       const id = p.id;
       if (absent[id] || !f.status[id]) continue;
       const st = f.status[id], half = st === 'half' && !f.got[id];
       if (st !== 'owed' && !half) continue;
-      const chance = half ? FINANCE.HALF_CHANCE : f.next[id] ?? feeChance(p.wealth, kind || (f.reminded[id] ? 'reminded' : 'later'), f.level);
+      const chance = (half ? FINANCE.HALF_CHANCE : f.next[id] ?? feeChance(p.wealth, kind || (f.reminded[id] ? 'reminded' : 'later'), f.level))
+        * (low ? FINANCE.LOW_TRAINING_PAY : 1);   // v3.21: "what are we paying for?" 
       delete f.reminded[id]; delete f.next[id];   // consumed by this roll
       if (seeded(f.month + '#fee#' + id + '#' + date)() >= chance) continue;
       const due = this.feeDue(id), amt = half ? Math.ceil(due / 2) : due;
@@ -1212,6 +1262,16 @@ class GameState {
       paid.push(id);
     }
     return paid;
+  }
+  /** v3.21: will this month stay under FINANCE.MIN_TRAININGS trainings? Rolled at each fee collection (simple projection):
+      trainings so far this month (today included) + the rest of this week's plan in this month + this week's pace × the weekdays
+      left in the month after this week / 5. Under the minimum → every fee chance × LOW_TRAINING_PAY. */
+  lowTrainingMonth(date = this.calendar.date) {
+    const f = this.fees, m = this.monthOf(date), w = this.weekState(), wkEnd = isoAdd(w.start, 6);
+    const rest = this.weekDays().filter(d => d.date > date && d.date.startsWith(m) && this.isOurTraining(d.date)).length;
+    let days = 0;
+    for (let d = isoAdd(wkEnd, 1); d.startsWith(m); d = isoAdd(d, 1)) if (WEEK.PLAN_KEYS.includes(weekKey(d))) days++;
+    return (f?.trn || 0) + rest + this.trainingsPlanned() * days / 5 < FINANCE.MIN_TRAININGS;
   }
   /** Locker Room [ Remind ] (free): consumed by this kid's next roll. */
   remindFee(id) { const f = this.fees; if (f && this.feeOwes(id)) { f.reminded[id] = true; this.save(); return true; } return false; }
@@ -1257,7 +1317,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, after: this.after || null, parentComplaints: this.parentComplaints || [], notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -1284,6 +1344,8 @@ class GameState {
       this.worldLast = typeof d.worldLast === 'string' ? d.worldLast : null;
       this.worldSalt = typeof d.worldSalt === 'string' ? d.worldSalt : null;   // v3.15 (old saves: set on the next Monday roll)
       this.ledger = d.ledger && typeof d.ledger === 'object' ? d.ledger : {};   // v3.15 (missing → {})
+      this.cohesion = Number.isFinite(d.cohesion) ? clamp(d.cohesion, 0, 100) : COH.START;   // v3.21 (old saves → 50)
+      this.stats = d.stats && typeof d.stats === 'object' ? d.stats : {};   // v3.21 (attention: lazy)
       this.fees = d.fees && typeof d.fees === 'object' && d.fees.status ? { reminded: {}, reason: {}, carry: {}, next: {}, got: {}, ...d.fees } : null;
       this.expelled = Array.isArray(d.expelled) ? d.expelled : [];   // v2.9
       const r = d.rep || {};   // v2.8 (older saves start neutral)

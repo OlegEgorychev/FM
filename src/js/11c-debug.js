@@ -35,7 +35,7 @@ class DebugConsole {
     add('ENGINE', 'INJ', p => p.injuryDays || 0, null, 'v2.2 injury: calendar days left');
     add('ENGINE', 'SUS', p => p.suspensionMatches || 0, null, 'v2.2 suspension: matches left');
     add('ENGINE', 'HOME', p => p.awayDays || 0, null, 'v2.3 kept at home by a parent: days left');
-    add('ENGINE', 'SKIP%', p => Math.round(arrivalSkipChance(p) * 100), null, 'v2.6 chance to skip the locker room (from discipline)');
+    add('ENGINE', 'TRN-SKIP', p => Math.round(arrivalSkipChance(p) * 100), null, 'v2.6 chance (%) to skip a training / the locker room (from discipline); v3.21: renamed from SKIP%');
     add('ENGINE', 'ABS', p => p.absentToday || '—', null, 'v2.6 absent today');
     add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
     return c;
@@ -100,9 +100,21 @@ class DebugConsole {
       const vals = squad.map(c.v).filter(v => typeof v === 'number');
       return vals.length && c.s ? `<td>${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}</td>` : '<td></td>';
     }).join('');
-    return `<p class="dbg-hint">${esc(L.t('dbg.dbHint'))}</p>
+    return `<p class="dbg-hint">${esc(L.t('dbg.dbHint'))}</p>${this.teamHTML()}
       <div class="dbg-scroll"><table class="dbg-table"><thead><tr>${head1}</tr><tr>${head2}</tr></thead>
       <tbody>${rows}</tbody><tfoot><tr>${avg}</tr></tfoot></table></div>`;
+  }
+
+  /** v3.21: team-level values — COH (the number the player never sees), the empty-week streak, and the Attention block
+      (skimming metrics from state.stats.attention: clicks, first-button share, median time after the text, share under 0.5 s). */
+  teamHTML() {
+    const s = this.ui.state, w = s.weekState(), pc = v => v == null ? '—' : Math.round(v * 100) + '%';
+    const row = which => { const a = s.attentionSummary(which), w0 = L.t('dbg.att.' + which);
+      return a ? L.t('dbg.att.row', { w: w0, c: a.clicks, pw: which === 'season' ? L.t('dbg.att.pw', { n: a.perWeek.toFixed(1) }) : '', f: pc(a.first),
+        m: a.median == null ? '—' : a.median.toFixed(2) + ' s', x: pc(a.fast) }) : L.t('dbg.att.none', { w: w0 }); };
+    return `<div class="dbg-team" id="dbg-team"><span title="${esc(L.t('dbg.cohTip'))}"><b>${L.t('dbg.coh')}</b> <span id="dbg-coh">${Math.round(s.cohesion ?? COH.START)}</span> (${esc(L.t('coh.band.' + cohBand(s.cohesion)))})</span>
+      <span>${esc(L.t('dbg.streak'))}: <b>${w.emptyStreak || 0}</b></span>
+      <span class="dbg-att" id="dbg-att"><b>${esc(L.t('dbg.att'))}</b> · ${esc(row('week'))} &nbsp;|&nbsp; ${esc(row('season'))}</span></div>`;
   }
 
   godHTML() {

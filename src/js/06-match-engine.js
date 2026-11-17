@@ -34,6 +34,11 @@ class MatchEngine {
     this.oppMentality = opts.oppMentality || 'balanced';   // v3.3: the away side's shout (AI stays balanced; test/balance.js mirrors setups)
     this.forceWin = !!opts.forceWin;
     this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8
+    // v3.21 cohesion [home, away] (null = neutral → no change at all, e.g. test/balance.js): a flat bonus on PASS duels only
+    // (passer + receiver vs the reader / interceptor); our knocks get likelier when the team hasn't trained (side 0 only)
+    this.cohesion = Array.isArray(opts.cohesion) ? opts.cohesion.map(c => c ?? null) : [null, null];
+    this.cohB = this.cohesion.map(c => cohBonus(c));
+    this.knockMult = 1 + Math.max(0, 50 - (this.cohesion[0] ?? 50)) / COH.KNOCK_DIV;
     // v3.7 hidden captain trait state + its OWN seeded stream (never Math.random → the match RNG order is untouched;
     // visual and Quick Sim run the same tick(), so the same match gives the same captain moments)
     this.capRng = seeded('cap|' + home.name + '|' + away.name + '|' + (opts.md ?? ''));
@@ -225,7 +230,7 @@ class MatchEngine {
   maybeInjure(p, side) {
     if (this.injured.has(p.id) || this.sentOff.has(p.id)) return;
     const str = p.physical?.strength ?? 10;
-    if (Math.random() >= MatchEngine.INJURY.CHANCE * (1.4 - str * 0.04)) return;
+    if (Math.random() >= MatchEngine.INJURY.CHANCE * (1.4 - str * 0.04) * (side === 0 ? this.knockMult : 1)) return;   // v3.21: not warmed up
     this.injured.add(p.id);
     this.energy.set(p.id, Math.max(0, this.energy.get(p.id) - MatchEngine.INJURY.ENERGY));
     this.addEvent('injury', p, side);
@@ -282,12 +287,13 @@ class MatchEngine {
     const stress = side === 0 ? this.captainStress(p) : 0;   // v3.7: anxious captain under the armband
     if (stress) flat = { ...flat, stress };
     let fl = 0; for (const k in flat) fl += flat[k];
-    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, total: stat + mood + rand + fl + m.v };
+    const coh = opt.coh || 0;   // v3.21: team cohesion (pass duels only)
+    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, coh, total: stat + mood + rand + fl + m.v + coh };
   }
   /** v3.4: record a duel in the match log (A = side in possession). */
   tr(kind, side, A, D, out) {
     const pack = r => ({ id: r.p.id, name: r.p.name, energy: Math.round(this.energy.get(r.p.id) ?? r.p.energy ?? 100), rating: r.rating, fat: r.fat, tag: r.tag, stat: r.stat, mood: r.mood, rand: r.rand,
-      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, cheat: r.cheat, total: r.total });
+      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, coh: r.coh || 0, cheat: r.cheat, total: r.total });
     this.trace.push({ min: this.minute, kind, side, zone: this.zone, A: pack(A), D: pack(D), margin: A.total - D.total, out });
   }
   counts(side) {
@@ -535,8 +541,8 @@ class MatchEngine {
     // a forward ball into the final third leans on crossing.
     const touch = ((recv.skill?.('firstTouch') ?? 10) - 10) * 0.15;
     const cross = forward && tz === 2 ? ((c.skill?.('crossing') ?? 10) - 10) * 0.1 : 0;
-    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) });
-    const D = this.rs(def, 'Mark', opp, 'def');
+    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) }, { coh: this.cohB[side] });
+    const D = this.rs(def, 'Mark', opp, 'def', {}, { coh: this.cohB[opp] });   // v3.21: the interception side's cohesion
     const vars = { a: c, b: recv, d: def };
     this.tr(forward ? 'passFwd' : 'pass', side, A, D, A.total >= D.total ? 'ok' : 'intercepted');
 
@@ -707,20 +713,20 @@ class MatchEngine {
       const avg = f => own.length ? r2(own.reduce((a, x) => a + f(x), 0) / own.length) : 0;
       return { name: s.name, formation: s.formation, score: s.score, user: s.user, possession: r2(this.possTicks[i] / ((this.possTicks[0] + this.possTicks[1]) || 1)),
         totals: this.teamTotals(i), duels: kinds,
-        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cheat: avg(x => x.cheat) },
+        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cohesion: avg(x => x.coh || 0), cheat: avg(x => x.cheat) },
         players: s.all.map(p => ({ id: p.id, name: p.name, line: this.lineOf.get(p.id), sentOff: this.sentOff.has(p.id), subbedOff: this.subbedOff.has(p.id),
           energyStart: Math.round(this.startEnergy?.get(p.id) ?? p.energy ?? 100), energyEnd: Math.round(this.energy.get(p.id) ?? 0),
           fatigueStart: r2(fatigueMult(this.startEnergy?.get(p.id) ?? p.energy ?? 100)), fatigueEnd: r2(fatigueMult(this.energy.get(p.id) ?? 0)), stats: { ...this.st(p) } })) };
     };
     return { format: 'yam-match-log/1', version: typeof APP_VERSION === 'undefined' ? null : APP_VERSION, ...meta, minute: this.minute, finished: this.finished,
-      forceWin: this.forceWin, shouts: this.shouts, subs: this.subs, events: this.matchEvents, teams: [side(0), side(1)],
+      forceWin: this.forceWin, cohesion: this.cohesion, cohBonus: this.cohB, shouts: this.shouts, subs: this.subs, events: this.matchEvents, teams: [side(0), side(1)],
       trace: this.trace.map(t => ({ ...t, margin: r2(t.margin), A: MatchEngine.r2obj(t.A), D: MatchEngine.r2obj(t.D) })) };
   }
   static r2obj(o) { const out = {}; for (const k in o) out[k] = typeof o[k] === 'number' ? Math.round(o[k] * 100) / 100 : k === 'flat' ? MatchEngine.r2obj(o[k]) : o[k]; return out; }
   /** One CSV row per duel (comma-separated, dot decimals, UTF-8). `pre` = extra leading columns (e.g. setup / match no.). */
   static traceCsv(trace, sides, pre = null) {
     const f = v => (typeof v === 'number' ? String(Math.round(v * 100) / 100) : `"${String(v ?? '').replace(/"/g, '""')}"`);
-    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'cheat', 'total'];
+    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'coh', 'cheat', 'total'];   // v3.21: + coh
     const head = [...(pre ? Object.keys(pre) : []), 'minute', 'kind', 'team', 'zone', ...part.map(k => 'atk_' + k), ...part.map(k => 'def_' + k), 'margin', 'outcome'];
     const cell = (x, k) => k === 'flat' ? f(Object.entries(x.flat || {}).filter(([, v]) => v).map(([n, v]) => `${n}:${Math.round(v * 100) / 100}`).join(' ')) : f(x[k]);
     const rows = trace.map(t => [...(pre ? Object.values(pre).map(f) : []), t.min, f(t.kind), f(sides?.[t.side] ?? t.side), t.zone,

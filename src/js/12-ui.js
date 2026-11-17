@@ -151,6 +151,7 @@ class UIController {
     if (x && typeof x === 'object' && 'pos' in x) return L.pos(x.pos);   // v3.6 diary
     if (x && typeof x === 'object' && 'role' in x) return L.tag(x.role);   // v3.19 diary
     if (x && typeof x === 'object' && 'focus' in x) return L.t('lesson.focus.' + x.focus);   // v3.16 diary
+    if (x && typeof x === 'object' && 'coh' in x) return L.t('coh.band.' + x.coh);   // v3.21 diary: the band word
     if (x && typeof x === 'object' && 'clue' in x) { const p = this.state.player(x.pid);   // v3.16: a v3.6 / v3.7 clue line without its "Match practice:" lead
       return L.t(x.clue, { k: p ? L.name(p.name) : '?' }).replace(/^[^:{}]{1,30}:\s*/, ''); }
     if (x && typeof x === 'object' && 'name' in x && !('pid' in x)) return L.name(x.name);   // v3.16: an expelled kid
@@ -909,23 +910,103 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (b === 'briefing') this.briefing.open(); else if (b === 'week') this.planner.open(); else if (b === 'locker') this.locker.open(); else this.renderAll();
   }
   /** v3.13: auto-sim / tests — an unconfirmed week gets Tue + Thu Match Practice and is confirmed.
-      v3.15: a new month's cash desk is confirmed with the normal fee. */
+      v3.15: a new month's cash desk is confirmed with the normal fee.
+      v3.21: under a policy (ui.autoPolicy) the cash desk goes through policyPick and the week gets POLICY.DAYS[policy]. */
   autoPlan() {
-    const s = this.state;
-    if (s.kassaDue()) s.confirmKassa(FINANCE.DEFAULT_LEVEL);
+    const s = this.state, pol = this.autoPolicy;
+    if (s.kassaDue()) {
+      const lv = FINANCE.FEE_LEVELS, i = pol ? this.policyPick('kassa', lv.map(k => ({ key: k, def: k === FINANCE.DEFAULT_LEVEL }))) : lv.indexOf(FINANCE.DEFAULT_LEVEL);
+      s.confirmKassa(lv[i]);
+    }
     const w = s.weekState();
     if (w.confirmed) return;
-    for (const k of WEEK.DEFAULT_DAYS) s.setWeekPlan(k, WEEK.DEFAULT_REGIME);
+    for (const k of pol ? POLICY.DAYS[pol] : WEEK.DEFAULT_DAYS) s.setWeekPlan(k, WEEK.DEFAULT_REGIME);
+    if (pol) this.noteChoice('plan', 0, [{}], null, pol === 'first');   // the week is confirmed as it stands
     s.confirmWeek();
   }
   /** v2.6: after a coach-initiated dialogue (office / roll call) the same day simply goes on. */
   afterManualEvent() { this.renderAll(); this.profile.tick(); if (this.locker?.isOpen) this.locker.maybeRequest(500); }   // v3.6: the next locker request waits its turn
-  /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
-  autoSim() {
+  /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days).
+      v3.21: autoSim({ policy }) — a scripted coach (POLICY.NAMES): every choice goes through policyPick(), the calendar runs fast,
+      and one call moves the game one stop on: calendar → match day → Quick Sim → post-match windows → closed matchday.
+      No policy = the old behaviour (DEBUG button, smoke). test/policy.js calls it in a loop. */
+  autoSim({ policy = null } = {}) {
     const s = this.state;
+    this.autoPolicy = POLICY.NAMES.includes(policy) ? policy : null;
+    if (this.autoPolicy) { this.policyStep(); return; }
     if (s.phase === 'post' && s.afterPending) { s.afterAuto(); this.afterView.close(); }   // v3.20: loss → first remark + keep, draw → praise
     if (s.phase === 'post' && s.reviewPending) { s.reviewPick(0); this.reviewView.close(); }   // v3.19: auto mode takes the first card
     if (s.phase === 'calendar' && !this.events.active) this.runCalendar();
+  }
+  /** v3.21: one policy step (see autoSim). */
+  policyStep() {
+    const s = this.state;
+    if (this.events.active) { this.events.view.autoPick(); return; }
+    if (s.phase === 'post') { this.policyPost(); return; }
+    if (s.phase === 'matchday') {
+      this.modal.close();
+      if (!s.dayState().locker?.done) { const lk = s.runLocker(false); lk.done = true; lk.revealed = true; }   // who turned up (no locker window)
+      this.onInstantSim();
+      if (s.phase === 'post') this.policyPost();
+      return;
+    }
+    if (s.phase === 'calendar') this.runCalendar();
+  }
+  /** v3.21: after the whistle — Coach's Word (not offered to `first`: Quick Sim never opens the summary), AFTER_GAME, REVIEW, close. */
+  policyPost() {
+    const s = this.state, pol = this.autoPolicy;
+    this.modal.close(); this.summary.close?.();
+    if (s.talkPending && pol !== 'first') {
+      const keys = TEAM_TALK.KEYS;
+      s.applyTeamTalk(keys[this.policyPick('word', keys.map(k => ({ key: k, out: talkOutcome(s.lastReport) })))]);
+    }
+    for (let guard = 0; s.afterPending && guard < 4; guard++) {
+      const af = s.after;
+      if (af.mode === 'draw') { if (this.policyPick('after', [{ key: 'praise' }, { key: 'listen' }]) === 0) s.afterPraise(); else s.afterListen(); continue; }
+      if (af.stage === 'pick') {
+        const opts = af.remarks.map((rm, i) => ({ key: 'remark', i })).concat(af.mode === 'loss' ? [{ key: 'skip' }] : []);
+        const i = this.policyPick('after', opts);
+        if (opts[i].key === 'skip') s.afterSkip(); else s.afterPick(i);
+        continue;
+      }
+      const p = s.afterKid, o = p ? s.rethinkOptions(p) : { remove: [], swap: [], give: [] };   // rethink: the buttons in on-screen order
+      const opts = [...o.remove.map(r => ({ key: 'remove', role: r })), ...o.swap.map(x => ({ key: 'swap', role: x.from, to: x.to })),
+        ...o.give.map(t => ({ key: 'give', to: t })), { key: 'keep' }];
+      const c = opts[this.policyPick('rethink', opts)];
+      if (!s.afterRethink(c.key, c.role || null, c.to || null)) s.endAfter();
+    }
+    if (s.reviewPending) {
+      const p = s.player(s.review.pid);
+      const opts = s.review.cards.map(c => ({ key: c.type, role: c.role, confirmed: GameState.roleConfirmed(p, c.role) }));
+      if (!opts.length || !s.reviewPick(this.policyPick('review', opts))) s.reviewSkip();
+    }
+    this.afterView.layer.hidden = true; this.reviewView.layer.hidden = true;
+    this.closeMatchday();
+  }
+  /** v3.21: THE choice hook of the scripted coaches. options = the window's buttons in on-screen order ({ enabled: false } = greyed).
+      `first` takes the first enabled one; the other policies ask POLICY_PICK[windowId] (null = first enabled). Logged in attention. */
+  policyPick(windowId, options) {
+    const pol = this.autoPolicy, ok = i => !!options[i] && options[i].enabled !== false;
+    const first = options.findIndex((o, i) => ok(i));
+    let i = first < 0 ? 0 : first;
+    if (pol && pol !== 'first') { const r = UIController.POLICY_PICK[windowId]?.(options, this.state); if (r != null && ok(r)) i = r; }
+    if (windowId === 'kassa' && pol === 'first') i = Math.max(0, options.findIndex(o => o.def));   // "as it is": CONFIRM with the preselected level
+    this.noteChoice(windowId, i, options, null);
+    return i;
+  }
+  /** v3.21 reference choices per window (null = the first enabled button). */
+  static POLICY_PICK = {
+    kassa: o => o.findIndex(x => x.key === FINANCE.DEFAULT_LEVEL),
+    word: o => { const out = o[0]?.out; return o.findIndex(x => x.key === (out === 'heavy' ? 'tough' : 'praise')); },   // result-appropriate line
+    review: o => { const i = o.findIndex(x => x.confirmed); return i < 0 ? 0 : i; },   // a role his confirmed clues point to, else the first card
+    after: () => 0,   // the first remark (draw: praise)
+    rethink: o => o.findIndex(x => x.key === 'keep'),
+  };
+  /** v3.21 DEBUG attention metrics: every answered choice window (human click or policy pick). dt = ms from "ready" (text typed /
+      window shown) to the click, null when unknown (policy picks). first = the first enabled button (or the preselected default). */
+  noteChoice(windowId, i, options = [], dt = null, first = null) {
+    const f = first ?? i === Math.max(0, options.findIndex(o => o && o.enabled !== false));
+    this.state.noteAttention?.({ first: !!f, dt });
   }
   /** v3.19: REVIEW.EXE picks the first card by itself (smoke auto-play: window.YAM_AUTO_REVIEW; `ui.autoReview = false` to test the window). */
   get autoReview() { return this._autoReview ?? !!window.YAM_AUTO_REVIEW; }
@@ -975,13 +1056,14 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.cal.running || this.state.phase !== 'calendar') return;
     this.calMonth = null;   // calendar view follows the days as they pass
     this.autoPlan();   // v3.13
-    this.state.autoFees = true;   // v3.15: auto-sim reminds every present kid who still owes
+    this.state.autoFees = this.autoPolicy !== 'first';   // v3.15: auto-sim reminds every present kid who still owes (v3.21: not the `first` script)
     this.cal.simulate({
-      stepMs: 180,
+      stepMs: this.autoPolicy ? 0 : 180,   // v3.21: policy runs don't need to be watched
       onStep: (date, infos) => {
         for (const info of infos) this.state.addDiary({ date, ...info });
         this.autoPlan();   // v3.13: a new week on the way (Monday) gets the default plan before its routine runs
         if (this.cal.nextEvent() && this.events.roll(date)) this.cal.stop();
+        if (this.autoPolicy) return;   // v3.21: policy runs draw and save at the stop only (test/policy.js speed)
         this.state.save();
         this.renderDash();
         this.renderTeam();
@@ -1492,7 +1574,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties, md: ctx.md });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties, md: ctx.md,
+      cohesion: [this.state.cohesion ?? COH.START, COH.AI] });   // v3.21: our cohesion vs the AI clubs' fixed value
     if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
@@ -1569,7 +1652,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.appendLog({ minute: 90, type: 'flavor', key: 'match.others', vars: { r: { fixtures: others } }, side: -1, r: 0 });
     const played = a.all.filter(p => eng.everPlayed.has(p.id));   // starters + substitutes (v2.6: minus empty slots)
     s.lastReport = {
-      md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
+      md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result, coh: Math.round(s.cohesion ?? COH.START),   // v3.21
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
       events: eng.matchEvents.map(e => ({ ...e })), ht: eng.htScore || null, instant: !!eng.instant,
       talk: null,   // v3.5: post-match team talk still owed (forced in the Match Summary)

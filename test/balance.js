@@ -21,6 +21,11 @@
  *                                     (up to 2 per kid, no clashing pair) vs the same squads without roles, the same with
  *                                     MISFIT roles, and every role alone at level 3 on the 4 outfield kids it fits best.
  *                                     Mirrored like the shouts. No hard gate yet; a single role above 65% gets a warning.
+ *   node test/balance.js --cohesion   v3.21: also the COHESION table (not default): equal squads, mirrored; the first team plays
+ *                                     with cohesion C, the other with 50 (COH.MAX on pass duels; the knock term only applies to
+ *                                     side 0, as in the game), averaged over the main pair + 4 other pairs (or --pairs K).
+ *                                     Targets (win share W / (W + L)): C=10 → 25–30 %, C=90 → 58–62 % (exit 1 if not).
+ *                                     --cohmax X tries another COH.MAX (tuning).
  * Exit code 1 if the Attack-vs-Defense win share (wins / (wins + losses)) is outside 45–55%.
  */
 'use strict';
@@ -30,7 +35,7 @@ const vm = require('vm');
 
 const argv = process.argv.slice(2);
 const flag = k => { const i = argv.indexOf(k); return i < 0 ? null : argv[i + 1]; };
-const nums = argv.filter((a, i) => /^\d+$/.test(a) && !['--pairs', '--log'].includes(argv[i - 1]));
+const nums = argv.filter((a, i) => /^\d+$/.test(a) && !['--pairs', '--log', '--cohmax', '--cohup'].includes(argv[i - 1]));
 const N = Math.max(4, parseInt(nums[0], 10) || 500);
 const SEED = parseInt(nums[1], 10) || 33;
 const PAIRS = parseInt(flag('--pairs'), 10) || 0;
@@ -38,6 +43,8 @@ const JSON_OUT = argv.includes('--json');
 const LOG_FILE = flag('--log');
 const LOG = LOG_FILE ? { rows: [], matches: [] } : null;
 const ROLES_MODE = argv.includes('--roles');   // v3.19
+const COH_MODE = argv.includes('--cohesion');   // v3.21
+const COH_MAX = flag('--cohmax'), COH_UP = flag('--cohup'), COH_PAIRS = 4;
 const TEAM_SEED = 5;   // a pair of equal-level (mod 0) 4-4-2 squads whose Neutral-vs-Neutral scoring ≈ the league average (~2.3)
 
 function mulberry32(a) {
@@ -55,7 +62,7 @@ function loadEngine(seed) {
   }
   const api = vm.runInContext('({ MatchEngine, Player, formationSlots, LINE_POS, SHOUT: typeof SHOUT === "undefined" ? null : SHOUT, fatigueMult: typeof fatigueMult === "function" ? fatigueMult : null,'
     + ' ROLES_DEF: typeof ROLES_DEF === "undefined" ? null : ROLES_DEF, roleClash: typeof roleClash === "function" ? roleClash : null, trueSignals: typeof trueSignals === "function" ? trueSignals : null,'
-    + ' roleFit: typeof roleFit === "function" ? roleFit : null, seeded })', ctx);
+    + ' roleFit: typeof roleFit === "function" ? roleFit : null, seeded, COH: typeof COH === "undefined" ? null : COH })', ctx);
   return Object.assign(api, { reseed: s => { gen = mulberry32(s); } });
 }
 
@@ -185,6 +192,25 @@ function roleSetups(E, A, B, n, seed) {
   return rows;
 }
 
+/* ---------- v3.21 cohesion: the side `xs` plays with cohesion c, the other with 50 ---------- */
+function runCohesion(E, A, B, c, n, seed) {
+  E.reseed(seed);
+  const r = { setup: `C=${c} vs C=50`, n, w: 0, d: 0, l: 0, gf: 0, ga: 0, shF: 0, shA: 0, otF: 0, otA: 0 };
+  for (let i = 0; i < n; i++) {
+    const { home, away, xs } = fixture(i, A, B), ys = 1 - xs, coh = [];
+    coh[xs] = c; coh[ys] = 50;
+    const eng = new E.MatchEngine(home, away, HOOKS, { cohesion: coh });
+    eng.runInstant();
+    const gx = eng.sides[xs].score, gy = eng.sides[ys].score, tx = eng.teamTotals(xs), ty = eng.teamTotals(ys);
+    r.gf += gx; r.ga += gy; r.shF += tx.shots; r.shA += ty.shots; r.otF += tx.onTarget; r.otA += ty.onTarget;
+    if (gx > gy) r.w++; else if (gx === gy) r.d++; else r.l++;
+  }
+  r.winShare = r.w + r.l ? r.w / (r.w + r.l) : 0.5;
+  return r;
+}
+const COH_LEVELS = [10, 30, 50, 70, 90];
+function cohesionRows(E, A, B, n, seed) { return COH_LEVELS.map((c, k) => runCohesion(E, A, B, c, n, seed + k)); }
+
 const pct = v => (v * 100).toFixed(1).padStart(5) + '%';
 const per = (v, n) => (v / n).toFixed(2).padStart(5);
 const rowSetup = r => `${r.setup.padEnd(20)} | ${pct(r.w / r.n)} ${pct(r.d / r.n)} ${pct(r.l / r.n)} | ${pct(r.winShare)}   | ${per(r.gf, r.n)} ${per(r.ga, r.n)} ${per(r.gf + r.ga, r.n)} | ${per(r.shF, r.n)} ${per(r.shA, r.n)} | ${per(r.otF, r.n)} ${per(r.otA, r.n)}`;
@@ -211,7 +237,19 @@ if (ROLES_MODE) {   // v3.19
     r.winShare = r.w / (r.w + r.l); return r; });
 }
 
-if (JSON_OUT) console.log(JSON.stringify({ setups: main.setups, states: main.states, fatigue: main.fatigue, pairs, roles: roleRows }, null, 1));
+let cohRows = null;
+if (COH_MODE) {   // v3.21
+  const engines = [main.E];
+  for (let k = 1; k <= (PAIRS || COH_PAIRS); k++) engines.push(loadEngine(TEAM_SEED * 100 + k));   // one squad pair is too noisy (±5 pp)
+  if (COH_MAX != null) for (const E of engines) E.COH.MAX = parseFloat(COH_MAX);
+  if (COH_UP != null) for (const E of engines) E.COH.MAX_UP = parseFloat(COH_UP);
+  const sets = engines.map((E, k) => cohesionRows(E, ...(k ? makeTeams(E) : main.teams), N, SEED + 900 + k));
+  cohRows = sets[0].map((r0, j) => { const r = { setup: r0.setup, n: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, shF: 0, shA: 0, otF: 0, otA: 0 };
+    for (const set of sets) for (const f of ['n', 'w', 'd', 'l', 'gf', 'ga', 'shF', 'shA', 'otF', 'otA']) r[f] += set[j][f];
+    r.winShare = r.w / (r.w + r.l); return r; });
+}
+
+if (JSON_OUT) console.log(JSON.stringify({ setups: main.setups, states: main.states, fatigue: main.fatigue, pairs, roles: roleRows, cohesion: cohRows }, null, 1));
 else {
   const head = 'Setup                | Win    Draw   Loss  | WinShare | GF/m  GA/m  Tot/m | ShF   ShA   | OnTgF OnTgA';
   console.log(`Balance: ${N} instant matches per setup, seed ${SEED}, team seed ${TEAM_SEED}, mirrored (first team's view)`);
@@ -229,10 +267,20 @@ else {
       ? `note: ${r.setup} win share ${pct(r.winShare).trim()} > 65% (v3.18 role, level 3 = its old strength)`
       : `WARNING: ${r.setup} win share ${pct(r.winShare).trim()} > 65% — tone its multiplier down`);
   }
+  if (cohRows) {
+    console.log(`\nCohesion (v3.21): the first team plays with C, the other with 50 — COH.MAX ${main.E.COH.MAX} below 50 / MAX_UP ${main.E.COH.MAX_UP} above (${N} matches × ${(PAIRS || COH_PAIRS) + 1} team pairs, mirrored; target = WinShare)`);
+    console.log(head); cohRows.forEach(r => console.log(rowSetup(r)));
+  }
   if (LOG) console.log(`\nMatch log written: ${LOG_FILE} (+ .matches.csv)`);
   if (main.E.fatigueMult) console.log('\nfatigueMult: ' + [100, 75, 50, 25, 0].map(e => `${e}%→${main.E.fatigueMult(e).toFixed(3)}`).join('  '));
 }
 const avd = main.setups.find(r => r.setup === 'Attack vs Defense');
-const ok = avd.winShare >= 0.45 && avd.winShare <= 0.55;
+let ok = avd.winShare >= 0.45 && avd.winShare <= 0.55;
 if (!JSON_OUT) console.log(ok ? `OK: Attack vs Defense win share ${pct(avd.winShare).trim()} (target 45–55%)` : `FAIL: Attack vs Defense win share ${pct(avd.winShare).trim()} outside 45–55%`);
+if (cohRows) {   // v3.21 targets: share of matches won by the C side
+  const w = c => cohRows.find(x => x.setup === `C=${c} vs C=50`).winShare;   // W / (W + L), like the shout gate
+  const lo = w(10), hi = w(90), okC = lo >= 0.25 && lo <= 0.30 && hi >= 0.58 && hi <= 0.62;
+  if (!JSON_OUT) console.log(`${okC ? 'OK' : 'FAIL'}: cohesion win share C=10 ${pct(lo).trim()} (target 25–30%), C=90 ${pct(hi).trim()} (target 58–62%)`);
+  ok = ok && okC;
+}
 process.exit(ok ? 0 : 1);

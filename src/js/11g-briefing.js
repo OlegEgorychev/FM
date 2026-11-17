@@ -98,13 +98,14 @@ class MorningBriefing {
     // v3.13: Monday — how this week's action points were made up
     const src = w.apSources || {}, apBox = document.getElementById('mb-ap');
     apBox.hidden = !(s.phase === 'calendar' && date === w.start);
-    apBox.innerHTML = apBox.hidden ? '' : L.t('mb.ap', { line: MorningBriefing.apLine(src) });
+    apBox.innerHTML = apBox.hidden ? '' : L.t('mb.ap', { line: MorningBriefing.apLine(src) }) + ` <span class="mb-coh">· ${MorningBriefing.cohLine(s)}</span>`;   // v3.21
     // v3.13 → v3.17: "while you were away" — new lines only (14-day mute), important first, routine collapsed
     const a = MorningBriefing.awayLines(s, date), box = document.getElementById('mb-away-box');
     this.shown = [...a.imp, ...a.rout];
     box.hidden = !this.shown.length;
     document.getElementById('mb-away').innerHTML = MorningBriefing.awayHTML(this.ui, a);
-    document.getElementById('mb-news').innerHTML = MorningBriefing.worldNews(s, date).map(n => `<li class="mb-world">${esc(n)}</li>`).join('')   // v3.14
+    document.getElementById('mb-news').innerHTML = (date === w.start ? MorningBriefing.cohNews(s, date) : []).map(n => `<li class="mb-cohlow">${esc(n)}</li>`).join('')   // v3.21
+      + MorningBriefing.worldNews(s, date).map(n => `<li class="mb-world">${esc(n)}</li>`).join('')   // v3.14
       + this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
     const bar = (k) => { const v = s.rep[k];
       return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };
@@ -157,6 +158,14 @@ class MorningBriefing {
     const e = s.worldEvent;
     if (!e || s.phase !== 'calendar' || date !== e.weekStart) return [];
     return [L.t('world.news.' + e.id, { d: L.t('world.on.' + weekKey(e.days[0])) })];
+  }
+  /** v3.21: Monday — the band word and, when cohesion is low, one of COH.LOW phrasings (the week's number picks it,
+      so two weeks in a row never repeat). Words only. */
+  static cohLine(s) { return L.t('coh.line', { b: L.t('coh.band.' + cohBand(s.cohesion)) }); }
+  static cohNews(s, date) {
+    if (s.phase !== 'calendar' || (s.cohesion ?? COH.START) >= COH.LOW) return [];
+    const n = Math.floor(isoDays('2000-01-03', weekStartOf(date)) / 7);
+    return [L.t('coh.low.' + (((n % 3) + 3) % 3))];
   }
   /** v3.13: "Base 4 · Carried 1 · Win +1 = 6 AP" */
   static apLine(src) {

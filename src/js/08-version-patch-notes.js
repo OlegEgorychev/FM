@@ -2,8 +2,24 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.20';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.21';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.21', name: { en: 'Cohesion', ru: 'Сыгранность' },
+    en: [
+      'Training matters now. The team has one Cohesion level: it grows with trainings the kids actually attend and fades in every week without them. You only ever see a word — from "falling apart" to "like clockwork" — in PLANNER.EXE, the Monday briefing and the Match Summary.',
+      'Cohesion shows in the passing: a team that hasn\'t played together loses more passes and reads the opponent\'s worse. Shots, dribbles, tackles and the keeper are not affected. Kids who haven\'t run in a while also pick up knocks more easily.',
+      'When it slips, you are told why: "Passes aren\'t connecting — the boys haven\'t played together for a while". After a loss or a draw the Match Summary names the cause.',
+      'Empty weeks in a row cost more each time: Board and Parents −2, then −4, then −6. One training with the kids in it ends the streak. A month with hardly any trainings: parents pay their fees less willingly ("what are we paying for?").',
+      'For developers: scripted coaches (`autoSim({ policy })`, `test/policy.js`) and skimming metrics in DEBUG.EXE (Attention block, COH; SKIP% is now TRN-SKIP).',
+    ],
+    ru: [
+      'Тренировки теперь важны. У команды есть сыгранность: она растёт от тренировок, на которые дети приходят, и тает в каждую неделю без них. Видно только слово — от «развалена» до «как часы» — в PLANNER.EXE, сводке понедельника и итогах матча.',
+      'Сыгранность видна по передачам: команда, которая давно не играла вместе, чаще теряет мяч на пасе и хуже читает чужие передачи. Удары, обводка, отбор и вратарь от неё не зависят. Кто давно не бегал, ещё и легче получает ушибы.',
+      'Когда сыгранность падает, причина названа: «Передачи не идут — ребята давно не играли вместе». После поражения или ничьей итог матча говорит, в чём дело.',
+      'Пустые недели подряд бьют сильнее: Правление и Родители −2, потом −4, потом −6. Одна тренировка, на которую пришли дети, обнуляет серию. Месяц почти без тренировок — родители платят взносы неохотнее («за что мы платим?»).',
+      'Для разработки: скриптовые тренеры (`autoSim({ policy })`, `test/policy.js`) и метрики пролистывания в DEBUG.EXE (блок «Внимание», COH; SKIP% теперь TRN-SKIP).',
+    ],
+  },
   { v: '3.20', name: { en: 'After the game', ru: 'После игры' },
     en: [
       'A win gives strength, a loss gives understanding. After a defeat AFTER_GAME.EXE opens: three remarks from kids (and sometimes a mum or dad), you listen to one. [ CONTINUE ] waits for your choice.',

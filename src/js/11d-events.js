@@ -676,7 +676,10 @@ class DialogueView {
     this.layer.addEventListener('click', e => {
       const b = e.target.closest('.talk-btn');
       if (this.typer) { if (e.target.closest('.talk-text')) this.finishTyping(); return; }   // v3.17: no choice until the line is fully typed
-      if (b && !b.disabled && this.choices) this.engine.choose(this.choices[+b.dataset.i]);
+      if (b && !b.disabled && this.choices) {   // v3.21 attention: time from the fully typed line to the click
+        this.ui.noteChoice('talk', +b.dataset.i, this.options(), this.readyAt ? performance.now() - this.readyAt : null);
+        this.engine.choose(this.choices[+b.dataset.i]);
+      }
       else if (e.target.closest('.talk-text')) this.finishTyping();
     });
   }
@@ -702,13 +705,29 @@ class DialogueView {
         ${short ? `<small class="tb-why">${esc(why)}</small>` : ''}</button>`;
     }).join('');
     this.layer.hidden = false;
+    this.readyAt = null;
     this.type(text);
     if (!this.typer) this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
+    if (this.ui.autoPolicy) { clearTimeout(this.autoT); this.autoT = setTimeout(() => this.autoPick(), 0); }   // v3.21: a scripted coach answers
+  }
+  /** v3.21: the buttons as policyPick() sees them (greyed = enabled: false). */
+  options() {
+    const s = this.ui.state;
+    return (this.choices || []).map(c => ({ key: c.key, enabled: !((c.cost && !s.canAfford(c.cost)) || c.blocked || (c.ap && s.ap < c.ap)), gain: c.gain || 0, cost: c.cost || 0 }));
+  }
+  /** v3.21: policy runs — the open dialogue is answered through ui.policyPick('talk:<event id>'). */
+  autoPick() {
+    clearTimeout(this.autoT); this.autoT = null;
+    if (!this.ui.autoPolicy || this.layer.hidden || !this.choices) return;
+    this.finishTyping();
+    const pe = this.ui.state.pendingEvent, i = this.ui.policyPick('talk:' + (pe?.id || '?'), this.options());
+    this.engine.choose(this.choices[i]);
   }
   /** v3.17: while the line is typing every choice is disabled (Win98 grey); `data-short` keeps the money / AP / blocked reasons. */
   setWaiting(on) {
     this.layer.classList.toggle('talk-typing', on);
     for (const b of this.layer.querySelectorAll('.talk-btn')) b.disabled = on || b.dataset.short === '1';
+    if (!on) this.readyAt = performance.now();   // v3.21 attention: the line is fully on screen
     if (on) this.layer.querySelector('#talk-text').focus?.();
     else if (!this.layer.hidden) this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
   }

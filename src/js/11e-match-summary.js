@@ -33,6 +33,7 @@ class MatchSummary {
     this.rep = rep;
     this.render();
     this.layer.hidden = false;
+    this.shownAt = performance.now();   // v3.21 attention
     this.ui.setModalLock(true);   // v3.5: closes whatever was open behind and makes it inert
     (this.body.querySelector('[data-talk]:not([disabled])') || document.getElementById('msum-go')).focus();
     for (const id of ['msum-csv', 'msum-json']) document.getElementById(id).disabled = !this.log;
@@ -56,6 +57,7 @@ class MatchSummary {
     if (t) { t.classList.remove('nudge'); void t.offsetWidth; t.classList.add('nudge'); }
   }
   chooseTalk(key) {
+    if (this.pending) this.ui.noteChoice('word', TEAM_TALK.KEYS.indexOf(key), TEAM_TALK.KEYS.map(() => ({})), this.shownAt ? performance.now() - this.shownAt : null);   // v3.21 attention
     const fx = this.ui.state.applyTeamTalk(key);
     if (!fx) return;
     this.ui.renderAll();   // morale / reputation / diary changed (this also re-renders the summary)
@@ -114,7 +116,8 @@ class MatchSummary {
         <div class="ms-team home">${emblemHTML(me, 'lg')}<span>${esc(L.team(s.clubName))}</span></div>
         <div class="ms-score">${rep.gf} - ${rep.ga}</div>
         <div class="ms-team away">${emblemHTML(opp, 'lg')}<span>${esc(L.team(rep.opponent))}</span></div>
-        <div class="ms-sub"><span class="ms-res ${rep.result}">${L.t('res.' + rep.result)}</span><span>${L.t('ms.md', { n: rep.md })} · ${L.t('venue.' + rep.venue)}</span>${rep.ht ? `<span>${L.t('ms.ht')} ${rep.ht[0]}-${rep.ht[1]}</span>` : ''}${rep.instant ? `<span>${L.t('ms.quick')}</span>` : ''}</div>
+        <div class="ms-sub"><span class="ms-res ${rep.result}">${L.t('res.' + rep.result)}</span><span>${L.t('ms.md', { n: rep.md })} · ${L.t('venue.' + rep.venue)}</span>${rep.ht ? `<span>${L.t('ms.ht')} ${rep.ht[0]}-${rep.ht[1]}</span>` : ''}${rep.instant ? `<span>${L.t('ms.quick')}</span>` : ''}${rep.coh != null ? `<span class="ms-coh" title="${esc(L.t('coh.tip'))}">${L.t('coh.line', { b: L.t('coh.band.' + cohBand(rep.coh)) })}</span>` : ''}</div>
+        ${rep.coh != null && rep.coh < COH.LOW && rep.result !== 'W' ? `<div class="ms-cause">${L.t('coh.cause')}</div>` : ''}
       </div>
       <div class="ms-timeline">${col(true, L.team(s.clubName))}${col(false, L.team(rep.opponent))}</div>
       <div class="ms-stats">

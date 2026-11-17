@@ -15,10 +15,10 @@ class ReviewView {
     this.cards.addEventListener('click', e => {
       const ban = e.target.closest('[data-ban]'), pick = e.target.closest('[data-pick]');
       if (ban && !ban.disabled) { if (this.state.reviewBanish(+ban.dataset.ban)) this.render(); return; }
-      if (pick && !pick.disabled && this.state.reviewPick(+pick.dataset.pick)) this.done();
+      if (pick && !pick.disabled) { this.note(+pick.dataset.pick); if (this.state.reviewPick(+pick.dataset.pick)) this.done(); }
     });
     document.getElementById('rv-reroll').addEventListener('click', () => { if (this.state.reviewReroll()) { this.render(); this.ui.renderBudget?.(); } });
-    document.getElementById('rv-skip').addEventListener('click', () => { if (this.state.reviewSkip()) this.done(); });
+    document.getElementById('rv-skip').addEventListener('click', () => { this.note(-1); if (this.state.reviewSkip()) this.done(); });
   }
   get isOpen() { return !this.layer.hidden; }
   get state() { return this.ui.state; }
@@ -29,9 +29,12 @@ class ReviewView {
     this.ui.modal.close(); this.ui.profile.close();
     this.render();
     this.layer.hidden = false;
+    this.shownAt = performance.now();   // v3.21 attention (no typewriter here)
     this.cards.querySelector('[data-pick]')?.focus();
     return true;
   }
+  /** v3.21 attention: the answer (−1 = Skip) and the time since the window was shown. */
+  note(i) { this.ui.noteChoice('review', i, [{}], this.shownAt ? performance.now() - this.shownAt : null, i === 0); }
   /** Only the state can close it (a choice was made). */
   close() { if (!this.state.reviewPending) this.layer.hidden = true; }
   done() { this.layer.hidden = true; this.ui.closeMatchday(); }

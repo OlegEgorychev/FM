@@ -28,6 +28,7 @@ class CashDesk {
     this.level = FINANCE.DEFAULT_LEVEL;
     this.render();
     this.layer.hidden = false;
+    this.shownAt = performance.now();   // v3.21 attention
     document.getElementById('ks-confirm').focus();
   }
   close() { this.layer.hidden = true; this.ui.renderAll(); }
@@ -65,6 +66,7 @@ class CashDesk {
   confirm() {
     const s = this.state;
     if (this.ui.events.active || !s.kassaDue()) return;
+    this.ui.noteChoice('kassa', 0, [{}], this.shownAt ? performance.now() - this.shownAt : null, this.level === FINANCE.DEFAULT_LEVEL);   // v3.21: "first" = the preselected level
     s.confirmKassa(this.level);
     this.layer.hidden = true;
     this.ui.renderAll();

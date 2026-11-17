@@ -1,0 +1,13 @@
+/* v3.21 "Cohesion": the band word (PLANNER.EXE top line, Monday briefing, Match Summary), the low-cohesion lines, DEBUG */
+.pl-coh{ margin-left: auto; white-space: nowrap; }
+.pl-coh b, .mb-coh b, .ms-coh b{ font-weight: 700; }
+.pl-coh.coh-apart b, .pl-coh.coh-weak b{ color: var(--bad, #a00000); }
+.pl-coh.coh-good b, .pl-coh.coh-clock b{ color: var(--good, #006400); }
+.pl-cohlow{ margin: 0 0 4px; color: #7a3a00; }
+.pl-cohlow::before, li.mb-cohlow::before{ content: '\25BC  '; font-size: 10px; }
+li.mb-cohlow{ color: #7a3a00; }
+.ms-coh{ text-transform: none; }
+.ms-cause{ grid-column: 1 / -1; text-align: center; font-size: 13px; color: #f0b878; font-style: italic; }
+.dbg-team{ display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 6px; padding: 4px 8px; background: #fff; border: 1px solid var(--shadow, #808080); font: 12px/1.4 var(--mono, monospace); }
+.dbg-team b{ font-weight: 700; }
+.dbg-team .dbg-att{ flex-basis: 100%; }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.20</title>
+<title>Youth Academy Manager v3.21</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1928,6 +1928,19 @@ body.modal-lock #startmenu{ display: none; }
   .af-card{ min-height: 0; }
 }
 .after-layer .rv-kid[hidden]{ display: none; }
+/* v3.21 "Cohesion": the band word (PLANNER.EXE top line, Monday briefing, Match Summary), the low-cohesion lines, DEBUG */
+.pl-coh{ margin-left: auto; white-space: nowrap; }
+.pl-coh b, .mb-coh b, .ms-coh b{ font-weight: 700; }
+.pl-coh.coh-apart b, .pl-coh.coh-weak b{ color: var(--bad, #a00000); }
+.pl-coh.coh-good b, .pl-coh.coh-clock b{ color: var(--good, #006400); }
+.pl-cohlow{ margin: 0 0 4px; color: #7a3a00; }
+.pl-cohlow::before, li.mb-cohlow::before{ content: '\25BC  '; font-size: 10px; }
+li.mb-cohlow{ color: #7a3a00; }
+.ms-coh{ text-transform: none; }
+.ms-cause{ grid-column: 1 / -1; text-align: center; font-size: 13px; color: #f0b878; font-style: italic; }
+.dbg-team{ display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 6px; padding: 4px 8px; background: #fff; border: 1px solid var(--shadow, #808080); font: 12px/1.4 var(--mono, monospace); }
+.dbg-team b{ font-weight: 700; }
+.dbg-team .dbg-att{ flex-basis: 100%; }
 /* =========================================================
    RESPONSIVE
    ========================================================= */
@@ -2546,10 +2559,27 @@ const YARD = { SHOW: 14, MAX: 2, WRONG: 0.2,
 /* v3.13 WEEKLY PLAN + WEEKLY ACTION POINTS (replaces the v2.5 1 AP/day). All numbers are test values.
    Monday: ap = min(AP_MAX, AP_BASE + carry + WIN_BONUS if the last match was won); carry = min(CARRY_MAX, AP left on Sunday).
    AP pay only for the coach's own actions (office, roll call); trainings are free (0–MAX_TRAININGS, Mon–Fri).
-   Sunday review: 0 trainings → Board / Parents EMPTY_*; ≥ HEAVY_FROM trainings → Parents HEAVY_PARENTS. */
+   Sunday review: 0 trainings → Board / Parents EMPTY_*; ≥ HEAVY_FROM trainings → Parents HEAVY_PARENTS.
+   v3.21: the k-th empty week in a row (state.week.emptyStreak) → Board / Parents EMPTY_* × k, capped at EMPTY_CAP each;
+   any training with at least one kid present resets the streak. */
 const WEEK = { AP_BASE: 4, AP_MAX: 7, CARRY_MAX: 2, WIN_BONUS: 1, MAX_TRAININGS: 5, DEFAULT_REGIME: 'match', DEFAULT_DAYS: ['tue', 'thu'],
-  WARN_HEAVY: 3, WARN_OVER: 4, EMPTY_BOARD: -2, EMPTY_PARENTS: -2, HEAVY_FROM: 4, HEAVY_PARENTS: -2,
+  WARN_HEAVY: 3, WARN_OVER: 4, EMPTY_BOARD: -2, EMPTY_PARENTS: -2, EMPTY_CAP: -6, HEAVY_FROM: 4, HEAVY_PARENTS: -2,
   KEYS: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], PLAN_KEYS: ['mon', 'tue', 'wed', 'thu', 'fri'] };
+/* v3.21 COHESION — one team value 0–100 (state.cohesion), all numbers are TEST values.
+   Sunday: C ← clamp(C × DECAY + GAIN × T_eff, 0, 100), T_eff = Σ (kids who trained / squad size) over the week's trainings, ≤ T_CAP.
+   Equilibrium ≈ 0 / 40 / 80 / 100 for 0 / 1 / 2 / 3 full trainings; from 50 with empty weeks 35 → 25 → 17 → 12.
+   Match: (C − 50) / 50 × MAX (below 50) / × MAX_UP (above 50) on PASS duels only (the passer + receiver side, and the reading / intercepting side) — never shots,
+   dribbles, tackles or the keeper. AI clubs: a fixed AI (they train Tue / Thu; their weeks are not simulated).
+   Knocks: our kids' in-match knock chance × (1 + max(0, 50 − C) / KNOCK_DIV). BANDS = lower bounds of the band words (no numbers in the UI).
+   LOW = the Monday briefing / Match Summary cause line below this value. */
+const COH = { START: 50, DECAY: 0.7, GAIN: 12, T_CAP: 3, MAX: 2.0, MAX_UP: 0.7, AI: 60, KNOCK_DIV: 100, LOW: 35,
+  BANDS: [{ min: 80, key: 'clock' }, { min: 60, key: 'good' }, { min: 40, key: 'normal' }, { min: 20, key: 'weak' }, { min: 0, key: 'apart' }] };
+const cohBand = c => COH.BANDS.find(b => (c ?? COH.START) >= b.min).key;
+/** Duel bonus for a side with cohesion c (null / undefined = neutral, so engines built without cohesion are unchanged). */
+const cohBonus = c => { if (c == null) return 0; const x = (clamp(c, 0, 100) - 50) / 50; return x * (x < 0 ? COH.MAX : COH.MAX_UP); };
+/* v3.21 POLICY HARNESS (ui.autoSim({ policy }), test/policy.js) — how each scripted coach plans his week. */
+const POLICY = { NAMES: ['first', 'empty', 'reference', 'overload'],
+  DAYS: { first: [], empty: [], reference: ['tue', 'thu'], overload: ['mon', 'tue', 'wed', 'thu', 'fri'] } };
 /* v3.13 ATTENDANCE CURVE — chance to turn up for the k-th training of the week (index 0…4), only from the 3rd one.
    chance = curve[k] + (discipline − 10)/10 × DISC − (energy < TIRED ? TIRED_PEN : 0), clamped MIN–MAX; seeded(date + '#load#' + id). */
 const ATTEND_CURVE = [1, 1, 0.7, 0.5, 0.3];
@@ -2629,7 +2659,7 @@ const FINANCE = { RENT: 100, RENT_LATE_BOARD: -3,
   FEES: { low: { fee: 5, pp: 0.10, rep: { parents: 2 } }, normal: { fee: 10 }, high: { fee: 15, mult: { poor: 0.6, middle: 0.9 }, rep: { parents: -3 } } },
   FEE_LEVELS: ['low', 'normal', 'high'], DEFAULT_LEVEL: 'normal',
   PAY: { first: { rich: 0.95, middle: 0.80, poor: 0.40 }, reminded: { rich: 1, middle: 0.90, poor: 0.50 }, later: { rich: 0.50, middle: 0.45, poor: 0.25 } },
-  NEXT_CHANCE: 0.9, HALF_CHANCE: 1, SPENT_DISC: 7, SPENT_SHARE: 0.5,
+  NEXT_CHANCE: 0.9, HALF_CHANCE: 1, MIN_TRAININGS: 4, LOW_TRAINING_PAY: 0.5, SPENT_DISC: 7, SPENT_SHARE: 0.5,
   FORGIVE_MORALE: 5, TELL_MORALE: -8, TELL_DISC: 1, TELL_PARENTS: 2, WAIVE_MORALE: 8, WAIVE_SQUAD: 2 };
 /** Chance to pay one fee roll: the wealth table for the kind of roll, then the month's level modifier, clamped 0–1. */
 const feeChance = (wealth, kind, level) => {
@@ -4651,6 +4681,39 @@ Object.assign(I18N.ru, {
   'clue.voice.self': 'Говорит, что лучше бы ему {s}.', 'clue.voice.role': 'ему бы {s}.', 'clue.voice.misfit': 'роль «{r}» ему не подходит.',
   'clue.voice.lead.high': 'После поражения взял вину на себя.', 'clue.voice.lead.low': 'После поражения искал оправдания.',
 });
+/* ---------- v3.21 "Cohesion": band words (never numbers), the cause lines, empty-week streak, fees, DEBUG ---------- */
+Object.assign(I18N.en, {
+  'coh.band.apart': 'falling apart', 'coh.band.weak': 'weak', 'coh.band.normal': 'normal', 'coh.band.good': 'good', 'coh.band.clock': 'like clockwork',
+  'coh.line': 'Cohesion: <b>{b}</b>', 'coh.tip': 'How well the boys play together. It grows with trainings the kids actually attend and fades in weeks without them. It shows in the passing.',
+  'coh.low.0': 'Passes aren\'t connecting — the boys haven\'t played together for a while.',
+  'coh.low.1': 'The passing has gone ragged: they hardly know where a teammate will be.',
+  'coh.low.2': 'The boys look like strangers on the pitch — too long without playing together.',
+  'coh.cause': 'Little training this month showed in the passing.',
+  'coh.diary.up': 'The boys are playing together better — cohesion: {b}.', 'coh.diary.down': 'The team is losing its touch — cohesion: {b}.',
+  'week.empty2': 'The gym stood empty again — the second week in a row. The board and the parents are asking questions.',
+  'week.empty3': 'Another empty week ({n} in a row). People in town say the academy has stopped training.',
+  'fee.lowTraining': 'Parents ask what they\'re paying for: hardly any trainings this month.',
+  'dbg.coh': 'COH', 'dbg.cohTip': 'v3.21 team cohesion 0–100 (players see only the band word)',
+  'dbg.att': 'Attention', 'dbg.att.week': 'this week', 'dbg.att.season': 'season',
+  'dbg.att.row': '{w}: {c} clicks{pw} · first button {f} · median {m} after the text · under 0.5 s {x}', 'dbg.att.pw': ' ({n}/week)', 'dbg.att.none': '{w}: no choices yet',
+  'dbg.streak': 'empty weeks in a row',
+});
+Object.assign(I18N.ru, {
+  'coh.band.apart': 'развалена', 'coh.band.weak': 'слабая', 'coh.band.normal': 'обычная', 'coh.band.good': 'хорошая', 'coh.band.clock': 'как часы',
+  'coh.line': 'Сыгранность: <b>{b}</b>', 'coh.tip': 'Насколько ребята понимают друг друга на поле. Растёт от тренировок, на которые дети приходят, и тает в неделю без них. Видна по передачам.',
+  'coh.low.0': 'Передачи не идут — ребята давно не играли вместе.',
+  'coh.low.1': 'Пас разладился: ребята не знают, где окажется партнёр.',
+  'coh.low.2': 'На поле ребята как чужие — слишком давно не играли вместе.',
+  'coh.cause': 'Мало тренировались — это было видно по передачам.',
+  'coh.diary.up': 'Ребята стали лучше понимать друг друга — сыгранность: {b}.', 'coh.diary.down': 'Команда теряет игру — сыгранность: {b}.',
+  'week.empty2': 'Зал снова пустовал — вторую неделю подряд. У правления и родителей появились вопросы.',
+  'week.empty3': 'Ещё одна пустая неделя (подряд — {n}). В городе говорят, что академия перестала тренироваться.',
+  'fee.lowTraining': 'Родители спрашивают, за что платят: тренировок в этом месяце почти нет.',
+  'dbg.coh': 'COH', 'dbg.cohTip': 'v3.21 сыгранность команды 0–100 (игрок видит только слово)',
+  'dbg.att': 'Внимание', 'dbg.att.week': 'эта неделя', 'dbg.att.season': 'сезон',
+  'dbg.att.row': '{w}: нажатий {c}{pw} · первая кнопка {f} · медиана {m} после текста · быстрее 0,5 с {x}', 'dbg.att.pw': ' ({n}/нед.)', 'dbg.att.none': '{w}: выборов пока нет',
+  'dbg.streak': 'пустых недель подряд',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -5446,6 +5509,7 @@ class GameState {
     this.today = null; this.week = null; this.away = null; this.worldEvent = null; this.worldLast = null;   // (v3.14 world events)
     this.review = null; this.lossStreak = 0;   // v3.19 REVIEW.EXE + losses in a row
     this.after = null; this.parentComplaints = [];   // v3.20 AFTER_GAME.EXE + parents' "wrong role" complaints
+    this.cohesion = COH.START; this.stats = {};   // v3.21 team cohesion + DEBUG attention metrics
     this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {};   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
@@ -6042,13 +6106,17 @@ class GameState {
   /** The current week (Mon–Sun), created lazily when the calendar enters a new week (never rolls backwards). */
   weekState() {
     const start = weekStartOf(this.calendar.date), w = this.week;
-    if (w && w.start >= start) { w.lessons ||= GameState.noLessons(); return w; }   // v3.16: lazy migration → no lessons
+    if (w && w.start >= start) {
+      w.lessons ||= GameState.noLessons();   // v3.16: lazy migration → no lessons
+      if (w.teff == null) { w.teff = Math.min(COH.T_CAP, w.trainingsDone || 0); w.present = !!w.trainingsDone; w.emptyStreak ||= 0; }   // v3.21: old saves (done = full)
+      return w;
+    }
     const prev = w && isoAdd(w.start, 7) === start ? w : null;
     const carry = prev ? Math.min(WEEK.CARRY_MAX, Math.max(0, prev.ap)) : 0;
     const win = this.lastResult() === 'W' ? WEEK.WIN_BONUS : 0;
     const ap = Math.min(WEEK.AP_MAX, WEEK.AP_BASE + carry + win);
     this.week = { start, plan: Object.fromEntries(WEEK.PLAN_KEYS.map(k => [k, null])), lessons: GameState.noLessons(), confirmed: false, ap, carry, trainingsDone: 0,
-      apSources: { base: WEEK.AP_BASE, carry, win, total: ap } };
+      apSources: { base: WEEK.AP_BASE, carry, win, total: ap }, teff: 0, present: false, emptyStreak: w?.emptyStreak || 0 };   // v3.21: cohesion input + empty-week streak
     if (!this.plannableDays().length) {   // nothing left to plan (the season opens on a Sunday): a stub week, no AP to carry
       Object.assign(this.week, { confirmed: true, ap: 0, carry: 0, apSources: { base: 0, carry: 0, win: 0, total: 0 } });
     }
@@ -6204,21 +6272,57 @@ class GameState {
     return true;
   }
   confirmWeek() { this.weekState().confirmed = true; this.save(); }
-  /** Sunday (daily hook): an empty gym or an overloaded week upsets the factions. */
+  /** Sunday (daily hook): an empty gym or an overloaded week upsets the factions.
+      v3.21: the team's cohesion is recalculated first; the k-th empty week in a row costs Board / Parents 2k (capped). */
   weekReview(date) {
     const w = this.weekState(), first = this.calendar.events[0] && isoAdd(this.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
     if (weekKey(date) !== 'sun' || weekStartOf(date) !== w.start || (first && w.start < first)) return null;
-    if (!w.trainingsDone) {
-      this.addRep('board', WEEK.EMPTY_BOARD); this.addRep('parents', WEEK.EMPTY_PARENTS);
-      this.addDiary({ date, key: 'week.empty', cls: 'ev' });
+    this.updateCohesion(date);
+    if (!w.present) {   // no training with a kid in it this week
+      const k = w.emptyStreak = (w.emptyStreak || 0) + 1;
+      this.addRep('board', Math.max(WEEK.EMPTY_CAP, WEEK.EMPTY_BOARD * k)); this.addRep('parents', Math.max(WEEK.EMPTY_CAP, WEEK.EMPTY_PARENTS * k));
+      this.addDiary({ date, key: k >= 3 ? 'week.empty3' : k === 2 ? 'week.empty2' : 'week.empty', vars: { n: k }, cls: 'ev' });
       return 'empty';
     }
+    w.emptyStreak = 0;
     if (w.trainingsDone >= WEEK.HEAVY_FROM) {
       this.addRep('parents', WEEK.HEAVY_PARENTS);
       this.addDiary({ date, key: 'week.heavy', vars: { n: w.trainingsDone }, cls: 'ev' });
       return 'heavy';
     }
     return null;
+  }
+  /** v3.21: Sunday — C ← clamp(C × DECAY + GAIN × T_eff, 0, 100); a diary line only when the band word changes. */
+  updateCohesion(date = this.calendar.date) {
+    const w = this.weekState(), before = this.cohesion ?? COH.START, band0 = cohBand(before);
+    this.cohesion = clamp(before * COH.DECAY + COH.GAIN * Math.min(COH.T_CAP, w.teff || 0), 0, 100);
+    const band = cohBand(this.cohesion);
+    if (band !== band0) this.addDiary({ date, key: 'coh.diary.' + (this.cohesion > before ? 'up' : 'down'), vars: { b: { coh: band } }, cls: 'ev' });
+    return this.cohesion;
+  }
+  /** v3.21 DEBUG attention metrics (lazy): one answered choice window — first button?, ms from "ready" to the click (null = unknown). */
+  noteAttention({ first = false, dt = null } = {}) {
+    const st = (this.stats ||= {}), a = (st.attention ||= {}), wk = this.calendar?.date ? weekStartOf(this.calendar.date) : null;
+    if (!a.season || a.season.season !== this.season) a.season = { season: this.season, weeks: [], clicks: 0, first: 0, dts: [] };
+    if (!a.week || a.week.start !== wk) a.week = { start: wk, clicks: 0, first: 0, dts: [] };
+    if (wk && !a.season.weeks.includes(wk)) a.season.weeks.push(wk);
+    for (const b of [a.week, a.season]) {
+      b.clicks++; if (first) b.first++;
+      if (Number.isFinite(dt)) { b.dts.push(Math.round(dt)); if (b.dts.length > 300) b.dts.shift(); }
+    }
+  }
+  /** v3.21: { clicks, perWeek, first (share), median (s), fast (share < 0.5 s) } of the current week / season, or null. */
+  attentionSummary(which) {
+    const a = this.stats?.attention, b = a?.[which];
+    if (!b || (which === 'week' && b.start !== weekStartOf(this.calendar.date)) || (which === 'season' && b.season !== this.season)) return null;
+    const d = [...b.dts].sort((x, y) => x - y), med = d.length ? (d.length % 2 ? d[(d.length - 1) / 2] : (d[d.length / 2 - 1] + d[d.length / 2]) / 2) : null;
+    return { clicks: b.clicks, perWeek: which === 'season' ? b.clicks / Math.max(1, b.weeks.length) : b.clicks, first: b.clicks ? b.first / b.clicks : 0,
+      median: med == null ? null : med / 1000, fast: d.length ? d.filter(x => x < 500).length / d.length : null, timed: d.length };
+  }
+  /** v3.21 (policy `reference`): does any of this kid's ✓ confirmed clues point at this role's signal? */
+  static roleConfirmed(p, roleId) {
+    const sig = ROLE_BY_ID[roleId]?.signal, list = p?.clues || [];
+    return !!sig && list.some(c => c.signal === sig && clueConfirmed(list, c));
   }
   /* ---------- v2.8 faction reputation ---------- */
   addRep(key, delta) { if (this.rep && key in this.rep) this.rep[key] = clamp(Math.round(this.rep[key] + delta), 0, 100); }
@@ -6407,7 +6511,8 @@ class GameState {
     let attended = 0;
     if (training) { const lk = this.runLocker(true, date || this.calendar.date); lk.done = true; }   // auto-sim: arrivals are rolled without the view
     else this.clearDayStatus();
-    if (training && date && weekStartOf(date) === this.weekState().start) this.week.trainingsDone++;   // v3.13: Sunday review
+    const thisWeek = training && date && weekStartOf(date) === this.weekState().start;
+    if (thisWeek) this.week.trainingsDone++;   // v3.13: Sunday review
     const wc = training ? this.worldRow(this.worldEventOn(date || this.calendar.date)?.id)?.effect.condition || 0 : 0;   // v3.14: tests week — tired trainees
     for (const p of this.squad) {
       const present = training && p.available;   // v2.6: only kids who came to the locker room train
@@ -6432,6 +6537,10 @@ class GameState {
         p.dyn.sharpness = Math.max(SHARPNESS.FLOOR, p.dyn.sharpness + SHARPNESS.DAILY);
       }
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
+    }
+    if (thisWeek && attended) {   // v3.21 cohesion: the share of the squad that trained; a kid present ends the empty-week streak
+      this.week.teff = (this.week.teff || 0) + attended / Math.max(1, this.squad.length);
+      this.week.present = true; this.week.emptyStreak = 0;
     }
     this.tickInjuries();
     this.league?.aiDay(!!date && isTrainingDay(date));   // v3.4: AI clubs rest / train on the same calendar (v3.13: always Tue / Thu)
@@ -6621,12 +6730,16 @@ class GameState {
     if (!f || f.closed || f.month !== this.monthOf(date)) return [];
     const kind = f.started ? null : 'first', paid = [];
     f.started = true;
+    f.trn = (f.trn || 0) + 1;   // v3.21: this month's trainings (today included)
+    const low = this.lowTrainingMonth(date);
+    if (low && !f.lowNoted) { f.lowNoted = true; this.addDiary({ date, key: 'fee.lowTraining', cls: 'ev' }); }
     for (const p of this.squad) {
       const id = p.id;
       if (absent[id] || !f.status[id]) continue;
       const st = f.status[id], half = st === 'half' && !f.got[id];
       if (st !== 'owed' && !half) continue;
-      const chance = half ? FINANCE.HALF_CHANCE : f.next[id] ?? feeChance(p.wealth, kind || (f.reminded[id] ? 'reminded' : 'later'), f.level);
+      const chance = (half ? FINANCE.HALF_CHANCE : f.next[id] ?? feeChance(p.wealth, kind || (f.reminded[id] ? 'reminded' : 'later'), f.level))
+        * (low ? FINANCE.LOW_TRAINING_PAY : 1);   // v3.21: "what are we paying for?" 
       delete f.reminded[id]; delete f.next[id];   // consumed by this roll
       if (seeded(f.month + '#fee#' + id + '#' + date)() >= chance) continue;
       const due = this.feeDue(id), amt = half ? Math.ceil(due / 2) : due;
@@ -6635,6 +6748,16 @@ class GameState {
       paid.push(id);
     }
     return paid;
+  }
+  /** v3.21: will this month stay under FINANCE.MIN_TRAININGS trainings? Rolled at each fee collection (simple projection):
+      trainings so far this month (today included) + the rest of this week's plan in this month + this week's pace × the weekdays
+      left in the month after this week / 5. Under the minimum → every fee chance × LOW_TRAINING_PAY. */
+  lowTrainingMonth(date = this.calendar.date) {
+    const f = this.fees, m = this.monthOf(date), w = this.weekState(), wkEnd = isoAdd(w.start, 6);
+    const rest = this.weekDays().filter(d => d.date > date && d.date.startsWith(m) && this.isOurTraining(d.date)).length;
+    let days = 0;
+    for (let d = isoAdd(wkEnd, 1); d.startsWith(m); d = isoAdd(d, 1)) if (WEEK.PLAN_KEYS.includes(weekKey(d))) days++;
+    return (f?.trn || 0) + rest + this.trainingsPlanned() * days / 5 < FINANCE.MIN_TRAININGS;
   }
   /** Locker Room [ Remind ] (free): consumed by this kid's next roll. */
   remindFee(id) { const f = this.fees; if (f && this.feeOwes(id)) { f.reminded[id] = true; this.save(); return true; } return false; }
@@ -6680,7 +6803,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, after: this.after || null, parentComplaints: this.parentComplaints || [], notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -6707,6 +6830,8 @@ class GameState {
       this.worldLast = typeof d.worldLast === 'string' ? d.worldLast : null;
       this.worldSalt = typeof d.worldSalt === 'string' ? d.worldSalt : null;   // v3.15 (old saves: set on the next Monday roll)
       this.ledger = d.ledger && typeof d.ledger === 'object' ? d.ledger : {};   // v3.15 (missing → {})
+      this.cohesion = Number.isFinite(d.cohesion) ? clamp(d.cohesion, 0, 100) : COH.START;   // v3.21 (old saves → 50)
+      this.stats = d.stats && typeof d.stats === 'object' ? d.stats : {};   // v3.21 (attention: lazy)
       this.fees = d.fees && typeof d.fees === 'object' && d.fees.status ? { reminded: {}, reason: {}, carry: {}, next: {}, got: {}, ...d.fees } : null;
       this.expelled = Array.isArray(d.expelled) ? d.expelled : [];   // v2.9
       const r = d.rep || {};   // v2.8 (older saves start neutral)
@@ -6803,6 +6928,11 @@ class MatchEngine {
     this.oppMentality = opts.oppMentality || 'balanced';   // v3.3: the away side's shout (AI stays balanced; test/balance.js mirrors setups)
     this.forceWin = !!opts.forceWin;
     this.repBonus = clamp(((opts.squadRep ?? 50) - 50) / REP.SQUAD_BONUS, -2, 2);   // v2.8
+    // v3.21 cohesion [home, away] (null = neutral → no change at all, e.g. test/balance.js): a flat bonus on PASS duels only
+    // (passer + receiver vs the reader / interceptor); our knocks get likelier when the team hasn't trained (side 0 only)
+    this.cohesion = Array.isArray(opts.cohesion) ? opts.cohesion.map(c => c ?? null) : [null, null];
+    this.cohB = this.cohesion.map(c => cohBonus(c));
+    this.knockMult = 1 + Math.max(0, 50 - (this.cohesion[0] ?? 50)) / COH.KNOCK_DIV;
     // v3.7 hidden captain trait state + its OWN seeded stream (never Math.random → the match RNG order is untouched;
     // visual and Quick Sim run the same tick(), so the same match gives the same captain moments)
     this.capRng = seeded('cap|' + home.name + '|' + away.name + '|' + (opts.md ?? ''));
@@ -6994,7 +7124,7 @@ class MatchEngine {
   maybeInjure(p, side) {
     if (this.injured.has(p.id) || this.sentOff.has(p.id)) return;
     const str = p.physical?.strength ?? 10;
-    if (Math.random() >= MatchEngine.INJURY.CHANCE * (1.4 - str * 0.04)) return;
+    if (Math.random() >= MatchEngine.INJURY.CHANCE * (1.4 - str * 0.04) * (side === 0 ? this.knockMult : 1)) return;   // v3.21: not warmed up
     this.injured.add(p.id);
     this.energy.set(p.id, Math.max(0, this.energy.get(p.id) - MatchEngine.INJURY.ENERGY));
     this.addEvent('injury', p, side);
@@ -7051,12 +7181,13 @@ class MatchEngine {
     const stress = side === 0 ? this.captainStress(p) : 0;   // v3.7: anxious captain under the armband
     if (stress) flat = { ...flat, stress };
     let fl = 0; for (const k in flat) fl += flat[k];
-    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, total: stat + mood + rand + fl + m.v };
+    const coh = opt.coh || 0;   // v3.21: team cohesion (pass duels only)
+    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, coh, total: stat + mood + rand + fl + m.v + coh };
   }
   /** v3.4: record a duel in the match log (A = side in possession). */
   tr(kind, side, A, D, out) {
     const pack = r => ({ id: r.p.id, name: r.p.name, energy: Math.round(this.energy.get(r.p.id) ?? r.p.energy ?? 100), rating: r.rating, fat: r.fat, tag: r.tag, stat: r.stat, mood: r.mood, rand: r.rand,
-      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, cheat: r.cheat, total: r.total });
+      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, coh: r.coh || 0, cheat: r.cheat, total: r.total });
     this.trace.push({ min: this.minute, kind, side, zone: this.zone, A: pack(A), D: pack(D), margin: A.total - D.total, out });
   }
   counts(side) {
@@ -7304,8 +7435,8 @@ class MatchEngine {
     // a forward ball into the final third leans on crossing.
     const touch = ((recv.skill?.('firstTouch') ?? 10) - 10) * 0.15;
     const cross = forward && tz === 2 ? ((c.skill?.('crossing') ?? 10) - 10) * 0.1 : 0;
-    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) });
-    const D = this.rs(def, 'Mark', opp, 'def');
+    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) }, { coh: this.cohB[side] });
+    const D = this.rs(def, 'Mark', opp, 'def', {}, { coh: this.cohB[opp] });   // v3.21: the interception side's cohesion
     const vars = { a: c, b: recv, d: def };
     this.tr(forward ? 'passFwd' : 'pass', side, A, D, A.total >= D.total ? 'ok' : 'intercepted');
 
@@ -7476,20 +7607,20 @@ class MatchEngine {
       const avg = f => own.length ? r2(own.reduce((a, x) => a + f(x), 0) / own.length) : 0;
       return { name: s.name, formation: s.formation, score: s.score, user: s.user, possession: r2(this.possTicks[i] / ((this.possTicks[0] + this.possTicks[1]) || 1)),
         totals: this.teamTotals(i), duels: kinds,
-        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cheat: avg(x => x.cheat) },
+        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cohesion: avg(x => x.coh || 0), cheat: avg(x => x.cheat) },
         players: s.all.map(p => ({ id: p.id, name: p.name, line: this.lineOf.get(p.id), sentOff: this.sentOff.has(p.id), subbedOff: this.subbedOff.has(p.id),
           energyStart: Math.round(this.startEnergy?.get(p.id) ?? p.energy ?? 100), energyEnd: Math.round(this.energy.get(p.id) ?? 0),
           fatigueStart: r2(fatigueMult(this.startEnergy?.get(p.id) ?? p.energy ?? 100)), fatigueEnd: r2(fatigueMult(this.energy.get(p.id) ?? 0)), stats: { ...this.st(p) } })) };
     };
     return { format: 'yam-match-log/1', version: typeof APP_VERSION === 'undefined' ? null : APP_VERSION, ...meta, minute: this.minute, finished: this.finished,
-      forceWin: this.forceWin, shouts: this.shouts, subs: this.subs, events: this.matchEvents, teams: [side(0), side(1)],
+      forceWin: this.forceWin, cohesion: this.cohesion, cohBonus: this.cohB, shouts: this.shouts, subs: this.subs, events: this.matchEvents, teams: [side(0), side(1)],
       trace: this.trace.map(t => ({ ...t, margin: r2(t.margin), A: MatchEngine.r2obj(t.A), D: MatchEngine.r2obj(t.D) })) };
   }
   static r2obj(o) { const out = {}; for (const k in o) out[k] = typeof o[k] === 'number' ? Math.round(o[k] * 100) / 100 : k === 'flat' ? MatchEngine.r2obj(o[k]) : o[k]; return out; }
   /** One CSV row per duel (comma-separated, dot decimals, UTF-8). `pre` = extra leading columns (e.g. setup / match no.). */
   static traceCsv(trace, sides, pre = null) {
     const f = v => (typeof v === 'number' ? String(Math.round(v * 100) / 100) : `"${String(v ?? '').replace(/"/g, '""')}"`);
-    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'cheat', 'total'];
+    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'coh', 'cheat', 'total'];   // v3.21: + coh
     const head = [...(pre ? Object.keys(pre) : []), 'minute', 'kind', 'team', 'zone', ...part.map(k => 'atk_' + k), ...part.map(k => 'def_' + k), 'margin', 'outcome'];
     const cell = (x, k) => k === 'flat' ? f(Object.entries(x.flat || {}).filter(([, v]) => v).map(([n, v]) => `${n}:${Math.round(v * 100) / 100}`).join(' ')) : f(x[k]);
     const rows = trace.map(t => [...(pre ? Object.values(pre).map(f) : []), t.min, f(t.kind), f(sides?.[t.side] ?? t.side), t.zone,
@@ -7577,8 +7708,24 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.20';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.21';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.21', name: { en: 'Cohesion', ru: 'Сыгранность' },
+    en: [
+      'Training matters now. The team has one Cohesion level: it grows with trainings the kids actually attend and fades in every week without them. You only ever see a word — from "falling apart" to "like clockwork" — in PLANNER.EXE, the Monday briefing and the Match Summary.',
+      'Cohesion shows in the passing: a team that hasn\'t played together loses more passes and reads the opponent\'s worse. Shots, dribbles, tackles and the keeper are not affected. Kids who haven\'t run in a while also pick up knocks more easily.',
+      'When it slips, you are told why: "Passes aren\'t connecting — the boys haven\'t played together for a while". After a loss or a draw the Match Summary names the cause.',
+      'Empty weeks in a row cost more each time: Board and Parents −2, then −4, then −6. One training with the kids in it ends the streak. A month with hardly any trainings: parents pay their fees less willingly ("what are we paying for?").',
+      'For developers: scripted coaches (`autoSim({ policy })`, `test/policy.js`) and skimming metrics in DEBUG.EXE (Attention block, COH; SKIP% is now TRN-SKIP).',
+    ],
+    ru: [
+      'Тренировки теперь важны. У команды есть сыгранность: она растёт от тренировок, на которые дети приходят, и тает в каждую неделю без них. Видно только слово — от «развалена» до «как часы» — в PLANNER.EXE, сводке понедельника и итогах матча.',
+      'Сыгранность видна по передачам: команда, которая давно не играла вместе, чаще теряет мяч на пасе и хуже читает чужие передачи. Удары, обводка, отбор и вратарь от неё не зависят. Кто давно не бегал, ещё и легче получает ушибы.',
+      'Когда сыгранность падает, причина названа: «Передачи не идут — ребята давно не играли вместе». После поражения или ничьей итог матча говорит, в чём дело.',
+      'Пустые недели подряд бьют сильнее: Правление и Родители −2, потом −4, потом −6. Одна тренировка, на которую пришли дети, обнуляет серию. Месяц почти без тренировок — родители платят взносы неохотнее («за что мы платим?»).',
+      'Для разработки: скриптовые тренеры (`autoSim({ policy })`, `test/policy.js`) и метрики пролистывания в DEBUG.EXE (блок «Внимание», COH; SKIP% теперь TRN-SKIP).',
+    ],
+  },
   { v: '3.20', name: { en: 'After the game', ru: 'После игры' },
     en: [
       'A win gives strength, a loss gives understanding. After a defeat AFTER_GAME.EXE opens: three remarks from kids (and sometimes a mum or dad), you listen to one. [ CONTINUE ] waits for your choice.',
@@ -9208,7 +9355,7 @@ class DebugConsole {
     add('ENGINE', 'INJ', p => p.injuryDays || 0, null, 'v2.2 injury: calendar days left');
     add('ENGINE', 'SUS', p => p.suspensionMatches || 0, null, 'v2.2 suspension: matches left');
     add('ENGINE', 'HOME', p => p.awayDays || 0, null, 'v2.3 kept at home by a parent: days left');
-    add('ENGINE', 'SKIP%', p => Math.round(arrivalSkipChance(p) * 100), null, 'v2.6 chance to skip the locker room (from discipline)');
+    add('ENGINE', 'TRN-SKIP', p => Math.round(arrivalSkipChance(p) * 100), null, 'v2.6 chance (%) to skip a training / the locker room (from discipline); v3.21: renamed from SKIP%');
     add('ENGINE', 'ABS', p => p.absentToday || '—', null, 'v2.6 absent today');
     add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
     return c;
@@ -9273,9 +9420,21 @@ class DebugConsole {
       const vals = squad.map(c.v).filter(v => typeof v === 'number');
       return vals.length && c.s ? `<td>${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}</td>` : '<td></td>';
     }).join('');
-    return `<p class="dbg-hint">${esc(L.t('dbg.dbHint'))}</p>
+    return `<p class="dbg-hint">${esc(L.t('dbg.dbHint'))}</p>${this.teamHTML()}
       <div class="dbg-scroll"><table class="dbg-table"><thead><tr>${head1}</tr><tr>${head2}</tr></thead>
       <tbody>${rows}</tbody><tfoot><tr>${avg}</tr></tfoot></table></div>`;
+  }
+
+  /** v3.21: team-level values — COH (the number the player never sees), the empty-week streak, and the Attention block
+      (skimming metrics from state.stats.attention: clicks, first-button share, median time after the text, share under 0.5 s). */
+  teamHTML() {
+    const s = this.ui.state, w = s.weekState(), pc = v => v == null ? '—' : Math.round(v * 100) + '%';
+    const row = which => { const a = s.attentionSummary(which), w0 = L.t('dbg.att.' + which);
+      return a ? L.t('dbg.att.row', { w: w0, c: a.clicks, pw: which === 'season' ? L.t('dbg.att.pw', { n: a.perWeek.toFixed(1) }) : '', f: pc(a.first),
+        m: a.median == null ? '—' : a.median.toFixed(2) + ' s', x: pc(a.fast) }) : L.t('dbg.att.none', { w: w0 }); };
+    return `<div class="dbg-team" id="dbg-team"><span title="${esc(L.t('dbg.cohTip'))}"><b>${L.t('dbg.coh')}</b> <span id="dbg-coh">${Math.round(s.cohesion ?? COH.START)}</span> (${esc(L.t('coh.band.' + cohBand(s.cohesion)))})</span>
+      <span>${esc(L.t('dbg.streak'))}: <b>${w.emptyStreak || 0}</b></span>
+      <span class="dbg-att" id="dbg-att"><b>${esc(L.t('dbg.att'))}</b> · ${esc(row('week'))} &nbsp;|&nbsp; ${esc(row('season'))}</span></div>`;
   }
 
   godHTML() {
@@ -10020,7 +10179,10 @@ class DialogueView {
     this.layer.addEventListener('click', e => {
       const b = e.target.closest('.talk-btn');
       if (this.typer) { if (e.target.closest('.talk-text')) this.finishTyping(); return; }   // v3.17: no choice until the line is fully typed
-      if (b && !b.disabled && this.choices) this.engine.choose(this.choices[+b.dataset.i]);
+      if (b && !b.disabled && this.choices) {   // v3.21 attention: time from the fully typed line to the click
+        this.ui.noteChoice('talk', +b.dataset.i, this.options(), this.readyAt ? performance.now() - this.readyAt : null);
+        this.engine.choose(this.choices[+b.dataset.i]);
+      }
       else if (e.target.closest('.talk-text')) this.finishTyping();
     });
   }
@@ -10046,13 +10208,29 @@ class DialogueView {
         ${short ? `<small class="tb-why">${esc(why)}</small>` : ''}</button>`;
     }).join('');
     this.layer.hidden = false;
+    this.readyAt = null;
     this.type(text);
     if (!this.typer) this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
+    if (this.ui.autoPolicy) { clearTimeout(this.autoT); this.autoT = setTimeout(() => this.autoPick(), 0); }   // v3.21: a scripted coach answers
+  }
+  /** v3.21: the buttons as policyPick() sees them (greyed = enabled: false). */
+  options() {
+    const s = this.ui.state;
+    return (this.choices || []).map(c => ({ key: c.key, enabled: !((c.cost && !s.canAfford(c.cost)) || c.blocked || (c.ap && s.ap < c.ap)), gain: c.gain || 0, cost: c.cost || 0 }));
+  }
+  /** v3.21: policy runs — the open dialogue is answered through ui.policyPick('talk:<event id>'). */
+  autoPick() {
+    clearTimeout(this.autoT); this.autoT = null;
+    if (!this.ui.autoPolicy || this.layer.hidden || !this.choices) return;
+    this.finishTyping();
+    const pe = this.ui.state.pendingEvent, i = this.ui.policyPick('talk:' + (pe?.id || '?'), this.options());
+    this.engine.choose(this.choices[i]);
   }
   /** v3.17: while the line is typing every choice is disabled (Win98 grey); `data-short` keeps the money / AP / blocked reasons. */
   setWaiting(on) {
     this.layer.classList.toggle('talk-typing', on);
     for (const b of this.layer.querySelectorAll('.talk-btn')) b.disabled = on || b.dataset.short === '1';
+    if (!on) this.readyAt = performance.now();   // v3.21 attention: the line is fully on screen
     if (on) this.layer.querySelector('#talk-text').focus?.();
     else if (!this.layer.hidden) this.layer.querySelector('.talk-btn:not([disabled])')?.focus();
   }
@@ -10109,6 +10287,7 @@ class MatchSummary {
     this.rep = rep;
     this.render();
     this.layer.hidden = false;
+    this.shownAt = performance.now();   // v3.21 attention
     this.ui.setModalLock(true);   // v3.5: closes whatever was open behind and makes it inert
     (this.body.querySelector('[data-talk]:not([disabled])') || document.getElementById('msum-go')).focus();
     for (const id of ['msum-csv', 'msum-json']) document.getElementById(id).disabled = !this.log;
@@ -10132,6 +10311,7 @@ class MatchSummary {
     if (t) { t.classList.remove('nudge'); void t.offsetWidth; t.classList.add('nudge'); }
   }
   chooseTalk(key) {
+    if (this.pending) this.ui.noteChoice('word', TEAM_TALK.KEYS.indexOf(key), TEAM_TALK.KEYS.map(() => ({})), this.shownAt ? performance.now() - this.shownAt : null);   // v3.21 attention
     const fx = this.ui.state.applyTeamTalk(key);
     if (!fx) return;
     this.ui.renderAll();   // morale / reputation / diary changed (this also re-renders the summary)
@@ -10190,7 +10370,8 @@ class MatchSummary {
         <div class="ms-team home">${emblemHTML(me, 'lg')}<span>${esc(L.team(s.clubName))}</span></div>
         <div class="ms-score">${rep.gf} - ${rep.ga}</div>
         <div class="ms-team away">${emblemHTML(opp, 'lg')}<span>${esc(L.team(rep.opponent))}</span></div>
-        <div class="ms-sub"><span class="ms-res ${rep.result}">${L.t('res.' + rep.result)}</span><span>${L.t('ms.md', { n: rep.md })} · ${L.t('venue.' + rep.venue)}</span>${rep.ht ? `<span>${L.t('ms.ht')} ${rep.ht[0]}-${rep.ht[1]}</span>` : ''}${rep.instant ? `<span>${L.t('ms.quick')}</span>` : ''}</div>
+        <div class="ms-sub"><span class="ms-res ${rep.result}">${L.t('res.' + rep.result)}</span><span>${L.t('ms.md', { n: rep.md })} · ${L.t('venue.' + rep.venue)}</span>${rep.ht ? `<span>${L.t('ms.ht')} ${rep.ht[0]}-${rep.ht[1]}</span>` : ''}${rep.instant ? `<span>${L.t('ms.quick')}</span>` : ''}${rep.coh != null ? `<span class="ms-coh" title="${esc(L.t('coh.tip'))}">${L.t('coh.line', { b: L.t('coh.band.' + cohBand(rep.coh)) })}</span>` : ''}</div>
+        ${rep.coh != null && rep.coh < COH.LOW && rep.result !== 'W' ? `<div class="ms-cause">${L.t('coh.cause')}</div>` : ''}
       </div>
       <div class="ms-timeline">${col(true, L.team(s.clubName))}${col(false, L.team(rep.opponent))}</div>
       <div class="ms-stats">
@@ -10475,13 +10656,14 @@ class MorningBriefing {
     // v3.13: Monday — how this week's action points were made up
     const src = w.apSources || {}, apBox = document.getElementById('mb-ap');
     apBox.hidden = !(s.phase === 'calendar' && date === w.start);
-    apBox.innerHTML = apBox.hidden ? '' : L.t('mb.ap', { line: MorningBriefing.apLine(src) });
+    apBox.innerHTML = apBox.hidden ? '' : L.t('mb.ap', { line: MorningBriefing.apLine(src) }) + ` <span class="mb-coh">· ${MorningBriefing.cohLine(s)}</span>`;   // v3.21
     // v3.13 → v3.17: "while you were away" — new lines only (14-day mute), important first, routine collapsed
     const a = MorningBriefing.awayLines(s, date), box = document.getElementById('mb-away-box');
     this.shown = [...a.imp, ...a.rout];
     box.hidden = !this.shown.length;
     document.getElementById('mb-away').innerHTML = MorningBriefing.awayHTML(this.ui, a);
-    document.getElementById('mb-news').innerHTML = MorningBriefing.worldNews(s, date).map(n => `<li class="mb-world">${esc(n)}</li>`).join('')   // v3.14
+    document.getElementById('mb-news').innerHTML = (date === w.start ? MorningBriefing.cohNews(s, date) : []).map(n => `<li class="mb-cohlow">${esc(n)}</li>`).join('')   // v3.21
+      + MorningBriefing.worldNews(s, date).map(n => `<li class="mb-world">${esc(n)}</li>`).join('')   // v3.14
       + this.news(date).map(n => `<li>${esc(n)}</li>`).join('');
     const bar = (k) => { const v = s.rep[k];
       return `<div class="rep-row"><span class="rep-name">${L.t('rep.' + k)}</span><div class="rep-bar ${v >= 65 ? 'hi' : v <= 35 ? 'lo' : ''}"><i style="width:${v}%"></i></div><b>${v}</b><small>${L.t('rep.' + k + '.d')}</small></div>`; };
@@ -10534,6 +10716,14 @@ class MorningBriefing {
     const e = s.worldEvent;
     if (!e || s.phase !== 'calendar' || date !== e.weekStart) return [];
     return [L.t('world.news.' + e.id, { d: L.t('world.on.' + weekKey(e.days[0])) })];
+  }
+  /** v3.21: Monday — the band word and, when cohesion is low, one of COH.LOW phrasings (the week's number picks it,
+      so two weeks in a row never repeat). Words only. */
+  static cohLine(s) { return L.t('coh.line', { b: L.t('coh.band.' + cohBand(s.cohesion)) }); }
+  static cohNews(s, date) {
+    if (s.phase !== 'calendar' || (s.cohesion ?? COH.START) >= COH.LOW) return [];
+    const n = Math.floor(isoDays('2000-01-03', weekStartOf(date)) / 7);
+    return [L.t('coh.low.' + (((n % 3) + 3) % 3))];
   }
   /** v3.13: "Base 4 · Carried 1 · Win +1 = 6 AP" */
   static apLine(src) {
@@ -10662,7 +10852,7 @@ class WeekPlanner {
     if (this.ui.events.active) { this.ui.events.open(); return; }
     // v3.17: an unconfirmed week = Monday's one window (briefing + cash desk + plan). Re-planning later keeps the old order.
     if (s.weekState().confirmed && this.ui.isStopDay() && (s.kassaDue() || !s.dayState().briefed)) { this.ui.briefing.open(); return; }
-    if (this.layer.hidden) this.feeLevel = FINANCE.DEFAULT_LEVEL;
+    if (this.layer.hidden) { this.feeLevel = FINANCE.DEFAULT_LEVEL; this.shownAt = performance.now(); this.plan0 = JSON.stringify(s.weekState().plan); }   // v3.21 attention
     this.ui.modal.close(); this.ui.briefing.close(); this.ui.kassa.layer.hidden = true;
     this.render();
     this.layer.hidden = false;
@@ -10678,9 +10868,10 @@ class WeekPlanner {
     const s = this.state, w = s.weekState(), monday = !w.confirmed && s.phase === 'calendar', date = s.calendar.date;
     const box = document.getElementById('pl-brief'), kb = document.getElementById('pl-kassa');
     const a = monday ? MorningBriefing.awayLines(s, date) : { imp: [], rout: [] }, world = monday ? MorningBriefing.worldNews(s, date) : [];
+    const coh = monday ? MorningBriefing.cohNews(s, date) : [];   // v3.21: "Passes aren't connecting…" (cohesion low)
     this.shown = [...a.imp, ...a.rout];
-    box.hidden = !this.shown.length && !world.length;
-    box.innerHTML = box.hidden ? '' : world.map(n => `<div class="pl-world">&#10022; ${esc(n)}</div>`).join('')
+    box.hidden = !this.shown.length && !world.length && !coh.length;
+    box.innerHTML = box.hidden ? '' : coh.map(n => `<div class="pl-cohlow">${esc(n)}</div>`).join('') + world.map(n => `<div class="pl-world">&#10022; ${esc(n)}</div>`).join('')
       + (this.shown.length ? `<details class="pl-sec"${a.imp.length ? ' open' : ''}><summary>${esc(L.t('mb.away'))} (${this.shown.length})</summary><ul class="pl-away">${MorningBriefing.awayHTML(this.ui, a)}</ul></details>` : '');
     const cash = monday && s.kassaDue();
     kb.hidden = !cash;
@@ -10720,7 +10911,8 @@ class WeekPlanner {
     document.getElementById('pl-title').textContent = 'PLANNER.EXE — ' + L.t('pl.week', { d: fmtDate(w.start, { day: 'numeric', month: 'short' }) });
     document.getElementById('pl-head').innerHTML = `<span class="pl-ap" title="${esc(L.t('ap.tip'))}">${L.t('pl.ap', { n: w.ap, line: esc(MorningBriefing.apLine(src)) })}</span>
       <span class="pl-apleft">${L.t('pl.apLeft', { n: w.ap })}</span>
-      <span class="pl-note">${L.t('pl.note', { m: WEEK.MAX_TRAININGS })}</span>`;
+      <span class="pl-note">${L.t('pl.note', { m: WEEK.MAX_TRAININGS })}</span>
+      <span class="pl-coh coh-${cohBand(s.cohesion)}" title="${esc(L.t('coh.tip'))}">${L.t('coh.line', { b: L.t('coh.band.' + cohBand(s.cohesion)) })}</span>`;   // v3.21: words only
     const warn = WeekPlanner.warnKey(n);
     document.getElementById('pl-sum').innerHTML = `${L.t('pl.count', { n })}${warn ? ` <b class="${warn === 'pl.warn.over' ? 'over' : ''}">${esc(L.t(warn))}</b>` : n ? '' : ` <b>${esc(L.t('pl.warn.empty'))}</b>`}`;
     document.getElementById('pl-confirm').innerHTML = L.t('pl.confirm');
@@ -10753,6 +10945,8 @@ class WeekPlanner {
     const s = this.state;
     if (this.ui.events.active) return;
     if (!s.weekState().confirmed) {   // v3.17: Monday's one window — the cash desk and the briefing are confirmed with the plan
+      // v3.21 attention: "first button" = CONFIRM with the plan (and the fee) exactly as the window opened
+      this.ui.noteChoice('plan', 0, [{}], this.shownAt ? performance.now() - this.shownAt : null, JSON.stringify(s.weekState().plan) === this.plan0 && (this.feeLevel || FINANCE.DEFAULT_LEVEL) === FINANCE.DEFAULT_LEVEL);
       if (s.phase === 'calendar' && s.kassaDue()) s.confirmKassa(this.feeLevel || FINANCE.DEFAULT_LEVEL);
       s.dayState().briefed = true;
       if (this.shown) s.markNews(this.shown);
@@ -10795,6 +10989,7 @@ class CashDesk {
     this.level = FINANCE.DEFAULT_LEVEL;
     this.render();
     this.layer.hidden = false;
+    this.shownAt = performance.now();   // v3.21 attention
     document.getElementById('ks-confirm').focus();
   }
   close() { this.layer.hidden = true; this.ui.renderAll(); }
@@ -10832,6 +11027,7 @@ class CashDesk {
   confirm() {
     const s = this.state;
     if (this.ui.events.active || !s.kassaDue()) return;
+    this.ui.noteChoice('kassa', 0, [{}], this.shownAt ? performance.now() - this.shownAt : null, this.level === FINANCE.DEFAULT_LEVEL);   // v3.21: "first" = the preselected level
     s.confirmKassa(this.level);
     this.layer.hidden = true;
     this.ui.renderAll();
@@ -10855,10 +11051,10 @@ class ReviewView {
     this.cards.addEventListener('click', e => {
       const ban = e.target.closest('[data-ban]'), pick = e.target.closest('[data-pick]');
       if (ban && !ban.disabled) { if (this.state.reviewBanish(+ban.dataset.ban)) this.render(); return; }
-      if (pick && !pick.disabled && this.state.reviewPick(+pick.dataset.pick)) this.done();
+      if (pick && !pick.disabled) { this.note(+pick.dataset.pick); if (this.state.reviewPick(+pick.dataset.pick)) this.done(); }
     });
     document.getElementById('rv-reroll').addEventListener('click', () => { if (this.state.reviewReroll()) { this.render(); this.ui.renderBudget?.(); } });
-    document.getElementById('rv-skip').addEventListener('click', () => { if (this.state.reviewSkip()) this.done(); });
+    document.getElementById('rv-skip').addEventListener('click', () => { this.note(-1); if (this.state.reviewSkip()) this.done(); });
   }
   get isOpen() { return !this.layer.hidden; }
   get state() { return this.ui.state; }
@@ -10869,9 +11065,12 @@ class ReviewView {
     this.ui.modal.close(); this.ui.profile.close();
     this.render();
     this.layer.hidden = false;
+    this.shownAt = performance.now();   // v3.21 attention (no typewriter here)
     this.cards.querySelector('[data-pick]')?.focus();
     return true;
   }
+  /** v3.21 attention: the answer (−1 = Skip) and the time since the window was shown. */
+  note(i) { this.ui.noteChoice('review', i, [{}], this.shownAt ? performance.now() - this.shownAt : null, i === 0); }
   /** Only the state can close it (a choice was made). */
   close() { if (!this.state.reviewPending) this.layer.hidden = true; }
   done() { this.layer.hidden = true; this.ui.closeMatchday(); }
@@ -10939,6 +11138,8 @@ class AfterGameView {
       const b = e.target.closest('button[data-act]');
       if (!b || b.disabled) return;
       const s = this.state, a = b.dataset.act;
+      const all = [...this.layer.querySelectorAll('button[data-act]')];   // v3.21 attention: first button? time since the lead was typed
+      this.ui.noteChoice('after', all.indexOf(b), all.map(x => ({ enabled: !x.disabled })), this.readyAt ? performance.now() - this.readyAt : null);
       let ok = false;
       if (a === 'pick') ok = s.afterPick(+b.dataset.i);
       else if (a === 'skip') ok = s.afterSkip();
@@ -10985,6 +11186,7 @@ class AfterGameView {
   }
   setWaiting(on) {
     this.layer.classList.toggle('af-typing', on);
+    this.readyAt = on ? null : performance.now();   // v3.21 attention
     this.layer.querySelectorAll('button[data-act]').forEach(b => { b.disabled = on || b.dataset.off === '1'; });
     if (!on) this.layer.querySelector('button[data-act]:not([disabled])')?.focus();
   }
@@ -11211,6 +11413,7 @@ class UIController {
     if (x && typeof x === 'object' && 'pos' in x) return L.pos(x.pos);   // v3.6 diary
     if (x && typeof x === 'object' && 'role' in x) return L.tag(x.role);   // v3.19 diary
     if (x && typeof x === 'object' && 'focus' in x) return L.t('lesson.focus.' + x.focus);   // v3.16 diary
+    if (x && typeof x === 'object' && 'coh' in x) return L.t('coh.band.' + x.coh);   // v3.21 diary: the band word
     if (x && typeof x === 'object' && 'clue' in x) { const p = this.state.player(x.pid);   // v3.16: a v3.6 / v3.7 clue line without its "Match practice:" lead
       return L.t(x.clue, { k: p ? L.name(p.name) : '?' }).replace(/^[^:{}]{1,30}:\s*/, ''); }
     if (x && typeof x === 'object' && 'name' in x && !('pid' in x)) return L.name(x.name);   // v3.16: an expelled kid
@@ -11969,23 +12172,103 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (b === 'briefing') this.briefing.open(); else if (b === 'week') this.planner.open(); else if (b === 'locker') this.locker.open(); else this.renderAll();
   }
   /** v3.13: auto-sim / tests — an unconfirmed week gets Tue + Thu Match Practice and is confirmed.
-      v3.15: a new month's cash desk is confirmed with the normal fee. */
+      v3.15: a new month's cash desk is confirmed with the normal fee.
+      v3.21: under a policy (ui.autoPolicy) the cash desk goes through policyPick and the week gets POLICY.DAYS[policy]. */
   autoPlan() {
-    const s = this.state;
-    if (s.kassaDue()) s.confirmKassa(FINANCE.DEFAULT_LEVEL);
+    const s = this.state, pol = this.autoPolicy;
+    if (s.kassaDue()) {
+      const lv = FINANCE.FEE_LEVELS, i = pol ? this.policyPick('kassa', lv.map(k => ({ key: k, def: k === FINANCE.DEFAULT_LEVEL }))) : lv.indexOf(FINANCE.DEFAULT_LEVEL);
+      s.confirmKassa(lv[i]);
+    }
     const w = s.weekState();
     if (w.confirmed) return;
-    for (const k of WEEK.DEFAULT_DAYS) s.setWeekPlan(k, WEEK.DEFAULT_REGIME);
+    for (const k of pol ? POLICY.DAYS[pol] : WEEK.DEFAULT_DAYS) s.setWeekPlan(k, WEEK.DEFAULT_REGIME);
+    if (pol) this.noteChoice('plan', 0, [{}], null, pol === 'first');   // the week is confirmed as it stands
     s.confirmWeek();
   }
   /** v2.6: after a coach-initiated dialogue (office / roll call) the same day simply goes on. */
   afterManualEvent() { this.renderAll(); this.profile.tick(); if (this.locker?.isOpen) this.locker.maybeRequest(500); }   // v3.6: the next locker request waits its turn
-  /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days). */
-  autoSim() {
+  /** v2.5 debug / tests: the old non-stop simulation to the next match (Match Practice on training days).
+      v3.21: autoSim({ policy }) — a scripted coach (POLICY.NAMES): every choice goes through policyPick(), the calendar runs fast,
+      and one call moves the game one stop on: calendar → match day → Quick Sim → post-match windows → closed matchday.
+      No policy = the old behaviour (DEBUG button, smoke). test/policy.js calls it in a loop. */
+  autoSim({ policy = null } = {}) {
     const s = this.state;
+    this.autoPolicy = POLICY.NAMES.includes(policy) ? policy : null;
+    if (this.autoPolicy) { this.policyStep(); return; }
     if (s.phase === 'post' && s.afterPending) { s.afterAuto(); this.afterView.close(); }   // v3.20: loss → first remark + keep, draw → praise
     if (s.phase === 'post' && s.reviewPending) { s.reviewPick(0); this.reviewView.close(); }   // v3.19: auto mode takes the first card
     if (s.phase === 'calendar' && !this.events.active) this.runCalendar();
+  }
+  /** v3.21: one policy step (see autoSim). */
+  policyStep() {
+    const s = this.state;
+    if (this.events.active) { this.events.view.autoPick(); return; }
+    if (s.phase === 'post') { this.policyPost(); return; }
+    if (s.phase === 'matchday') {
+      this.modal.close();
+      if (!s.dayState().locker?.done) { const lk = s.runLocker(false); lk.done = true; lk.revealed = true; }   // who turned up (no locker window)
+      this.onInstantSim();
+      if (s.phase === 'post') this.policyPost();
+      return;
+    }
+    if (s.phase === 'calendar') this.runCalendar();
+  }
+  /** v3.21: after the whistle — Coach's Word (not offered to `first`: Quick Sim never opens the summary), AFTER_GAME, REVIEW, close. */
+  policyPost() {
+    const s = this.state, pol = this.autoPolicy;
+    this.modal.close(); this.summary.close?.();
+    if (s.talkPending && pol !== 'first') {
+      const keys = TEAM_TALK.KEYS;
+      s.applyTeamTalk(keys[this.policyPick('word', keys.map(k => ({ key: k, out: talkOutcome(s.lastReport) })))]);
+    }
+    for (let guard = 0; s.afterPending && guard < 4; guard++) {
+      const af = s.after;
+      if (af.mode === 'draw') { if (this.policyPick('after', [{ key: 'praise' }, { key: 'listen' }]) === 0) s.afterPraise(); else s.afterListen(); continue; }
+      if (af.stage === 'pick') {
+        const opts = af.remarks.map((rm, i) => ({ key: 'remark', i })).concat(af.mode === 'loss' ? [{ key: 'skip' }] : []);
+        const i = this.policyPick('after', opts);
+        if (opts[i].key === 'skip') s.afterSkip(); else s.afterPick(i);
+        continue;
+      }
+      const p = s.afterKid, o = p ? s.rethinkOptions(p) : { remove: [], swap: [], give: [] };   // rethink: the buttons in on-screen order
+      const opts = [...o.remove.map(r => ({ key: 'remove', role: r })), ...o.swap.map(x => ({ key: 'swap', role: x.from, to: x.to })),
+        ...o.give.map(t => ({ key: 'give', to: t })), { key: 'keep' }];
+      const c = opts[this.policyPick('rethink', opts)];
+      if (!s.afterRethink(c.key, c.role || null, c.to || null)) s.endAfter();
+    }
+    if (s.reviewPending) {
+      const p = s.player(s.review.pid);
+      const opts = s.review.cards.map(c => ({ key: c.type, role: c.role, confirmed: GameState.roleConfirmed(p, c.role) }));
+      if (!opts.length || !s.reviewPick(this.policyPick('review', opts))) s.reviewSkip();
+    }
+    this.afterView.layer.hidden = true; this.reviewView.layer.hidden = true;
+    this.closeMatchday();
+  }
+  /** v3.21: THE choice hook of the scripted coaches. options = the window's buttons in on-screen order ({ enabled: false } = greyed).
+      `first` takes the first enabled one; the other policies ask POLICY_PICK[windowId] (null = first enabled). Logged in attention. */
+  policyPick(windowId, options) {
+    const pol = this.autoPolicy, ok = i => !!options[i] && options[i].enabled !== false;
+    const first = options.findIndex((o, i) => ok(i));
+    let i = first < 0 ? 0 : first;
+    if (pol && pol !== 'first') { const r = UIController.POLICY_PICK[windowId]?.(options, this.state); if (r != null && ok(r)) i = r; }
+    if (windowId === 'kassa' && pol === 'first') i = Math.max(0, options.findIndex(o => o.def));   // "as it is": CONFIRM with the preselected level
+    this.noteChoice(windowId, i, options, null);
+    return i;
+  }
+  /** v3.21 reference choices per window (null = the first enabled button). */
+  static POLICY_PICK = {
+    kassa: o => o.findIndex(x => x.key === FINANCE.DEFAULT_LEVEL),
+    word: o => { const out = o[0]?.out; return o.findIndex(x => x.key === (out === 'heavy' ? 'tough' : 'praise')); },   // result-appropriate line
+    review: o => { const i = o.findIndex(x => x.confirmed); return i < 0 ? 0 : i; },   // a role his confirmed clues point to, else the first card
+    after: () => 0,   // the first remark (draw: praise)
+    rethink: o => o.findIndex(x => x.key === 'keep'),
+  };
+  /** v3.21 DEBUG attention metrics: every answered choice window (human click or policy pick). dt = ms from "ready" (text typed /
+      window shown) to the click, null when unknown (policy picks). first = the first enabled button (or the preselected default). */
+  noteChoice(windowId, i, options = [], dt = null, first = null) {
+    const f = first ?? i === Math.max(0, options.findIndex(o => o && o.enabled !== false));
+    this.state.noteAttention?.({ first: !!f, dt });
   }
   /** v3.19: REVIEW.EXE picks the first card by itself (smoke auto-play: window.YAM_AUTO_REVIEW; `ui.autoReview = false` to test the window). */
   get autoReview() { return this._autoReview ?? !!window.YAM_AUTO_REVIEW; }
@@ -12035,13 +12318,14 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.cal.running || this.state.phase !== 'calendar') return;
     this.calMonth = null;   // calendar view follows the days as they pass
     this.autoPlan();   // v3.13
-    this.state.autoFees = true;   // v3.15: auto-sim reminds every present kid who still owes
+    this.state.autoFees = this.autoPolicy !== 'first';   // v3.15: auto-sim reminds every present kid who still owes (v3.21: not the `first` script)
     this.cal.simulate({
-      stepMs: 180,
+      stepMs: this.autoPolicy ? 0 : 180,   // v3.21: policy runs don't need to be watched
       onStep: (date, infos) => {
         for (const info of infos) this.state.addDiary({ date, ...info });
         this.autoPlan();   // v3.13: a new week on the way (Monday) gets the default plan before its routine runs
         if (this.cal.nextEvent() && this.events.roll(date)) this.cal.stop();
+        if (this.autoPolicy) return;   // v3.21: policy runs draw and save at the stop only (test/policy.js speed)
         this.state.save();
         this.renderDash();
         this.renderTeam();
@@ -12552,7 +12836,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onEnd: eng => this.onMatchEnd(eng),
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
-    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties, md: ctx.md });
+    }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties, md: ctx.md,
+      cohesion: [this.state.cohesion ?? COH.START, COH.AI] });   // v3.21: our cohesion vs the AI clubs' fixed value
     if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
@@ -12629,7 +12914,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.appendLog({ minute: 90, type: 'flavor', key: 'match.others', vars: { r: { fixtures: others } }, side: -1, r: 0 });
     const played = a.all.filter(p => eng.everPlayed.has(p.id));   // starters + substitutes (v2.6: minus empty slots)
     s.lastReport = {
-      md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result,
+      md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result, coh: Math.round(s.cohesion ?? COH.START),   // v3.21
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
       events: eng.matchEvents.map(e => ({ ...e })), ht: eng.htScore || null, instant: !!eng.instant,
       talk: null,   // v3.5: post-match team talk still owed (forced in the Match Summary)
