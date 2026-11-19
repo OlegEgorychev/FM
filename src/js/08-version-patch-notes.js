@@ -2,8 +2,26 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.23';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.24';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.24', name: { en: 'Loose ends', ru: 'Хвосты' },
+    en: [
+      'Morning headlines don\'t repeat for two weeks, and kids have eight kinds of excuses now (dentist, the garage, a family wedding, the school play, a little brother…) — nobody repeats his for a month.',
+      'Match day goes in order: the morning briefing, then any match-day event, then the "Match day" window. The cash desk never opens on a match day — it waits for the next stop.',
+      'A truant\'s fine is paid by his family to the club. A poor family pays at the next training if they can; if not, nothing happens.',
+      'Two kids with the same surname show an initial ("C. Brennan") in the planner, the locker room, the fee list and the roster.',
+      'The auto lineup puts a kid tagged GK in goal, else one with "safe hands in goal" from the yard match, else whoever kept goal most — and never moves a keeper you placed yourself.',
+      'The [1 AP] family visit, the seniors\' boots and the paramedic friend show what happened before the game moves on; the cash block in PLANNER.EXE is no longer squeezed.',
+    ],
+    ru: [
+      'Утренние заголовки не повторяются две недели, а отговорок у ребят теперь восемь видов (зубной, гараж, свадьба у родни, школьный спектакль, младший брат…) — свою никто не повторяет месяц.',
+      'День матча идёт по порядку: утренняя сводка, потом событие дня матча, потом окно «День матча». Касса в день матча не открывается — ждёт следующей остановки.',
+      'Штраф за прогул платит семья — в кассу клуба. Бедная семья платит на следующей тренировке, если может; если нет — ничего не происходит.',
+      'Двое ребят с одной фамилией показаны с инициалом («Ч. Бреннан») в планировщике, раздевалке, списке взносов и составе.',
+      'Автосостав ставит в ворота отмеченного GK, иначе того, у кого с дворового матча «надёжные руки в воротах», иначе того, кто чаще стоял в воротах, — и не трогает вратаря, которого ты поставил сам.',
+      'Визит к семье [1 ОД], старые бутсы от старших и знакомый фельдшер показывают результат, прежде чем игра идёт дальше; блок кассы в PLANNER.EXE больше не сжат.',
+    ],
+  },
   { v: '3.23', name: { en: 'Not blind', ru: 'Не вслепую' },
     en: [
       'The man of the match is always in the Notebook now (marked ☆) and always has a clue from this match, so the REVIEW pick is no longer blind.',

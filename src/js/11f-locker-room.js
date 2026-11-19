@@ -98,7 +98,7 @@ class LockerRoom {
         const e = Math.round(p.energy);
         return `<div class="lk here${reveal ? ' rv' : ''}" ${delay} data-pid="${p.id}">${plate}
           <div class="lk-in"><span class="portrait lk-face">${p.portraitSvg}</span></div>
-          <div class="lk-name">${esc(L.name(p.surname))}</div>
+          <div class="lk-name">${esc(squadName(p, s.squad))}</div>
           <div class="energy ${this.ui.energyClass(e)}"><i style="width:${e}%"></i><span>${e}%</span></div></div>`;
       }
       const load = why === 'overload' || why.startsWith('world:');   // v3.13: weekly load / v3.14: school or city event — known at once, no roll call (not truancy)
@@ -108,7 +108,7 @@ class LockerRoom {
       return `<div class="lk empty${reveal ? ' rv' : ''}${checked || load ? ' checked' : ''}${load ? ' load' : ''}${can ? ' can' : ''}" ${delay} data-pid="${p.id}" role="button" tabindex="0"
           title="${esc(checked || load ? L.t('lr.short.' + why) : can ? L.t('lr.investigate') : L.t('lr.noAp'))}">${plate}
         <div class="lk-in dark">${note}</div>
-        <div class="lk-name">${esc(L.name(p.surname))}</div><div class="lk-miss">${L.t('lr.missing')}</div></div>`;
+        <div class="lk-name">${esc(squadName(p, s.squad))}</div><div class="lk-miss">${L.t('lr.missing')}</div></div>`;
     }).join('');
     document.getElementById('lr-title').textContent = 'LOCKER_ROOM.EXE — ' + fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' });
     document.getElementById('lr-head').innerHTML = `
@@ -134,7 +134,7 @@ class LockerRoom {
       + squad.map(p => {
         const st = f.status[p.id] || 'owed', here = !lk.absent[p.id], owes = s.feeOwes(p.id), rem = f.reminded[p.id];
         const btn = owes && here ? (rem ? `<small class="lrf-rem">${L.t('fee.reminded')}</small>` : `<button type="button" class="btn lrf-btn" data-remind="${p.id}">${L.t('fee.remind')}</button>`) : '';
-        return `<div class="lrf-row st-${st}${here ? '' : ' away'}" title="${esc(L.t('fee.st.' + st))}"><i>${mark[st] || '?'}</i><span>${p.number}. ${esc(L.name(p.surname))}</span>${btn}</div>`;
+        return `<div class="lrf-row st-${st}${here ? '' : ' away'}" title="${esc(L.t('fee.st.' + st))}"><i>${mark[st] || '?'}</i><span>${p.number}. ${esc(squadName(p, s.squad))}</span>${btn}</div>`;
       }).join('') + '</div>';
   }
 
@@ -156,7 +156,7 @@ class LockerRoom {
     if (!lk || this.ui.events.active) return;
     if (this.requestPending) { this.maybeRequest(0); return; }   // v2.8
     lk.done = true;
-    for (const c of s.ensureAvailableXI()) s.addDiary({ date: s.calendar.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
+    s.xiAutoDiary(s.ensureAvailableXI());
     const miss = Object.keys(lk.absent).length;
     s.addDiary({ date: s.calendar.date, key: miss ? 'lr.diary' : 'lr.diaryAll', vars: { n: s.squad.length - miss, t: s.squad.length,
       s: { list: Object.keys(lk.absent).map(pid => ({ pid })) } }, cls: 'tr' });

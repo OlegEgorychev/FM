@@ -205,6 +205,7 @@ const AP_OPTION = { TRUANT_DISC: 1, TRUANT_MORALE: 3, BOOTS_MORALE: 5, KNOCK_COS
    Prefix match ('rep.' = every rep line); a trailing '.diary' = any event choice. */
 const NEWS = {
   COOLDOWN: 14,
+  CD_DAYS: 14,   // v3.24: a morning headline (MorningBriefing.NEWS id) is not picked again within this many days (state.newsSeen['hl:' + id])
   IMPORTANT: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'home.back', 'world.', 'fin.', 'fee.lost', 'rep.', 'week.', 'tr.plateau.',
     'tr.improved', 'lesson.improved', 'lesson.cancel', 'lesson.clue', 'obs.', 'scout.', 'cb.', 'xi.auto', 'af.complaint'],
   NEVER_MUTE: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'world.', 'fin.', 'fee.', 'rep.', 'week.', 'af.complaint'],
@@ -263,7 +264,10 @@ const REP = { START: 50,
   SQUAD_BONUS: 25,                                    // match rolls for us: (squad − 50) / 25 → −2 … +2
   MATCH: { W: { board: 3, squad: 2 }, D: { board: 0, squad: 0 }, L: { board: -2, squad: -2 } },
   EXCUSE_HOME_PARENTS: 5, EXCUSE_STAY_SQUAD: -5, EXCUSE_STAY_MORALE: -10, EXCUSE_ANKLE_INJURY: 0.3, EXCUSE_ANKLE_DAYS: [3, 6] };
-const EXCUSE = { BASE: 0.04, PER_DISC: 0.006, KINDS: ['test', 'ankle', 'birthday'] };   // per present kid: 4% + (20 − discipline) × 0.6%
+const EXCUSE = { BASE: 0.04, PER_DISC: 0.006,   // per present kid: 4% + (20 − discipline) × 0.6%
+  // v3.24: 8 kinds × PHRASES phrasings (ex.<kind>.0–1). Seeded pick (date#excuse#id) among the kinds this kid hasn't used for KID_CD days
+  // and the team hasn't heard for TEAM_CD days; the team never hears the same phrasing twice in a row. state.excuseLog keeps LOG_DAYS.
+  KINDS: ['test', 'ankle', 'birthday', 'dentist', 'garage', 'wedding', 'play', 'brother'], PHRASES: 2, KID_CD: 28, TEAM_CD: 7 };
 const WEATHER = ['heavyRain', 'rain', 'drizzle', 'overcast', 'fog', 'wind', 'clearCold'];
 const WEATHER_W = [4, 4, 3, 4, 2, 2, 1];
 const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };

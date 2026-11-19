@@ -26,3 +26,12 @@ class Lang {
 }
 const L = new Lang();
 
+/** v3.24: how a squad kid is named where only his surname is shown (planner, locker room, fee checklist, roster, board):
+    the surname alone; another kid in `squad` with the same surname → "C. Brennan"; the same initial too → "Charlie Brennan". */
+function squadName(p, squad = []) {
+  const sn = L.name(p.surname), first = n => L.name(n.split(' ').slice(0, -1).join(' ') || n);
+  const same = (squad || []).filter(q => q && q.id !== p.id && q.surname === p.surname);
+  if (!same.length) return sn;
+  const f = first(p.name);
+  return same.some(q => first(q.name)[0] === f[0]) ? `${f} ${sn}` : `${f[0]}. ${sn}`;
+}

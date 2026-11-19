@@ -32,6 +32,13 @@ const NARRATIVE_EVENTS = [
     },
     execute(ctx) {
       const { snitch, kid } = ctx.cast;
+      if (ctx.step === 'seniors') {   // v3.24: the [1 AP] result line before the game moves on
+        ctx.show({ face: kid.portraitSvg, name: L.name(kid.name), role: L.t('talk.roleKid', { n: kid.number, p: L.pos(kid.position) }),
+          text: L.t('ev.boots.seniors', { k: L.name(kid.name) }),
+          choices: [{ key: 'ev.boots.seniorsOk', as: 'ev.boots.c', tone: 'gray', who: kid.id,
+            run: () => { kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.BOOTS_MORALE, 0, 100); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
       ctx.show({
         face: snitch.portraitSvg, name: L.name(snitch.name), role: L.t('talk.roleSnitch', { n: snitch.number, p: L.pos(snitch.position) }),
         text: L.t('ev.boots.text', { s: L.name(snitch.name), k: L.name(kid.name) }),
@@ -40,8 +47,7 @@ const NARRATIVE_EVENTS = [
             run: () => { kid.dyn.morale = 100; return { k: { pid: kid.id } }; } },
           { key: 'ev.boots.b', tone: 'gray', who: kid.id,
             run: () => { kid.physical.agility = Math.max(1, kid.physical.agility + EVENTS_CFG.BOOTS_AGILITY); return { k: { pid: kid.id } }; } },
-          { key: 'ev.boots.c', tone: 'green', ap: 1, who: kid.id,   // v3.16: [1 AP] — free and no agility lost, but only +5 morale
-            run: () => { kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.BOOTS_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+          { key: 'ev.boots.c', tone: 'green', ap: 1, who: kid.id, next: 'seniors' },   // v3.16: [1 AP] — free and no agility lost, but only +5 morale
         ],
       });
     },
@@ -112,6 +118,13 @@ const NARRATIVE_EVENTS = [
     },
     execute(ctx) {
       const { kid, snitch } = ctx.cast;
+      if (ctx.step === 'medic') {   // v3.24: the paramedic's verdict, one button (AP and money were spent on the first click)
+        ctx.show({ face: kid.portraitSvg, name: L.name(kid.name), role: L.t('talk.roleKnock', { n: kid.number, p: L.pos(kid.position) }),
+          text: L.t('ev.knock.medic', { k: L.name(kid.name), d: AP_OPTION.KNOCK_DAYS }),
+          choices: [{ key: 'ev.knock.medicOk', as: 'ev.knock.c', tone: 'gray', who: kid.id,
+            run: () => { kid.injuryDays = AP_OPTION.KNOCK_DAYS; return { k: { pid: kid.id }, d: AP_OPTION.KNOCK_DAYS, m: '−$' + AP_OPTION.KNOCK_COST }; } }] });
+        return;
+      }
       ctx.show({   // v3.17: the window shows the injured kid himself (it showed the teammate while the text was about the kid)
         face: kid.portraitSvg, name: L.name(kid.name), role: L.t('talk.roleKnock', { n: kid.number, p: L.pos(kid.position) }),
         text: L.t('ev.knock.text', { k: L.name(kid.name) }) + (snitch ? ' ' + L.t('ev.knock.helper', { s: L.name(snitch.name) }) : ''),
@@ -120,8 +133,7 @@ const NARRATIVE_EVENTS = [
             run: () => { kid.injuryDays = EVENTS_CFG.CLINIC_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.CLINIC_DAYS }; } },
           { key: 'ev.knock.b', tone: 'gray', who: kid.id,
             run: () => { kid.injuryDays = EVENTS_CFG.ICE_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.ICE_DAYS }; } },
-          { key: 'ev.knock.c', tone: 'green', ap: 1, cost: AP_OPTION.KNOCK_COST, who: kid.id,   // v3.16: [1 AP] — cheaper than the clinic, slower than it
-            run: () => { kid.injuryDays = AP_OPTION.KNOCK_DAYS; return { k: { pid: kid.id }, d: AP_OPTION.KNOCK_DAYS }; } },
+          { key: 'ev.knock.c', tone: 'green', ap: 1, cost: AP_OPTION.KNOCK_COST, who: kid.id, next: 'medic' },   // v3.16: [1 AP] — cheaper than the clinic, slower than it (v3.24: result line first)
         ],
       });
     },
@@ -248,6 +260,13 @@ const NARRATIVE_EVENTS = [
     execute(ctx) {
       const { kid } = ctx.cast, face = kid.portraitSvg, name = L.name(kid.name), role = L.t('talk.roleSnitch', { n: kid.number, p: L.pos(kid.position) });
       const sorry = ctx.step === 'sorry';
+      if (ctx.step === 'visit') {   // v3.24: the family visit's result, one button, before the game moves on
+        ctx.show({ face, name, role: L.t('talk.roleVisit'), text: L.t('ev.truant.visit', { k: name }),
+          choices: [{ key: 'ev.visitOk', as: 'ev.truant.d', tone: 'gray', who: kid.id,
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
+              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
       if (sorry || ctx.step === 'hangup') {   // result of "call him": decided once, saved as the step (a reload can't re-roll it)
         ctx.show({ face, name, role: L.t('talk.rolePhone'), text: L.t('ev.truant.' + ctx.step, { k: name }),
           choices: [{ key: 'ev.truant.' + ctx.step + 'Ok', tone: 'gray', who: kid.id,
@@ -260,8 +279,14 @@ const NARRATIVE_EVENTS = [
       }
       ctx.show({ face, name, role: L.t('talk.roleTruant'), text: L.t('ev.truant.text', { k: name }),
         choices: [
-          { key: 'ev.truant.a', tone: 'red', cost: EVENTS_CFG.TRUANT_FINE, who: kid.id,
-            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + EVENTS_CFG.TRUANT_FINE_DISC); return { k: { pid: kid.id } }; } },
+          // v3.24: the fine is paid by his family to the club (income, ledger 'event', like the Ultimatum fine). A poor family pays
+          // at the next training with the poor kids' first-fee chance — or not at all (no debt). Same amount, same discipline.
+          { key: 'ev.truant.a', tone: 'red', who: kid.id, ...(kid.wealth === 'poor' ? { gainLater: EVENTS_CFG.TRUANT_FINE, diary: 'ev.truant.aLater' } : { gain: EVENTS_CFG.TRUANT_FINE }),
+            run: () => {
+              kid.psych.discipline = Math.min(20, kid.psych.discipline + EVENTS_CFG.TRUANT_FINE_DISC);
+              if (kid.wealth === 'poor') ctx.state.addFine(kid.id, EVENTS_CFG.TRUANT_FINE, ctx.date);
+              return { k: { pid: kid.id }, f: '$' + EVENTS_CFG.TRUANT_FINE };
+            } },
           { key: 'ev.truant.b', tone: 'gray', who: kid.id,
             run: () => {
               kid.suspensionMatches = Math.max(kid.suspensionMatches, 1);
@@ -269,9 +294,7 @@ const NARRATIVE_EVENTS = [
               return { k: { pid: kid.id } };
             } },
           { key: 'ev.truant.c', tone: 'green', next: () => (Math.random() < 0.5 ? 'sorry' : 'hangup') },
-          { key: 'ev.truant.d', tone: 'green', ap: 1, who: kid.id,   // v3.16: [1 AP] — no fine, no ban, but only discipline +1
-            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
-              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+          { key: 'ev.truant.d', tone: 'green', ap: 1, who: kid.id, next: 'visit' },   // v3.16: [1 AP] — no fine, no ban, but only discipline +1 (v3.24: result line first)
         ] });
     },
   },
@@ -361,9 +384,10 @@ const NARRATIVE_EVENTS = [
     cast: () => null,
     execute(ctx) {
       const s = ctx.state, { kid } = ctx.cast, lk = s.dayState().locker, req = lk?.request, kind = req?.kind || 'test', name = L.name(kid.name);
+      const text = req?.text || `ex.${kind}.0`;   // v3.24: 8 kinds × 2 phrasings (a v3.23 request has no text → the first phrasing)
       const finish = () => { if (req) req.done = true; };
       ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleExcuse', { n: kid.number, p: L.pos(kid.position) }),
-        text: L.t('ex.' + kind, { k: name }),
+        text: L.t(text, { k: name }),
         choices: [
           { key: 'ex.home', tone: 'gray', who: kid.id,
             run: () => {
@@ -542,6 +566,13 @@ const NARRATIVE_EVENTS = [
     },
     execute(ctx) {
       const { kid } = ctx.cast, face = kid.portraitSvg, name = L.name(kid.name), role = L.t('talk.roleSnitch', { n: kid.number, p: L.pos(kid.position) });
+      if (ctx.step === 'visit') {   // v3.24: the family visit's result, one button, before the game moves on
+        ctx.show({ face, name, role: L.t('talk.roleVisit'), text: L.t('ev.truant.visit', { k: name }),
+          choices: [{ key: 'ev.visitOk', as: 'ev.ulti.e', tone: 'gray', who: kid.id,
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
+              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
       if (ctx.step === 'office') {
         ctx.show({ face, name, role, text: L.t('ev.ulti.text2', { k: name }),
           choices: [
@@ -561,9 +592,7 @@ const NARRATIVE_EVENTS = [
           { key: 'ev.ulti.a', tone: 'green', gain: EVENTS_CFG.ULTI_FINE, who: kid.id,
             run: () => { kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.ULTI_FINE_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
           { key: 'ev.ulti.b', tone: 'gray', next: 'office' },
-          { key: 'ev.ulti.e', tone: 'green', ap: 1, who: kid.id,   // v3.17: the same [1 AP] family visit as The Truant (v3.16)
-            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
-              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+          { key: 'ev.ulti.e', tone: 'green', ap: 1, who: kid.id, next: 'visit' },   // v3.17: the same [1 AP] family visit as The Truant (v3.16; v3.24: result line first)
         ] });
     },
   },
@@ -752,11 +781,12 @@ class EventEngine {
       return;
     }
     const delta = choice.cost ? -choice.cost : choice.debt ? -choice.debt : choice.gain || 0;
-    s.eventLog.push({ id: pe.id, date: pe.date, season: s.season, choice: choice.key, who: choice.who });   // ('office' is skipped by the cooldown)
+    const key = choice.as || choice.key;   // v3.24: a result step logs / writes the diary of the option that led to it
+    s.eventLog.push({ id: pe.id, date: pe.date, season: s.season, choice: key, who: choice.who });   // ('office' is skipped by the cooldown)
     if (s.eventLog.length > 60) s.eventLog.shift();
-    s.addDiary({ date: pe.date, key: choice.key + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : '' }, cls: 'ev' });
+    s.addDiary({ date: pe.date, key: (choice.diary || key) + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : vars.m ?? '' }, cls: 'ev' });
     s.pendingEvent = null;
-    for (const c of s.ensureAvailableXI()) s.addDiary({ date: pe.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
+    s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
     s.save();
     this.view.close();
     this.ui.renderAll();
@@ -807,7 +837,7 @@ class DialogueView {
       const broke = !!c.cost && !s.canAfford(c.cost), short = broke || !!c.blocked || noAp;   // v2.9: `blocked` = i18n key of a non-money reason
       const pay = c.cost || c.debt;   // v2.2: `debt` = forced payment, never disabled, may push the budget below $0
       const tag = (c.ap ? `<span class="tb-ap" title="${esc(L.t('talk.apTip'))}">${L.t('talk.apTag', { n: c.ap })}</span>` : '')
-        + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '');
+        + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain || c.gainLater ? `<span class="tb-money pos"${c.gainLater ? ` title="${esc(L.t('talk.gainLater'))}"` : ''}>+$${c.gain || c.gainLater}</span>` : '');   // v3.24: gainLater = paid by the family later
       const why = c.blocked ? L.t(c.blocked) : broke ? L.t('talk.short', { b: money(s.budget), c: c.cost }) : noAp ? L.t('talk.noAp') : '';
       return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` data-short="1" disabled aria-disabled="true" title="${esc(why)}"` : ''}>
         <span class="tb-label">${esc(L.t(c.key, c.vars || {}))}</span>${tag}

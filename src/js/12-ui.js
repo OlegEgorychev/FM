@@ -19,7 +19,7 @@ class UIController {
       onFlash: tone => this.flash(tone),
     });
     this.board = new RadarView(this.$('tac-board'), {
-      labels: true,
+      labels: true, squad: () => this.state.squad,   // v3.24: namesakes get an initial (squadName)
       onDotClick: i => this.onBoardClick(i),
       onDrop: (i, srcId) => this.onDropSwap(this.state.lineup[i], srcId),
     });
@@ -455,7 +455,7 @@ class UIController {
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
         <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>
-        <span class="lr-name"><b>${esc(L.name(p.surname))}${this.statusBadge(p)}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
+        <span class="lr-name"><b>${esc(squadName(p, this.state.squad))}${this.statusBadge(p)}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
         <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
       </div>`;
     };
@@ -467,7 +467,7 @@ class UIController {
     this.lrRefs = [...box.querySelectorAll('.r-row')].map(el => ({ id: el.dataset.id, bar: el.querySelector('.energy'), fill: el.querySelector('.energy i'), txt: el.querySelector('.energy span'), cards: el.querySelector('.lr-cards'), last: '' }));
     this.$('lr-subs').textContent = eng ? L.t('lr.subs', { n: eng.subsUsed, m: MatchEngine.MAX_SUBS }) : L.t('lr.preMatch');
     const help = over ? 'lr.help.over' : this.liveSel ? 'lr.help.sel' : eng ? 'lr.help.live' : 'lr.help.pre';
-    this.$('lr-help').textContent = L.t(help, { n: selP ? L.name(selP.surname) : '' });
+    this.$('lr-help').textContent = L.t(help, { n: selP ? squadName(selP, this.state.squad) : '' });
     this.updateLiveRoster();
   }
 
@@ -1150,7 +1150,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       <div class="td-note">${L.t(on.length ? 'obs.picked' : 'obs.none')}</div><div class="obs-grid">`
       + kids.map(p => { const sel = on.includes(p.id);
         return `<button type="button" class="obs-btn${sel ? ' on' : ''}" data-observe="${p.id}" aria-pressed="${sel}"${!sel && full ? ' disabled' : ''}>
-          <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span> ${p.number}. ${esc(L.name(p.surname))}</button>`; }).join('')
+          <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span> ${p.number}. ${esc(squadName(p, this.state.squad))}</button>`; }).join('')
       + '</div></div>';
   }
 
@@ -1242,13 +1242,22 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const ctx = s.matchContext();
     const vars = { md: ev.md, o: { team: ctx.opp.name }, v: L.t('venue.' + ctx.venue) };
     s.addDiary({ date: ev.date, key: 'cal.arrive', vars: { ...vars, v: { venue: ctx.venue } }, cls: 'hl' });
-    for (const c of s.ensureAvailableXI()) s.addDiary({ date: ev.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
+    s.xiAutoDiary(s.ensureAvailableXI(), ev.date);
     s.save();
     this.engine = null;
     this.prepareMatch();
     this.renderAll();
     this.$('tk-match').classList.add('alert');
-    if (this.events.rollMatchDay(ev)) return;   // v2.2: match-day event BEFORE kick-off; the matchday dialog follows the choice
+    // v3.24: the morning comes first — briefing (if there is anything new) → match-day event → "Match day" dialog → locker room.
+    // The event roll waits for [ HEAD TO THE CLUB ] (dayState().mdWait survives a reload). Scripted coaches never see the briefing.
+    if (!this.autoPolicy && !s.dayState().briefed && this.briefing.hasNews()) { s.dayState().mdWait = true; s.save(); this.briefing.open(); return; }
+    this.matchdayMorning(ev);
+  }
+  /** v3.24: after the match-day briefing (or at once when there is none): the match-day event, else the "Match day" dialog. */
+  matchdayMorning(ev = this.state.nextMatchEvent()) {
+    const s = this.state;
+    if (s.dayState().mdWait) { delete s.dayState().mdWait; s.save(); }
+    if (ev && this.events.rollMatchDay(ev)) return;   // v2.2: match-day event BEFORE kick-off; the matchday dialog follows the choice
     this.showMatchdayDialog();
   }
   /** v2.2: called by EventEngine.choose() after a match-day event. */
@@ -1389,7 +1398,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     }).join('');
     const oop = s.outOfPosition();
     this.$('tac-warn').innerHTML = oop.length
-      ? oop.map(({ p, line }) => `<span class="w">&#9888; ${L.t('tac.oop', { n: esc(L.name(p.surname)), p: L.pos(p.position), l: L.line(line) })}</span>`).join('')
+      ? oop.map(({ p, line }) => `<span class="w">&#9888; ${L.t('tac.oop', { n: esc(squadName(p, this.state.squad)), p: L.pos(p.position), l: L.line(line) })}</span>`).join('')
       : `<span class="okmsg">&#10003; ${L.t('tac.allGood')}</span>`;
 
     // board: the starting XI exactly as the match engine will read it (state.lineup, slot order)
@@ -1455,7 +1464,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       this.renderTeam();
       return;
     }
-    this.teamMsg = L.t('team.done', { a: L.name(s.player(a).surname), b: L.name(s.player(b).surname) });
+    this.teamMsg = L.t('team.done', { a: squadName(s.player(a), this.state.squad), b: squadName(s.player(b), this.state.squad) });
     this.afterLineupChange();
   }
 
@@ -1730,7 +1739,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.tickComplaints(s.calendar.date);   // v3.20: parents' "wrong role" complaints count this match (before tonight's talk)
     s.startReview(result, outfield, s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak); v3.23: outfield kids only
     s.startAfter(result, played.map(p => [p.id, { ...eng.st(p) }]), eng.matchEvents, s.calendar.date, ctx.md);   // v3.20: AFTER_GAME.EXE after a loss / draw
-    s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
+    s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]), new Set(played.filter(p => eng.isGK(p)).map(p => p.id)));   // v3.24: + who kept goal
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);

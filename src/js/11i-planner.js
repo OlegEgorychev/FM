@@ -115,12 +115,12 @@ class WeekPlanner {
     if (!editable) {   // past / today after confirming: read-only
       if (!l) return `<div class="pl-lesson none">${head}<small>—</small></div>`;
       const st = l.cancelled ? L.t('pl.lessonCancelled') : l.done ? L.t('pl.lessonDone') : '';
-      return `<div class="pl-lesson on">${head}<small>${p ? `${p.number}. ${esc(L.name(p.surname))}` : '?'} · ${esc(L.t('lesson.focus.' + l.focus))}${st ? ' · ' + esc(st) : ''}</small></div>`;
+      return `<div class="pl-lesson on">${head}<small>${p ? `${p.number}. ${esc(squadName(p, s.squad))}` : '?'} · ${esc(L.t('lesson.focus.' + l.focus))}${st ? ' · ' + esc(st) : ''}</small></div>`;
     }
     const taken = new Set(WEEK.PLAN_KEYS.filter(x => x !== k && w.lessons[x]).map(x => w.lessons[x].id));
     const canBook = !!l || w.ap >= 1, tip = canBook ? L.t('pl.lessonTip') : L.t('pl.lessonNo.noAp');
     const kids = [...s.squad].sort((a, b) => a.number - b.number).map(q =>
-      `<option value="${q.id}"${l?.id === q.id ? ' selected' : ''}${taken.has(q.id) ? ' disabled' : ''}>${q.number}. ${esc(L.name(q.surname))}</option>`).join('');
+      `<option value="${q.id}"${l?.id === q.id ? ' selected' : ''}${taken.has(q.id) ? ' disabled' : ''}>${q.number}. ${esc(squadName(q, s.squad))}</option>`).join('');
     return `<div class="pl-lesson${l ? ' on' : ''}" title="${esc(tip)}">${head}
       <select data-lkid="${k}" aria-label="${esc(L.t('pl.lesson'))}"${canBook ? '' : ' disabled'}><option value="">${L.t('pl.lessonNone')}</option>${kids}</select>
       <select data-lfocus="${k}" aria-label="${esc(L.t('pl.lessonFocus'))}"${l ? '' : ' disabled'}>${LESSON_FOCI.map(f =>

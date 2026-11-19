@@ -1,0 +1,5 @@
+/* v3.24 "Loose ends" */
+/* PLANNER.EXE: the cash block is never squeezed to two lines — while it is shown the top area takes its full height
+   (last month's ledger + the fee choice); the window body (.pl-scroll) scrolls instead. */
+.pl-top:has(> .pl-kassa:not([hidden])){ flex: none; min-height: min-content; overflow: visible; }
+.pl-top > .pl-kassa:not([hidden]){ min-height: min-content; }

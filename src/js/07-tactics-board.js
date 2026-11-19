@@ -10,7 +10,8 @@ class RadarView {
     <div class="pl-line six l"></div><div class="pl-line six r"></div>
     <div class="pl-goal l"></div><div class="pl-goal r"></div>`;
 
-  constructor(el, { labels = false, onDotClick = null, onDrop = null } = {}) {
+  constructor(el, { labels = false, onDotClick = null, onDrop = null, squad = null } = {}) {
+    this.squadOf = squad;   // v3.24: () => the academy squad, for squadName() on our side
     this.el = el;
     this.labels = labels;
     this.onDotClick = onDotClick;
@@ -28,7 +29,7 @@ class RadarView {
     sides.forEach((side, si) => side.entries.forEach((e, idx) => {
       const d = document.createElement(this.onDotClick ? 'button' : 'div');
       d.className = `pl ${si === 0 ? 'home' : 'away'}${e.line === 'GK' ? ' gk' : ''}`;
-      d.innerHTML = `<b>${e.p.number ?? idx + 1}</b>${this.labels ? `<span class="pl-pos ${e.p.position}">${L.pos(e.p.position)}</span><span class="pl-nm">${esc(L.name(e.p.surname))}</span>` : ''}`;
+      d.innerHTML = `<b>${e.p.number ?? idx + 1}</b>${this.labels ? `<span class="pl-pos ${e.p.position}">${L.pos(e.p.position)}</span><span class="pl-nm">${esc(squadName(e.p, si === 0 && this.squadOf ? this.squadOf() : side.entries.map(x => x.p)))}</span>` : ''}`;
       d.title = `${L.name(e.p.name)} · ${L.line(e.line === 'GK' ? 'GK' : e.line)}`;
       d.dataset.pid = e.p.id;   // v1.5: right-click → Player Profile Card
       if (this.onDotClick) { d.type = 'button'; d.dataset.slot = idx; d.addEventListener('click', () => this.onDotClick(idx)); }

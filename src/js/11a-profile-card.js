@@ -132,7 +132,7 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
         <fieldset class="pi-assign"><legend>${L.t('pi.assign')}</legend><div class="pa-wrap">
           <div class="pa-row"><span class="pa-lbl">${L.t('pi.assignPos')}</span>${['GK', 'DEF', 'MID', 'FWD'].map(t => `<button type="button" class="pa-btn${p.tag === t ? ' on' : ''}" data-postag="${t}" aria-pressed="${p.tag === t}">${L.t('tag.pos.' + t)}</button>`).join('')}</div>
           <div class="pa-row"><span class="pa-lbl">${L.t('pi.assignDuty')}</span>${Object.keys(DUTIES).map(d => { const holder = s.duties[d], mine = holder === p.id, other = holder && !mine ? s.player(holder) : null;
-            return `<button type="button" class="pa-btn duty${mine ? ' on' : ''}" data-duty="${d}" aria-pressed="${mine}" title="${esc(other ? L.t('pi.dutyHeld', { n: L.name(other.name) }) : L.t('duty.' + d + '.d'))}">${L.t('duty.' + d)}${other ? ` <small>(${esc(L.name(other.surname))})</small>` : ''}</button>`; }).join('')}</div>
+            return `<button type="button" class="pa-btn duty${mine ? ' on' : ''}" data-duty="${d}" aria-pressed="${mine}" title="${esc(other ? L.t('pi.dutyHeld', { n: L.name(other.name) }) : L.t('duty.' + d + '.d'))}">${L.t('duty.' + d)}${other ? ` <small>(${esc(squadName(other, this.ui.state.squad))})</small>` : ''}</button>`; }).join('')}</div>
         </div></fieldset>` : ''}
         <fieldset><legend>${L.t('pi.tags')}</legend><div class="pi-role">${roleHtml}</div></fieldset>
         <fieldset><legend>${L.t('pi.stats')}</legend>${table}</fieldset>

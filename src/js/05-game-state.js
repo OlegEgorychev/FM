@@ -24,7 +24,7 @@ class GameState {
     this.review = null; this.lossStreak = 0;   // v3.19 REVIEW.EXE + losses in a row
     this.after = null; this.parentComplaints = [];   // v3.20 AFTER_GAME.EXE + parents' "wrong role" complaints
     this.cohesion = COH.START; this.stats = {};   // v3.21 team cohesion + DEBUG attention metrics
-    this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {};   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
+    this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {}; this.excuseLog = []; this.fines = []; this.gkByHand = null;   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
     this.globalPlayers = GameState.buildWorld(used);
@@ -124,7 +124,9 @@ class GameState {
   autoArrange() {
     const slots = this.slots();
     const pool = this.starters();
-    const gk = pool.find(p => p.position === 'GK') || pool[0];   // v3.0: by the coach's tags (untagged kids just fill the gaps)
+    // v3.0: by the coach's tags (untagged kids just fill the gaps). v3.24: a keeper the coach put in goal himself stays; else
+    // keeperPick (tag GK → yard note "hands" → kept goal most this season), else the current keeper.
+    const gk = pool[0] && this.gkByHand === pool[0].id ? pool[0] : this.keeperPick(pool) || pool[0];
     const free = pool.filter(p => p !== gk).sort((a, b) => b.energy - a.energy);
     const assigned = new Array(slots.length).fill(null);
     slots.forEach((s, i) => {
@@ -157,8 +159,24 @@ class GameState {
       const [slot, incoming] = ia >= 0 ? [ia, pb] : [ib, pa];
       this.lineup[slot] = incoming.id;
     }
+    if (ia === 0 || ib === 0) this.gkByHand = this.lineup[0];   // v3.24: the coach chose this keeper — the auto lineup leaves him there
     this.save();
     return null;
+  }
+  /* ---------- v3.24 the auto lineup's keeper: only what the coach can see, never hidden skills ---------- */
+  /** What he saw in the yard match (kept since the draft; older saves: DraftView.notes). */
+  yardNotesOf(p) { return p.yardNotes || (typeof DraftView !== 'undefined' ? DraftView.notes(p) : []); }
+  /** League matches he finished in goal this season. */
+  keptGoal(id) { return this.seasonStats?.[id]?.kept || 0; }
+  /** 3 = tagged GK, 2 = yard note "hands" ("safe hands in goal"), 1 = has kept goal this season, 0 = nothing visible. */
+  keeperTier(p) { return p.position === 'GK' ? 3 : this.yardNotesOf(p).includes('hands') ? 2 : this.keptGoal(p.id) > 0 ? 1 : 0; }
+  /** The best visible keeper among `cands` (their order breaks the last ties), or null → the caller's old rule. */
+  keeperPick(cands, benchIds = null) {
+    const c = cands.filter(p => p && this.keeperTier(p) > 0);
+    if (!c.length) return null;
+    const onBench = p => (benchIds && benchIds.has(p.id) ? 1 : 0);
+    return c.map((p, i) => ({ p, i })).sort((a, b) => this.keeperTier(b.p) - this.keeperTier(a.p) || onBench(b.p) - onBench(a.p)
+      || this.keptGoal(b.p.id) - this.keptGoal(a.p.id) || a.i - b.i)[0].p;
   }
   /* ---------- v3.0 coach's assignment: visual position tag + exclusive duties ---------- */
   setPosTag(id, tag) {
@@ -606,8 +624,9 @@ class GameState {
   addYardClues(p, date) {
     if (!p || p.yardDone || typeof DraftView === 'undefined') return;
     p.yardDone = true;
+    p.yardNotes = DraftView.notes(p);   // v3.24: kept as seen on draft day (the auto lineup's "safe hands in goal")
     const out = [];
-    for (const k of DraftView.notes(p)) {
+    for (const k of p.yardNotes) {
       const signal = YARD.SIGNAL[k];
       if (signal) out.push({ date, source: 'yard', ref: 'draft', signal, textKey: 'clue.yard.' + k, seen: true });
     }
@@ -992,9 +1011,10 @@ class GameState {
     }
     if (training) {   // v3.15: fee collection among the kids who came (+ auto-sim reminds everyone who still owes)
       d.feesPaid = this.collectFees(date, absent);
+      this.resolveFines(date);   // v3.24: a poor family's truant fine — paid (or not) at the next training
       if (this.autoFees) for (const p of this.squad) if (!absent[p.id]) this.remindFee(p.id);
     }
-    d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent), posRequest: this.rollPositionRequest(absent) };   // v3.6
+    d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent, date), posRequest: this.rollPositionRequest(absent) };   // v3.6
     d.locker.capRequest = d.locker.request || d.locker.posRequest ? null : this.rollCaptainRequest(absent);   // v3.8: urgent kid requests come first
     this.save();
     return d.locker;
@@ -1036,12 +1056,46 @@ class GameState {
   }
 
   /** v2.8: "Immediate request" — maybe one present kid asks to go home (low discipline asks more). Rolled with the arrivals. */
-  rollExcuse(absent) {
+  rollExcuse(absent, date = this.calendar.date) {
     if (this.excusesOff) return null;
     for (const p of shuffle(this.squad.filter(x => !absent[x.id]))) {
-      if (Math.random() < EXCUSE.BASE + (20 - p.psych.discipline) * EXCUSE.PER_DISC) return { pid: p.id, kind: pick(EXCUSE.KINDS), done: false };
+      if (Math.random() < EXCUSE.BASE + (20 - p.psych.discipline) * EXCUSE.PER_DISC) {
+        Math.random();   // v3.24: the kind is seeded now; this keeps the v3.23 Math.random stream (the old pick(EXCUSE.KINDS))
+        return this.pickExcuse(p, date);
+      }
     }
     return null;
+  }
+  /** v3.24: which excuse this kid uses today (seeded date#excuse#id): a kind he hasn't used for EXCUSE.KID_CD days and the team
+      hasn't heard for EXCUSE.TEAM_CD days (none left → he doesn't ask today); one of EXCUSE.PHRASES phrasings, never the team's
+      last one. Logged in state.excuseLog [{ date, pid, kind, text }] (the last entry is always kept). */
+  pickExcuse(p, date = this.calendar.date) {
+    const log = (this.excuseLog || []).filter((e, i, a) => i === a.length - 1 || isoDays(e.date, date) < EXCUSE.KID_CD);
+    this.excuseLog = log;
+    const recent = (e, k) => e.kind === k && e.date <= date && isoDays(e.date, date) < (e.pid === p.id ? EXCUSE.KID_CD : EXCUSE.TEAM_CD);
+    const ok = EXCUSE.KINDS.filter(k => !log.some(e => recent(e, k)));
+    if (!ok.length) return null;
+    const r = seeded(date + '#excuse#' + p.id), kind = ok[Math.floor(r() * ok.length)];
+    let n = Math.floor(r() * EXCUSE.PHRASES), text = `ex.${kind}.${n}`;
+    if (text === log[log.length - 1]?.text) text = `ex.${kind}.${(n + 1) % EXCUSE.PHRASES}`;
+    log.push({ date, pid: p.id, kind, text });
+    return { pid: p.id, kind, text, done: false };
+  }
+  /* ---------- v3.24: a truant's fine is paid by his family (income). A poor family pays at the next training with the v3.15
+     first-fee chance for poor kids (one seeded roll); if not, nothing happens — no debt. state.fines [{ pid, amount, date }]. ---------- */
+  addFine(pid, amount, date = this.calendar.date) { (this.fines ||= []).push({ pid, amount, date }); }
+  resolveFines(date = this.calendar.date) {
+    if (!this.fines?.length) return;
+    const keep = [];
+    for (const f of this.fines) {
+      const p = this.player(f.pid);
+      if (!p) continue;   // he left the academy: the fine is forgotten
+      if (f.date >= date) { keep.push(f); continue; }   // the next training, not today's
+      const paid = seeded(date + '#fine#' + f.pid)() < feeChance(p.wealth, 'first', this.fees?.level || FINANCE.DEFAULT_LEVEL);
+      if (paid) this.addMoney(f.amount, 'event', false, date);
+      this.addDiary({ date, key: paid ? 'fine.paid' : 'fine.unpaid', vars: { k: { pid: p.id }, m: '$' + f.amount }, cls: 'ev' });
+    }
+    this.fines = keep;
   }
   /** Every morning (and after a match): nobody is "absent" any more. */
   clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
@@ -1131,6 +1185,7 @@ class GameState {
     this.lineup.forEach((id, i) => {
       const p = this.player(id);
       if (!p || p.available) return;
+      if (i === 0 && this.keeperSwap(p, changes)) return;   // v3.24: the keeper by what the coach can see
       const best = this.bestBenchFor(i);
       if (!best) return;
       this.lineup[i] = best.id;
@@ -1138,6 +1193,25 @@ class GameState {
     });
     if (changes.length) this.save();
     return changes;
+  }
+  /** v3.24: the keeper is out — keeperPick over the available bench (old bench order: tag, then overall) and the outfield starters.
+      A starter moves into goal and the best bench kid for his slot fills it. false = nobody visible → the old bench rule. */
+  keeperSwap(out, changes) {
+    const bench = this.bench().filter(b => b.available && !b.hasFlag('Promised_Start'))
+      .sort((a, b) => (b.position === 'GK') - (a.position === 'GK') || b.overall - a.overall);
+    const xi = this.lineup.slice(1).map(id => this.player(id)).filter(q => q && q.available);
+    const pick = this.keeperPick([...bench, ...xi], new Set(bench.map(b => b.id)));
+    if (!pick) return false;
+    if (bench.includes(pick)) { this.lineup[0] = pick.id; changes.push({ out, in: pick }); return true; }
+    const j = this.lineup.indexOf(pick.id), fill = this.bestBenchFor(j);
+    if (!fill) return false;
+    this.lineup[0] = pick.id; this.lineup[j] = fill.id;
+    changes.push({ out, in: pick, fill });
+    return true;
+  }
+  /** v3.24: diary lines for ensureAvailableXI's changes (a starter moved into goal names the kid who took his place). */
+  xiAutoDiary(changes, date = this.calendar.date) {
+    for (const c of changes) this.addDiary({ date, key: c.fill ? 'xi.autoGK' : 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id }, ...(c.fill ? { c: { pid: c.fill.id } } : {}) }, cls: 'ev' });
   }
   /* ---------- v3.22 "MONEY WITH STRINGS": the promise card ---------- */
   /** The kid whose kick-off promise card is still owed today (present and available, no answer yet), or null. */
@@ -1223,11 +1297,12 @@ class GameState {
   }
 
   /** Adds one match to every player's season totals. pairs: [[id, stats], ...] */
-  recordSeasonStats(pairs) {
+  recordSeasonStats(pairs, keepers = null) {
     for (const [id, st] of pairs) {
       const acc = this.seasonStats[id] || (this.seasonStats[id] = { ...MatchEngine.blankStats(), apps: 0 });
       for (const k in st) acc[k] = (acc[k] || 0) + st[k];
       acc.apps++;
+      if (keepers?.has(id)) acc.kept = (acc.kept || 0) + 1;   // v3.24: finished the match in goal (the auto lineup's keeper rule)
     }
   }
   /** v1.5: remember the notes shown in the Notebook so the Profile Card can quote them later. */
@@ -1261,7 +1336,9 @@ class GameState {
   /* ---------- v3.15 CASH DESK + MONTHLY FEES ---------- */
   monthOf(date = this.calendar.date) { return date.slice(0, 7); }
   /** KASSA.EXE is due at the first stop of a month (also old saves without fees). */
-  kassaDue() { return this.phase !== 'draft' && this.squad.length > 0 && ['calendar', 'matchday'].includes(this.phase) && this.fees?.month !== this.monthOf(); }
+  /** v3.24: the cash desk belongs to the month's first stop that is NOT a match day (the 1st on a Saturday → the next stop;
+      the 1st on a Monday → inside PLANNER.EXE as in v3.17). Rent and the grant are still booked on the 1st (repDaily). */
+  kassaDue() { return this.phase === 'calendar' && this.squad.length > 0 && this.fees?.month !== this.monthOf(); }
   /** Last month's ledger totals for the cash desk: { month, rows: {cat: sum}, total } — null for the academy's first month. */
   lastMonthReport() {
     const d = new Date(this.monthOf() + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1);
@@ -1360,6 +1437,16 @@ class GameState {
     for (const e of list || []) m[newsKey(e)] = date;
     for (const k in m) if (isoDays(m[k], date) > NEWS.COOLDOWN * 2) delete m[k];
   }
+  /** v3.24: a morning headline id (MorningBriefing.NEWS) may be picked on `date` unless the coach read it < NEWS.CD_DAYS days ago
+      (read today = still fresh, so a re-render of the same morning keeps it). Stored in newsSeen as 'hl:<id>' (pruned with the rest). */
+  headlineFresh(id, date = this.calendar.date) {
+    const seen = this.newsSeen?.['hl:' + id];
+    return !seen || seen >= date || isoDays(seen, date) >= NEWS.CD_DAYS;
+  }
+  markHeadlines(ids, date = this.calendar.date) {
+    const m = this.newsSeen || (this.newsSeen = {});
+    for (const id of ids || []) m['hl:' + id] = date;
+  }
   /** Office talk about the fee: the reason is fixed per month (poor → nomoney; discipline ≤ 7 → spent 50 %; else forgot). */
   feeReason(id) {
     const f = this.fees, p = this.player(id);
@@ -1381,7 +1468,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, after: this.after || null, parentComplaints: this.parentComplaints || [], notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, excuseLog: this.excuseLog || [], fines: this.fines || [], gkByHand: this.gkByHand || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -1404,6 +1491,9 @@ class GameState {
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
       this.away = Array.isArray(d.away) ? d.away : null;   // v3.13 "while you were away"
       this.newsSeen = d.newsSeen && typeof d.newsSeen === 'object' ? d.newsSeen : {};   // v3.17 muted repeats (lazy migration)
+      this.excuseLog = Array.isArray(d.excuseLog) ? d.excuseLog.filter(e => e && EXCUSE.KINDS.includes(e.kind)) : [];   // v3.24 (lazy)
+      this.fines = Array.isArray(d.fines) ? d.fines.filter(f => f && f.pid && f.amount > 0) : [];   // v3.24: poor families' truant fines
+      this.gkByHand = typeof d.gkByHand === 'string' ? d.gkByHand : null;   // v3.24: the coach put this kid in goal himself
       this.worldEvent = d.worldEvent && typeof d.worldEvent === 'object' && Array.isArray(d.worldEvent.playerIds) && Array.isArray(d.worldEvent.days) ? d.worldEvent : null;   // v3.14 (missing → none this week)
       this.worldLast = typeof d.worldLast === 'string' ? d.worldLast : null;
       this.worldSalt = typeof d.worldSalt === 'string' ? d.worldSalt : null;   // v3.15 (old saves: set on the next Monday roll)

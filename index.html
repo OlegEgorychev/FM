@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.23</title>
+<title>Youth Academy Manager v3.24</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1943,6 +1943,11 @@ li.mb-cohlow{ color: #7a3a00; }
 .dbg-team{ display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 6px; padding: 4px 8px; background: #fff; border: 1px solid var(--shadow, #808080); font: 12px/1.4 var(--mono, monospace); }
 .dbg-team b{ font-weight: 700; }
 .dbg-team .dbg-att{ flex-basis: 100%; }
+/* v3.24 "Loose ends" */
+/* PLANNER.EXE: the cash block is never squeezed to two lines — while it is shown the top area takes its full height
+   (last month's ledger + the fee choice); the window body (.pl-scroll) scrolls instead. */
+.pl-top:has(> .pl-kassa:not([hidden])){ flex: none; min-height: min-content; overflow: visible; }
+.pl-top > .pl-kassa:not([hidden]){ min-height: min-content; }
 /* =========================================================
    RESPONSIVE
    ========================================================= */
@@ -2645,6 +2650,7 @@ const AP_OPTION = { TRUANT_DISC: 1, TRUANT_MORALE: 3, BOOTS_MORALE: 5, KNOCK_COS
    Prefix match ('rep.' = every rep line); a trailing '.diary' = any event choice. */
 const NEWS = {
   COOLDOWN: 14,
+  CD_DAYS: 14,   // v3.24: a morning headline (MorningBriefing.NEWS id) is not picked again within this many days (state.newsSeen['hl:' + id])
   IMPORTANT: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'home.back', 'world.', 'fin.', 'fee.lost', 'rep.', 'week.', 'tr.plateau.',
     'tr.improved', 'lesson.improved', 'lesson.cancel', 'lesson.clue', 'obs.', 'scout.', 'cb.', 'xi.auto', 'af.complaint'],
   NEVER_MUTE: ['.diary', 'tr.hurt', 'inj.', 'ex.ankleHurt', 'sus.', 'world.', 'fin.', 'fee.', 'rep.', 'week.', 'af.complaint'],
@@ -2703,7 +2709,10 @@ const REP = { START: 50,
   SQUAD_BONUS: 25,                                    // match rolls for us: (squad − 50) / 25 → −2 … +2
   MATCH: { W: { board: 3, squad: 2 }, D: { board: 0, squad: 0 }, L: { board: -2, squad: -2 } },
   EXCUSE_HOME_PARENTS: 5, EXCUSE_STAY_SQUAD: -5, EXCUSE_STAY_MORALE: -10, EXCUSE_ANKLE_INJURY: 0.3, EXCUSE_ANKLE_DAYS: [3, 6] };
-const EXCUSE = { BASE: 0.04, PER_DISC: 0.006, KINDS: ['test', 'ankle', 'birthday'] };   // per present kid: 4% + (20 − discipline) × 0.6%
+const EXCUSE = { BASE: 0.04, PER_DISC: 0.006,   // per present kid: 4% + (20 − discipline) × 0.6%
+  // v3.24: 8 kinds × PHRASES phrasings (ex.<kind>.0–1). Seeded pick (date#excuse#id) among the kinds this kid hasn't used for KID_CD days
+  // and the team hasn't heard for TEAM_CD days; the team never hears the same phrasing twice in a row. state.excuseLog keeps LOG_DAYS.
+  KINDS: ['test', 'ankle', 'birthday', 'dentist', 'garage', 'wedding', 'play', 'brother'], PHRASES: 2, KID_CD: 28, TEAM_CD: 7 };
 const WEATHER = ['heavyRain', 'rain', 'drizzle', 'overcast', 'fog', 'wind', 'clearCold'];
 const WEATHER_W = [4, 4, 3, 4, 2, 2, 1];
 const LOCKER = { MIN_COND: 25, DISC_GRACE: 8, FINE: 10, FINE_DISC: 2 };
@@ -3812,9 +3821,9 @@ Object.assign(I18N.en, {
   'news.rain': 'Forecast: more rain. Then a little more rain.',
   'lr.toPitch': '[ HEAD TO PITCH ]',
   'talk.roleExcuse': '#{n} · {p} · just arrived',
-  'ex.test': '{k} hovers by the door. "Coach, I have a big maths test tomorrow… can I go home and study?"',
-  'ex.ankle': '{k} limps a little. "Coach, my ankle feels weird from yesterday."',
-  'ex.birthday': '{k} looks at his feet. "Coach, it\'s my nan\'s birthday. Mum says I should be there…"',
+  'ex.test.0': '{k} hovers by the door. "Coach, I have a big maths test tomorrow… can I go home and study?"',
+  'ex.ankle.0': '{k} limps a little. "Coach, my ankle feels weird from yesterday."',
+  'ex.birthday.0': '{k} looks at his feet. "Coach, it\'s my nan\'s birthday. Mum says I should be there…"',
   'ex.home': 'Go home', 'ex.stay': 'Stay and train',
   'ex.home.diary': '{k} was sent home this morning. The parents appreciated it.', 'ex.stay.diary': '{k} had to stay. He sulked all session; the others noticed.',
   'ex.ankleHurt': 'It really was something: {k} is injured for {d} days.',
@@ -3843,9 +3852,9 @@ Object.assign(I18N.ru, {
   'news.rain': 'Прогноз: снова дождь. Потом ещё немного дождя.',
   'lr.toPitch': '[ НА ПОЛЕ ]',
   'talk.roleExcuse': '№{n} · {p} · только что пришёл',
-  'ex.test': '{k} мнётся у двери. «Тренер, у меня завтра большая контрольная по математике… можно я пойду домой готовиться?»',
-  'ex.ankle': '{k} слегка прихрамывает. «Тренер, у меня со вчера что-то странное с лодыжкой».',
-  'ex.birthday': '{k} смотрит в пол. «Тренер, у бабушки день рождения. Мама говорит, я должен быть там…»',
+  'ex.test.0': '{k} мнётся у двери. «Тренер, у меня завтра большая контрольная по математике… можно я пойду домой готовиться?»',
+  'ex.ankle.0': '{k} слегка прихрамывает. «Тренер, у меня со вчера что-то странное с лодыжкой».',
+  'ex.birthday.0': '{k} смотрит в пол. «Тренер, у бабушки день рождения. Мама говорит, я должен быть там…»',
   'ex.home': 'Иди домой', 'ex.stay': 'Остаёшься и тренируешься',
   'ex.home.diary': 'Отпустили игрока домой с утра. Родители оценили. Игрок: {k}.', 'ex.stay.diary': '{k} остался, но дулся всю тренировку; остальные это заметили.',
   'ex.ankleHurt': 'Это действительно было что-то: {k} травмирован на {d} дн.',
@@ -4795,6 +4804,63 @@ Object.assign(I18N.ru, {
   'clue.yard.dribble': 'Держал мяч у ноги, даже в грязи.', 'clue.yard.shot': 'Бил сильно, стоило увидеть ворота.',
   'clue.yard.engine': 'Бегал весь день без остановки.',
 });
+/* ---------- v3.24 "Loose ends": excuses, family fines, [1 AP] result lines, headlines ---------- */
+Object.assign(I18N.en, {
+  'ex.test.1': '{k} holds up a crumpled exercise book. "Coach, there\'s a history test in the morning and I haven\'t even opened it…"',
+  'ex.ankle.1': '{k} rubs his ankle and winces. "Coach, I went over on it on the stairs at school. Maybe I should rest it?"',
+  'ex.birthday.1': '{k} keeps checking the clock. "Coach, it\'s Nan\'s birthday tonight. The whole family\'s coming, Mum said don\'t be late…"',
+  'ex.dentist.0': '{k} points at his cheek. "Coach, I\'ve got the dentist at five. Mum booked it weeks ago."',
+  'ex.dentist.1': '{k} talks out of the corner of his mouth. "Coach, my tooth\'s been killing me all day. Dad\'s taking me to the dentist."',
+  'ex.garage.0': '{k} already has oil on his hands. "Coach, Dad needs me at the garage tonight — he has to get a car finished."',
+  'ex.garage.1': '{k} shifts from foot to foot. "Coach, I promised Dad I\'d help with the van. He can\'t lift the engine parts on his own."',
+  'ex.wedding.0': '{k} looks a bit embarrassed. "Coach, my cousin\'s getting married this weekend. We\'re driving up tonight."',
+  'ex.wedding.1': '{k} has a sports bag over his shoulder. "Coach, the whole family\'s going to my aunt\'s tonight. Mum\'s already packed the car."',
+  'ex.play.0': '{k} is holding a few printed pages. "Coach, it\'s the school play rehearsal tonight. Miss says I can\'t miss another one."',
+  'ex.play.1': '{k} mumbles: "Coach, I\'ve got lines in the school play. Rehearsal\'s at five… sorry."',
+  'ex.brother.0': '{k} glances at the gate. "Coach, Mum\'s on a late shift. I have to pick my little brother up from school."',
+  'ex.brother.1': '{k} sighs. "Coach, I\'m looking after my little brother tonight. There\'s nobody else at home."',
+  'ev.truant.a': 'Fine him — his family pays (+discipline)',
+  'ev.truant.aLater.diary': 'Fined {k} for skipping training. His family will pay the {f} at the next training — if they can.',
+  'talk.gainLater': 'Paid by his family at the next training, if they can',
+  'fine.paid': '{k}\'s family paid his {m} fine for skipping training.',
+  'fine.unpaid': '{k}\'s family couldn\'t pay his {m} fine. Nobody chases it.',
+  'talk.roleVisit': 'Evening · his family\'s kitchen', 'talk.roleKid': '#{n} · {p} · after training',
+  'ev.truant.visit': 'His mum puts the kettle on. {k} sits at the table, red-eared, and listens. At the door his dad shakes your hand: "He\'ll be there next time, coach."',
+  'ev.visitOk': 'Thank them and go home',
+  'ev.boots.seniors': 'The seniors\' kit room smells of old leather. You find a pair a size too big. {k} laces them tight, jogs a lap and gives you a thumbs-up.',
+  'ev.boots.seniorsOk': 'Good enough',
+  'ev.knock.medic': 'Your paramedic friend strapped {k}\'s ankle properly: "Nothing torn. Keep him off it for {d} days and he\'ll be fine."',
+  'ev.knock.medicOk': 'Thank him',
+  'xi.autoGK': '{a} is unavailable: {b} goes in goal, {c} takes his place in the XI.',
+});
+Object.assign(I18N.ru, {
+  'ex.test.1': '{k} показывает мятую тетрадь. «Тренер, завтра с утра контрольная по истории, а я её даже не открывал…»',
+  'ex.ankle.1': '{k} потирает лодыжку и морщится. «Тренер, подвернул на лестнице в школе. Может, мне её поберечь?»',
+  'ex.birthday.1': '{k} всё поглядывает на часы. «Тренер, у бабушки сегодня день рождения. Вся родня приедет, мама сказала не опаздывать…»',
+  'ex.dentist.0': '{k} показывает на щёку. «Тренер, мне в пять к зубному. Мама записала ещё месяц назад».',
+  'ex.dentist.1': '{k} говорит уголком рта. «Тренер, зуб весь день болит. Папа везёт меня к стоматологу».',
+  'ex.garage.0': '{k} — руки уже в машинном масле. «Тренер, папа просил помочь в гараже: ему сегодня машину доделать надо».',
+  'ex.garage.1': '{k} переминается с ноги на ногу. «Тренер, я обещал папе помочь с фургоном. Одному ему детали от мотора не поднять».',
+  'ex.wedding.0': '{k} немного смущается. «Тренер, у двоюродного брата в выходные свадьба. Мы сегодня вечером уезжаем».',
+  'ex.wedding.1': '{k} с сумкой через плечо. «Тренер, мы всей семьёй сегодня едем к тёте. Мама уже сложила вещи в машину».',
+  'ex.play.0': '{k} держит в руках листки с текстом. «Тренер, сегодня репетиция школьного спектакля. Учительница сказала, ещё одну пропускать нельзя».',
+  'ex.play.1': '{k} бормочет: «Тренер, у меня слова в школьном спектакле. Репетиция в пять… извините».',
+  'ex.brother.0': '{k} поглядывает на ворота. «Тренер, мама сегодня во вторую смену. Мне надо забрать младшего брата из школы».',
+  'ex.brother.1': '{k} вздыхает. «Тренер, я сегодня сижу с младшим братом. Дома больше никого нет».',
+  'ev.truant.a': 'Оштрафовать — платит семья (+дисциплина)',
+  'ev.truant.aLater.diary': 'Штраф за прогул тренировки. Игрок: {k}. Семья отдаст {f} на следующей тренировке — если сможет.',
+  'talk.gainLater': 'Семья заплатит на следующей тренировке, если сможет',
+  'fine.paid': 'Семья заплатила штраф за прогул ({m}). Игрок: {k}.',
+  'fine.unpaid': 'Семье не по силам штраф за прогул ({m}). Никто не требует. Игрок: {k}.',
+  'talk.roleVisit': 'Вечер · кухня его семьи', 'talk.roleKid': '№{n} · {p} · после тренировки',
+  'ev.truant.visit': 'Мама ставит чайник. {k} сидит за столом с красными ушами и слушает. В дверях отец жмёт тебе руку: «В следующий раз придёт, тренер».',
+  'ev.visitOk': 'Поблагодарить и пойти домой',
+  'ev.boots.seniors': 'В кладовке старших пахнет старой кожей. Находится пара на размер больше. {k} туго шнурует, пробегает круг и показывает большой палец.',
+  'ev.boots.seniorsOk': 'Сойдёт',
+  'ev.knock.medic': 'Знакомый фельдшер как следует перевязал лодыжку. Игрок: {k}. «Ничего не порвано. {d} дн. без нагрузки — и будет в порядке».',
+  'ev.knock.medicOk': 'Поблагодарить',
+  'xi.autoGK': '{a} недоступен: в ворота встаёт {b}, его место в основе занимает {c}.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -4823,6 +4889,15 @@ class Lang {
 }
 const L = new Lang();
 
+/** v3.24: how a squad kid is named where only his surname is shown (planner, locker room, fee checklist, roster, board):
+    the surname alone; another kid in `squad` with the same surname → "C. Brennan"; the same initial too → "Charlie Brennan". */
+function squadName(p, squad = []) {
+  const sn = L.name(p.surname), first = n => L.name(n.split(' ').slice(0, -1).join(' ') || n);
+  const same = (squad || []).filter(q => q && q.id !== p.id && q.surname === p.surname);
+  if (!same.length) return sn;
+  const f = first(p.name);
+  return same.some(q => first(q.name)[0] === f[0]) ? `${f} ${sn}` : `${f[0]}. ${sn}`;
+}
 /* =========================================================
    v2.1 — BOOT / LOADING SCREEN (atmospheric startup)
    Static markup (#loading-overlay) is the FIRST thing in <body>, so it is visible before any script runs.
@@ -5075,6 +5150,7 @@ class Player {
       // v3.18: the Notebook's clues [{ date, source 'match'|'training' (v3.20: 'voice'), ref, signal|null, textKey, seen }] + matches his current role has played
       this.clues = Array.isArray(o.clues) ? o.clues.filter(c => c && typeof c.textKey === 'string').map(c => ({ ...c, signal: CLUE_SIGNALS[c.signal] ? c.signal : null })).slice(-CLUES.MAX_PER_KID) : [];
       this.yardDone = !!o.yardDone;   // v3.23: his yard notes were turned into clues (once)
+      this.yardNotes = Array.isArray(o.yardNotes) ? o.yardNotes.filter(k => typeof k === 'string') : null;   // v3.24: what the coach saw in the yard match (null = an older save → DraftView.notes)
       this.lessonClues = Math.max(0, Math.round(o.lessonClues || 0));   // v3.16: lesson clues given (alternates archetype ↔ leadership)
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
       this.positionHintCooldown = Math.max(0, Math.round(o.positionHintCooldown || 0));   // v3.6: matches before he may ask again
@@ -5593,7 +5669,7 @@ class GameState {
     this.review = null; this.lossStreak = 0;   // v3.19 REVIEW.EXE + losses in a row
     this.after = null; this.parentComplaints = [];   // v3.20 AFTER_GAME.EXE + parents' "wrong role" complaints
     this.cohesion = COH.START; this.stats = {};   // v3.21 team cohesion + DEBUG attention metrics
-    this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {};   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
+    this.worldSalt = null; this.ledger = {}; this.fees = null; this.newsSeen = {}; this.excuseLog = []; this.fines = []; this.gkByHand = null;   // v3.15: world seed salt, money ledger, this month's fees   // v3.13: weekly plan / AP wallet / "while you were away"
     // v3.1 SANDBOX: a global database of 100 kids; the coach drafts 15 of them at the Yard Match
     const used = new Set();
     this.globalPlayers = GameState.buildWorld(used);
@@ -5693,7 +5769,9 @@ class GameState {
   autoArrange() {
     const slots = this.slots();
     const pool = this.starters();
-    const gk = pool.find(p => p.position === 'GK') || pool[0];   // v3.0: by the coach's tags (untagged kids just fill the gaps)
+    // v3.0: by the coach's tags (untagged kids just fill the gaps). v3.24: a keeper the coach put in goal himself stays; else
+    // keeperPick (tag GK → yard note "hands" → kept goal most this season), else the current keeper.
+    const gk = pool[0] && this.gkByHand === pool[0].id ? pool[0] : this.keeperPick(pool) || pool[0];
     const free = pool.filter(p => p !== gk).sort((a, b) => b.energy - a.energy);
     const assigned = new Array(slots.length).fill(null);
     slots.forEach((s, i) => {
@@ -5726,8 +5804,24 @@ class GameState {
       const [slot, incoming] = ia >= 0 ? [ia, pb] : [ib, pa];
       this.lineup[slot] = incoming.id;
     }
+    if (ia === 0 || ib === 0) this.gkByHand = this.lineup[0];   // v3.24: the coach chose this keeper — the auto lineup leaves him there
     this.save();
     return null;
+  }
+  /* ---------- v3.24 the auto lineup's keeper: only what the coach can see, never hidden skills ---------- */
+  /** What he saw in the yard match (kept since the draft; older saves: DraftView.notes). */
+  yardNotesOf(p) { return p.yardNotes || (typeof DraftView !== 'undefined' ? DraftView.notes(p) : []); }
+  /** League matches he finished in goal this season. */
+  keptGoal(id) { return this.seasonStats?.[id]?.kept || 0; }
+  /** 3 = tagged GK, 2 = yard note "hands" ("safe hands in goal"), 1 = has kept goal this season, 0 = nothing visible. */
+  keeperTier(p) { return p.position === 'GK' ? 3 : this.yardNotesOf(p).includes('hands') ? 2 : this.keptGoal(p.id) > 0 ? 1 : 0; }
+  /** The best visible keeper among `cands` (their order breaks the last ties), or null → the caller's old rule. */
+  keeperPick(cands, benchIds = null) {
+    const c = cands.filter(p => p && this.keeperTier(p) > 0);
+    if (!c.length) return null;
+    const onBench = p => (benchIds && benchIds.has(p.id) ? 1 : 0);
+    return c.map((p, i) => ({ p, i })).sort((a, b) => this.keeperTier(b.p) - this.keeperTier(a.p) || onBench(b.p) - onBench(a.p)
+      || this.keptGoal(b.p.id) - this.keptGoal(a.p.id) || a.i - b.i)[0].p;
   }
   /* ---------- v3.0 coach's assignment: visual position tag + exclusive duties ---------- */
   setPosTag(id, tag) {
@@ -6175,8 +6269,9 @@ class GameState {
   addYardClues(p, date) {
     if (!p || p.yardDone || typeof DraftView === 'undefined') return;
     p.yardDone = true;
+    p.yardNotes = DraftView.notes(p);   // v3.24: kept as seen on draft day (the auto lineup's "safe hands in goal")
     const out = [];
-    for (const k of DraftView.notes(p)) {
+    for (const k of p.yardNotes) {
       const signal = YARD.SIGNAL[k];
       if (signal) out.push({ date, source: 'yard', ref: 'draft', signal, textKey: 'clue.yard.' + k, seen: true });
     }
@@ -6561,9 +6656,10 @@ class GameState {
     }
     if (training) {   // v3.15: fee collection among the kids who came (+ auto-sim reminds everyone who still owes)
       d.feesPaid = this.collectFees(date, absent);
+      this.resolveFines(date);   // v3.24: a poor family's truant fine — paid (or not) at the next training
       if (this.autoFees) for (const p of this.squad) if (!absent[p.id]) this.remindFee(p.id);
     }
-    d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent), posRequest: this.rollPositionRequest(absent) };   // v3.6
+    d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent, date), posRequest: this.rollPositionRequest(absent) };   // v3.6
     d.locker.capRequest = d.locker.request || d.locker.posRequest ? null : this.rollCaptainRequest(absent);   // v3.8: urgent kid requests come first
     this.save();
     return d.locker;
@@ -6605,12 +6701,46 @@ class GameState {
   }
 
   /** v2.8: "Immediate request" — maybe one present kid asks to go home (low discipline asks more). Rolled with the arrivals. */
-  rollExcuse(absent) {
+  rollExcuse(absent, date = this.calendar.date) {
     if (this.excusesOff) return null;
     for (const p of shuffle(this.squad.filter(x => !absent[x.id]))) {
-      if (Math.random() < EXCUSE.BASE + (20 - p.psych.discipline) * EXCUSE.PER_DISC) return { pid: p.id, kind: pick(EXCUSE.KINDS), done: false };
+      if (Math.random() < EXCUSE.BASE + (20 - p.psych.discipline) * EXCUSE.PER_DISC) {
+        Math.random();   // v3.24: the kind is seeded now; this keeps the v3.23 Math.random stream (the old pick(EXCUSE.KINDS))
+        return this.pickExcuse(p, date);
+      }
     }
     return null;
+  }
+  /** v3.24: which excuse this kid uses today (seeded date#excuse#id): a kind he hasn't used for EXCUSE.KID_CD days and the team
+      hasn't heard for EXCUSE.TEAM_CD days (none left → he doesn't ask today); one of EXCUSE.PHRASES phrasings, never the team's
+      last one. Logged in state.excuseLog [{ date, pid, kind, text }] (the last entry is always kept). */
+  pickExcuse(p, date = this.calendar.date) {
+    const log = (this.excuseLog || []).filter((e, i, a) => i === a.length - 1 || isoDays(e.date, date) < EXCUSE.KID_CD);
+    this.excuseLog = log;
+    const recent = (e, k) => e.kind === k && e.date <= date && isoDays(e.date, date) < (e.pid === p.id ? EXCUSE.KID_CD : EXCUSE.TEAM_CD);
+    const ok = EXCUSE.KINDS.filter(k => !log.some(e => recent(e, k)));
+    if (!ok.length) return null;
+    const r = seeded(date + '#excuse#' + p.id), kind = ok[Math.floor(r() * ok.length)];
+    let n = Math.floor(r() * EXCUSE.PHRASES), text = `ex.${kind}.${n}`;
+    if (text === log[log.length - 1]?.text) text = `ex.${kind}.${(n + 1) % EXCUSE.PHRASES}`;
+    log.push({ date, pid: p.id, kind, text });
+    return { pid: p.id, kind, text, done: false };
+  }
+  /* ---------- v3.24: a truant's fine is paid by his family (income). A poor family pays at the next training with the v3.15
+     first-fee chance for poor kids (one seeded roll); if not, nothing happens — no debt. state.fines [{ pid, amount, date }]. ---------- */
+  addFine(pid, amount, date = this.calendar.date) { (this.fines ||= []).push({ pid, amount, date }); }
+  resolveFines(date = this.calendar.date) {
+    if (!this.fines?.length) return;
+    const keep = [];
+    for (const f of this.fines) {
+      const p = this.player(f.pid);
+      if (!p) continue;   // he left the academy: the fine is forgotten
+      if (f.date >= date) { keep.push(f); continue; }   // the next training, not today's
+      const paid = seeded(date + '#fine#' + f.pid)() < feeChance(p.wealth, 'first', this.fees?.level || FINANCE.DEFAULT_LEVEL);
+      if (paid) this.addMoney(f.amount, 'event', false, date);
+      this.addDiary({ date, key: paid ? 'fine.paid' : 'fine.unpaid', vars: { k: { pid: p.id }, m: '$' + f.amount }, cls: 'ev' });
+    }
+    this.fines = keep;
   }
   /** Every morning (and after a match): nobody is "absent" any more. */
   clearDayStatus() { for (const p of this.squad) { p.absentToday = null; p.skipped_training = false; } }
@@ -6700,6 +6830,7 @@ class GameState {
     this.lineup.forEach((id, i) => {
       const p = this.player(id);
       if (!p || p.available) return;
+      if (i === 0 && this.keeperSwap(p, changes)) return;   // v3.24: the keeper by what the coach can see
       const best = this.bestBenchFor(i);
       if (!best) return;
       this.lineup[i] = best.id;
@@ -6707,6 +6838,25 @@ class GameState {
     });
     if (changes.length) this.save();
     return changes;
+  }
+  /** v3.24: the keeper is out — keeperPick over the available bench (old bench order: tag, then overall) and the outfield starters.
+      A starter moves into goal and the best bench kid for his slot fills it. false = nobody visible → the old bench rule. */
+  keeperSwap(out, changes) {
+    const bench = this.bench().filter(b => b.available && !b.hasFlag('Promised_Start'))
+      .sort((a, b) => (b.position === 'GK') - (a.position === 'GK') || b.overall - a.overall);
+    const xi = this.lineup.slice(1).map(id => this.player(id)).filter(q => q && q.available);
+    const pick = this.keeperPick([...bench, ...xi], new Set(bench.map(b => b.id)));
+    if (!pick) return false;
+    if (bench.includes(pick)) { this.lineup[0] = pick.id; changes.push({ out, in: pick }); return true; }
+    const j = this.lineup.indexOf(pick.id), fill = this.bestBenchFor(j);
+    if (!fill) return false;
+    this.lineup[0] = pick.id; this.lineup[j] = fill.id;
+    changes.push({ out, in: pick, fill });
+    return true;
+  }
+  /** v3.24: diary lines for ensureAvailableXI's changes (a starter moved into goal names the kid who took his place). */
+  xiAutoDiary(changes, date = this.calendar.date) {
+    for (const c of changes) this.addDiary({ date, key: c.fill ? 'xi.autoGK' : 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id }, ...(c.fill ? { c: { pid: c.fill.id } } : {}) }, cls: 'ev' });
   }
   /* ---------- v3.22 "MONEY WITH STRINGS": the promise card ---------- */
   /** The kid whose kick-off promise card is still owed today (present and available, no answer yet), or null. */
@@ -6792,11 +6942,12 @@ class GameState {
   }
 
   /** Adds one match to every player's season totals. pairs: [[id, stats], ...] */
-  recordSeasonStats(pairs) {
+  recordSeasonStats(pairs, keepers = null) {
     for (const [id, st] of pairs) {
       const acc = this.seasonStats[id] || (this.seasonStats[id] = { ...MatchEngine.blankStats(), apps: 0 });
       for (const k in st) acc[k] = (acc[k] || 0) + st[k];
       acc.apps++;
+      if (keepers?.has(id)) acc.kept = (acc.kept || 0) + 1;   // v3.24: finished the match in goal (the auto lineup's keeper rule)
     }
   }
   /** v1.5: remember the notes shown in the Notebook so the Profile Card can quote them later. */
@@ -6830,7 +6981,9 @@ class GameState {
   /* ---------- v3.15 CASH DESK + MONTHLY FEES ---------- */
   monthOf(date = this.calendar.date) { return date.slice(0, 7); }
   /** KASSA.EXE is due at the first stop of a month (also old saves without fees). */
-  kassaDue() { return this.phase !== 'draft' && this.squad.length > 0 && ['calendar', 'matchday'].includes(this.phase) && this.fees?.month !== this.monthOf(); }
+  /** v3.24: the cash desk belongs to the month's first stop that is NOT a match day (the 1st on a Saturday → the next stop;
+      the 1st on a Monday → inside PLANNER.EXE as in v3.17). Rent and the grant are still booked on the 1st (repDaily). */
+  kassaDue() { return this.phase === 'calendar' && this.squad.length > 0 && this.fees?.month !== this.monthOf(); }
   /** Last month's ledger totals for the cash desk: { month, rows: {cat: sum}, total } — null for the academy's first month. */
   lastMonthReport() {
     const d = new Date(this.monthOf() + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1);
@@ -6929,6 +7082,16 @@ class GameState {
     for (const e of list || []) m[newsKey(e)] = date;
     for (const k in m) if (isoDays(m[k], date) > NEWS.COOLDOWN * 2) delete m[k];
   }
+  /** v3.24: a morning headline id (MorningBriefing.NEWS) may be picked on `date` unless the coach read it < NEWS.CD_DAYS days ago
+      (read today = still fresh, so a re-render of the same morning keeps it). Stored in newsSeen as 'hl:<id>' (pruned with the rest). */
+  headlineFresh(id, date = this.calendar.date) {
+    const seen = this.newsSeen?.['hl:' + id];
+    return !seen || seen >= date || isoDays(seen, date) >= NEWS.CD_DAYS;
+  }
+  markHeadlines(ids, date = this.calendar.date) {
+    const m = this.newsSeen || (this.newsSeen = {});
+    for (const id of ids || []) m['hl:' + id] = date;
+  }
   /** Office talk about the fee: the reason is fixed per month (poor → nomoney; discipline ≤ 7 → spent 50 %; else forgot). */
   feeReason(id) {
     const f = this.fees, p = this.player(id);
@@ -6950,7 +7113,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, after: this.after || null, parentComplaints: this.parentComplaints || [], notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, excuseLog: this.excuseLog || [], fines: this.fines || [], gkByHand: this.gkByHand || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -6973,6 +7136,9 @@ class GameState {
       this.today = d.today && typeof d.today === 'object' ? d.today : null;   // v2.5
       this.away = Array.isArray(d.away) ? d.away : null;   // v3.13 "while you were away"
       this.newsSeen = d.newsSeen && typeof d.newsSeen === 'object' ? d.newsSeen : {};   // v3.17 muted repeats (lazy migration)
+      this.excuseLog = Array.isArray(d.excuseLog) ? d.excuseLog.filter(e => e && EXCUSE.KINDS.includes(e.kind)) : [];   // v3.24 (lazy)
+      this.fines = Array.isArray(d.fines) ? d.fines.filter(f => f && f.pid && f.amount > 0) : [];   // v3.24: poor families' truant fines
+      this.gkByHand = typeof d.gkByHand === 'string' ? d.gkByHand : null;   // v3.24: the coach put this kid in goal himself
       this.worldEvent = d.worldEvent && typeof d.worldEvent === 'object' && Array.isArray(d.worldEvent.playerIds) && Array.isArray(d.worldEvent.days) ? d.worldEvent : null;   // v3.14 (missing → none this week)
       this.worldLast = typeof d.worldLast === 'string' ? d.worldLast : null;
       this.worldSalt = typeof d.worldSalt === 'string' ? d.worldSalt : null;   // v3.15 (old saves: set on the next Monday roll)
@@ -7795,7 +7961,8 @@ class RadarView {
     <div class="pl-line six l"></div><div class="pl-line six r"></div>
     <div class="pl-goal l"></div><div class="pl-goal r"></div>`;
 
-  constructor(el, { labels = false, onDotClick = null, onDrop = null } = {}) {
+  constructor(el, { labels = false, onDotClick = null, onDrop = null, squad = null } = {}) {
+    this.squadOf = squad;   // v3.24: () => the academy squad, for squadName() on our side
     this.el = el;
     this.labels = labels;
     this.onDotClick = onDotClick;
@@ -7813,7 +7980,7 @@ class RadarView {
     sides.forEach((side, si) => side.entries.forEach((e, idx) => {
       const d = document.createElement(this.onDotClick ? 'button' : 'div');
       d.className = `pl ${si === 0 ? 'home' : 'away'}${e.line === 'GK' ? ' gk' : ''}`;
-      d.innerHTML = `<b>${e.p.number ?? idx + 1}</b>${this.labels ? `<span class="pl-pos ${e.p.position}">${L.pos(e.p.position)}</span><span class="pl-nm">${esc(L.name(e.p.surname))}</span>` : ''}`;
+      d.innerHTML = `<b>${e.p.number ?? idx + 1}</b>${this.labels ? `<span class="pl-pos ${e.p.position}">${L.pos(e.p.position)}</span><span class="pl-nm">${esc(squadName(e.p, si === 0 && this.squadOf ? this.squadOf() : side.entries.map(x => x.p)))}</span>` : ''}`;
       d.title = `${L.name(e.p.name)} · ${L.line(e.line === 'GK' ? 'GK' : e.line)}`;
       d.dataset.pid = e.p.id;   // v1.5: right-click → Player Profile Card
       if (this.onDotClick) { d.type = 'button'; d.dataset.slot = idx; d.addEventListener('click', () => this.onDotClick(idx)); }
@@ -7856,8 +8023,26 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.23';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.24';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.24', name: { en: 'Loose ends', ru: 'Хвосты' },
+    en: [
+      'Morning headlines don\'t repeat for two weeks, and kids have eight kinds of excuses now (dentist, the garage, a family wedding, the school play, a little brother…) — nobody repeats his for a month.',
+      'Match day goes in order: the morning briefing, then any match-day event, then the "Match day" window. The cash desk never opens on a match day — it waits for the next stop.',
+      'A truant\'s fine is paid by his family to the club. A poor family pays at the next training if they can; if not, nothing happens.',
+      'Two kids with the same surname show an initial ("C. Brennan") in the planner, the locker room, the fee list and the roster.',
+      'The auto lineup puts a kid tagged GK in goal, else one with "safe hands in goal" from the yard match, else whoever kept goal most — and never moves a keeper you placed yourself.',
+      'The [1 AP] family visit, the seniors\' boots and the paramedic friend show what happened before the game moves on; the cash block in PLANNER.EXE is no longer squeezed.',
+    ],
+    ru: [
+      'Утренние заголовки не повторяются две недели, а отговорок у ребят теперь восемь видов (зубной, гараж, свадьба у родни, школьный спектакль, младший брат…) — свою никто не повторяет месяц.',
+      'День матча идёт по порядку: утренняя сводка, потом событие дня матча, потом окно «День матча». Касса в день матча не открывается — ждёт следующей остановки.',
+      'Штраф за прогул платит семья — в кассу клуба. Бедная семья платит на следующей тренировке, если может; если нет — ничего не происходит.',
+      'Двое ребят с одной фамилией показаны с инициалом («Ч. Бреннан») в планировщике, раздевалке, списке взносов и составе.',
+      'Автосостав ставит в ворота отмеченного GK, иначе того, у кого с дворового матча «надёжные руки в воротах», иначе того, кто чаще стоял в воротах, — и не трогает вратаря, которого ты поставил сам.',
+      'Визит к семье [1 ОД], старые бутсы от старших и знакомый фельдшер показывают результат, прежде чем игра идёт дальше; блок кассы в PLANNER.EXE больше не сжат.',
+    ],
+  },
   { v: '3.23', name: { en: 'Not blind', ru: 'Не вслепую' },
     en: [
       'The man of the match is always in the Notebook now (marked ☆) and always has a clue from this match, so the REVIEW pick is no longer blind.',
@@ -9414,7 +9599,7 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
         <fieldset class="pi-assign"><legend>${L.t('pi.assign')}</legend><div class="pa-wrap">
           <div class="pa-row"><span class="pa-lbl">${L.t('pi.assignPos')}</span>${['GK', 'DEF', 'MID', 'FWD'].map(t => `<button type="button" class="pa-btn${p.tag === t ? ' on' : ''}" data-postag="${t}" aria-pressed="${p.tag === t}">${L.t('tag.pos.' + t)}</button>`).join('')}</div>
           <div class="pa-row"><span class="pa-lbl">${L.t('pi.assignDuty')}</span>${Object.keys(DUTIES).map(d => { const holder = s.duties[d], mine = holder === p.id, other = holder && !mine ? s.player(holder) : null;
-            return `<button type="button" class="pa-btn duty${mine ? ' on' : ''}" data-duty="${d}" aria-pressed="${mine}" title="${esc(other ? L.t('pi.dutyHeld', { n: L.name(other.name) }) : L.t('duty.' + d + '.d'))}">${L.t('duty.' + d)}${other ? ` <small>(${esc(L.name(other.surname))})</small>` : ''}</button>`; }).join('')}</div>
+            return `<button type="button" class="pa-btn duty${mine ? ' on' : ''}" data-duty="${d}" aria-pressed="${mine}" title="${esc(other ? L.t('pi.dutyHeld', { n: L.name(other.name) }) : L.t('duty.' + d + '.d'))}">${L.t('duty.' + d)}${other ? ` <small>(${esc(squadName(other, this.ui.state.squad))})</small>` : ''}</button>`; }).join('')}</div>
         </div></fieldset>` : ''}
         <fieldset><legend>${L.t('pi.tags')}</legend><div class="pi-role">${roleHtml}</div></fieldset>
         <fieldset><legend>${L.t('pi.stats')}</legend>${table}</fieldset>
@@ -9722,6 +9907,13 @@ const NARRATIVE_EVENTS = [
     },
     execute(ctx) {
       const { snitch, kid } = ctx.cast;
+      if (ctx.step === 'seniors') {   // v3.24: the [1 AP] result line before the game moves on
+        ctx.show({ face: kid.portraitSvg, name: L.name(kid.name), role: L.t('talk.roleKid', { n: kid.number, p: L.pos(kid.position) }),
+          text: L.t('ev.boots.seniors', { k: L.name(kid.name) }),
+          choices: [{ key: 'ev.boots.seniorsOk', as: 'ev.boots.c', tone: 'gray', who: kid.id,
+            run: () => { kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.BOOTS_MORALE, 0, 100); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
       ctx.show({
         face: snitch.portraitSvg, name: L.name(snitch.name), role: L.t('talk.roleSnitch', { n: snitch.number, p: L.pos(snitch.position) }),
         text: L.t('ev.boots.text', { s: L.name(snitch.name), k: L.name(kid.name) }),
@@ -9730,8 +9922,7 @@ const NARRATIVE_EVENTS = [
             run: () => { kid.dyn.morale = 100; return { k: { pid: kid.id } }; } },
           { key: 'ev.boots.b', tone: 'gray', who: kid.id,
             run: () => { kid.physical.agility = Math.max(1, kid.physical.agility + EVENTS_CFG.BOOTS_AGILITY); return { k: { pid: kid.id } }; } },
-          { key: 'ev.boots.c', tone: 'green', ap: 1, who: kid.id,   // v3.16: [1 AP] — free and no agility lost, but only +5 morale
-            run: () => { kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.BOOTS_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+          { key: 'ev.boots.c', tone: 'green', ap: 1, who: kid.id, next: 'seniors' },   // v3.16: [1 AP] — free and no agility lost, but only +5 morale
         ],
       });
     },
@@ -9802,6 +9993,13 @@ const NARRATIVE_EVENTS = [
     },
     execute(ctx) {
       const { kid, snitch } = ctx.cast;
+      if (ctx.step === 'medic') {   // v3.24: the paramedic's verdict, one button (AP and money were spent on the first click)
+        ctx.show({ face: kid.portraitSvg, name: L.name(kid.name), role: L.t('talk.roleKnock', { n: kid.number, p: L.pos(kid.position) }),
+          text: L.t('ev.knock.medic', { k: L.name(kid.name), d: AP_OPTION.KNOCK_DAYS }),
+          choices: [{ key: 'ev.knock.medicOk', as: 'ev.knock.c', tone: 'gray', who: kid.id,
+            run: () => { kid.injuryDays = AP_OPTION.KNOCK_DAYS; return { k: { pid: kid.id }, d: AP_OPTION.KNOCK_DAYS, m: '−$' + AP_OPTION.KNOCK_COST }; } }] });
+        return;
+      }
       ctx.show({   // v3.17: the window shows the injured kid himself (it showed the teammate while the text was about the kid)
         face: kid.portraitSvg, name: L.name(kid.name), role: L.t('talk.roleKnock', { n: kid.number, p: L.pos(kid.position) }),
         text: L.t('ev.knock.text', { k: L.name(kid.name) }) + (snitch ? ' ' + L.t('ev.knock.helper', { s: L.name(snitch.name) }) : ''),
@@ -9810,8 +10008,7 @@ const NARRATIVE_EVENTS = [
             run: () => { kid.injuryDays = EVENTS_CFG.CLINIC_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.CLINIC_DAYS }; } },
           { key: 'ev.knock.b', tone: 'gray', who: kid.id,
             run: () => { kid.injuryDays = EVENTS_CFG.ICE_DAYS; return { k: { pid: kid.id }, d: EVENTS_CFG.ICE_DAYS }; } },
-          { key: 'ev.knock.c', tone: 'green', ap: 1, cost: AP_OPTION.KNOCK_COST, who: kid.id,   // v3.16: [1 AP] — cheaper than the clinic, slower than it
-            run: () => { kid.injuryDays = AP_OPTION.KNOCK_DAYS; return { k: { pid: kid.id }, d: AP_OPTION.KNOCK_DAYS }; } },
+          { key: 'ev.knock.c', tone: 'green', ap: 1, cost: AP_OPTION.KNOCK_COST, who: kid.id, next: 'medic' },   // v3.16: [1 AP] — cheaper than the clinic, slower than it (v3.24: result line first)
         ],
       });
     },
@@ -9938,6 +10135,13 @@ const NARRATIVE_EVENTS = [
     execute(ctx) {
       const { kid } = ctx.cast, face = kid.portraitSvg, name = L.name(kid.name), role = L.t('talk.roleSnitch', { n: kid.number, p: L.pos(kid.position) });
       const sorry = ctx.step === 'sorry';
+      if (ctx.step === 'visit') {   // v3.24: the family visit's result, one button, before the game moves on
+        ctx.show({ face, name, role: L.t('talk.roleVisit'), text: L.t('ev.truant.visit', { k: name }),
+          choices: [{ key: 'ev.visitOk', as: 'ev.truant.d', tone: 'gray', who: kid.id,
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
+              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
       if (sorry || ctx.step === 'hangup') {   // result of "call him": decided once, saved as the step (a reload can't re-roll it)
         ctx.show({ face, name, role: L.t('talk.rolePhone'), text: L.t('ev.truant.' + ctx.step, { k: name }),
           choices: [{ key: 'ev.truant.' + ctx.step + 'Ok', tone: 'gray', who: kid.id,
@@ -9950,8 +10154,14 @@ const NARRATIVE_EVENTS = [
       }
       ctx.show({ face, name, role: L.t('talk.roleTruant'), text: L.t('ev.truant.text', { k: name }),
         choices: [
-          { key: 'ev.truant.a', tone: 'red', cost: EVENTS_CFG.TRUANT_FINE, who: kid.id,
-            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + EVENTS_CFG.TRUANT_FINE_DISC); return { k: { pid: kid.id } }; } },
+          // v3.24: the fine is paid by his family to the club (income, ledger 'event', like the Ultimatum fine). A poor family pays
+          // at the next training with the poor kids' first-fee chance — or not at all (no debt). Same amount, same discipline.
+          { key: 'ev.truant.a', tone: 'red', who: kid.id, ...(kid.wealth === 'poor' ? { gainLater: EVENTS_CFG.TRUANT_FINE, diary: 'ev.truant.aLater' } : { gain: EVENTS_CFG.TRUANT_FINE }),
+            run: () => {
+              kid.psych.discipline = Math.min(20, kid.psych.discipline + EVENTS_CFG.TRUANT_FINE_DISC);
+              if (kid.wealth === 'poor') ctx.state.addFine(kid.id, EVENTS_CFG.TRUANT_FINE, ctx.date);
+              return { k: { pid: kid.id }, f: '$' + EVENTS_CFG.TRUANT_FINE };
+            } },
           { key: 'ev.truant.b', tone: 'gray', who: kid.id,
             run: () => {
               kid.suspensionMatches = Math.max(kid.suspensionMatches, 1);
@@ -9959,9 +10169,7 @@ const NARRATIVE_EVENTS = [
               return { k: { pid: kid.id } };
             } },
           { key: 'ev.truant.c', tone: 'green', next: () => (Math.random() < 0.5 ? 'sorry' : 'hangup') },
-          { key: 'ev.truant.d', tone: 'green', ap: 1, who: kid.id,   // v3.16: [1 AP] — no fine, no ban, but only discipline +1
-            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
-              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+          { key: 'ev.truant.d', tone: 'green', ap: 1, who: kid.id, next: 'visit' },   // v3.16: [1 AP] — no fine, no ban, but only discipline +1 (v3.24: result line first)
         ] });
     },
   },
@@ -10051,9 +10259,10 @@ const NARRATIVE_EVENTS = [
     cast: () => null,
     execute(ctx) {
       const s = ctx.state, { kid } = ctx.cast, lk = s.dayState().locker, req = lk?.request, kind = req?.kind || 'test', name = L.name(kid.name);
+      const text = req?.text || `ex.${kind}.0`;   // v3.24: 8 kinds × 2 phrasings (a v3.23 request has no text → the first phrasing)
       const finish = () => { if (req) req.done = true; };
       ctx.show({ face: kid.portraitSvg, name, role: L.t('talk.roleExcuse', { n: kid.number, p: L.pos(kid.position) }),
-        text: L.t('ex.' + kind, { k: name }),
+        text: L.t(text, { k: name }),
         choices: [
           { key: 'ex.home', tone: 'gray', who: kid.id,
             run: () => {
@@ -10232,6 +10441,13 @@ const NARRATIVE_EVENTS = [
     },
     execute(ctx) {
       const { kid } = ctx.cast, face = kid.portraitSvg, name = L.name(kid.name), role = L.t('talk.roleSnitch', { n: kid.number, p: L.pos(kid.position) });
+      if (ctx.step === 'visit') {   // v3.24: the family visit's result, one button, before the game moves on
+        ctx.show({ face, name, role: L.t('talk.roleVisit'), text: L.t('ev.truant.visit', { k: name }),
+          choices: [{ key: 'ev.visitOk', as: 'ev.ulti.e', tone: 'gray', who: kid.id,
+            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
+              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
       if (ctx.step === 'office') {
         ctx.show({ face, name, role, text: L.t('ev.ulti.text2', { k: name }),
           choices: [
@@ -10251,9 +10467,7 @@ const NARRATIVE_EVENTS = [
           { key: 'ev.ulti.a', tone: 'green', gain: EVENTS_CFG.ULTI_FINE, who: kid.id,
             run: () => { kid.dyn.morale = clamp(kid.dyn.morale + EVENTS_CFG.ULTI_FINE_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
           { key: 'ev.ulti.b', tone: 'gray', next: 'office' },
-          { key: 'ev.ulti.e', tone: 'green', ap: 1, who: kid.id,   // v3.17: the same [1 AP] family visit as The Truant (v3.16)
-            run: () => { kid.psych.discipline = Math.min(20, kid.psych.discipline + AP_OPTION.TRUANT_DISC);
-              kid.dyn.morale = clamp(kid.dyn.morale + AP_OPTION.TRUANT_MORALE, 0, 100); return { k: { pid: kid.id } }; } },
+          { key: 'ev.ulti.e', tone: 'green', ap: 1, who: kid.id, next: 'visit' },   // v3.17: the same [1 AP] family visit as The Truant (v3.16; v3.24: result line first)
         ] });
     },
   },
@@ -10442,11 +10656,12 @@ class EventEngine {
       return;
     }
     const delta = choice.cost ? -choice.cost : choice.debt ? -choice.debt : choice.gain || 0;
-    s.eventLog.push({ id: pe.id, date: pe.date, season: s.season, choice: choice.key, who: choice.who });   // ('office' is skipped by the cooldown)
+    const key = choice.as || choice.key;   // v3.24: a result step logs / writes the diary of the option that led to it
+    s.eventLog.push({ id: pe.id, date: pe.date, season: s.season, choice: key, who: choice.who });   // ('office' is skipped by the cooldown)
     if (s.eventLog.length > 60) s.eventLog.shift();
-    s.addDiary({ date: pe.date, key: choice.key + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : '' }, cls: 'ev' });
+    s.addDiary({ date: pe.date, key: (choice.diary || key) + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : vars.m ?? '' }, cls: 'ev' });
     s.pendingEvent = null;
-    for (const c of s.ensureAvailableXI()) s.addDiary({ date: pe.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
+    s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
     s.save();
     this.view.close();
     this.ui.renderAll();
@@ -10497,7 +10712,7 @@ class DialogueView {
       const broke = !!c.cost && !s.canAfford(c.cost), short = broke || !!c.blocked || noAp;   // v2.9: `blocked` = i18n key of a non-money reason
       const pay = c.cost || c.debt;   // v2.2: `debt` = forced payment, never disabled, may push the budget below $0
       const tag = (c.ap ? `<span class="tb-ap" title="${esc(L.t('talk.apTip'))}">${L.t('talk.apTag', { n: c.ap })}</span>` : '')
-        + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain ? `<span class="tb-money pos">+$${c.gain}</span>` : '');
+        + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain || c.gainLater ? `<span class="tb-money pos"${c.gainLater ? ` title="${esc(L.t('talk.gainLater'))}"` : ''}>+$${c.gain || c.gainLater}</span>` : '');   // v3.24: gainLater = paid by the family later
       const why = c.blocked ? L.t(c.blocked) : broke ? L.t('talk.short', { b: money(s.budget), c: c.cost }) : noAp ? L.t('talk.noAp') : '';
       return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` data-short="1" disabled aria-disabled="true" title="${esc(why)}"` : ''}>
         <span class="tb-label">${esc(L.t(c.key, c.vars || {}))}</span>${tag}
@@ -10785,7 +11000,7 @@ class LockerRoom {
         const e = Math.round(p.energy);
         return `<div class="lk here${reveal ? ' rv' : ''}" ${delay} data-pid="${p.id}">${plate}
           <div class="lk-in"><span class="portrait lk-face">${p.portraitSvg}</span></div>
-          <div class="lk-name">${esc(L.name(p.surname))}</div>
+          <div class="lk-name">${esc(squadName(p, s.squad))}</div>
           <div class="energy ${this.ui.energyClass(e)}"><i style="width:${e}%"></i><span>${e}%</span></div></div>`;
       }
       const load = why === 'overload' || why.startsWith('world:');   // v3.13: weekly load / v3.14: school or city event — known at once, no roll call (not truancy)
@@ -10795,7 +11010,7 @@ class LockerRoom {
       return `<div class="lk empty${reveal ? ' rv' : ''}${checked || load ? ' checked' : ''}${load ? ' load' : ''}${can ? ' can' : ''}" ${delay} data-pid="${p.id}" role="button" tabindex="0"
           title="${esc(checked || load ? L.t('lr.short.' + why) : can ? L.t('lr.investigate') : L.t('lr.noAp'))}">${plate}
         <div class="lk-in dark">${note}</div>
-        <div class="lk-name">${esc(L.name(p.surname))}</div><div class="lk-miss">${L.t('lr.missing')}</div></div>`;
+        <div class="lk-name">${esc(squadName(p, s.squad))}</div><div class="lk-miss">${L.t('lr.missing')}</div></div>`;
     }).join('');
     document.getElementById('lr-title').textContent = 'LOCKER_ROOM.EXE — ' + fmtDate(s.calendar.date, { weekday: 'long', day: 'numeric', month: 'short' });
     document.getElementById('lr-head').innerHTML = `
@@ -10821,7 +11036,7 @@ class LockerRoom {
       + squad.map(p => {
         const st = f.status[p.id] || 'owed', here = !lk.absent[p.id], owes = s.feeOwes(p.id), rem = f.reminded[p.id];
         const btn = owes && here ? (rem ? `<small class="lrf-rem">${L.t('fee.reminded')}</small>` : `<button type="button" class="btn lrf-btn" data-remind="${p.id}">${L.t('fee.remind')}</button>`) : '';
-        return `<div class="lrf-row st-${st}${here ? '' : ' away'}" title="${esc(L.t('fee.st.' + st))}"><i>${mark[st] || '?'}</i><span>${p.number}. ${esc(L.name(p.surname))}</span>${btn}</div>`;
+        return `<div class="lrf-row st-${st}${here ? '' : ' away'}" title="${esc(L.t('fee.st.' + st))}"><i>${mark[st] || '?'}</i><span>${p.number}. ${esc(squadName(p, s.squad))}</span>${btn}</div>`;
       }).join('') + '</div>';
   }
 
@@ -10843,7 +11058,7 @@ class LockerRoom {
     if (!lk || this.ui.events.active) return;
     if (this.requestPending) { this.maybeRequest(0); return; }   // v2.8
     lk.done = true;
-    for (const c of s.ensureAvailableXI()) s.addDiary({ date: s.calendar.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
+    s.xiAutoDiary(s.ensureAvailableXI());
     const miss = Object.keys(lk.absent).length;
     s.addDiary({ date: s.calendar.date, key: miss ? 'lr.diary' : 'lr.diaryAll', vars: { n: s.squad.length - miss, t: s.squad.length,
       s: { list: Object.keys(lk.absent).map(pid => ({ pid })) } }, cls: 'tr' });
@@ -10880,8 +11095,10 @@ class MorningBriefing {
   /** 1–2 seeded flavour headlines, filled with names from the league. */
   news(date) {
     const s = this.state, r = seeded('news' + date), lg = s.league;
-    const pool = MorningBriefing.NEWS.filter(id => id !== 'leader' || lg.playedMatchdays() > 0);   // no "league leaders" before a ball is kicked
+    const pool = MorningBriefing.NEWS.filter(id => id !== 'leader' || lg.playedMatchdays() > 0)   // no "league leaders" before a ball is kicked
+      .filter(id => s.headlineFresh(id, date));   // v3.24: a headline the coach read < NEWS.CD_DAYS days ago is not picked (empty → none)
     const ids = [...pool].sort(() => r() - 0.5).slice(0, r() < 0.55 ? 1 : 2);
+    this.newsIds = ids;   // remembered by go() only if the window was actually shown
     const leader = lg.table()[0]?.team, ctx = s.matchContext(), kid = s.squad[Math.floor(r() * s.squad.length)];
     const rival = lg.teams.filter(t => !t.user)[Math.floor(r() * (lg.teams.length - 1))];
     return ids.map(id => L.t('news.' + id, { t: L.team(leader?.name || ''), k: L.name(kid.name), o: L.team(ctx?.opp.name || rival.name), r: L.team(rival.name) }));
@@ -10892,7 +11109,7 @@ class MorningBriefing {
     if (this.ui.modalLock) return;   // v3.5
     if (this.ui.events.active) { this.ui.events.open(); return; }
     if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.planner.open(); return; }   // v3.17: Monday = one window (PLANNER.EXE)
-    if (s.kassaDue() && (s.phase === 'matchday' || this.ui.isStopDay())) { this.ui.kassa.open(); return; }   // v3.15: the cash desk first
+    if (s.kassaDue() && this.ui.isStopDay()) { this.ui.kassa.open(); return; }   // v3.15: the cash desk first (v3.24: never on a match day — kassaDue())
     if (!this.hasNews()) { this.go(); return; }   // v3.17: nothing new → no window, the day simply goes on
     this.report = null;
     this.ui.modal.close(); this.ui.profile.close();
@@ -11034,11 +11251,14 @@ class MorningBriefing {
     if (this.report) { this.endReport(); return; }   // v3.17: the training report's [ OK ]
     s.dayState().briefed = true;
     if (!this.layer.hidden && this.shown) s.markNews(this.shown);   // v3.17: what he read is muted for NEWS.COOLDOWN days
+    if (!this.layer.hidden && this.newsIds) s.markHeadlines(this.newsIds);   // v3.24: the headlines he read are not repeated for NEWS.CD_DAYS
+    this.newsIds = null;
     this.shown = null;
     s.away = null;   // v3.13: the coach has read what happened while he was away
     s.save();
     this.close();
     if (s.phase === 'calendar' && !s.weekState().confirmed) { this.ui.renderAll(); this.ui.planner.open(); return; }   // v3.13: Monday → PLANNER.EXE
+    if (s.phase === 'matchday' && s.dayState().mdWait) { this.ui.renderAll(); this.ui.matchdayMorning(); return; }   // v3.24: → match-day event / "Match day" dialog
     const kind = s.phase === 'matchday' ? 'match' : this.ui.dayInfo(s.calendar.date).kind;
     if (kind === 'training' || kind === 'match') this.ui.locker.open();
     else this.ui.renderAll();
@@ -11226,12 +11446,12 @@ class WeekPlanner {
     if (!editable) {   // past / today after confirming: read-only
       if (!l) return `<div class="pl-lesson none">${head}<small>—</small></div>`;
       const st = l.cancelled ? L.t('pl.lessonCancelled') : l.done ? L.t('pl.lessonDone') : '';
-      return `<div class="pl-lesson on">${head}<small>${p ? `${p.number}. ${esc(L.name(p.surname))}` : '?'} · ${esc(L.t('lesson.focus.' + l.focus))}${st ? ' · ' + esc(st) : ''}</small></div>`;
+      return `<div class="pl-lesson on">${head}<small>${p ? `${p.number}. ${esc(squadName(p, s.squad))}` : '?'} · ${esc(L.t('lesson.focus.' + l.focus))}${st ? ' · ' + esc(st) : ''}</small></div>`;
     }
     const taken = new Set(WEEK.PLAN_KEYS.filter(x => x !== k && w.lessons[x]).map(x => w.lessons[x].id));
     const canBook = !!l || w.ap >= 1, tip = canBook ? L.t('pl.lessonTip') : L.t('pl.lessonNo.noAp');
     const kids = [...s.squad].sort((a, b) => a.number - b.number).map(q =>
-      `<option value="${q.id}"${l?.id === q.id ? ' selected' : ''}${taken.has(q.id) ? ' disabled' : ''}>${q.number}. ${esc(L.name(q.surname))}</option>`).join('');
+      `<option value="${q.id}"${l?.id === q.id ? ' selected' : ''}${taken.has(q.id) ? ' disabled' : ''}>${q.number}. ${esc(squadName(q, s.squad))}</option>`).join('');
     return `<div class="pl-lesson${l ? ' on' : ''}" title="${esc(tip)}">${head}
       <select data-lkid="${k}" aria-label="${esc(L.t('pl.lesson'))}"${canBook ? '' : ' disabled'}><option value="">${L.t('pl.lessonNone')}</option>${kids}</select>
       <select data-lfocus="${k}" aria-label="${esc(L.t('pl.lessonFocus'))}"${l ? '' : ' disabled'}>${LESSON_FOCI.map(f =>
@@ -11579,7 +11799,7 @@ class UIController {
       onFlash: tone => this.flash(tone),
     });
     this.board = new RadarView(this.$('tac-board'), {
-      labels: true,
+      labels: true, squad: () => this.state.squad,   // v3.24: namesakes get an initial (squadName)
       onDotClick: i => this.onBoardClick(i),
       onDrop: (i, srcId) => this.onDropSwap(this.state.lineup[i], srcId),
     });
@@ -12015,7 +12235,7 @@ class UIController {
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
         <span class="portrait sm">${p.portraitSvg}</span><span class="num">${p.number}</span><span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>
-        <span class="lr-name"><b>${esc(L.name(p.surname))}${this.statusBadge(p)}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
+        <span class="lr-name"><b>${esc(squadName(p, this.state.squad))}${this.statusBadge(p)}</b><span class="lr-sub">${this.infoBtn(p)}<small>${sub}</small></span></span>
         <div class="energy"><i></i><span></span></div><span class="lr-cards"></span>
       </div>`;
     };
@@ -12027,7 +12247,7 @@ class UIController {
     this.lrRefs = [...box.querySelectorAll('.r-row')].map(el => ({ id: el.dataset.id, bar: el.querySelector('.energy'), fill: el.querySelector('.energy i'), txt: el.querySelector('.energy span'), cards: el.querySelector('.lr-cards'), last: '' }));
     this.$('lr-subs').textContent = eng ? L.t('lr.subs', { n: eng.subsUsed, m: MatchEngine.MAX_SUBS }) : L.t('lr.preMatch');
     const help = over ? 'lr.help.over' : this.liveSel ? 'lr.help.sel' : eng ? 'lr.help.live' : 'lr.help.pre';
-    this.$('lr-help').textContent = L.t(help, { n: selP ? L.name(selP.surname) : '' });
+    this.$('lr-help').textContent = L.t(help, { n: selP ? squadName(selP, this.state.squad) : '' });
     this.updateLiveRoster();
   }
 
@@ -12710,7 +12930,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       <div class="td-note">${L.t(on.length ? 'obs.picked' : 'obs.none')}</div><div class="obs-grid">`
       + kids.map(p => { const sel = on.includes(p.id);
         return `<button type="button" class="obs-btn${sel ? ' on' : ''}" data-observe="${p.id}" aria-pressed="${sel}"${!sel && full ? ' disabled' : ''}>
-          <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span> ${p.number}. ${esc(L.name(p.surname))}</button>`; }).join('')
+          <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span> ${p.number}. ${esc(squadName(p, this.state.squad))}</button>`; }).join('')
       + '</div></div>';
   }
 
@@ -12802,13 +13022,22 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const ctx = s.matchContext();
     const vars = { md: ev.md, o: { team: ctx.opp.name }, v: L.t('venue.' + ctx.venue) };
     s.addDiary({ date: ev.date, key: 'cal.arrive', vars: { ...vars, v: { venue: ctx.venue } }, cls: 'hl' });
-    for (const c of s.ensureAvailableXI()) s.addDiary({ date: ev.date, key: 'xi.auto', vars: { a: { pid: c.out.id }, b: { pid: c.in.id } }, cls: 'ev' });
+    s.xiAutoDiary(s.ensureAvailableXI(), ev.date);
     s.save();
     this.engine = null;
     this.prepareMatch();
     this.renderAll();
     this.$('tk-match').classList.add('alert');
-    if (this.events.rollMatchDay(ev)) return;   // v2.2: match-day event BEFORE kick-off; the matchday dialog follows the choice
+    // v3.24: the morning comes first — briefing (if there is anything new) → match-day event → "Match day" dialog → locker room.
+    // The event roll waits for [ HEAD TO THE CLUB ] (dayState().mdWait survives a reload). Scripted coaches never see the briefing.
+    if (!this.autoPolicy && !s.dayState().briefed && this.briefing.hasNews()) { s.dayState().mdWait = true; s.save(); this.briefing.open(); return; }
+    this.matchdayMorning(ev);
+  }
+  /** v3.24: after the match-day briefing (or at once when there is none): the match-day event, else the "Match day" dialog. */
+  matchdayMorning(ev = this.state.nextMatchEvent()) {
+    const s = this.state;
+    if (s.dayState().mdWait) { delete s.dayState().mdWait; s.save(); }
+    if (ev && this.events.rollMatchDay(ev)) return;   // v2.2: match-day event BEFORE kick-off; the matchday dialog follows the choice
     this.showMatchdayDialog();
   }
   /** v2.2: called by EventEngine.choose() after a match-day event. */
@@ -12949,7 +13178,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     }).join('');
     const oop = s.outOfPosition();
     this.$('tac-warn').innerHTML = oop.length
-      ? oop.map(({ p, line }) => `<span class="w">&#9888; ${L.t('tac.oop', { n: esc(L.name(p.surname)), p: L.pos(p.position), l: L.line(line) })}</span>`).join('')
+      ? oop.map(({ p, line }) => `<span class="w">&#9888; ${L.t('tac.oop', { n: esc(squadName(p, this.state.squad)), p: L.pos(p.position), l: L.line(line) })}</span>`).join('')
       : `<span class="okmsg">&#10003; ${L.t('tac.allGood')}</span>`;
 
     // board: the starting XI exactly as the match engine will read it (state.lineup, slot order)
@@ -13015,7 +13244,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       this.renderTeam();
       return;
     }
-    this.teamMsg = L.t('team.done', { a: L.name(s.player(a).surname), b: L.name(s.player(b).surname) });
+    this.teamMsg = L.t('team.done', { a: squadName(s.player(a), this.state.squad), b: squadName(s.player(b), this.state.squad) });
     this.afterLineupChange();
   }
 
@@ -13290,7 +13519,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.tickComplaints(s.calendar.date);   // v3.20: parents' "wrong role" complaints count this match (before tonight's talk)
     s.startReview(result, outfield, s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak); v3.23: outfield kids only
     s.startAfter(result, played.map(p => [p.id, { ...eng.st(p) }]), eng.matchEvents, s.calendar.date, ctx.md);   // v3.20: AFTER_GAME.EXE after a loss / draw
-    s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
+    s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]), new Set(played.filter(p => eng.isGK(p)).map(p => p.id)));   // v3.24: + who kept goal
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);

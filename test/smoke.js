@@ -27,7 +27,11 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
   // v2.8: START DAY → morning briefing → [ HEAD TO THE CLUB ] → locker room
   const toLocker = async () => {
     await page.evaluate(() => YAM.ui.locker.open());
-    if (await page.evaluate(() => !document.getElementById('morning-briefing-view').hidden)) await page.click('#mb-go');
+    if (await page.evaluate(() => !document.getElementById('morning-briefing-view').hidden)) {
+      await page.click('#mb-go');
+      // v3.24: on a match day the briefing is followed by the "Match day" dialog → its [ TO THE LOCKER ROOM ]
+      await page.evaluate(() => { if (YAM.game.phase === 'matchday' && !YAM.ui.locker.isOpen && !YAM.ui.events.active) { YAM.ui.modal.close(); YAM.ui.locker.open(); } });
+    }
     await page.waitForTimeout(60);
   };
   // v3.17: dialogue choices are disabled until the line is fully typed → skip the typewriter first
@@ -117,6 +121,13 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       return { agenda: document.getElementById('mb-agenda').textContent, sq: ctx.opp.squad.length, xi: ctx.team.players.length, en: ctx.opp.squad.map(k => k.en), name: ctx.opp.name }; });
     check('AI fatigue: 15-kid AI squads with energy, XI of 11, briefing scout line', opp0.sq === 15 && opp0.xi === 11 && opp0.en.every(e => e === 100) && /100%/.test(opp0.agenda), opp0.agenda);
     await shot('1-dashboard');
+    // v3.24 (2): match day = morning briefing → (match-day event) → "Match day" dialog → locker room
+    const md0 = await page.evaluate(() => ({ brief: YAM.ui.briefing.isOpen, modal: !document.getElementById('modal-layer').hidden, wait: !!YAM.game.dayState().mdWait, kassa: YAM.ui.kassa.isOpen }));
+    if (md0.brief) await page.click('#mb-go');
+    const md1 = await page.evaluate(() => ({ brief: YAM.ui.briefing.isOpen, modal: !document.getElementById('modal-layer').hidden, briefed: !!YAM.game.dayState().briefed, wait: !!YAM.game.dayState().mdWait,
+      title: document.getElementById('modal-layer').textContent.includes(L.t('dlg.matchdayTitle')) }));
+    check('v3.24 match day with news: the morning briefing opens first (no "Match day" dialog, no cash desk), the "Match day" dialog only after [ HEAD TO THE CLUB ]',
+      md0.brief && !md0.modal && md0.wait && !md0.kassa && !md1.brief && md1.modal && md1.title && md1.briefed && !md1.wait, JSON.stringify({ md0, md1 }));
     await closeModal();
     await toLocker(); await page.click('#lr-proceed');   // v2.6: roll call before kick-off
     await page.click('.tk[data-view=match]');
@@ -381,10 +392,10 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const still = await talkOpen();
     await talkClick('#talk-choices .talk-btn[data-i="1"]');
     const bt2 = await page.evaluate(k => ({ agi: YAM.game.player(k).physical.agility, closed: document.getElementById('talk-layer').hidden, pe: YAM.game.pendingEvent, b: YAM.game.budget,
-      diary: YAM.game.diary[YAM.game.diary.length - 1].key }), bt.kid);
+      diary: YAM.game.diary[YAM.game.diary.length - 1].key, tail: YAM.game.diary.slice(-4).map(d => d.key + ':' + JSON.stringify(d.vars || {})) }), bt.kid);
     check('budget in header = $500 + the ledger (September fees); Torn Boots: snitch face, unaffordable choice disabled, Esc blocked, "no" = agility −2',
       hdr0.b === 500 + hdr0.led && hdr0.fee > 0 && hdr0.txt.includes('$' + hdr0.b) && bt.n === 3 && bt.dis && bt.en && bt.face && /\$100/.test(bt.hdr) && still
-      && bt2.agi === Math.max(1, bt.agi - 2) && bt2.closed && !bt2.pe && bt2.b === 100 && bt2.diary === 'ev.boots.b.diary', JSON.stringify({ hdr0, bt, still, bt2 }));
+      && bt2.agi === Math.max(1, bt.agi - 2) && bt2.closed && !bt2.pe && bt2.b === 100 && bt2.tail.some(x => x.startsWith('ev.boots.b.diary:')), JSON.stringify({ hdr0, bt, still, bt2 }));   // v3.24: an injured starter's xi.auto may follow
     // v3.22: money offers open with the refusal (dad / scout / pool); the dad's refusal costs the kid only −5 morale
     const firstBtns = async id => { await page.evaluate(i => YAM.ui.events.fire(i), id); await finishTyping();
       const r = await page.evaluate(() => [...document.querySelectorAll('#talk-choices .talk-btn')].map(b => b.className.match(/tone-(\w+)/)[1] + (b.querySelector('.tb-money') ? '$' : '')));
@@ -730,7 +741,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       && !trn.rest.training && trn.rest.other.join() === '95,50' && trn.rest.flag === false, JSON.stringify(trn));
     await page.evaluate(() => { YAM.game.budget = 10; YAM.ui.renderBudget(); YAM.ui.events.fire('truant'); });
     await finishTyping();
-    const tu = await page.evaluate(() => ({ kid: YAM.game.pendingEvent?.cast.kid, n: document.querySelectorAll('#talk-choices .talk-btn').length, fineOff: document.querySelector('#talk-choices .talk-btn[data-i="0"]').disabled,
+    const tu = await page.evaluate(() => ({ kid: YAM.game.pendingEvent?.cast.kid, n: document.querySelectorAll('#talk-choices .talk-btn').length, fineOff: document.querySelector('#talk-choices .talk-btn[data-i="0"]').disabled, fineTag: document.querySelector('#talk-choices .talk-btn[data-i="0"] .tb-money')?.textContent || '',
       face: !!document.querySelector('#talk-face svg rect') }));
     const d0 = await page.evaluate(k => YAM.game.player(k).psych.discipline, tu.kid);
     await page.evaluate(() => { window.__R = Math.random; Math.random = () => 0.1; });
@@ -743,8 +754,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await talk(1);   // suspend for the next match
     const tu4 = await page.evaluate(k => ({ sus: YAM.game.player(k).suspensionMatches, starter: YAM.game.isStarter(k) }), tu.kid);
     await page.evaluate(k => { YAM.game.player(k).suspensionMatches = 0; YAM.game.player(k).skipped_training = false; }, tu.kid);
-    check('The Truant: skipper\'s portrait, fine disabled under $20, "call him" rolls a saved step (sorry → +2 discipline), suspend = 1 match',
-      trn.id === tu.kid && tu.n === 4 && tu.fineOff && tu.face && tu2.step === 'sorry' && tu2.n === 1 && tu3.disc === Math.min(20, d0 + 2) && tu3.closed && tu4.sus === 1 && !tu4.starter,
+    check('The Truant: skipper\'s portrait, the fine is paid by his family (v3.24: enabled even with $10, tag +$20), "call him" rolls a saved step (sorry → +2 discipline), suspend = 1 match',
+      trn.id === tu.kid && tu.n === 4 && !tu.fineOff && tu.fineTag === '+$20' && tu.face && tu2.step === 'sorry' && tu2.n === 1 && tu3.disc === Math.min(20, d0 + 2) && tu3.closed && tu4.sus === 1 && !tu4.starter,
       JSON.stringify({ tu, tu2, tu3, tu4 }));
 
     // a dilemma survives a reload, then the calendar pauses on a random event and resumes after the choice
@@ -766,7 +777,9 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await talkClick('#talk-choices .talk-btn[data-i="1"]');
     const resumed = await page.evaluate(() => YAM.ui.cal.running);
     await page.waitForFunction(() => YAM.game.phase === 'matchday', null, { timeout: 20000 });
-    // the time bomb goes off on the match day, BEFORE kick-off
+    // the time bomb goes off on the match day, BEFORE kick-off (v3.24: right after the morning briefing)
+    const mdBrief = await page.evaluate(() => ({ brief: YAM.ui.briefing.isOpen, talk: !document.getElementById('talk-layer').hidden, wait: !!YAM.game.dayState().mdWait }));
+    if (mdBrief.brief) await page.click('#mb-go');
     await page.waitForFunction(() => !document.getElementById('talk-layer').hidden, null, { timeout: 3000 });
     const fv = await page.evaluate(() => ({ id: YAM.game.pendingEvent?.id, top: YAM.game.pendingEvent?.cast.top, q: YAM.game.eventQueue.length, modal: !document.getElementById('modal-layer').hidden }));
     await talk(0);   // they start and play the full match
@@ -775,8 +788,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       return { showcase: t.every(id => s.isStarter(id) && s.player(id).hasFlag('Showcase')), modal: !document.getElementById('modal-layer').hidden,
         lock: bench ? s.swapPlayers(t.find(id => s.player(id).archetype !== 'GK') || t[0], bench.id) : 'showcase' };
     }, fv.top);
-    check('scheduled scout visit: queue persisted (reload), fires on match day before the matchday dialog, top 3 start and are locked in', qPersist && fv.id === 'scoutvisit' && fv.top.length === 3 && fv.q === 0
-      && !fv.modal && fv2.showcase && fv2.modal && fv2.lock === 'showcase', JSON.stringify({ qPersist, fv, fv2 }));
+    check('scheduled scout visit: queue persisted (reload), fires on match day after the morning briefing (v3.24) and before the matchday dialog, top 3 start and are locked in', qPersist && fv.id === 'scoutvisit' && fv.top.length === 3 && fv.q === 0
+      && mdBrief.brief && !mdBrief.talk && mdBrief.wait && !fv.modal && fv2.showcase && fv2.modal && fv2.lock === 'showcase', JSON.stringify({ qPersist, mdBrief, fv, fv2 }));
     await closeModal();
     // v3.22: the promise is decided on the card — break = out of the XI, full refund $300, morale −30, Parents −3
     const pr0 = await page.evaluate(() => {
@@ -875,8 +888,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       apps: Object.values(YAM.game.seasonStats).reduce((a, s) => a + s.apps, 0), tired: YAM.game.lastReport && YAM.game.starters().some((p, i) => p.energy < e0[i]),
       score: document.getElementById('sb-score').textContent, rep: YAM.game.lastReport.gf + '-' + YAM.game.lastReport.ga }), qs0.energy);
     const after = await page.evaluate(([t, u]) => ({ showcase: t.some(id => YAM.game.player(id).hasFlag('Showcase')), sus: YAM.game.player(u).suspensionMatches,
-      diary: YAM.game.diary.filter(d => /^scout\.(done|hurt)$/.test(d.key)).length }), [fv.top, ul]);
-    check('after the match: showcase cleared (+ diary per kid), suspension served (2 → 1)', !after.showcase && after.sus === 1 && after.diary === fv.top.filter(id => id !== ex0.kid).length, JSON.stringify(after));
+      diary: YAM.game.diary.filter(d => /^scout\.(done|hurt)$/.test(d.key)).length}), [fv.top, ul]);
+    check('after the match: showcase cleared (+ diary per kid), suspension served (2 → 1)', !after.showcase && after.sus === (ul === pr0.id ? 0 : 1)   /* v3.24: the promise test clears the promised kid's ban when he is the same kid */ && after.diary === fv.top.filter(id => id !== ex0.kid).length, JSON.stringify(after));
     check('Quick Sim: button → result in ms, Notebook opens, stats/energy/fixtures recorded', qs0.btn && qs.ms < 250 && qs.view === 'notes' && qs.cards === 3 && qs.md2 && !qs.modal
       && qs.apps >= qs0.apps + 11 && qs.tired && qs.score.replace(/\s/g, '') === qs.rep, JSON.stringify(qs));
     // v3.5: reload before the team talk → straight back to the locked Match Summary; tough love = discipline + Board, Parents −3 after a win
@@ -1670,19 +1683,24 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const ap1 = await page.evaluate(() => { const pe = YAM.game.pendingEvent, k = YAM.game.player(pe.cast.kid); k.dyn.morale = 40;
       return { dis: document.querySelector('#talk-choices .talk-btn[data-i="2"]').disabled, kid: k.id, agi: k.physical.agility, b: YAM.game.budget }; });
     await talk(2);
+    const apM = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step, n: document.querySelectorAll('#talk-choices .talk-btn').length, ap: YAM.game.ap }));   // v3.24: the result line first
+    await talk(0);
     const ap2 = await page.evaluate(k => { const s = YAM.game, p = s.player(k); return { ap: s.ap, b: s.budget, m: p.dyn.morale, agi: p.physical.agility, closed: !s.pendingEvent,
       diary: s.diary.slice(-3).some(d => d.key === 'ev.boots.c.diary') }; }, ap1.kid);
     check('v3.16 [1 AP] in Torn Boots (fired via DEBUG): 0 AP → disabled with a reason; with AP → exactly 1 AP, $0, morale +5, no agility loss',
-      ap0.n === 3 && ap0.dis && /AP|ОД/.test(ap0.tag) && ap0.why.length > 5 && !ap1.dis && ap2.ap === 1 && ap2.b === ap1.b && ap2.m === 45 && ap2.agi === ap1.agi && ap2.closed && ap2.diary,
-      JSON.stringify({ ap0, ap1, ap2 }));
+      ap0.n === 3 && ap0.dis && /AP|ОД/.test(ap0.tag) && ap0.why.length > 5 && !ap1.dis && ap2.ap === 1 && ap2.b === ap1.b && ap2.m === 45 && ap2.agi === ap1.agi && ap2.closed && ap2.diary
+      && apM.step === 'seniors' && apM.n === 1 && apM.ap === 1,
+      JSON.stringify({ ap0, ap1, apM, ap2 }));
     // (5) knock [1 AP] → −$35, injury 8 days, 1 AP
     await page.evaluate(() => { const s = YAM.game; s.weekState().ap = 1; s.budget = 300; s.squad.forEach(p => { p.injuryDays = 0; p.suspensionMatches = 0; p.awayDays = 0; p.absentToday = null; }); YAM.ui.events.fire('knock'); });
     await page.waitForSelector('#talk-layer:not([hidden]) .talk-btn');
     const kn0 = await page.evaluate(() => ({ kid: YAM.game.pendingEvent?.cast.kid, n: document.querySelectorAll('#talk-choices .talk-btn').length }));
     await talk(2);
+    const knM = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step, n: document.querySelectorAll('#talk-choices .talk-btn').length, ap: YAM.game.ap }));   // v3.24: the result line first
+    await talk(0);
     const kn1 = await page.evaluate(k => ({ b: YAM.game.budget, days: YAM.game.player(k).injuryDays, ap: YAM.game.ap, ledger: YAM.game.ledger[YAM.game.calendar.date.slice(0, 7)]?.event }), kn0.kid);
     check('v3.16 [1 AP] in Knock: −$35 (booked as event), injury 8 days, 1 AP spent',
-      kn0.n === 3 && kn1.b === 265 && kn1.days === 8 && kn1.ap === 0, JSON.stringify({ kn0, kn1 }));
+      kn0.n === 3 && kn1.b === 265 && kn1.days === 8 && kn1.ap === 0 && knM.step === 'medic' && knM.n === 1, JSON.stringify({ kn0, knM, kn1 }));
     /* ---------- v3.17 "SILENCE" ---------- */
     // (1) typewriter: while the line types every choice is disabled; a (forced) click picks nothing; Space finishes the line only
     await page.evaluate(() => { const s = YAM.game; s.weekState().ap = 1; s.budget = 300; s.eventLog = []; s.squad.forEach(p => { p.injuryDays = 0; p.suspensionMatches = 0; p.awayDays = 0; p.absentToday = null; }); YAM.ui.events.fire('knock'); });
@@ -1731,9 +1749,11 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     const ul0 = await page.evaluate(() => { const b = document.querySelector('#talk-choices .talk-btn[data-i="2"]'), k = YAM.game.player(YAM.game.pendingEvent.cast.kid);
       return { n: document.querySelectorAll('#talk-choices .talk-btn').length, tag: b?.querySelector('.tb-ap')?.textContent || '', dis: b?.disabled, kid: k.id, d: k.psych.discipline, m: k.dyn.morale }; });
     await talk(2);
+    const ulM = await page.evaluate(() => ({ step: YAM.game.pendingEvent?.step, n: document.querySelectorAll('#talk-choices .talk-btn').length, ap: YAM.game.ap }));   // v3.24: the result line first
+    await talk(0);
     const ul1 = await page.evaluate(k => { const s = YAM.game, p = s.player(k); return { ap: s.ap, d: p.psych.discipline, m: p.dyn.morale, sus: p.suspensionMatches, diary: s.diary.slice(-3).some(x => x.key === 'ev.ulti.e.diary') }; }, ul0.kid);
     check('v3.17 bugs: match-day excuse says "Stay and play" (training days keep "Stay and train"); the assistant\'s truancy report has the [1 AP] family visit (discipline +1, morale +3, no ban); namesakes in the match log get an initial (and the club when even that clashes); 23 interceptions → "read the game" note',
-      bg.matchStay && bg.trainStay && ul0.n === 3 && /AP|ОД/.test(ul0.tag) && !ul0.dis && ul1.ap === 0 && ul1.d === ul0.d + 1 && ul1.m === ul0.m + 3 && !ul1.sus && ul1.diary
+      bg.matchStay && bg.trainStay && ul0.n === 3 && /AP|ОД/.test(ul0.tag) && !ul0.dis && ul1.ap === 0 && ul1.d === ul0.d + 1 && ul1.m === ul0.m + 3 && !ul1.sus && ul1.diary && ulM.step === 'visit' && ulM.n === 1
       && /^\S\. /.test(bg.names[0]) && /^\S\. /.test(bg.names[1]) && bg.names[0] !== bg.names[1] && /\(/.test(bg.names[2]) && /\(/.test(bg.names[3]) && bg.names[2] !== bg.names[3] && !/[.(]/.test(bg.names[4])
       && bg.note === true && bg.noteLow === false, JSON.stringify({ bg, ul0, ul1 }));
     // (3) the match window at ~800 px: [ START MATCH ] visible (not under the pitch)
@@ -2655,7 +2675,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     await pick(0);
     const c2 = await page.evaluate(({ a, out }) => { const s = YAM.game, p = s.player(a), o = s.player(out);
       return { starter: s.isStarter(a), outStarter: s.isStarter(out), outMor: o.dyn.morale, par: s.rep.parents, choice: p.promiseChoice, flag: p.hasFlag('Promised_Start'),
-        diary: s.diary.some(d => d.key === 'ev.promise.keepSwap.diary'), open: !document.getElementById('talk-layer').hidden, req: YAM.ui.locker.requestPending }; }, setup);
+        diary: s.diary.some(d => d.key === 'ev.promise.keepSwap.diary'), open: !document.getElementById('talk-layer').hidden, req: YAM.ui.locker.requestPending,
+        }; }, setup);
     // keep (already in the XI) → no displacement, Parents −2 all the same
     const c2b0 = await page.evaluate(() => { const s = YAM.game, b = s.starters().find(p => p.position !== 'GK' && !p.hasFlag('Promised_Start'));
       b.flags.push('Promised_Start'); b.promiseBy = 'dad'; b.promiseChoice = null;
@@ -3035,6 +3056,214 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       o1.out.saved && o1.withNote.length > 0 && o2.ok && o2.dated && o2.cap && o2.oldest && o3, JSON.stringify({ o1: { ...o1, before: undefined, wantN: undefined }, o2: { ...o2, snapshot: undefined }, o3 }));
     // restore the smoke's standing flags (the reloads dropped the random rig and the pickMotm / recordMatchClues wrappers)
     await page.evaluate(() => { YAM.ui.autoReview = true; YAM.ui.autoAfter = true; });
+    }
+
+    /* ---------- v3.24 "LOOSE ENDS" ---------- */
+    {   // block scope: the v3.24 names never clash with older checks
+      await page.evaluate(() => { for (const v of ['locker', 'planner', 'briefing', 'kassa']) if (YAM.ui[v].isOpen) YAM.ui[v].layer.hidden = true; YAM.ui.modal.close(); });
+      // (1) headlines: no id twice within NEWS.CD_DAYS over a simulated month (marked as read every morning); an empty filtered pool → no headline
+      const h = await page.evaluate(() => {
+        const s = YAM.game, b = YAM.ui.briefing, keep = JSON.stringify(s.newsSeen || {}), last = {};
+        s.newsSeen = {};
+        let ok = true, shown = 0, stable = true;
+        for (let i = 0; i < 31; i++) {
+          const d = isoAdd('2002-10-01', i);
+          b.news(d); const ids = b.newsIds; b.news(d); if (b.newsIds.join() !== ids.join()) stable = false;   // the same morning re-rendered = the same lines
+          for (const id of ids) { if (last[id] && isoDays(last[id], d) < NEWS.CD_DAYS) ok = false; last[id] = d; }
+          s.markHeadlines(ids, d); shown += ids.length;
+        }
+        for (const id of MorningBriefing.NEWS) s.newsSeen['hl:' + id] = '2002-11-01';
+        const empty = b.news('2002-11-02').length === 0 && b.newsIds.length === 0, back = b.news('2002-11-15').length > 0;
+        const marks = /markHeadlines/.test(MorningBriefing.prototype.go.toString()) && /!this\.layer\.hidden && this\.newsIds/.test(MorningBriefing.prototype.go.toString());
+        s.newsSeen = JSON.parse(keep);
+        return { ok, shown, stable, empty, back, marks, cd: NEWS.CD_DAYS };
+      });
+      check('v3.24 headlines: over a simulated month no headline id repeats within 14 days (marked as read each morning, stable on re-render); every id read → no headline; free again after 14 days; only a shown briefing marks them',
+        h.ok && h.shown >= 20 && h.stable && h.empty && h.back && h.marks && h.cd === 14, JSON.stringify(h));
+      // (3) excuses: 8 kinds × 2 phrasings (EN + RU); 8 weeks of forced excuses → no kid repeats a kind within 28 days, the team within 7, no phrasing twice in a row
+      const ex = await page.evaluate(() => {
+        const s = YAM.game, keep = s.excuseLog, kids = s.squad.slice(0, 5), out = { texts: true, kid: true, team: true, row: true, det: true };
+        out.kinds = EXCUSE.KINDS.length;
+        for (const k of EXCUSE.KINDS) for (let i = 0; i < EXCUSE.PHRASES; i++) for (const lg of ['en', 'ru']) { const t = I18N[lg][`ex.${k}.${i}`]; if (!t || !t.includes('{k}')) out.texts = false; }
+        s.excuseLog = [];
+        const log = [];
+        for (let i = 0; i < 56; i++) {
+          const d = isoAdd('2003-01-06', i), p = kids[i % kids.length];
+          const saved = JSON.stringify(s.excuseLog), r = s.pickExcuse(p, d);
+          if (!r) continue;
+          s.excuseLog = JSON.parse(saved); const r2 = s.pickExcuse(p, d); if (JSON.stringify(r) !== JSON.stringify(r2)) out.det = false;   // seeded
+          log.push({ d, pid: p.id, kind: r.kind, text: r.text });
+        }
+        for (let i = 0; i < log.length; i++) for (let j = 0; j < i; j++) {
+          const a = log[j], b = log[i], gap = isoDays(a.d, b.d);
+          if (a.kind === b.kind && a.pid === b.pid && gap < EXCUSE.KID_CD) out.kid = false;
+          if (a.kind === b.kind && gap < EXCUSE.TEAM_CD) out.team = false;
+        }
+        for (let i = 1; i < log.length; i++) if (log[i].text === log[i - 1].text) out.row = false;
+        out.n = log.length; out.used = new Set(log.map(e => e.kind)).size;
+        // the Math.random stream of v3.23: a forced excuse still consumes exactly two numbers after the shuffle
+        const R = Math.random; let calls = 0; Math.random = () => { calls++; return 0; };
+        const base = EXCUSE.BASE, off = s.excusesOff; EXCUSE.BASE = 1; s.excusesOff = false; s.excuseLog = [];
+        const one = s.rollExcuse({}, '2003-03-03'); const shuffleCalls = s.squad.length - 1;
+        EXCUSE.BASE = base; s.excusesOff = off; Math.random = R;
+        out.stream = calls === shuffleCalls + 2 && !!one && EXCUSE.KINDS.includes(one.kind) && /^ex\.\w+\.[01]$/.test(one.text);
+        s.excuseLog = keep;
+        return out;
+      });
+      check('v3.24 excuses: 8 kinds × 2 phrasings with EN + RU texts; 8 simulated weeks of forced excuses — no kid repeats a kind within 28 days, the team within 7, no phrasing twice in a row; seeded, the Math.random stream unchanged',
+        ex.kinds === 8 && ex.texts && ex.kid && ex.team && ex.row && ex.det && ex.stream && ex.n >= 30 && ex.used === 8, JSON.stringify(ex));
+      // (4) the truant fine: income from the family (ledger 'event', tag +$); a poor family pays at the next training or not at all (no debt)
+      const tf0 = await page.evaluate(() => {
+        const s = YAM.game; s.weekState().ap = 0;
+        const kid = s.squad.find(p => p.available && p.wealth !== 'poor'); kid.skipped_training = true;
+        const out = { kid: kid.id, b: s.budget, ev: s.ledger[s.monthOf()]?.event || 0, d: kid.psych.discipline, wealth: kid.wealth };
+        YAM.ui.events.fire('truant', s.calendar.date, { cast: { kid: kid.id } });
+        return out;
+      });
+      await finishTyping();
+      const tfTag = await page.evaluate(() => { const b = document.querySelector('#talk-choices .talk-btn[data-i="0"]'); return { tag: b.querySelector('.tb-money')?.textContent || '', dis: b.disabled, pos: !!b.querySelector('.tb-money.pos') }; });
+      await talk(0);
+      const tf1 = await page.evaluate(t => { const s = YAM.game, m = t.date; return { b: s.budget, ev: s.ledger[s.monthOf(m)]?.event || 0, d: s.player(t.kid).psych.discipline, diary: s.diary.some(x => x.key === 'ev.truant.a.diary' && x.vars?.m === '+$20') }; }, { kid: tf0.kid, date: await page.evaluate(() => YAM.game.calendar.date) });
+      const tf2 = await page.evaluate(() => {
+        const s = YAM.game, kid = s.squad.find(p => p.available), w0 = kid.wealth; kid.wealth = 'poor'; kid.skipped_training = true;
+        const r = { kid: kid.id, w0, b: s.budget };
+        YAM.ui.events.fire('truant', s.calendar.date, { cast: { kid: kid.id } });
+        return r;
+      });
+      await finishTyping();
+      const tfTag2 = await page.evaluate(() => document.querySelector('#talk-choices .talk-btn[data-i="0"] .tb-money')?.textContent || '');
+      await talk(0);
+      const tf3 = await page.evaluate(t => {
+        const s = YAM.game, kid = s.player(t.kid), out = { b: s.budget, fines: (s.fines || []).length, later: s.diary.some(x => x.key === 'ev.truant.aLater.diary') };
+        const f = s.fines[0], next = isoAdd(f.date, 2), pay = FINANCE.PAY.first.poor;
+        FINANCE.PAY.first.poor = 0; const b1 = s.budget; s.resolveFines(next);
+        out.unpaid = { b: s.budget - b1, left: s.fines.length, line: s.diary.some(x => x.date === next && x.key === 'fine.unpaid'), debt: s.budget < 0 };
+        s.addFine(kid.id, 20, f.date); FINANCE.PAY.first.poor = 1; const ev0 = s.ledger[s.monthOf(next)]?.event || 0, b2 = s.budget; s.resolveFines(next);
+        out.paid = { b: s.budget - b2, ev: (s.ledger[s.monthOf(next)]?.event || 0) - ev0, line: s.diary.some(x => x.date === next && x.key === 'fine.paid') };
+        s.addFine(kid.id, 20, next); s.resolveFines(next); out.sameDay = s.fines.length === 1; s.fines = [];   // the fine day itself is not "the next training"
+        FINANCE.PAY.first.poor = pay; kid.wealth = t.w0;
+        return out;
+      }, tf2);
+      check('v3.24 truant fine: option A adds money to the club (+$20, ledger "event", button +$20 even with 0 AP / any budget); a poor family: +$ tag, no money now, paid at the next training with the poor first-fee chance — or not at all (diary line, no debt)',
+        tfTag.tag === '+$20' && tfTag.pos && !tfTag.dis && tf1.b === tf0.b + 20 && tf1.ev === tf0.ev + 20 && tf1.d === Math.min(20, tf0.d + 2) && tf1.diary
+        && tfTag2 === '+$20' && tf3.b === tf2.b && tf3.fines === 1 && tf3.later && tf3.unpaid.b === 0 && tf3.unpaid.left === 0 && tf3.unpaid.line && !tf3.unpaid.debt
+        && tf3.paid.b === 20 && tf3.paid.ev === 20 && tf3.paid.line && tf3.sameDay, JSON.stringify({ tf0, tfTag, tf1, tfTag2, tf3 }));
+      // (5) namesakes: initials in the planner, the locker room and the fee checklist; the same initial → the first name
+      const nm = await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui, [a, b, c] = s.squad, keep = [a.name, b.name, c.name], ph = s.phase, out = {};
+        a.name = 'Charlie Brennan'; b.name = 'Theo Brennan';
+        out.one = squadName(a, s.squad) === L.name('Charlie')[0] + '. ' + L.name('Brennan') && squadName(b, s.squad) === L.name('Theo')[0] + '. ' + L.name('Brennan') && (u => !u || squadName(u, s.squad) === L.name(u.surname))(s.squad.find(q => q !== a && q !== b && s.squad.filter(x => x.surname === q.surname).length === 1));
+        const lesson = ui.planner.lessonHTML('mon', true);
+        out.planner = lesson.includes(esc(squadName(a, s.squad))) && lesson.includes(esc(squadName(b, s.squad)));
+        const d = s.dayState(), lk0 = d.locker, f0 = s.fees;
+        s.phase = 'calendar';
+        d.locker = { done: false, revealed: true, absent: {}, checked: [], request: null, posRequest: null, capRequest: null };
+        s.fees = { month: s.monthOf(), level: 'normal', amount: 10, started: true, status: Object.fromEntries(s.squad.map(p => [p.id, 'owed'])), reminded: {}, reason: {}, carry: {}, next: {}, got: {} };
+        ui.locker.render();
+        const names = [...document.querySelectorAll('#lr-grid .lk-name')].map(x => x.textContent), fees = [...document.querySelectorAll('#lr-fees .lrf-row span')].map(x => x.textContent);
+        out.locker = names.includes(squadName(a, s.squad)) && names.includes(squadName(b, s.squad)) && names.filter(n => /Brennan|Бреннан/.test(n)).every(n => /^\S\. /.test(n));
+        out.fees = fees.some(t => t.endsWith(squadName(a, s.squad))) && fees.some(t => t.endsWith(squadName(b, s.squad)));
+        // same initial (in both languages) → the first name
+        const fn = Object.keys(RU_NAMES).filter(n => /^[A-Z][a-z]+$/.test(n)), pair = fn.flatMap(x => fn.filter(y => y > x && y[0] === x[0] && RU_NAMES[y][0] === RU_NAMES[x][0]).map(y => [x, y]))[0];
+        a.name = pair[0] + ' Brennan'; b.name = pair[1] + ' Brennan';
+        out.first = squadName(a, s.squad) === L.name(pair[0]) + ' ' + L.name('Brennan') && squadName(b, s.squad) === L.name(pair[1]) + ' ' + L.name('Brennan');
+        ui.locker.render(); out.lockerFirst = [...document.querySelectorAll('#lr-grid .lk-name')].some(x => x.textContent === squadName(b, s.squad));
+        out.sample = [squadName(a, s.squad), squadName(b, s.squad)];
+        [a.name, b.name, c.name] = keep; d.locker = lk0; s.fees = f0; s.phase = ph; ui.locker.render();
+        return out;
+      });
+      check('v3.24 namesakes: two Brennans show "C. Brennan" / "T. Brennan" in the planner\'s lesson list, the locker room and the fee checklist; the same initial → the full first name; a unique surname stays alone',
+        nm.one && nm.planner && nm.locker && nm.fees && nm.first && nm.lockerFirst, JSON.stringify(nm));
+      // (6) the auto lineup's keeper: GK tag → yard note "hands" → kept goal most → old rule; a starter with "hands" moves into goal; a hand-placed keeper stays
+      const gk = await page.evaluate(() => {
+        const s = YAM.game, keep = { lineup: [...s.lineup], hand: s.gkByHand, stats: JSON.stringify(s.seasonStats), kids: s.squad.map(p => [p.id, p.tag, p.yardNotes, p.injuryDays, p.suspensionMatches, p.awayDays, p.absentToday, p.flags.slice()]) };
+        const reset = () => { s.lineup = [...keep.lineup]; s.gkByHand = null; s.seasonStats = {}; s.squad.forEach(p => { p.tag = null; p.yardNotes = ['quiet']; p.injuryDays = 0; p.suspensionMatches = 0; p.awayDays = 0; p.absentToday = null; p.flags = []; }); };
+        const xi = () => s.lineup.map(id => s.player(id)), bench = () => s.bench(), out = {};
+        // (the squad may be down to 12 by now: one bench kid is enough — the other candidates are starters)
+        reset(); let k0 = xi()[0], h = bench()[0]; h.yardNotes = ['hands']; k0.injuryDays = 5;
+        let ch = s.ensureAvailableXI(); out.hands = s.lineup[0] === h.id && ch.length === 1 && !ch[0].fill;
+        reset(); k0 = xi()[0]; h = bench()[0]; const t = xi()[3]; h.yardNotes = ['hands']; t.tag = 'GK'; k0.injuryDays = 5;
+        s.ensureAvailableXI(); out.tag = s.lineup[0] === t.id && s.lineup[3] !== t.id && !!s.player(s.lineup[3])?.available;   // the tagged starter beats the "hands" bench kid; a bench kid fills his slot
+        reset(); k0 = xi()[0]; const kept = bench()[0]; s.seasonStats[kept.id] = { apps: 3, kept: 3 }; k0.injuryDays = 5;
+        s.ensureAvailableXI(); out.kept = s.lineup[0] === kept.id;
+        reset(); k0 = xi()[0]; const mid = xi()[5], slot = 5; mid.yardNotes = ['hands']; k0.injuryDays = 5;
+        ch = s.ensureAvailableXI(); out.starter = s.lineup[0] === mid.id && s.lineup[slot] !== mid.id && !!s.player(s.lineup[slot]) && ch[0]?.fill?.id === s.lineup[slot];
+        s.xiAutoDiary(ch, s.calendar.date); out.diary = s.diary.at(-1).key === 'xi.autoGK' && /\S/.test(YAM.ui.entryText({ ...s.diary.at(-1), r: 0 }));
+        reset(); k0 = xi()[0]; k0.injuryDays = 5; const old = s.bestBenchFor(0); s.ensureAvailableXI(); out.oldRule = s.lineup[0] === old.id;   // nothing visible → the old bench rule
+        // never hidden skills: the bench kid with perfect goalkeeping but no visible sign loses to a starter with "hands"
+        reset(); k0 = xi()[0]; const ace = bench()[0], hk = xi()[4], aceGk = ace.technical.goalkeeping; ace.technical.goalkeeping = 20; hk.yardNotes = ['hands']; k0.injuryDays = 5;
+        s.ensureAvailableXI(); out.hidden = s.lineup[0] === hk.id; ace.technical.goalkeeping = aceGk;
+        // hand-placed keeper: autoArrange (formation change / [ AUTO ]) leaves him; without the hand mark a tagged GK starter goes in
+        reset(); const g = xi()[3]; g.tag = 'GK'; const b0 = bench()[0];
+        s.swapPlayers(s.lineup[0], b0.id); out.handMark = s.gkByHand === b0.id; s.autoArrange(); out.handStays = s.lineup[0] === b0.id;
+        s.gkByHand = null; s.autoArrange(); out.autoTag = s.lineup[0] === g.id;
+        s.lineup = keep.lineup; s.gkByHand = keep.hand; s.seasonStats = JSON.parse(keep.stats);
+        for (const [id, tag, yn, inj, sus, aw, ab, fl] of keep.kids) Object.assign(s.player(id), { tag, yardNotes: yn, injuryDays: inj, suspensionMatches: sus, awayDays: aw, absentToday: ab, flags: fl });
+        s.save();
+        return out;
+      });
+      check('v3.24 auto lineup keeper: no GK tag → the yard-note "hands" kid; a GK tag beats him; else whoever kept goal most; a starter with "hands" moves into goal (his slot filled, diary xi.autoGK); never hidden goalkeeping; a hand-placed keeper stays on auto-arrange',
+        Object.values(gk).every(Boolean), JSON.stringify(gk));
+      // (7) the cash desk: never on a match day (the 1st on a Saturday → the next non-match stop); the planner's cash block shows the whole ledger at 800 px
+      const ks = await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui, ph = s.phase, f0 = s.fees, out = {};
+        s.fees = { ...(f0 || {}), month: '1999-01' };   // this month's cash desk not done yet
+        s.phase = 'matchday'; out.md = !s.kassaDue();
+        ui.briefing.open(); out.mdKassa = ui.kassa.isOpen; ui.briefing.layer.hidden = true; ui.locker.layer.hidden = true; ui.modal.close();
+        s.phase = 'calendar'; out.cal = s.kassaDue();
+        s.phase = ph; s.fees = f0;
+        return out;
+      });
+      await page.setViewportSize({ width: 800, height: 600 });
+      const ks2 = await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui, ph = s.phase, f0 = s.fees, w = s.weekState(), conf = w.confirmed, out = {};
+        s.phase = 'calendar'; s.fees = { ...(f0 || {}), month: '1999-01' }; w.confirmed = false;
+        ui.planner.open();
+        const k = document.getElementById('pl-kassa'), top = document.querySelector('.pl-top'), rep = document.getElementById('pl-ks-report'), lv = document.getElementById('pl-ks-levels');
+        out.shown = ui.planner.isOpen && !k.hidden;
+        out.rows = rep.querySelectorAll('tr').length; out.levels = lv.querySelectorAll('input, button, label').length;
+        out.kassaH = Math.round(k.getBoundingClientRect().height); out.topFits = top.scrollHeight <= top.clientHeight + 1 && k.scrollHeight <= k.clientHeight + 1;
+        out.whole = rep.getBoundingClientRect().bottom <= k.getBoundingClientRect().bottom + 1 && lv.getBoundingClientRect().bottom <= k.getBoundingClientRect().bottom + 1;
+        ui.planner.layer.hidden = true; w.confirmed = conf; s.fees = f0; s.phase = ph;
+        return out;
+      });
+      await page.setViewportSize({ width: 1440, height: 860 });
+      check('v3.24 cash desk: no KASSA on a match day (kassaDue false, the briefing does not redirect), due again at the next calendar stop; PLANNER.EXE at 800 px shows the whole ledger and the fee choice without scrolling the cash block',
+        ks.md && !ks.mdKassa && ks.cal && ks2.shown && ks2.topFits && ks2.whole && ks2.kassaH > 120 && ks2.rows > 0, JSON.stringify({ ks, ks2 }));
+      // (8) "Visit the family" ([1 AP], truant D) shows its result line with one button before the game moves on
+      const vf0 = await page.evaluate(() => {
+        const s = YAM.game; s.weekState().ap = 1; s.budget = Math.max(s.budget, 100);
+        const kid = s.squad.find(p => p.available); kid.skipped_training = true; kid.psych.discipline = 10; kid.dyn.morale = 50;
+        YAM.ui.events.fire('truant', s.calendar.date, { cast: { kid: kid.id } });
+        return { kid: kid.id, date: s.calendar.date };
+      });
+      await finishTyping();
+      await talk(3);
+      const vf1 = await page.evaluate(k => ({ step: YAM.game.pendingEvent?.step, n: document.querySelectorAll('#talk-choices .talk-btn').length, open: !document.getElementById('talk-layer').hidden,
+        text: YAM.game.pendingEvent ? L.t('ev.truant.visit', { k: L.name(YAM.game.player(k).name) }).slice(0, 20) : '', date: YAM.game.calendar.date, ap: YAM.game.ap, d: YAM.game.player(k).psych.discipline }), vf0.kid);
+      await finishTyping();
+      const vfTxt = await page.evaluate(() => document.querySelector('#talk-layer .talk-text')?.textContent || '');
+      await talk(0);
+      const vf2 = await page.evaluate(k => ({ closed: !YAM.game.pendingEvent, d: YAM.game.player(k).psych.discipline, m: YAM.game.player(k).dyn.morale,
+        diary: YAM.game.diary.slice(-4).some(x => x.key === 'ev.truant.d.diary'), log: YAM.game.eventLog.at(-1)?.choice }), vf0.kid);
+      check('v3.24 [1 AP] result lines: "Visit the family" (truant D) shows the visit with ONE button before the game moves on (same day, AP spent, effects on OK: discipline +1, morale +3, diary + log as ev.truant.d); the seniors\' boots / paramedic / ulti visit — see the v3.16 / v3.17 checks',
+        vf1.open && vf1.step === 'visit' && vf1.n === 1 && vf1.date === vf0.date && vf1.ap === 0 && vf1.d === 10 && vfTxt.startsWith(vf1.text) && vf2.closed && vf2.d === 11 && vf2.m === 53 && vf2.diary && vf2.log === 'ev.truant.d',
+        JSON.stringify({ vf0, vf1, vfTxt: vfTxt.slice(0, 40), vf2 }));
+      // (9) an old save without newsSeen / excuseLog / fines / gkByHand / yardNotes loads
+      await page.evaluate(() => {
+        YAM.game.save(); const d = JSON.parse(localStorage.getItem('yam_save_v1'));
+        delete d.newsSeen; delete d.excuseLog; delete d.fines; delete d.gkByHand;
+        for (const p of d.squad || []) delete p.yardNotes;
+        localStorage.setItem('yam_save_v1', JSON.stringify(d));
+      });
+      await page.reload();
+      await page.waitForFunction(() => window.YAM && YAM.ui);
+      const old = await page.evaluate(() => { const s = YAM.game;
+        return { news: JSON.stringify(s.newsSeen) === '{}', ex: Array.isArray(s.excuseLog) && !s.excuseLog.length, fines: Array.isArray(s.fines) && !s.fines.length, hand: s.gkByHand === null,
+          yard: s.squad.every(p => p.yardNotes === null && Array.isArray(s.yardNotesOf(p))), headline: Array.isArray(YAM.ui.briefing.news(s.calendar.date)), squad: s.squad.length };
+      });
+      await page.evaluate(() => { YAM.ui.autoReview = true; YAM.ui.autoAfter = true; YAM.game.excusesOff = true; });
+      check('v3.24 old save without newsSeen / excuseLog / fines / gkByHand / yard notes loads (empty defaults, yard notes from DraftView)', Object.values(old).every(Boolean), JSON.stringify(old));
     }
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
