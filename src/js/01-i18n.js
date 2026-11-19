@@ -1076,9 +1076,9 @@ Object.assign(I18N.en, {
   'tt.react.excuse.L': 'The blame moves off their shoulders. The parents agree loudly.',
   'tt.react.excuse.heavy': 'It softens the blow for the kids — but the Board hears excuses.',
   'tt.diary': 'Coach\'s word after {o}: {t}. {r}',
-  'tt.skipped': 'After {o} the coach left the dressing room without a word.',
+  'tt.skipped': 'You went home without a word to the boys.',
   'tt.react.none': 'No word was given after this match.',
-  'tt.nbPending': 'The kids are still waiting for your Coach\'s Word.', 'tt.nbDone': 'Score, timeline and your Coach\'s Word:', 'tt.nbOpen': '[ MATCH SUMMARY ]',
+  'tt.nbPending': 'The boys are waiting for a word from you.', 'tt.nbDone': 'Score, timeline and your Coach\'s Word:', 'tt.nbOpen': '[ MATCH SUMMARY ]',
   'lock.bar': 'NAVIGATION LOCKED — FINISH MATCH_SUMMARY.EXE',
   'lock.tipTalk': 'Locked while the Match Summary is open. Give your Coach\'s Word, then proceed to the Notebook.',
   'lock.tip': 'Locked while the Match Summary is open. Proceed to the Notebook or close the summary.',
@@ -1112,9 +1112,9 @@ Object.assign(I18N.ru, {
   'tt.react.excuse.L': 'Вина уходит с их плеч. Родители громко соглашаются.',
   'tt.react.excuse.heavy': 'Удар для ребят смягчён — но Правление слышит отговорки.',
   'tt.diary': 'Слово тренера после матча ({o}): {t}. {r}',
-  'tt.skipped': 'После матча ({o}) тренер ушёл из раздевалки молча.',
+  'tt.skipped': 'Ты ушёл, не сказав ребятам ни слова.',
   'tt.react.none': 'После этого матча слова тренера не было.',
-  'tt.nbPending': 'Ребята всё ещё ждут твоего «Слова тренера».', 'tt.nbDone': 'Счёт, ход матча и твоё «Слово тренера»:', 'tt.nbOpen': '[ ИТОГИ МАТЧА ]',
+  'tt.nbPending': 'Ребята ждут твоего слова.', 'tt.nbDone': 'Счёт, ход матча и твоё «Слово тренера»:', 'tt.nbOpen': '[ ИТОГИ МАТЧА ]',
   'lock.bar': 'НАВИГАЦИЯ ЗАБЛОКИРОВАНА — ЗАВЕРШИ MATCH_SUMMARY.EXE',
   'lock.tipTalk': 'Заблокировано, пока открыты итоги матча. Скажи «Слово тренера» и переходи в Блокнот.',
   'lock.tip': 'Заблокировано, пока открыты итоги матча. Перейди в Блокнот или закрой итоги.',
@@ -1874,4 +1874,19 @@ Object.assign(I18N.ru, {
   'dbg.att': 'Внимание', 'dbg.att.week': 'эта неделя', 'dbg.att.season': 'сезон',
   'dbg.att.row': '{w}: нажатий {c}{pw} · первая кнопка {f} · медиана {m} после текста · быстрее 0,5 с {x}', 'dbg.att.pw': ' ({n}/нед.)', 'dbg.att.none': '{w}: выборов пока нет',
   'dbg.streak': 'пустых недель подряд',
+});
+/* ---------- v3.23 "Not blind": the man of the match in the Notebook, keepers, yard clues ---------- */
+Object.assign(I18N.en, {
+  'nb.motm': 'Man of the match', 'nb.cluesKeeper': 'Keeper — roles aren\'t for him yet.',
+  'clue.src.yard': 'Yard match',
+  'clue.yard.pass': 'Saw the pass nobody else saw.', 'clue.yard.tackle': 'Won his tackles all afternoon.',
+  'clue.yard.dribble': 'Kept the ball close, even in the mud.', 'clue.yard.shot': 'Hit it hard whenever he saw the goal.',
+  'clue.yard.engine': 'Ran the whole afternoon without stopping.',
+});
+Object.assign(I18N.ru, {
+  'nb.motm': 'Лучший в матче', 'nb.cluesKeeper': 'Вратарь — роли пока не для него.',
+  'clue.src.yard': 'Дворовый матч',
+  'clue.yard.pass': 'Увидел пас, который не видел никто.', 'clue.yard.tackle': 'Выигрывал отбор весь день.',
+  'clue.yard.dribble': 'Держал мяч у ноги, даже в грязи.', 'clue.yard.shot': 'Бил сильно, стоило увидеть ворота.',
+  'clue.yard.engine': 'Бегал весь день без остановки.',
 });

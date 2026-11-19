@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.22</title>
+<title>Youth Academy Manager v3.23</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1839,6 +1839,8 @@ body.modal-lock #startmenu{ display: none; }
 .pinfo .nb-clues .cl-d{ color: var(--muted); font-size: 11px; }
 .pinfo .nb-clues .cl-ok{ font-size: 10px; }
 .pinfo .nb-clues .nb-more summary{ color: var(--amber); }
+/* v3.23: the man of the match mark on his Notebook card */
+.card h3 .motm{ display: inline-block; margin-left: 6px; padding: 0 4px; font: bold 10px/14px var(--mono); vertical-align: middle; color: #111; background: #ffe58a; border: 1px solid #000; }
 /* =========================================================
    v3.19 "GROWTH" — REVIEW.EXE (the pick after a win), role level pips, Notebook remove buttons
    ========================================================= */
@@ -2560,7 +2562,9 @@ const roomFromCeiling = (v, overall) => clamp(Math.round((v > 20 ? clamp(Math.ro
    strengths (never the growth room); a trait shows when its value ≥ SHOW, up to 2 per kid; each note is wrong with WRONG chance. */
 const YARD = { SHOW: 14, MAX: 2, WRONG: 0.2,
   TRAITS: { pace: p => p.rating('Speed'), dribble: p => p.rating('Dribble'), pass: p => p.rating('Pass'), shot: p => p.rating('Shoot'),
-    tackle: p => p.rating('Tackle'), hands: p => p.rating('Save'), engine: p => p.physical.baseStamina - 1, strong: p => p.physical.strength - 1 } };   // raw skills swing more than composites → −1
+    tackle: p => p.rating('Tackle'), hands: p => p.rating('Save'), engine: p => p.physical.baseStamina - 1, strong: p => p.physical.strength - 1 },
+  /* v3.23: a yard note that maps to a role signal becomes a clue (source 'yard'); pace / strong / hands / quiet have no role signal → no clue. */
+  SIGNAL: { pass: 'pass', tackle: 'duel', dribble: 'solo', shot: 'finish', engine: 'run' } };   // raw skills swing more than composites → −1
 /* v3.13 WEEKLY PLAN + WEEKLY ACTION POINTS (replaces the v2.5 1 AP/day). All numbers are test values.
    Monday: ap = min(AP_MAX, AP_BASE + carry + WIN_BONUS if the last match was won); carry = min(CARRY_MAX, AP left on Sunday).
    AP pay only for the coach's own actions (office, roll call); trainings are free (0–MAX_TRAININGS, Mon–Fri).
@@ -2725,7 +2729,7 @@ const CLUE_SIGNALS = {
   screen: { role: 'Anchor',     attrs: ['Mark'],            stats: ['intercepts'],                                  min: 1, lots: 4 },
   finish: { role: 'Finisher',   attrs: ['Shoot'],           stats: ['onTarget'],                                    min: 1, lots: 3 },
 };
-const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606', voice: '\u{1F5E3}' } };   // v3.19 'review'; v3.20 'voice' (AFTER_GAME.EXE)
+const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606', voice: '\u{1F5E3}', yard: '\u{1F3DF}' } };   // v3.19 'review'; v3.20 'voice' (AFTER_GAME.EXE)
 const KEEPER_NOTE = { ROUGH: 4 };   // v3.18.1: goals let in from which the keeper's day reads as a rough one, whatever his saves
 /* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free.
    v3.19 GROWTH: p.roles = [{ id, level, m }] (m = league matches he played with it since he got it), at most SLOTS, levels 1–LEVELS.
@@ -2821,6 +2825,7 @@ const MORALE = { W: 8, D: 1, L: -6, GOAL: 5, RED: -10, DRIFT_TO: 60 };
 const TEAM_TALK = {
   KEYS: ['praise', 'tough', 'excuse'],
   HEAVY_LOSS: 2, DISC_CAP: 16,
+  SKIP_SQUAD: -1,   // v3.23: the word was owed and never given (Quick Sim without the summary): Squad reputation
   praise: { W: { morale: 6, squad: 2 }, D: { morale: 6, squad: 2 }, L: { morale: 5, squad: 2 }, heavy: { morale: 5, squad: 2, board: -3 } },
   tough:  { W: { morale: -6, disc: 1, board: 2, parents: -3 }, D: { morale: -6, disc: 1, board: 2 }, L: { morale: -5, disc: 1, board: 2 }, heavy: { morale: -5, disc: 2, board: 2 } },
   excuse: { W: { morale: 0, parents: 2, board: -3 }, D: { morale: 3, parents: 2, board: -3 }, L: { morale: 5, parents: 2, board: -3 }, heavy: { morale: 5, parents: 2, board: -4 } },
@@ -3976,9 +3981,9 @@ Object.assign(I18N.en, {
   'tt.react.excuse.L': 'The blame moves off their shoulders. The parents agree loudly.',
   'tt.react.excuse.heavy': 'It softens the blow for the kids — but the Board hears excuses.',
   'tt.diary': 'Coach\'s word after {o}: {t}. {r}',
-  'tt.skipped': 'After {o} the coach left the dressing room without a word.',
+  'tt.skipped': 'You went home without a word to the boys.',
   'tt.react.none': 'No word was given after this match.',
-  'tt.nbPending': 'The kids are still waiting for your Coach\'s Word.', 'tt.nbDone': 'Score, timeline and your Coach\'s Word:', 'tt.nbOpen': '[ MATCH SUMMARY ]',
+  'tt.nbPending': 'The boys are waiting for a word from you.', 'tt.nbDone': 'Score, timeline and your Coach\'s Word:', 'tt.nbOpen': '[ MATCH SUMMARY ]',
   'lock.bar': 'NAVIGATION LOCKED — FINISH MATCH_SUMMARY.EXE',
   'lock.tipTalk': 'Locked while the Match Summary is open. Give your Coach\'s Word, then proceed to the Notebook.',
   'lock.tip': 'Locked while the Match Summary is open. Proceed to the Notebook or close the summary.',
@@ -4012,9 +4017,9 @@ Object.assign(I18N.ru, {
   'tt.react.excuse.L': 'Вина уходит с их плеч. Родители громко соглашаются.',
   'tt.react.excuse.heavy': 'Удар для ребят смягчён — но Правление слышит отговорки.',
   'tt.diary': 'Слово тренера после матча ({o}): {t}. {r}',
-  'tt.skipped': 'После матча ({o}) тренер ушёл из раздевалки молча.',
+  'tt.skipped': 'Ты ушёл, не сказав ребятам ни слова.',
   'tt.react.none': 'После этого матча слова тренера не было.',
-  'tt.nbPending': 'Ребята всё ещё ждут твоего «Слова тренера».', 'tt.nbDone': 'Счёт, ход матча и твоё «Слово тренера»:', 'tt.nbOpen': '[ ИТОГИ МАТЧА ]',
+  'tt.nbPending': 'Ребята ждут твоего слова.', 'tt.nbDone': 'Счёт, ход матча и твоё «Слово тренера»:', 'tt.nbOpen': '[ ИТОГИ МАТЧА ]',
   'lock.bar': 'НАВИГАЦИЯ ЗАБЛОКИРОВАНА — ЗАВЕРШИ MATCH_SUMMARY.EXE',
   'lock.tipTalk': 'Заблокировано, пока открыты итоги матча. Скажи «Слово тренера» и переходи в Блокнот.',
   'lock.tip': 'Заблокировано, пока открыты итоги матча. Перейди в Блокнот или закрой итоги.',
@@ -4775,6 +4780,21 @@ Object.assign(I18N.ru, {
   'dbg.att.row': '{w}: нажатий {c}{pw} · первая кнопка {f} · медиана {m} после текста · быстрее 0,5 с {x}', 'dbg.att.pw': ' ({n}/нед.)', 'dbg.att.none': '{w}: выборов пока нет',
   'dbg.streak': 'пустых недель подряд',
 });
+/* ---------- v3.23 "Not blind": the man of the match in the Notebook, keepers, yard clues ---------- */
+Object.assign(I18N.en, {
+  'nb.motm': 'Man of the match', 'nb.cluesKeeper': 'Keeper — roles aren\'t for him yet.',
+  'clue.src.yard': 'Yard match',
+  'clue.yard.pass': 'Saw the pass nobody else saw.', 'clue.yard.tackle': 'Won his tackles all afternoon.',
+  'clue.yard.dribble': 'Kept the ball close, even in the mud.', 'clue.yard.shot': 'Hit it hard whenever he saw the goal.',
+  'clue.yard.engine': 'Ran the whole afternoon without stopping.',
+});
+Object.assign(I18N.ru, {
+  'nb.motm': 'Лучший в матче', 'nb.cluesKeeper': 'Вратарь — роли пока не для него.',
+  'clue.src.yard': 'Дворовый матч',
+  'clue.yard.pass': 'Увидел пас, который не видел никто.', 'clue.yard.tackle': 'Выигрывал отбор весь день.',
+  'clue.yard.dribble': 'Держал мяч у ноги, даже в грязи.', 'clue.yard.shot': 'Бил сильно, стоило увидеть ворота.',
+  'clue.yard.engine': 'Бегал весь день без остановки.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -5054,6 +5074,7 @@ class Player {
       this.absentToday = o.absentToday || null;
       // v3.18: the Notebook's clues [{ date, source 'match'|'training' (v3.20: 'voice'), ref, signal|null, textKey, seen }] + matches his current role has played
       this.clues = Array.isArray(o.clues) ? o.clues.filter(c => c && typeof c.textKey === 'string').map(c => ({ ...c, signal: CLUE_SIGNALS[c.signal] ? c.signal : null })).slice(-CLUES.MAX_PER_KID) : [];
+      this.yardDone = !!o.yardDone;   // v3.23: his yard notes were turned into clues (once)
       this.lessonClues = Math.max(0, Math.round(o.lessonClues || 0));   // v3.16: lesson clues given (alternates archetype ↔ leadership)
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
       this.positionHintCooldown = Math.max(0, Math.round(o.positionHintCooldown || 0));   // v3.6: matches before he may ask again
@@ -5613,6 +5634,7 @@ class GameState {
     const keeper = [...this.squad].sort((a, b) => b.bio.height - a.bio.height)[0];
     this.lineup = [keeper.id, ...this.squad.filter(p => p !== keeper).slice(0, 10).map(p => p.id)];
     for (const p of this.squad) p.energy = 100;
+    for (const p of this.squad) this.addYardClues(p, this.calendar.date);   // v3.23: the draft notes → clues
     this.draft = null;
     this.phase = 'calendar';
     this.addDiary({ date: this.calendar.date, key: 'draft.diary', vars: { n: this.squad.length }, cls: 'ev' });
@@ -5844,12 +5866,25 @@ class GameState {
   /** Every card he may be offered now: new role (free slot, no clash), +1 level (< LEVELS), replace (slots full; no clash with
       the role he keeps). Banished roles never come back this season. */
   reviewPool(p) {
+    if (GameState.isKeeper(p)) return [];   // v3.23: keeper roles are a separate version — nobody offers a keeper a role
     const held = rolesOf(p), ids = held.map(r => r.id), out = [];
     const fresh = ROLE_IDS.filter(id => !ids.includes(id) && !(p.banned || []).includes(id));
     if (held.length < ROLES.SLOTS) for (const id of fresh) if (!ids.some(h => roleClash(h, id))) out.push({ type: 'new', role: id });
     for (const r of held) if (r.level < ROLES.LEVELS) out.push({ type: 'up', role: r.id });
     if (held.length >= ROLES.SLOTS) for (const r of held) for (const id of fresh) if (!ids.some(h => h !== r.id && roleClash(h, id))) out.push({ type: 'swap', role: id, replaces: r.id });
     return out;
+  }
+  /** v3.23: a kid the coach tagged GK. Roles are not for him yet (REVIEW, free rethink); a role he already holds stays. */
+  static isKeeper(p) { return !!p && p.tag === 'GK'; }
+  /** v3.23: the man of the match among [[id, stats]] (the caller passes OUTFIELD kids only): best matchRating, a tie → seeded(date#motm).
+      Shared by REVIEW (startReview) and the Notebook (lastReport.motm), so they always agree. Returns { pid, rating, stats } or null. */
+  pickMotm(kids, date) {
+    kids = kids.filter(([id]) => this.player(id));
+    if (!kids.length) return null;
+    const best = Math.max(...kids.map(([, st]) => matchRating(st)));
+    const top = kids.filter(([, st]) => matchRating(st) >= best - 1e-9).map(([id]) => id).sort();
+    const pid = top.length > 1 ? top[Math.floor(seeded(date + '#motm')() * top.length)] : top[0];
+    return { pid, rating: best, stats: { ...kids.find(k => k[0] === pid)[1] } };
   }
   /** Card weight: base 1 + EVIDENCE_W × how much of his role's signal he showed this match (CLUE_SIGNALS stats / lots, capped at 1). */
   static reviewWeight(card, stats) {
@@ -5886,13 +5921,10 @@ class GameState {
     this.lossStreak = result === 'L' ? streak + 1 : 0;
     this.review = null;
     if (result === 'L') return null;
-    const kids = played.filter(([id]) => this.player(id));
-    if (!kids.length) return null;
-    const best = Math.max(...kids.map(([, st]) => matchRating(st)));
-    const top = kids.filter(([, st]) => matchRating(st) >= best - 1e-9).map(([id]) => id).sort();
-    const pid = top.length > 1 ? top[Math.floor(seeded(date + '#motm')() * top.length)] : top[0];
-    const p = this.player(pid), mode = result === 'W' ? 'win' : 'draw';
-    const rv = { mode, date, md, pid, rating: +best.toFixed(1), stats: { ...kids.find(k => k[0] === pid)[1] },
+    const m = this.pickMotm(played.filter(([id]) => !GameState.isKeeper(this.player(id))), date);   // v3.23: outfield kids only (the caller also drops whoever stood in goal)
+    if (!m) return null;
+    const pid = m.pid, p = this.player(pid), mode = result === 'W' ? 'win' : 'draw';
+    const rv = { mode, date, md, pid, rating: +m.rating.toFixed(1), stats: m.stats,
       n: mode === 'draw' ? REVIEW.CARDS_DRAW : streak >= REVIEW.STREAK_FROM ? REVIEW.CARDS_STREAK : REVIEW.CARDS,
       rerolled: false, banished: false, cards: [] };
     rv.cards = this.rollReviewCards(p, rv);
@@ -6078,8 +6110,8 @@ class GameState {
     const held = rolesOf(p), ids = held.map(r => r.id), ok = id => !ids.includes(id) && !(p.banned || []).includes(id);
     return {
       remove: ids,
-      swap: held.flatMap(r => ROLE_IDS.filter(id => ok(id) && !ids.some(h => h !== r.id && roleClash(h, id))).map(to => ({ from: r.id, to }))),
-      give: held.length ? [] : ROLE_IDS.filter(ok),
+      swap: GameState.isKeeper(p) ? [] : held.flatMap(r => ROLE_IDS.filter(id => ok(id) && !ids.some(h => h !== r.id && roleClash(h, id))).map(to => ({ from: r.id, to }))),
+      give: held.length || GameState.isKeeper(p) ? [] : ROLE_IDS.filter(ok),   // v3.23: no new roles for a keeper
     };
   }
   /** The one free rethink: 'remove' (role) / 'swap' (role → to) / 'give' (to) / 'keep'. Uses the v3.18 role-change path with free = true. */
@@ -6135,6 +6167,20 @@ class GameState {
     const v = c.source === 'voice' ? { kind: c.kind, claim: c.claim || null, role: c.role || null, by: c.by || null } : {};   // v3.20 voice clue extras
     (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, ...v, seen: false });
     if (p.clues.length > CLUES.MAX_PER_KID) p.clues.splice(0, p.clues.length - CLUES.MAX_PER_KID);
+  }
+  /** v3.23: his yard notes (DraftView.notes — seeded by id, already lying with YARD.WRONG) become clues: source 'yard', ref 'draft'.
+      Only traits that map to a role signal (YARD.SIGNAL) write one; no second WRONG roll — the note's signal is carried as it is.
+      Yard clues are the OLDEST in his list, so with the cap they drop off first. One-shot per kid (p.yardDone): a clue that
+      dropped off never comes back. They are born read (the coach saw the notes in the draft): no 📝 badge. */
+  addYardClues(p, date) {
+    if (!p || p.yardDone || typeof DraftView === 'undefined') return;
+    p.yardDone = true;
+    const out = [];
+    for (const k of DraftView.notes(p)) {
+      const signal = YARD.SIGNAL[k];
+      if (signal) out.push({ date, source: 'yard', ref: 'draft', signal, textKey: 'clue.yard.' + k, seen: true });
+    }
+    p.clues = [...out, ...(p.clues || [])].slice(-CLUES.MAX_PER_KID);
   }
   /** v3.18: one clue per kid the Notebook covers after a match (checked against that match's numbers). pr.clue = its text. */
   recordMatchClues(rep, date = this.calendar.date) {
@@ -6726,6 +6772,7 @@ class GameState {
   skipTeamTalk() {
     if (!this.talkPending) return;
     this.lastReport.talk = 'none';
+    this.addRep('squad', TEAM_TALK.SKIP_SQUAD);   // v3.23: the boys noticed
     this.addDiary({ date: this.calendar.date, key: 'tt.skipped', vars: { o: { team: this.lastReport.opponent } }, cls: 'ev' });
     this.save();
   }
@@ -6982,6 +7029,7 @@ class GameState {
       } else {
         this.newSeason(SEASON.FIRST_YEAR);   // older saves: keep the squad, start the league
       }
+      for (const p of this.squad) this.addYardClues(p, `${this.season}-${SEASON.START_MONTH_DAY}`);   // v3.23: old saves get their yard clues once (dated the season start)
       this.save();
       return true;
     } catch (e) { return false; }
@@ -7808,8 +7856,26 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.22';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.23';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.23', name: { en: 'Not blind', ru: 'Не вслепую' },
+    en: [
+      'The man of the match is always in the Notebook now (marked ☆) and always has a clue from this match, so the REVIEW pick is no longer blind.',
+      'Keepers don\'t get roles yet: REVIEW goes to the best outfield player, and a keeper\'s Notebook card says so instead of "No clues yet". A role a keeper already holds stays.',
+      'The yard notes from the draft are clues now (🏟 "Yard match") and confirm, or contradict, what the matches show later. Old saves get them on load.',
+      'Leaving without the Coach\'s Word costs a little Squad reputation, and the Notebook reminds you the boys are waiting.',
+      'REVIEW after a win and AFTER THE GAME after a draw or a loss open by themselves, the same way, when the Notebook first appears after the Coach\'s Word. The Notebook button is still the way back.',
+      'For developers: the two `greedy` gates in `test/policy.js` are warnings until the money-sinks version; the report counts how often REVIEW had a confirmed card.',
+    ],
+    ru: [
+      'Лучший в матче теперь всегда есть в Блокноте (отмечен ☆) и всегда с зацепкой из этого матча — выбор в РАЗБОРЕ больше не вслепую.',
+      'Вратарям пока не дают роли: РАЗБОР достаётся лучшему полевому игроку, а в карточке вратаря вместо «Зацепок пока нет» — пояснение. Роль, которая у вратаря уже есть, остаётся.',
+      'Дворовые пометки из драфта теперь зацепки (🏟 «Дворовый матч»): они подтверждают или опровергают то, что покажут матчи. Старые сохранения получают их при загрузке.',
+      'Уйти без слова тренера теперь немного стоит по репутации среди ребят, а Блокнот напоминает, что ребята ждут.',
+      'РАЗБОР после победы и «После игры» после ничьей и поражения открываются сами и одинаково — когда Блокнот впервые появляется после слова тренера. Кнопка в Блокноте остаётся на случай возврата.',
+      'Для разработки: два гейта `greedy` в `test/policy.js` — предупреждения до версии со статьями расходов; в отчёте считается, как часто в РАЗБОРЕ была подтверждённая карточка.',
+    ],
+  },
   { v: '3.22', name: { en: 'Money with strings', ru: 'Деньги с условиями' },
     en: [
       'Money offers now open with the refusal (the rich dad, the scout, the pub pool). Saying no is a fair option: the rich dad\'s son takes it far better than before.',
@@ -11538,6 +11604,7 @@ class UIController {
     this.prepareMatch();
     this.renderAll();
     this.show('dash');
+    this.autoOpenedFor = this.state.phase === 'post' && !this.state.talkPending ? this.state.lastReport : null;   // v3.23: a reload never re-opens a post-match window by itself (the Notebook button is the way back)
     if (this.state.phase === 'draft') this.draft.open();   // v3.1: a new academy starts at the Yard Match
     if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
     else if (this.state.talkPending && !this.state.lastReport.instant) this.summary.open(this.state.lastReport);   // v3.5: reload before the team talk → back to the Match Summary (v3.9: not for Quick Sim)
@@ -12077,10 +12144,23 @@ class UIController {
     for (const id of new Set(Object.values(scenes))) this.$(id).classList.toggle('active', id === scenes[view]);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-    if (view === 'notes') { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); }   // v3.18
+    if (view === 'notes') { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); this.autoOpenPost(); }   // v3.18; v3.23
     if (view === 'match') this.$('tk-match').classList.remove('alert');
     if (view === 'table') this.renderTable();
     if (view === 'dash') this.renderDash();
+  }
+
+  /** v3.23: the post-match window (AFTER_GAME after a draw / loss, REVIEW after a win) opens by itself, once per match, when the
+      Notebook is first shown AFTER the Coach's Word (a Quick Sim with the word still owed waits: the coach may still give it).
+      One rule for all three results. The Notebook button / [ CONTINUE ] stay as the way back; a reload does not re-open it. */
+  autoOpenPost() {
+    const s = this.state, rep = s.lastReport;
+    if (s.phase !== 'post' || !rep || this.autoOpenedFor === rep || s.talkPending) return;
+    if (!s.afterPending && !s.reviewPending) return;
+    if (s.afterPending ? this.autoAfter : this.autoReview) return;   // auto-play / smoke decide by themselves at [ CONTINUE ]
+    this.autoOpenedFor = rep;
+    if (s.afterPending) this.afterView.open(); else this.reviewView.open();
+    this.renderDash();
   }
 
   alert(html, title, icon = 'info', buttons) { this.profile?.close(); this.teamCard?.close(); this.modal.show({ title, html, icon, buttons }); }
@@ -13182,6 +13262,11 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const others = s.league.simulateOthers(ctx.md);
     this.appendLog({ minute: 90, type: 'flavor', key: 'match.others', vars: { r: { fixtures: others } }, side: -1, r: 0 });
     const played = a.all.filter(p => eng.everPlayed.has(p.id));   // starters + substitutes (v2.6: minus empty slots)
+    // v3.23: the man of the match is chosen BEFORE the report — outfield kids only (whoever stood in goal / is tagged GK is never the subject of REVIEW)
+    const outfield = played.filter(p => !eng.isGK(p) && !GameState.isKeeper(p)).map(p => [p.id, { ...eng.st(p) }]);
+    const motm = s.pickMotm(outfield, s.calendar.date)?.pid || null;
+    const sample = shuffle(played).slice(0, 3);   // (same Math.random consumption as before v3.23)
+    if (motm && !sample.some(p => p.id === motm) && sample.length) sample[sample.length - 1] = played.find(p => p.id === motm);   // he replaces the last of the three
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result, coh: Math.round(s.cohesion ?? COH.START),   // v3.21
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
@@ -13189,7 +13274,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       talk: null,   // v3.5: post-match team talk still owed (forced in the Match Summary)
       totals: [eng.teamTotals(0), eng.teamTotals(1)].map(t => ({ shots: t.shots, onTarget: t.onTarget, passOk: t.passOk, passFail: t.passFail, yellow: t.yellow, red: t.red })),
       poss: Math.round(eng.possTicks[0] / ((eng.possTicks[0] + eng.possTicks[1]) || 1) * 100),
-      players: shuffle(played).slice(0, 3).map(p => ({
+      motm,
+      players: sample.map(p => ({
         id: p.id, stats: { ...eng.st(p) },
         tired: eng.tired.has(p.id), oop: false, gk: eng.lineOf.get(p.id) === 'GK', role: (p.tags || [])[0] || null,   // v3.0
         roles: rolesOf(p).map(r => ({ id: r.id, level: r.level })),   // v3.19: both slots + levels
@@ -13202,7 +13288,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.recordMatchClues(s.lastReport, s.calendar.date);   // v3.18: one clue per Notebook kid (an episode, sometimes wrong)
     s.trackRoles(eng.everPlayed);   // v3.18: roles that played this match now cost morale to change
     s.tickComplaints(s.calendar.date);   // v3.20: parents' "wrong role" complaints count this match (before tonight's talk)
-    s.startReview(result, played.map(p => [p.id, { ...eng.st(p) }]), s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak)
+    s.startReview(result, outfield, s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak); v3.23: outfield kids only
     s.startAfter(result, played.map(p => [p.id, { ...eng.st(p) }]), eng.matchEvents, s.calendar.date, ctx.md);   // v3.20: AFTER_GAME.EXE after a loss / draw
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
@@ -13240,9 +13326,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       + `${ok ? `<b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}</li>`;
   }
   /** Clues block, newest first; max → the rest folds into "All clues (n)". */
-  cluesBlock(p, max = Infinity) {
+  cluesBlock(p, max = Infinity, keeper = false) {
     const list = [...(p.clues || [])].reverse();
-    if (!list.length) return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><p class="pi-none">${L.t('nb.cluesNone')}</p></fieldset>`;
+    if (!list.length) return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><p class="pi-none">${L.t(keeper ? 'nb.cluesKeeper' : 'nb.cluesNone')}</p></fieldset>`;   // v3.23: a keeper has no roles yet
     const top = list.slice(0, max), rest = list.slice(max);
     return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><ul>${top.map(c => this.clueLine(p, c)).join('')}</ul>`
       + (rest.length ? `<details class="nb-more"><summary>${L.t('nb.cluesAll', { n: list.length })}</summary><ul>${rest.map(c => this.clueLine(p, c)).join('')}</ul></details>` : '')
@@ -13310,12 +13396,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       }).join('');
       return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
-        <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${this.dutyBadges(p)}</h3>
+        <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${this.dutyBadges(p)}${id === rep.motm ? `<span class="motm" title="${esc(L.t('nb.motm'))}">\u2606 ${L.t('nb.motm')}</span>` : ''}</h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>
         <div class="rm-roles">${btns}</div>
-        ${this.cluesBlock(p, CLUES.TIP)}
+        ${this.cluesBlock(p, CLUES.TIP, pr.gk || GameState.isKeeper(p))}
       </article>`;
     }).join('');
     // v3.18: everybody else who has clues — collapsed; opening a name = opening his card (marks his clues read)

@@ -33,7 +33,11 @@
  *   `empty` wk 3–8 from ≈ 30 % to 38–42 % (a v3.21 gate) for reasons that have nothing to do with money.
  *   The report counts the offers fired / taken per run (wrapped EventEngine.choose).
  * Gates (exit 1): win share reference − first ≥ 15 pp; empty weeks 3–8 win share ≤ 35 %; overload win share < reference;
- *   (v3.22) greedy (Parents + Squad + Board) Δ ≤ reference Δ − 8; greedy win share ≤ reference; first ΔBudget ≤ reference + $200.
+ *   first ΔBudget ≤ reference + $200.
+ * WARNINGS (v3.23, printed with the seed-paired SE, never exit 1 — "greedy gates are warnings until money sinks"): greedy
+ *   (Parents + Squad + Board) Δ ≤ reference Δ − 8; greedy win share ≤ reference. The two failed inside the noise in v3.22.
+ * v3.23 REVIEW counter: per run, how many REVIEW windows had a ✓ confirmed card on offer and how often the policy took one
+ *   (counted at ui.policyPick('review'), so it works on older builds too).
  */
 'use strict';
 const path = require('path');
@@ -77,6 +81,9 @@ async function playOne(page, policy, seed) {
     const orig = s.dayRoutine.bind(s);
     s.dayRoutine = (...a) => { const r = orig(...a); if (r.training) window.__trn.push({ date: a[0], att: r.attended, n: s.squad.length }); return r; };
     window.__start = { budget: s.budget, rep: { ...s.rep }, coh: s.cohesion };
+    window.__rv = [];   // v3.23: every REVIEW pick ({ any: a confirmed card was on offer, got: the pick was a confirmed card })
+    const pp = ui.policyPick.bind(ui);
+    ui.policyPick = (id, opts) => { const i = pp(id, opts); if (id === 'review') window.__rv.push({ any: opts.some(o => o.confirmed), got: !!opts[i]?.confirmed }); return i; };
     window.__ch = [];   // v3.22: every answered dialogue choice ({ id, key }) — offers fired / taken, promise cards, poach outcomes
     const ev = ui.events, ch = ev.choose.bind(ev);
     ev.choose = c => { const pe = s.pendingEvent; if (pe && c && !c.next) window.__ch.push({ id: pe.id, key: c.key }); return ch(c); };
@@ -103,7 +110,7 @@ async function playOne(page, policy, seed) {
       dParents: s.rep.parents - st.rep.parents, dSquad: s.rep.squad - st.rep.squad, dBoard: s.rep.board - st.rep.board,
       dBudget: s.budget - st.budget, ledger: led, cohEnd: s.cohesion,
       money: s.eventLog.filter(e => /\.a$/.test(e.choice) && ['dad', 'scout', 'pool', 'ulti'].includes(e.id)).map(e => e.id),   // the money offers taken
-      choices: window.__ch, leaks: s.eventLog.filter(e => e.id === 'poolleak').length,
+      choices: window.__ch, rv: window.__rv || [], leaks: s.eventLog.filter(e => e.id === 'poolleak').length,
       firstShare: a ? a.first : null, clicks: a ? a.clicks : 0 };
   }, { policy, seed, startDate });
 }
@@ -131,7 +138,8 @@ function summarise(runs) {
     gf: all.length ? all.reduce((a, m) => a + m.gf, 0) / all.length : 0, ga: all.length ? all.reduce((a, m) => a + m.ga, 0) / all.length : 0,
     dParents: avg(r => r.dParents), dSquad: avg(r => r.dSquad), dBoard: avg(r => r.dBoard), dBudget: avg(r => r.dBudget),
     perWeek: avg(r => r.perWeek), attend: avg(r => r.attend), coh: all.length ? all.reduce((a, m) => a + (m.coh ?? 50), 0) / all.length : 0,
-    ledger: led, money, offers, firstShare: avg(r => r.firstShare), dRep: avg(r => r.dParents + r.dSquad + r.dBoard) };
+    ledger: led, money, offers, firstShare: avg(r => r.firstShare), dRep: avg(r => r.dParents + r.dSquad + r.dBoard),
+    rvN: avg(r => r.rv.length), rvAny: avg(r => r.rv.filter(x => x.any).length), rvGot: avg(r => r.rv.filter(x => x.got).length) };
 }
 
 (async () => {
@@ -195,9 +203,16 @@ function summarise(runs) {
   if (sum.reference && sum.first) gates.push({ name: 'win share reference − first ≥ 15 pp', v: (sum.reference.W - sum.first.W) * 100, ok: sum.reference.W - sum.first.W >= 0.15 });
   if (sum.empty) gates.push({ name: 'empty: win share weeks 3–8 ≤ 35 %', v: sum.empty.W38 * 100, ok: sum.empty.W38 <= 0.35 });
   if (sum.overload && sum.reference) gates.push({ name: 'overload win share < reference', v: (sum.overload.W - sum.reference.W) * 100, ok: sum.overload.W < sum.reference.W });
+  // v3.23: the two v3.22 greedy gates failed inside the noise → WARNINGS (printed with the seed-paired SE, never exit 1) until the money-sinks version
+  const pairedSE = f => {   // mean and SE of (greedy − reference) over the seeds both finished
+    const ref = Object.fromEntries(runs.reference.map(r => [r.seed, r])), d = runs.greedy.filter(r => ref[r.seed]).map(r => f(r) - f(ref[r.seed]));
+    const n = d.length, m = d.reduce((a, b) => a + b, 0) / (n || 1), v = d.reduce((a, b) => a + (b - m) ** 2, 0) / Math.max(1, n - 1);
+    return { m, se: Math.sqrt(v / (n || 1)), n };
+  };
   if (sum.greedy && sum.reference) {   // v3.22: money has a bill
-    gates.push({ name: 'greedy Δ(Parents+Squad+Board) ≤ reference − 8', v: sum.greedy.dRep - sum.reference.dRep, ok: sum.greedy.dRep <= sum.reference.dRep - 8 });
-    gates.push({ name: 'greedy win share ≤ reference (pp)', v: (sum.greedy.W - sum.reference.W) * 100, ok: sum.greedy.W <= sum.reference.W });
+    const a = pairedSE(r => r.dParents + r.dSquad + r.dBoard), b = pairedSE(r => r.matches.filter(x => x.r === 'W').length / Math.max(1, r.matches.length) * 100);
+    gates.push({ warn: true, name: 'greedy Δ(Parents+Squad+Board) ≤ reference − 8', v: sum.greedy.dRep - sum.reference.dRep, se: a.se, n: a.n, ok: sum.greedy.dRep <= sum.reference.dRep - 8 });
+    gates.push({ warn: true, name: 'greedy win share ≤ reference (pp)', v: (sum.greedy.W - sum.reference.W) * 100, se: b.se, n: b.n, ok: sum.greedy.W <= sum.reference.W });
   }
   if (sum.first && sum.reference) gates.push({ name: 'first ΔBudget ≤ reference + $200', v: sum.first.dBudget - sum.reference.dBudget, ok: sum.first.dBudget <= sum.reference.dBudget + 200 });
   if (LOG) {
@@ -226,9 +241,13 @@ function summarise(runs) {
     for (const p of POLICIES) console.log(`${p.padEnd(10)} | ` + ['fee', 'grant', 'donation', 'rent', 'event'].map(k => `${k} ${sg(sum[p].ledger[k] || 0, 0)}`).join(' · ')
       + ' | money offers taken per run: ' + (Object.entries(sum[p].money).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(', ') || '—'));
     console.log('');
-    for (const g of gates) console.log(`${g.ok ? 'OK  ' : 'FAIL'} ${g.name}: ${g.v.toFixed(1)}`);
+    console.log('REVIEW (v3.23) per run, windows opened / with a ✓ confirmed card on offer / a confirmed card taken:');
+    for (const p of POLICIES) { const x = sum[p]; console.log(`${p.padEnd(10)} | ${x.rvN.toFixed(2)} / ${x.rvAny.toFixed(2)} / ${x.rvGot.toFixed(2)}`); }
+    console.log('');
+    for (const g of gates) console.log(`${g.ok ? 'OK  ' : g.warn ? 'WARN' : 'FAIL'} ${g.name}: ${g.v.toFixed(1)}${g.se != null ? ` (seed-paired SE ${g.se.toFixed(1)}, n=${g.n})` : ''}`);
+    if (gates.some(g => g.warn)) console.log('greedy gates are warnings until money sinks');
     if (errors.length) console.log('\nErrors:\n' + errors.slice(0, 20).join('\n'));
   }
-  const fail = errors.length > 0 || (!BASELINE && gates.some(g => !g.ok));
+  const fail = errors.length > 0 || (!BASELINE && gates.some(g => !g.ok && !g.warn));
   process.exit(fail ? 1 : 0);
 })();

@@ -44,6 +44,7 @@ class UIController {
     this.prepareMatch();
     this.renderAll();
     this.show('dash');
+    this.autoOpenedFor = this.state.phase === 'post' && !this.state.talkPending ? this.state.lastReport : null;   // v3.23: a reload never re-opens a post-match window by itself (the Notebook button is the way back)
     if (this.state.phase === 'draft') this.draft.open();   // v3.1: a new academy starts at the Yard Match
     if (this.state.pendingEvent) this.events.open();   // v1.9: an unanswered dilemma survives a reload
     else if (this.state.talkPending && !this.state.lastReport.instant) this.summary.open(this.state.lastReport);   // v3.5: reload before the team talk → back to the Match Summary (v3.9: not for Quick Sim)
@@ -583,10 +584,23 @@ class UIController {
     for (const id of new Set(Object.values(scenes))) this.$(id).classList.toggle('active', id === scenes[view]);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-    if (view === 'notes') { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); }   // v3.18
+    if (view === 'notes') { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); this.autoOpenPost(); }   // v3.18; v3.23
     if (view === 'match') this.$('tk-match').classList.remove('alert');
     if (view === 'table') this.renderTable();
     if (view === 'dash') this.renderDash();
+  }
+
+  /** v3.23: the post-match window (AFTER_GAME after a draw / loss, REVIEW after a win) opens by itself, once per match, when the
+      Notebook is first shown AFTER the Coach's Word (a Quick Sim with the word still owed waits: the coach may still give it).
+      One rule for all three results. The Notebook button / [ CONTINUE ] stay as the way back; a reload does not re-open it. */
+  autoOpenPost() {
+    const s = this.state, rep = s.lastReport;
+    if (s.phase !== 'post' || !rep || this.autoOpenedFor === rep || s.talkPending) return;
+    if (!s.afterPending && !s.reviewPending) return;
+    if (s.afterPending ? this.autoAfter : this.autoReview) return;   // auto-play / smoke decide by themselves at [ CONTINUE ]
+    this.autoOpenedFor = rep;
+    if (s.afterPending) this.afterView.open(); else this.reviewView.open();
+    this.renderDash();
   }
 
   alert(html, title, icon = 'info', buttons) { this.profile?.close(); this.teamCard?.close(); this.modal.show({ title, html, icon, buttons }); }
@@ -1688,6 +1702,11 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const others = s.league.simulateOthers(ctx.md);
     this.appendLog({ minute: 90, type: 'flavor', key: 'match.others', vars: { r: { fixtures: others } }, side: -1, r: 0 });
     const played = a.all.filter(p => eng.everPlayed.has(p.id));   // starters + substitutes (v2.6: minus empty slots)
+    // v3.23: the man of the match is chosen BEFORE the report — outfield kids only (whoever stood in goal / is tagged GK is never the subject of REVIEW)
+    const outfield = played.filter(p => !eng.isGK(p) && !GameState.isKeeper(p)).map(p => [p.id, { ...eng.st(p) }]);
+    const motm = s.pickMotm(outfield, s.calendar.date)?.pid || null;
+    const sample = shuffle(played).slice(0, 3);   // (same Math.random consumption as before v3.23)
+    if (motm && !sample.some(p => p.id === motm) && sample.length) sample[sample.length - 1] = played.find(p => p.id === motm);   // he replaces the last of the three
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result, coh: Math.round(s.cohesion ?? COH.START),   // v3.21
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
@@ -1695,7 +1714,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       talk: null,   // v3.5: post-match team talk still owed (forced in the Match Summary)
       totals: [eng.teamTotals(0), eng.teamTotals(1)].map(t => ({ shots: t.shots, onTarget: t.onTarget, passOk: t.passOk, passFail: t.passFail, yellow: t.yellow, red: t.red })),
       poss: Math.round(eng.possTicks[0] / ((eng.possTicks[0] + eng.possTicks[1]) || 1) * 100),
-      players: shuffle(played).slice(0, 3).map(p => ({
+      motm,
+      players: sample.map(p => ({
         id: p.id, stats: { ...eng.st(p) },
         tired: eng.tired.has(p.id), oop: false, gk: eng.lineOf.get(p.id) === 'GK', role: (p.tags || [])[0] || null,   // v3.0
         roles: rolesOf(p).map(r => ({ id: r.id, level: r.level })),   // v3.19: both slots + levels
@@ -1708,7 +1728,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.recordMatchClues(s.lastReport, s.calendar.date);   // v3.18: one clue per Notebook kid (an episode, sometimes wrong)
     s.trackRoles(eng.everPlayed);   // v3.18: roles that played this match now cost morale to change
     s.tickComplaints(s.calendar.date);   // v3.20: parents' "wrong role" complaints count this match (before tonight's talk)
-    s.startReview(result, played.map(p => [p.id, { ...eng.st(p) }]), s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak)
+    s.startReview(result, outfield, s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak); v3.23: outfield kids only
     s.startAfter(result, played.map(p => [p.id, { ...eng.st(p) }]), eng.matchEvents, s.calendar.date, ctx.md);   // v3.20: AFTER_GAME.EXE after a loss / draw
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]));
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
@@ -1746,9 +1766,9 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       + `${ok ? `<b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}</li>`;
   }
   /** Clues block, newest first; max → the rest folds into "All clues (n)". */
-  cluesBlock(p, max = Infinity) {
+  cluesBlock(p, max = Infinity, keeper = false) {
     const list = [...(p.clues || [])].reverse();
-    if (!list.length) return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><p class="pi-none">${L.t('nb.cluesNone')}</p></fieldset>`;
+    if (!list.length) return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><p class="pi-none">${L.t(keeper ? 'nb.cluesKeeper' : 'nb.cluesNone')}</p></fieldset>`;   // v3.23: a keeper has no roles yet
     const top = list.slice(0, max), rest = list.slice(max);
     return `<fieldset class="nb-clues"><legend>${L.t('nb.clues')}</legend><ul>${top.map(c => this.clueLine(p, c)).join('')}</ul>`
       + (rest.length ? `<details class="nb-more"><summary>${L.t('nb.cluesAll', { n: list.length })}</summary><ul>${rest.map(c => this.clueLine(p, c)).join('')}</ul></details>` : '')
@@ -1816,12 +1836,12 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       }).join('');
       return `<article class="card" data-pid="${p.id}">
         <div class="nb-face"><span class="portrait lg">${p.portraitSvg}</span></div>
-        <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${this.dutyBadges(p)}</h3>
+        <h3><span class="num dark">${p.number}</span>${esc(L.name(p.name))}<span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${this.dutyBadges(p)}${id === rep.motm ? `<span class="motm" title="${esc(L.t('nb.motm'))}">\u2606 ${L.t('nb.motm')}</span>` : ''}</h3>
         <ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>
         <p class="coach-note"><b>${L.t('nb.coachNote')}:</b> ${esc(note)}</p>
         <div class="cur tags">${p.tags.map(t => this.tagChip(t, p.id, false)).join('') || `<span style="color:#6f6754">${L.t('notes.noTags')}</span>`}</div>
         <div class="rm-roles">${btns}</div>
-        ${this.cluesBlock(p, CLUES.TIP)}
+        ${this.cluesBlock(p, CLUES.TIP, pr.gk || GameState.isKeeper(p))}
       </article>`;
     }).join('');
     // v3.18: everybody else who has clues — collapsed; opening a name = opening his card (marks his clues read)

@@ -142,6 +142,7 @@ class Player {
       this.absentToday = o.absentToday || null;
       // v3.18: the Notebook's clues [{ date, source 'match'|'training' (v3.20: 'voice'), ref, signal|null, textKey, seen }] + matches his current role has played
       this.clues = Array.isArray(o.clues) ? o.clues.filter(c => c && typeof c.textKey === 'string').map(c => ({ ...c, signal: CLUE_SIGNALS[c.signal] ? c.signal : null })).slice(-CLUES.MAX_PER_KID) : [];
+      this.yardDone = !!o.yardDone;   // v3.23: his yard notes were turned into clues (once)
       this.lessonClues = Math.max(0, Math.round(o.lessonClues || 0));   // v3.16: lesson clues given (alternates archetype ↔ leadership)
       this.outOfPositionMatches = Math.max(0, Math.round(o.outOfPositionMatches || 0));   // v3.6: straight league matches outside his hidden archetype
       this.positionHintCooldown = Math.max(0, Math.round(o.positionHintCooldown || 0));   // v3.6: matches before he may ask again

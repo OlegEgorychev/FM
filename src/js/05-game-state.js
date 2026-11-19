@@ -65,6 +65,7 @@ class GameState {
     const keeper = [...this.squad].sort((a, b) => b.bio.height - a.bio.height)[0];
     this.lineup = [keeper.id, ...this.squad.filter(p => p !== keeper).slice(0, 10).map(p => p.id)];
     for (const p of this.squad) p.energy = 100;
+    for (const p of this.squad) this.addYardClues(p, this.calendar.date);   // v3.23: the draft notes → clues
     this.draft = null;
     this.phase = 'calendar';
     this.addDiary({ date: this.calendar.date, key: 'draft.diary', vars: { n: this.squad.length }, cls: 'ev' });
@@ -296,12 +297,25 @@ class GameState {
   /** Every card he may be offered now: new role (free slot, no clash), +1 level (< LEVELS), replace (slots full; no clash with
       the role he keeps). Banished roles never come back this season. */
   reviewPool(p) {
+    if (GameState.isKeeper(p)) return [];   // v3.23: keeper roles are a separate version — nobody offers a keeper a role
     const held = rolesOf(p), ids = held.map(r => r.id), out = [];
     const fresh = ROLE_IDS.filter(id => !ids.includes(id) && !(p.banned || []).includes(id));
     if (held.length < ROLES.SLOTS) for (const id of fresh) if (!ids.some(h => roleClash(h, id))) out.push({ type: 'new', role: id });
     for (const r of held) if (r.level < ROLES.LEVELS) out.push({ type: 'up', role: r.id });
     if (held.length >= ROLES.SLOTS) for (const r of held) for (const id of fresh) if (!ids.some(h => h !== r.id && roleClash(h, id))) out.push({ type: 'swap', role: id, replaces: r.id });
     return out;
+  }
+  /** v3.23: a kid the coach tagged GK. Roles are not for him yet (REVIEW, free rethink); a role he already holds stays. */
+  static isKeeper(p) { return !!p && p.tag === 'GK'; }
+  /** v3.23: the man of the match among [[id, stats]] (the caller passes OUTFIELD kids only): best matchRating, a tie → seeded(date#motm).
+      Shared by REVIEW (startReview) and the Notebook (lastReport.motm), so they always agree. Returns { pid, rating, stats } or null. */
+  pickMotm(kids, date) {
+    kids = kids.filter(([id]) => this.player(id));
+    if (!kids.length) return null;
+    const best = Math.max(...kids.map(([, st]) => matchRating(st)));
+    const top = kids.filter(([, st]) => matchRating(st) >= best - 1e-9).map(([id]) => id).sort();
+    const pid = top.length > 1 ? top[Math.floor(seeded(date + '#motm')() * top.length)] : top[0];
+    return { pid, rating: best, stats: { ...kids.find(k => k[0] === pid)[1] } };
   }
   /** Card weight: base 1 + EVIDENCE_W × how much of his role's signal he showed this match (CLUE_SIGNALS stats / lots, capped at 1). */
   static reviewWeight(card, stats) {
@@ -338,13 +352,10 @@ class GameState {
     this.lossStreak = result === 'L' ? streak + 1 : 0;
     this.review = null;
     if (result === 'L') return null;
-    const kids = played.filter(([id]) => this.player(id));
-    if (!kids.length) return null;
-    const best = Math.max(...kids.map(([, st]) => matchRating(st)));
-    const top = kids.filter(([, st]) => matchRating(st) >= best - 1e-9).map(([id]) => id).sort();
-    const pid = top.length > 1 ? top[Math.floor(seeded(date + '#motm')() * top.length)] : top[0];
-    const p = this.player(pid), mode = result === 'W' ? 'win' : 'draw';
-    const rv = { mode, date, md, pid, rating: +best.toFixed(1), stats: { ...kids.find(k => k[0] === pid)[1] },
+    const m = this.pickMotm(played.filter(([id]) => !GameState.isKeeper(this.player(id))), date);   // v3.23: outfield kids only (the caller also drops whoever stood in goal)
+    if (!m) return null;
+    const pid = m.pid, p = this.player(pid), mode = result === 'W' ? 'win' : 'draw';
+    const rv = { mode, date, md, pid, rating: +m.rating.toFixed(1), stats: m.stats,
       n: mode === 'draw' ? REVIEW.CARDS_DRAW : streak >= REVIEW.STREAK_FROM ? REVIEW.CARDS_STREAK : REVIEW.CARDS,
       rerolled: false, banished: false, cards: [] };
     rv.cards = this.rollReviewCards(p, rv);
@@ -530,8 +541,8 @@ class GameState {
     const held = rolesOf(p), ids = held.map(r => r.id), ok = id => !ids.includes(id) && !(p.banned || []).includes(id);
     return {
       remove: ids,
-      swap: held.flatMap(r => ROLE_IDS.filter(id => ok(id) && !ids.some(h => h !== r.id && roleClash(h, id))).map(to => ({ from: r.id, to }))),
-      give: held.length ? [] : ROLE_IDS.filter(ok),
+      swap: GameState.isKeeper(p) ? [] : held.flatMap(r => ROLE_IDS.filter(id => ok(id) && !ids.some(h => h !== r.id && roleClash(h, id))).map(to => ({ from: r.id, to }))),
+      give: held.length || GameState.isKeeper(p) ? [] : ROLE_IDS.filter(ok),   // v3.23: no new roles for a keeper
     };
   }
   /** The one free rethink: 'remove' (role) / 'swap' (role → to) / 'give' (to) / 'keep'. Uses the v3.18 role-change path with free = true. */
@@ -587,6 +598,20 @@ class GameState {
     const v = c.source === 'voice' ? { kind: c.kind, claim: c.claim || null, role: c.role || null, by: c.by || null } : {};   // v3.20 voice clue extras
     (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, ...v, seen: false });
     if (p.clues.length > CLUES.MAX_PER_KID) p.clues.splice(0, p.clues.length - CLUES.MAX_PER_KID);
+  }
+  /** v3.23: his yard notes (DraftView.notes — seeded by id, already lying with YARD.WRONG) become clues: source 'yard', ref 'draft'.
+      Only traits that map to a role signal (YARD.SIGNAL) write one; no second WRONG roll — the note's signal is carried as it is.
+      Yard clues are the OLDEST in his list, so with the cap they drop off first. One-shot per kid (p.yardDone): a clue that
+      dropped off never comes back. They are born read (the coach saw the notes in the draft): no 📝 badge. */
+  addYardClues(p, date) {
+    if (!p || p.yardDone || typeof DraftView === 'undefined') return;
+    p.yardDone = true;
+    const out = [];
+    for (const k of DraftView.notes(p)) {
+      const signal = YARD.SIGNAL[k];
+      if (signal) out.push({ date, source: 'yard', ref: 'draft', signal, textKey: 'clue.yard.' + k, seen: true });
+    }
+    p.clues = [...out, ...(p.clues || [])].slice(-CLUES.MAX_PER_KID);
   }
   /** v3.18: one clue per kid the Notebook covers after a match (checked against that match's numbers). pr.clue = its text. */
   recordMatchClues(rep, date = this.calendar.date) {
@@ -1178,6 +1203,7 @@ class GameState {
   skipTeamTalk() {
     if (!this.talkPending) return;
     this.lastReport.talk = 'none';
+    this.addRep('squad', TEAM_TALK.SKIP_SQUAD);   // v3.23: the boys noticed
     this.addDiary({ date: this.calendar.date, key: 'tt.skipped', vars: { o: { team: this.lastReport.opponent } }, cls: 'ev' });
     this.save();
   }
@@ -1434,6 +1460,7 @@ class GameState {
       } else {
         this.newSeason(SEASON.FIRST_YEAR);   // older saves: keep the squad, start the league
       }
+      for (const p of this.squad) this.addYardClues(p, `${this.season}-${SEASON.START_MONTH_DAY}`);   // v3.23: old saves get their yard clues once (dated the season start)
       this.save();
       return true;
     } catch (e) { return false; }

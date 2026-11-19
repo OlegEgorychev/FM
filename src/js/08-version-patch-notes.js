@@ -2,8 +2,26 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.22';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.23';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.23', name: { en: 'Not blind', ru: 'Не вслепую' },
+    en: [
+      'The man of the match is always in the Notebook now (marked ☆) and always has a clue from this match, so the REVIEW pick is no longer blind.',
+      'Keepers don\'t get roles yet: REVIEW goes to the best outfield player, and a keeper\'s Notebook card says so instead of "No clues yet". A role a keeper already holds stays.',
+      'The yard notes from the draft are clues now (🏟 "Yard match") and confirm, or contradict, what the matches show later. Old saves get them on load.',
+      'Leaving without the Coach\'s Word costs a little Squad reputation, and the Notebook reminds you the boys are waiting.',
+      'REVIEW after a win and AFTER THE GAME after a draw or a loss open by themselves, the same way, when the Notebook first appears after the Coach\'s Word. The Notebook button is still the way back.',
+      'For developers: the two `greedy` gates in `test/policy.js` are warnings until the money-sinks version; the report counts how often REVIEW had a confirmed card.',
+    ],
+    ru: [
+      'Лучший в матче теперь всегда есть в Блокноте (отмечен ☆) и всегда с зацепкой из этого матча — выбор в РАЗБОРЕ больше не вслепую.',
+      'Вратарям пока не дают роли: РАЗБОР достаётся лучшему полевому игроку, а в карточке вратаря вместо «Зацепок пока нет» — пояснение. Роль, которая у вратаря уже есть, остаётся.',
+      'Дворовые пометки из драфта теперь зацепки (🏟 «Дворовый матч»): они подтверждают или опровергают то, что покажут матчи. Старые сохранения получают их при загрузке.',
+      'Уйти без слова тренера теперь немного стоит по репутации среди ребят, а Блокнот напоминает, что ребята ждут.',
+      'РАЗБОР после победы и «После игры» после ничьей и поражения открываются сами и одинаково — когда Блокнот впервые появляется после слова тренера. Кнопка в Блокноте остаётся на случай возврата.',
+      'Для разработки: два гейта `greedy` в `test/policy.js` — предупреждения до версии со статьями расходов; в отчёте считается, как часто в РАЗБОРЕ была подтверждённая карточка.',
+    ],
+  },
   { v: '3.22', name: { en: 'Money with strings', ru: 'Деньги с условиями' },
     en: [
       'Money offers now open with the refusal (the rich dad, the scout, the pub pool). Saying no is a fair option: the rich dad\'s son takes it far better than before.',

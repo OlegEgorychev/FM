@@ -43,3 +43,5 @@
 .pinfo .nb-clues .cl-d{ color: var(--muted); font-size: 11px; }
 .pinfo .nb-clues .cl-ok{ font-size: 10px; }
 .pinfo .nb-clues .nb-more summary{ color: var(--amber); }
+/* v3.23: the man of the match mark on his Notebook card */
+.card h3 .motm{ display: inline-block; margin-left: 6px; padding: 0 4px; font: bold 10px/14px var(--mono); vertical-align: middle; color: #111; background: #ffe58a; border: 1px solid #000; }

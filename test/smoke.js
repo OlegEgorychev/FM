@@ -92,6 +92,17 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       dr0.open && dr0.phase === 'draft' && dr0.world === 100 && dr0.free === 60 && dr0.rivals === 40 && dr0.squad === 0 && dr0.cards === 30 && dr0.allFree && dr0.notes && dr0.face && dr0.noPos && dr0.bio && dr0.start
       && dr1.signed === 15 && dr1.open && dr1.start && dr1.off === 15 && dr2.phase === 'calendar' && dr2.n === 15 && dr2.same && dr2.team && dr2.free === 45 && dr2.world === 100 && dr2.xi && dr2.closed
       && dr2.nums === Array.from({ length: 15 }, (_, i) => i + 1).join(), JSON.stringify({ dr0, dr1, dr2 }));
+    // v3.23: signing writes the yard notes as clues — exactly the mapped ones, source 'yard', ref 'draft', the draft date, the signal from YARD.SIGNAL
+    const yc = await page.evaluate(() => { const s = YAM.game, out = { n: 0, exact: true, mapped: 0, none: 0, seen: true };
+      for (const p of s.squad) {
+        const want = DraftView.notes(p).filter(k => YARD.SIGNAL[k]), got = p.clues || [];
+        out.n++; out.mapped += want.length; if (!want.length) out.none++;
+        if (got.length !== want.length || want.some((k, i) => got[i].source !== 'yard' || got[i].ref !== 'draft' || got[i].date !== s.calendar.date || got[i].signal !== YARD.SIGNAL[k] || got[i].textKey !== 'clue.yard.' + k)) out.exact = false;
+        if (got.some(c => !c.seen)) out.seen = false;
+      }
+      out.flag = s.squad.every(p => p.yardDone); return out; });
+    check('v3.23 START SEASON writes every signed kid\'s yard notes as clues (only traits with a role signal, draft date, read), nothing for pace / strong / hands / quiet',
+      yc.n === 15 && yc.exact && yc.seen && yc.flag && yc.mapped > 0, JSON.stringify(yc));
 
     // fast match for testing
     await page.evaluate(() => { for (const k of [1, 2, 5]) { YAM.MatchEngine.SPEED[k] = 6; YAM.MatchEngine.HIGHLIGHT[k] = 12; } });
@@ -2232,7 +2243,9 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     }, voiceN);
     await v320toPost('loss');
     const a6 = await page.evaluate(n => {
-      const s = YAM.game, ui = YAM.ui, vn = eval(n), sq0 = s.rep.squad = 50, v0 = s.squad.map(vn);
+      const s = YAM.game, ui = YAM.ui, vn = eval(n), v0 = s.squad.map(vn);
+      s.skipTeamTalk();   // v3.23: a Quick Sim day closed without the word costs Squad −1 on its own (checked in the v3.23 block)
+      const sq0 = s.rep.squad = 50;
       ui.closeMatchday(); ui.afterView.finishTyping();
       document.querySelector('#af-foot [data-act="skip"]').click();
       return { squad: s.rep.squad === sq0 + AFTER.SKIP_SQUAD, none: s.squad.every((p, j) => vn(p) === v0[j]), closed: document.getElementById('after-view').hidden && s.after === null && s.phase !== 'post',
@@ -2791,6 +2804,237 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
     check('v3.22 autoSim({ policy: "greedy" }) plays 8 weeks (offers ×4) without getting stuck, takes the money offers, answers the promise cards',
       !gstuck && (g1.md >= g0.md + 8 || g1.phase === 'seasonEnd') && g1.taken > 0, JSON.stringify({ g0, g1, gi, gstuck }));
     await calm();
+    }
+    // ===== v3.23 NOT BLIND: the man of the match in the Notebook, keepers keep their gloves, yard clues, a skipped Coach's Word, windows that open by themselves =====
+    {   // block scope: the v3.23 names never clash with older checks
+    const v323calm = () => page.evaluate(() => { const s = YAM.game, ui = YAM.ui; ui.autoReview = false; ui.autoAfter = false; ui.events.enabled = false; s.excusesOff = true;
+      s.eventQueue = []; s.pendingEvent = null; ui.events.view?.layer && (ui.events.view.layer.hidden = true); ui.modal.close(); ui.profile.close(); ui.debug.close(); ui.locker.close?.();
+      ui.afterView.layer.hidden = true; ui.reviewView.layer.hidden = true; });
+    // the next league match by Quick Sim: 'win' = Force Win, 'loss' = the same bonus turned around for this one match (our kids' hidden truth untouched)
+    const v323toPost = async mode => {
+      for (let t = 0; t < 4; t++) {
+        await v323calm();
+        await page.evaluate(() => { const s = YAM.game, ui = YAM.ui;
+          if (s.phase === 'post') { s.afterAuto(); if (s.reviewPending) s.reviewPick(0); if (s.talkPending) s.applyTeamTalk('praise'); ui.closeMatchday(); }
+          if (s.phase === 'seasonEnd') ui.onDashAction();
+          if (s.phase === 'calendar') ui.autoSim(); });
+        await page.waitForFunction(() => YAM.game.phase === 'matchday' || (YAM.game.pendingEvent && !document.getElementById('talk-layer').hidden), null, { timeout: 30000 });
+        const res = await page.evaluate(m => { const s = YAM.game, ui = YAM.ui, ME = YAM.MatchEngine, orig = ME.prototype.modParts;
+          ui.modal.close(); ui.locker.close?.(); ui.briefing.close?.();
+          s.dayState().locker = { done: true, absent: {}, checked: [] }; s.cheats.forceWin = m === 'win';
+          if (m === 'loss') ME.prototype.modParts = function (side, role) { const o = orig.call(this, side, role), c = side === 0 ? -8 : 5; return { ...o, cheat: c, v: o.v + c }; };
+          window.__armed = true;   // 1st pickMotm of this match = the report's (see the shuffle rig below)
+          try { ui.onInstantSim(); } finally { ME.prototype.modParts = orig; }
+          ui.modal.close(); ui.summary.close?.();
+          return s.lastReport?.result; }, mode);
+        if (mode !== 'loss' || res === 'L') return res;
+      }
+      return null;
+    };
+    const rvShown = () => page.evaluate(() => !document.getElementById('review-view').hidden);
+    const afShown = () => page.evaluate(() => !document.getElementById('after-view').hidden);
+
+    // the rig: for the report-building window (pickMotm → recordMatchClues) Math.random returns ≈1 → shuffle(played) is the identity
+    // → the Notebook's three are the first three of `played`; consumption is counted (new code must add none)
+    await page.evaluate(() => {
+      const R = Math.random; let cnt = 0, fix = false, c0 = 0;
+      Math.random = () => { cnt++; return fix ? 0.9999999 : R(); };
+      window.__rnd = { pick: [], win: [] }; window.__armed = false;
+      const pm = GameState.prototype.pickMotm, rm = GameState.prototype.recordMatchClues;
+      GameState.prototype.pickMotm = function (...a) { const b = cnt, r = pm.apply(this, a); window.__rnd.pick.push(cnt - b); if (window.__armed) { window.__armed = false; fix = true; c0 = cnt; } return r; };
+      GameState.prototype.recordMatchClues = function (...a) { if (fix) { fix = false; window.__rnd.win.push(cnt - c0); } return rm.apply(this, a); };
+    });
+
+    // 1. a win: the man of the match is one of the Notebook's three whatever the shuffle did, ☆ on his card, a clue from THIS match; REVIEW goes to him
+    let m1 = null;
+    for (let t = 0; t < 6; t++) {
+      const res = await v323toPost('win');
+      m1 = await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui, e = ui.engine, rep = s.lastReport;
+        const played = e.sides[0].all.filter(p => e.everPlayed.has(p.id)), ids = rep.players.map(p => p.id), sample = played.slice(0, 3).map(p => p.id);
+        const p = s.player(rep.motm), c = p?.clues.at(-1), mc = p?.clues.find(x => x.source === 'match' && x.ref === rep.md && x.date === s.calendar.date);   // (c can be the "he lit up" review clue written after it)
+        const out = { forced: !!rep.motm && !sample.includes(rep.motm), motm: !!rep.motm, three: ids.length === 3, last: ids[2] === rep.motm, keep2: ids[0] === sample[0] && ids[1] === sample[1],
+          rnd: window.__rnd.win.at(-1) === played.length - 1, pick0: window.__rnd.pick.every(d => d === 0),   // the shuffle used exactly n − 1 numbers; pickMotm none
+          outfield: e.lineOf.get(rep.motm) !== 'GK' && !GameState.isKeeper(p), rv: s.review?.pid === rep.motm, clue: !!mc,
+          pr: !!rep.players.find(x => x.id === rep.motm)?.clue, played: played.length };
+        ui.show('notes'); ui.renderNotebook();
+        const card = document.querySelector(`#notes-body .card[data-pid="${rep.motm}"]`), marks = document.querySelectorAll('#notes-body .card .motm');
+        out.star = marks.length === 1 && !!card?.querySelector('.motm') && /☆/.test(card.querySelector('.motm').textContent) && card.querySelector('.motm').textContent.includes(L.t('nb.motm'));
+        out.ru = I18N.ru['nb.motm'] === 'Лучший в матче' && !!I18N.ru['nb.cluesKeeper'];
+        out.shown = !!c && card?.querySelector('.nb-clues li .cl-t')?.textContent === clueText(c);   // newest clue first = this match's
+        out.noAuto = document.getElementById('review-view').hidden;   // Quick Sim with the word still owed: nothing pops up over the chance to give it
+        ui.reviewView.open();
+        out.rvClue = !!mc && [...document.querySelectorAll('#rv-kid .rv-clues li .cl-t')].some(x => x.textContent === clueText(mc)) && document.querySelector('#rv-kid .rv-clues li .cl-t')?.textContent === clueText(c) && document.getElementById('rv-kid').textContent.includes(L.name(p.name));   // this match's line is in REVIEW's clue block
+        ui.reviewView.layer.hidden = true;
+        out.res = rep.result;
+        return out;
+      });
+      if (res === 'W' && m1.forced) break;
+    }
+    await shot('23-motm');
+    check('v3.23 the man of the match is always one of the Notebook\'s three (he replaces the last), marked ☆, with a clue from this match; REVIEW goes to the same kid; the shuffle used exactly n−1 random numbers and pickMotm none',
+      m1.res === 'W' && m1.forced && m1.motm && m1.three && m1.last && m1.keep2 && m1.rnd && m1.pick0 && m1.outfield && m1.rv && m1.clue && m1.pr && m1.star && m1.ru && m1.shown && m1.rvClue, JSON.stringify(m1));
+
+    // 2. REVIEW after a win opens by itself once the word is given and the Notebook shows; a Quick Sim with the word owed waits; the word costs / pays as before, no extra −1 later; a reload does not re-open it, the Notebook button does
+    const w1 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, rep = s.lastReport, sq0 = s.rep.squad, out = { pending: s.talkPending, hidden: document.getElementById('review-view').hidden };
+      s.applyTeamTalk('praise'); out.fx = s.rep.squad === Math.min(100, sq0 + TEAM_TALK.praise.W.squad);
+      ui.autoOpenedFor = null; ui.show('notes');
+      out.open = !document.getElementById('review-view').hidden && s.reviewPending && !s.afterPending && s.review.mode === 'win';
+      out.once = ui.autoOpenedFor === rep;
+      ui.reviewView.layer.hidden = true; ui.show('notes');   // minimised, the Notebook shown again: not re-opened by itself
+      out.notTwice = document.getElementById('review-view').hidden;
+      ui.renderNotebook(); { const tmp = document.createElement('div'); tmp.innerHTML = L.t('notes.backReview'); out.label = document.getElementById('btn-back')?.textContent.includes(tmp.textContent.trim()); }
+      return out;
+    });
+    await page.reload();
+    await page.waitForFunction(() => window.YAM && YAM.ui);
+    await page.evaluate(() => { YAM.ui.autoReview = false; YAM.ui.autoAfter = false; YAM.ui.events.enabled = false; });
+    const w2 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, out = { post: s.phase === 'post' && s.reviewPending };
+      ui.show('notes'); ui.renderNotebook();
+      out.notAuto = document.getElementById('review-view').hidden;   // a reload never re-opens it by itself
+      document.getElementById('btn-back').click();   // the Notebook button = the way back
+      out.btn = !document.getElementById('review-view').hidden;
+      const sq = s.rep.squad;
+      s.reviewSkip(); ui.reviewView.layer.hidden = true; ui.closeMatchday();   // the word was given: closing the day takes nothing more
+      out.noMinus = s.rep.squad === sq && s.phase !== 'post';
+      return out;
+    });
+    check('v3.23 win → REVIEW.EXE opens by itself when the Notebook first shows after the Coach\'s Word (not while a Quick Sim\'s word is still owed), once; after a reload it stays closed and the Notebook button opens it; a given word is never charged the −1',
+      w1.pending && w1.hidden && w1.fx && w1.open && w1.once && w1.notTwice && w1.label && w2.post && w2.notAuto && w2.btn && w2.noMinus, JSON.stringify({ w1, w2 }));
+
+    // 3. a loss: Quick Sim + closing the matchday without the word → Squad −1 and the new diary line; AFTER_GAME opens by itself after the word on the next loss
+    const l1res = await v323toPost('loss');
+    const l1 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, rep = s.lastReport, sq0 = s.rep.squad, out = { res: rep.result === 'L', instant: rep.instant, owed: s.talkPending, af: s.afterPending };
+      ui.show('notes'); out.noAuto = document.getElementById('after-view').hidden;
+      out.nb = !!document.querySelector('#notes-body .nb-talk.pending') && document.querySelector('#notes-body .nb-talk').textContent.includes(L.t('tt.nbPending')) && !/\d/.test(L.t('tt.nbPending'));
+      ui.closeMatchday();   // the word never given
+      out.minus = s.rep.squad === sq0 + TEAM_TALK.SKIP_SQUAD && rep.talk === 'none' && TEAM_TALK.SKIP_SQUAD === -1;
+      out.diary = s.diary.some(d => d.key === 'tt.skipped') && I18N.en['tt.skipped'] === 'You went home without a word to the boys.' && I18N.ru['tt.skipped'] === 'Ты ушёл, не сказав ребятам ни слова.';
+      out.still = s.phase === 'post' && !document.getElementById('after-view').hidden;   // [ CONTINUE ] still stops at AFTER_GAME
+      return out;
+    });
+    check('v3.23 Quick Sim without the Coach\'s Word: closing the matchday costs Squad −1 and writes "You went home without a word to the boys"; the Notebook reminder says the boys are waiting (no numbers); the loss window still waits at [ CONTINUE ]',
+      l1res === 'L' && l1.res && l1.instant && l1.owed && l1.af && l1.noAuto && l1.nb && l1.minus && l1.diary && l1.still, JSON.stringify(l1));
+    const l2res = await v323toPost('loss');
+    const l2 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, rep = s.lastReport, out = { res: rep.result === 'L', af: s.after?.mode === 'loss' };
+      s.applyTeamTalk('tough'); ui.autoOpenedFor = null; ui.show('notes');
+      out.open = !document.getElementById('after-view').hidden && document.getElementById('review-view').hidden && s.afterPending;
+      out.cards = document.querySelectorAll('#after-view .af-card').length === 3;
+      return out;
+    });
+    check('v3.23 loss → AFTER_GAME.EXE opens by itself at the same moment as REVIEW after a win (Notebook first shown after the word)', l2res === 'L' && l2.res && l2.af && l2.open && l2.cards, JSON.stringify(l2));
+
+    // 4. a draw (the v3.20 way: the post-match state rebuilt as a draw) → the praise / listen window opens by itself
+    await v323calm();
+    const d1 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, e = ui.engine, rep = s.lastReport;
+      s.afterAuto(); ui.afterView.layer.hidden = true; s.after = null; s.review = null;   // (the loss's window is done)
+      rep.result = 'D'; rep.gf = rep.ga;
+      const played = e.sides[0].all.filter(p => e.everPlayed.has(p.id)).map(p => [p.id, { ...e.st(p) }]);
+      s.startReview('D', played.filter(([id]) => !GameState.isKeeper(s.player(id)) && e.lineOf.get(id) !== 'GK'), s.calendar.date, rep.md); s.startAfter('D', played, e.matchEvents, s.calendar.date, rep.md);
+      ui.autoOpenedFor = null; ui.show('notes');
+      return { open: !document.getElementById('after-view').hidden, mode: s.after?.mode === 'draw', rv: s.review?.mode === 'draw', rvHidden: document.getElementById('review-view').hidden,
+        opts: JSON.stringify([...document.querySelectorAll('#after-view #af-body [data-act]')].map(b => b.dataset.act)) === '["praise","listen"]' };
+    });
+    check('v3.23 draw → the praise / listen window opens by itself (REVIEW draw mode waits behind it), no hunting for the "After the game" button', d1.open && d1.mode && d1.rv && d1.rvHidden && d1.opts, JSON.stringify(d1));
+    await page.evaluate(() => { const s = YAM.game, ui = YAM.ui; s.afterAuto(); if (s.reviewPending) s.reviewPick(0); ui.afterView.layer.hidden = true; ui.reviewView.layer.hidden = true; ui.closeMatchday(); });
+
+    // 5. keepers keep their gloves: REVIEW never goes to a kid tagged GK, reviewPool is empty for him (a held role stays), his Notebook card says so, no free "give / swap"
+    const k1 = await page.evaluate(() => {
+      const s = YAM.game, ui = YAM.ui, [g, a, b] = s.squad.filter(p => p.tag !== 'GK'), keep = { tag: g.tag, roles: g.roles, clues: g.clues, review: s.review, loss: s.lossStreak, aRoles: a.roles, aClues: a.clues, nb: s.notebookUnlocked };
+      g.tag = 'GK'; g.roles = []; g.clues = []; a.roles = [];
+      const big = { passOk: 30, saves: 12, goals: 0 }, mid = { passOk: 20, tackles: 4 }, low = { passOk: 4 };
+      const out = {};
+      const rv = s.startReview('W', [[g.id, big], [a.id, mid], [b.id, low]], '2005-03-01', 7);   // (he is the best rated of them all)
+      out.pid = rv?.pid === a.id && matchRating(big) > matchRating(mid);
+      out.noGK = !s.startReview('W', [[g.id, big]], '2005-03-02', 8);   // only the keeper played → no REVIEW
+      out.pool = s.reviewPool(g).length === 0 && s.reviewPool(a).length > 0;
+      g.roles = [{ id: 'Playmaker', level: 1, m: 0 }];   // an old save: a keeper who already holds a role
+      const o = s.rethinkOptions(g);
+      out.held = rolesOf(g).length === 1 && s.reviewPool(g).length === 0 && o.remove.length === 1 && o.swap.length === 0 && o.give.length === 0;
+      g.roles = [];
+      const o2 = s.rethinkOptions(g); out.give = o2.give.length === 0 && s.rethinkOptions(a).give.length > 0;
+      // his Notebook card
+      const rep = s.lastReport, was = rep.players; rep.players = [{ id: g.id, stats: { passOk: 1, passFail: 0, tackles: 0, tacklesLost: 0, dribbleOk: 0, dribbleFail: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, saves: 3, yellow: 0, red: 0 }, gk: true, roles: [] },
+        { id: a.id, stats: { passOk: 1, passFail: 0, tackles: 0, tacklesLost: 0, dribbleOk: 0, dribbleFail: 0, intercepts: 0, shots: 0, onTarget: 0, goals: 0, saves: 0, yellow: 0, red: 0 }, gk: false, roles: [] }];
+      a.clues = [];
+      s.notebookUnlocked = true; const ph = s.phase; s.phase = 'post'; ui.renderNotebook();
+      const cards = [...document.querySelectorAll('#notes-body .card')], gc = cards.find(c => c.dataset.pid === g.id), ac = cards.find(c => c.dataset.pid === a.id);
+      out.card = !!gc && gc.querySelector('.nb-clues').textContent.includes(L.t('nb.cluesKeeper')) && !gc.querySelector('.nb-clues').textContent.includes(L.t('nb.cluesNone'))
+        && gc.textContent.includes(L.t('nb.saves', { a: 3, b: s.seasonOf(g.id).saves })) && !!ac && ac.querySelector('.nb-clues').textContent.includes(L.t('nb.cluesNone'));
+      rep.players = was; s.phase = ph; s.notebookUnlocked = keep.nb; g.tag = keep.tag; g.roles = keep.roles; g.clues = keep.clues; s.review = keep.review; s.lossStreak = keep.loss; a.roles = keep.aRoles; a.clues = keep.aClues;
+      ui.renderNotebook();
+      return out;
+    });
+    check('v3.23 keepers: a kid tagged GK is never the man of the match for REVIEW (the best outfield kid is), reviewPool is empty for him, a role he already holds stays (Remove still works), no free give / swap, his Notebook card shows "Keeper — roles aren\'t for him yet" instead of "No clues yet" (saves line stays)',
+      k1.pid && k1.noGK && k1.pool && k1.held && k1.give && k1.card, JSON.stringify(k1));
+
+    // 6. yard clues: signed kids carry their notes as clues (mapping in YARD.SIGNAL), only role signals write one; confirmation rules; old saves get them once, cap respected
+    const y1 = await page.evaluate(() => {
+      const s = YAM.game, out = {};
+      out.map = JSON.stringify(YARD.SIGNAL) === JSON.stringify({ pass: 'pass', tackle: 'duel', dribble: 'solo', shot: 'finish', engine: 'run' }) && ['pace', 'strong', 'hands', 'quiet'].every(k => !YARD.SIGNAL[k]);
+      out.texts = Object.keys(YARD.SIGNAL).every(k => I18N.en['clue.yard.' + k] && I18N.ru['clue.yard.' + k]) && !!I18N.en['clue.src.yard'] && !!I18N.ru['clue.src.yard'] && !!CLUES.SOURCES.yard;
+      out.draft = /addYardClues/.test(GameState.prototype.finishDraft.toString());
+      // free agents stand in for the signed kids: the same function finishDraft calls
+      const pool = s.globalPlayers.filter(p => p.teamId === 'free_agent').slice(0, 40), date = '2002-09-01';
+      let withNote = 0, none = 0, exact = true, flags = true, born = true;
+      for (const p of pool) {
+        p.clues = []; p.yardDone = false; s.addYardClues(p, date);
+        const want = DraftView.notes(p).filter(k => YARD.SIGNAL[k]), got = p.clues;
+        if (want.length) withNote++; else none++;
+        if (got.length !== want.length || want.some((k, i) => got[i].source !== 'yard' || got[i].ref !== 'draft' || got[i].date !== date || got[i].signal !== YARD.SIGNAL[k] || got[i].textKey !== 'clue.yard.' + k)) exact = false;
+        if (!p.yardDone || !got.every(c => c.seen)) born = false;
+        s.addYardClues(p, date); if (p.clues.length !== got.length) flags = false;   // one-shot
+      }
+      out.exact = exact && born && flags; out.mix = withNote > 0 && none >= 0 && pool.length === 40;
+      // confirmation: yard ↔ match with the same signal → both ✓; two yard clues of one kid are one event
+      const mk = (source, ref, date, signal) => ({ source, ref, date, signal, textKey: 'x', seen: true });
+      const yy = [mk('yard', 'draft', date, 'pass'), mk('yard', 'draft', date, 'pass')], ym = [mk('yard', 'draft', date, 'pass'), mk('match', 3, '2002-09-20', 'pass'), mk('match', 4, '2002-09-27', 'duel')];
+      out.conf = !clueConfirmed(yy, yy[0]) && !clueConfirmed(yy, yy[1]) && clueConfirmed(ym, ym[0]) && clueConfirmed(ym, ym[1]) && !clueConfirmed(ym, ym[2]);
+      return out;
+    });
+    // the same, through the real draft: at its start every signed kid carries exactly his mapped notes (checked in the draft check above)
+    // old saves: a squad without yard clues (or the flag) gets them on load, once; no duplicates on the second load; the cap drops the oldest (yard) first
+    const o1 = await page.evaluate(() => {
+      const s = YAM.game, [a, b, c] = s.squad, season = `${s.season}-${SEASON.START_MONTH_DAY}`, out = {};
+      const wantN = p => DraftView.notes(p).filter(k => YARD.SIGNAL[k]).length;
+      // find kids with ≥ 1 mapped note so the check means something (the squad is the same 15 as the draft)
+      const withNote = s.squad.filter(p => wantN(p) > 0);
+      for (const p of s.squad) { p.yardDone = false; p.clues = p.clues.filter(x => x.source !== 'yard'); }
+      const before = Object.fromEntries(s.squad.map(p => [p.id, p.clues.length]));
+      s.save(); out.saved = /"yardDone":false/.test(localStorage.getItem('yam_save_v1'));
+      return { withNote: withNote.map(p => p.id), before, season, wantN: Object.fromEntries(s.squad.map(p => [p.id, wantN(p)])), out };
+    });
+    await page.reload();
+    await page.waitForFunction(() => window.YAM && YAM.ui);
+    await page.evaluate(() => { YAM.ui.autoReview = false; YAM.ui.autoAfter = false; });
+    const o2 = await page.evaluate(o1 => {
+      const s = YAM.game, out = { ok: true, dated: true, cap: true, oldest: true }, cl = Object.fromEntries(s.squad.map(p => [p.id, p.clues.length]));
+      for (const p of s.squad) {
+        const yard = p.clues.filter(c => c.source === 'yard'), want = o1.wantN[p.id], room = CLUES.MAX_PER_KID;
+        if (p.clues.length > room) out.cap = false;
+        if (!p.yardDone) out.ok = false;
+        if (yard.some(c => c.date !== o1.season || c.ref !== 'draft')) out.dated = false;
+        if (o1.before[p.id] + want <= room ? yard.length !== want : p.clues.length !== room) out.ok = false;   // everything fits, or the cap trimmed the yard clues (the oldest)
+        if (p.clues.some((c, i) => c.source === 'yard' && p.clues.slice(0, i).some(x => x.source !== 'yard'))) out.oldest = false;   // yard clues sit at the old end
+      }
+      out.snapshot = JSON.stringify(Object.entries(cl).map(([k, v]) => [k, v, s.player(k).clues.map(c => c.textKey).join()]));
+      return out;
+    }, o1);
+    await page.reload();   // a second load: no duplicates
+    await page.waitForFunction(() => window.YAM && YAM.ui);
+    await page.evaluate(() => { YAM.ui.autoReview = false; YAM.ui.autoAfter = false; });
+    const o3 = await page.evaluate(snap => JSON.stringify(Object.entries(Object.fromEntries(YAM.game.squad.map(p => [p.id, p.clues.length]))).map(([k, v]) => [k, v, YAM.game.player(k).clues.map(c => c.textKey).join()])) === snap, o2.snapshot);
+    check('v3.23 yard clues: a signed kid\'s notes become clues (🏟 "Yard match", pass → pass, tackle → duel, dribble → solo, shot → finish, engine → run; pace / strong / hands / quiet write nothing, no second WRONG roll); a yard clue and a match clue with the same signal confirm each other, two yard clues do not',
+      y1.map && y1.texts && y1.draft && y1.exact && y1.mix && y1.conf, JSON.stringify(y1));
+    check('v3.23 old save without yard clues: they are added on load (dated the season start, oldest in the list), no duplicates on the second load, the 8-clue cap is respected (yard clues drop first)',
+      o1.out.saved && o1.withNote.length > 0 && o2.ok && o2.dated && o2.cap && o2.oldest && o3, JSON.stringify({ o1: { ...o1, before: undefined, wantN: undefined }, o2: { ...o2, snapshot: undefined }, o3 }));
+    // restore the smoke's standing flags (the reloads dropped the random rig and the pickMotm / recordMatchClues wrappers)
+    await page.evaluate(() => { YAM.ui.autoReview = true; YAM.ui.autoAfter = true; });
     }
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
