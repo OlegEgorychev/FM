@@ -382,8 +382,8 @@ class UIController {
     const board = this.$('tac-board');
     roster.addEventListener('mouseover', e => { const row = e.target.closest('.r-row'); if (row) this.setSwapHover(row.dataset.id); });
     roster.addEventListener('mouseleave', () => this.setSwapHover(null));
-    board.addEventListener('mouseover', e => { const d = e.target.closest('.pl[data-pid]'); this.setSwapHover(d ? d.dataset.pid : null); });
-    board.addEventListener('mouseleave', () => this.setSwapHover(null));
+    board.addEventListener('mouseover', e => { const d = e.target.closest('.pl[data-pid]'); this.setSwapHover(d ? d.dataset.pid : null); this.drawBondLines(d ? d.dataset.pid : null); });
+    board.addEventListener('mouseleave', () => { this.setSwapHover(null); this.drawBondLines(null); });
     board.addEventListener('dragstart', e => { const d = e.target.closest('.pl[data-pid]'); if (d && !this.live) this.swapDragId = d.dataset.pid; });
     board.addEventListener('dragend', () => this.endSwapDrag());
     board.addEventListener('dragover', e => { const d = e.target.closest('.pl[data-pid]'); if (d) this.setSwapHover(d.dataset.pid); });
@@ -406,6 +406,7 @@ class UIController {
     this.$('notes-body').addEventListener('click', e => {
       if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
       if (e.target.closest('#btn-nb-msum')) { this.summary.open(this.state.lastReport); return; }   // v3.9
+      const tab = e.target.closest('[data-nbtab]'); if (tab) { this.nbTab = tab.dataset.nbtab; this.renderNotebook(); return; }   // v3.25
       const b = e.target.closest('[data-rmrole]'); if (!b || b.disabled) return;   // v3.19: the Notebook only takes roles away
       this.state.removeRole(b.dataset.id, b.dataset.rmrole);
       this.renderNotebook(); this.renderTeam(); this.renderDash();
@@ -572,11 +573,14 @@ class UIController {
   }
   get matchOpen() { return this.live || this.state.phase === 'matchday' || this.state.phase === 'post'; }
   get notesOpen() { return this.state.phase === 'post' && this.state.notebookUnlocked && !!this.state.lastReport; }
+  /** v3.25: the Notebook's "Locker room" tab is there between matches too (the match tab stays locked). */
+  get notesAvail() { return this.notesOpen || (!!this.state.bonds && this.state.phase !== 'draft'); }
 
   show(view) {
     if (this.swapHoverId) { this.swapHoverId = null; this.applySwapHover(); }   // v3.10: switching screens clears the swap hover
     if (this.modalLock) return;   // v3.5: the Match Summary decides where we go next
-    if (view === 'notes' && !this.notesOpen) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'), 'warn'); return; }
+    if (view === 'notes' && !this.notesAvail) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'), 'warn'); return; }
+    if (view === 'notes' && !this.notesOpen) this.nbTab = 'locker';   // v3.25: between matches the Notebook opens on "Locker room"
     if (view === 'match' && !this.matchOpen) { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
     this.view = view;
     const scenes = { dash: 'scene-office', team: 'scene-squad', match: 'scene-match', table: 'scene-table', notes: 'scene-notes', readme: 'scene-office' };
@@ -584,7 +588,7 @@ class UIController {
     for (const id of new Set(Object.values(scenes))) this.$(id).classList.toggle('active', id === scenes[view]);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-    if (view === 'notes') { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); this.autoOpenPost(); }   // v3.18; v3.23
+    if (view === 'notes' && this.notesOpen) { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); this.autoOpenPost(); }   // v3.18; v3.23
     if (view === 'match') this.$('tk-match').classList.remove('alert');
     if (view === 'table') this.renderTable();
     if (view === 'dash') this.renderDash();
@@ -607,7 +611,7 @@ class UIController {
 
   /** Match / Notebook only exist in the navigation while the calendar has unlocked them. */
   syncLocks() {
-    const m = this.matchOpen, n = this.notesOpen;
+    const m = this.matchOpen, n = this.notesAvail;   // v3.25: the "Locker room" tab keeps the Notebook in the navigation
     for (const id of ['tk-match', 'icon-match', 'sm-match']) this.$(id).hidden = !m;
     for (const id of ['tk-notes', 'icon-notes', 'sm-notes']) this.$(id).hidden = !n;
     this.$('dyn-sep').hidden = !(m || n);
@@ -964,7 +968,26 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (s.phase === 'post') this.policyPost();
       return;
     }
-    if (s.phase === 'calendar') this.runCalendar();
+    if (s.phase === 'calendar') { this.policyTalk(); this.runCalendar(); }
+  }
+  /** v3.25: every policy but `first` has one talk a week (1 AP): "How do you get on with X?" about the pair with the worst known
+      note (else a random XI neighbour), then "Who are you mates with?". Straight through the state (the window is the human's). */
+  policyTalk() {
+    const s = this.state, w = s.weekState();
+    if (this.autoPolicy === 'first' || !s.bonds || w.talked || s.ap < TALK.AP || this.events.active) return false;
+    const worst = s.squad.flatMap(p => s.squad.filter(q => q.id > p.id).map(q => ({ a: p.id, b: q.id, k: s.knownBond(p.id, q.id) })))
+      .filter(x => x.k && x.k.cls === 'bad').sort((x, y) => (x.k.band === 'war' ? 0 : 1) - (y.k.band === 'war' ? 0 : 1) || (y.k.date || '').localeCompare(x.k.date || ''))[0];
+    let pair = worst ? [worst.a, worst.b] : null;
+    if (!pair) { const nb = s.lineupNeighbours(); pair = nb.length ? nb[Math.floor(seeded(w.start + '#poltalk')() * nb.length)] : null; }
+    const kid = pair && s.player(pair[0]);
+    if (!kid || s.talkBlock(kid.id)) return false;
+    s.spendAP(); w.talked = true;
+    (kid.talk ||= {}).last = s.calendar.date;
+    s.talkAnswer(kid, 'how', pair[1]); s.talkAnswer(kid, 'mates');
+    s.learnTwins(kid);
+    const st = (s.stats ||= {}); st.talkAP = (st.talkAP || 0) + TALK.AP;
+    s.save();
+    return true;
   }
   /** v3.21: after the whistle — Coach's Word (not offered to `first`: Quick Sim never opens the summary), AFTER_GAME, REVIEW, close. */
   policyPost() {
@@ -1025,6 +1048,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     'talk:scoutvisit': o => o.findIndex(x => x.key === 'ev.scoutvisit.a'),
     'talk:scoutpoach': o => { const t = o.findIndex(x => x.key === 'ev.scoutpoach.b'); return o[t]?.enabled !== false ? t : o.findIndex(x => x.key === 'ev.scoutpoach.a'); },
     'talk:promise': () => 0,   // keep
+    'talk:twinmiss': o => { const t = o.findIndex(x => x.key === 'ev.twinmiss.b'); return o[t]?.enabled !== false ? t : o.findIndex(x => x.key === 'ev.twinmiss.c'); },   // v3.25
   };
   /** v3.22 `greedy`: takes every money offer, keeps every promise, accepts the showcase, lets a poached kid go. */
   static POLICY_GREEDY = {
@@ -1073,6 +1097,31 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.events.active || (this.engine && !this.engine.finished)) { s.confirmCaptain(id, true); return false; }
     this.profile.close();
     return this.events.fire('capassign', s.calendar.date, { cast: { kid: id } });
+  }
+  /** v3.25: why [ Have a word ] is greyed (busy like the office, 0 AP, talked this week) — or null. */
+  talkBlock(id) {
+    if (this.events.active || (this.engine && !this.engine.finished) || this.cal.running || this.state.phase === 'draft') return 'office.blk.busy';
+    return this.state.talkBlock(id);
+  }
+  /** v3.25 the talk one-on-one: 1 AP for TALK.QUESTIONS questions, then the window closes. */
+  haveWord(id) {
+    const s = this.state, p = s.player(id);
+    if (!p || this.talkBlock(id) || !s.spendAP()) return false;
+    (p.talk ||= {}).last = s.calendar.date;
+    this.profile.close();
+    this.events.fire('bondtalk', s.calendar.date, { cast: { kid: id } });
+    this.renderBudget();
+    return true;
+  }
+  /** v3.25 PLAYER_INFO.EXE "In the squad": friends / doesn't get on — only what the coach's notes say (no numbers). */
+  squadBondsBlock(p) {
+    const s = this.state, links = s.knownLinks(p.id), nm = id => esc(squadName(s.player(id), s.squad));
+    const good = links.filter(l => l.cls === 'good'), bad = links.filter(l => l.cls === 'bad');
+    const tw = p.twinId && s.player(p.twinId);
+    const line = (key, list) => list.length ? `<li><b>${L.t(key)}</b> ${list.map(l => `<span class="bn-${l.band}${l.stale ? ' stale' : ''}" title="${esc(L.t('bn.src.' + l.source))}">${BOND_ICONS[l.band] || ''} ${nm(l.id)}${l.confirmed ? ' ' + L.t('clue.confirmed') : ''}</span>`).join(', ')}</li>` : '';
+    const body = (tw ? `<li>${L.t('bn.twin', { x: nm(tw.id) })}</li>` : '') + line('bn.friends', good) + line('bn.cold', bad)
+      + (s.isLoner(p) && (p.bondNotes || []).some(n => n.band === 'alone') ? `<li>${L.t('bn.alone')}</li>` : '');
+    return `<fieldset class="pi-bonds"><legend>${L.t('bn.legend')}</legend>${body ? `<ul>${body}</ul>` : `<p class="pi-none">${L.t('bn.none')}</p>`}</fieldset>`;
   }
   callIntoOffice(id) {
     if (!this.canCallIn(id) || !this.state.spendAP()) return;
@@ -1406,6 +1455,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     for (const d of this.$('tac-board').querySelectorAll('.pl[data-pid]')) { const b = this.clueBadge(s.player(d.dataset.pid)); if (b) d.insertAdjacentHTML('beforeend', b); }   // v3.18 📝
     this.board.highlight(this.selected, id => this.swapClass(s.player(id)));
     this.setSwapHover(this.swapHoverId);   // v3.10: re-apply (or drop, if nothing is selected any more) after the re-render
+    this.drawBondLines(null);   // v3.25: the selected kid's known links
     const boardEl = this.$('tac-board');
     boardEl.classList.toggle('locked', live);
     boardEl.classList.toggle('armed', !!this.selected);
@@ -1435,6 +1485,19 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.$('tac-board').querySelector(`.pl[data-pid="${id}"]`)?.classList.add('swap-hover-target');   // bench kids have no dot: list only
   }
   endSwapDrag() { this.swapDragId = null; this.setSwapHover(null); }
+  /** v3.25: lines from the hovered (else the selected) kid to his KNOWN links on the board — green solid = mates / best mates,
+      red dashed = don't get on / at war. Only the coach's notes, never the hidden value. */
+  drawBondLines(id) {
+    const el = this.$('tac-board'), s = this.state;
+    el.querySelector('.bond-lines')?.remove();
+    id ||= this.selected;
+    const me = id && this.board.dots.get(id);
+    if (!me || !s.bonds) return;
+    const lines = s.knownLinks(id).map(l => ({ l, d: this.board.dots.get(l.id) })).filter(x => x.d && (x.l.cls === 'good' || x.l.cls === 'bad'));
+    if (!lines.length) return;
+    el.insertAdjacentHTML('beforeend', `<svg class="bond-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines.map(({ l, d }) =>
+      `<line class="bl-${l.cls}" data-with="${l.id}" x1="${me.base.x}" y1="${me.base.y}" x2="${d.base.x}" y2="${d.base.y}" vector-effect="non-scaling-stroke"${l.cls === 'bad' ? ' stroke-dasharray="5 4"' : ''}/>`).join('')}</svg>`);
+  }
 
   /** Smart swap highlighting: same natural position as the selected player = suggested, anything else = dimmed
       (still clickable — out-of-position swaps are allowed, just not recommended). */
@@ -1635,7 +1698,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
     }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties, md: ctx.md,
-      cohesion: [this.state.cohesion ?? COH.START, COH.AI] });   // v3.21: our cohesion vs the AI clubs' fixed value
+      cohesion: [this.state.cohesion ?? COH.START, COH.AI],   // v3.21: our cohesion vs the AI clubs' fixed value
+      bonds: this.state.bonds ? this.state.engineBonds() : null });   // v3.25: our bonds only (AI clubs have none)
     if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
@@ -1718,6 +1782,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (motm && !sample.some(p => p.id === motm) && sample.length) sample[sample.length - 1] = played.find(p => p.id === motm);   // he replaces the last of the three
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result, coh: Math.round(s.cohesion ?? COH.START),   // v3.21
+      atmos: s.bonds ? +s.atmos().toFixed(3) : null,   // v3.25 (harness only — never shown)
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
       events: eng.matchEvents.map(e => ({ ...e })), ht: eng.htScore || null, instant: !!eng.instant,
       talk: null,   // v3.5: post-match team talk still owed (forced in the Match Summary)
@@ -1747,11 +1812,14 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.applyMatchDynamics(eng, result, capRep);
     s.trackPositions(eng);   // v3.6: out-of-position streaks (live + Quick Sim)
     s.trackCaptaincy(eng, result, capRep);   // v3.8: armband tenure, bench streaks, promised pitch time (before bans tick down)
+    s.bondMatch(eng, result);   // v3.25: side by side, assists, the win, blame, the fight for a place, twins
+    s.lastReport.bondCause = s.bondCauseOf(eng);   // v3.25: a lost pass between two kids the coach knows don't get on
     this.applyAvailabilityAfterMatch(eng, ctx);   // v2.2
     if (s.cheats?.forceWin) s.cheats.forceWin = false;   // v1.8: one-shot debug cheat
     this.debug?.render();
     s.phase = 'post';
     s.notebookUnlocked = true;
+    this.nbTab = 'match';   // v3.25: a new match opens on its own tab
     s.save();
     this.tableMd = ctx.md;
     this.renderAll();
@@ -1771,7 +1839,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   clueLine(p, c) {
     const ok = clueConfirmed(p.clues, c), src = L.t('clue.src.' + c.source, { r: c.ref });
     return `<li class="clue${c.seen ? '' : ' new'}${ok ? ' ok' : ''}" data-sig="${c.signal || ''}"><span class="cl-d">${esc(fmtDate(c.date, { day: 'numeric', month: 'short' }))}</span>`
-      + `<span class="cl-src" title="${esc(src)}" aria-label="${esc(src)}">${CLUES.SOURCES[c.source] || '\u2022'}</span><span class="cl-t">${esc(clueText(c))}</span>`
+      + `<span class="cl-src" title="${esc(src)}" aria-label="${esc(src)}">${CLUES.SOURCES[c.source] || '\u2022'}</span><span class="cl-t">${c.mix ? (this.state.twinsKnown(p) ? '<s>' : '') + esc(L.t('twins.mix', { k: L.name(p.name) })) + ' ' : ''}${esc(clueText(c))}${c.mix && this.state.twinsKnown(p) ? '</s>' : ''}</span>`
       + `${ok ? `<b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}</li>`;
   }
   /** Clues block, newest first; max → the rest folds into "All clues (n)". */
@@ -1806,11 +1874,52 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (!p) return '';
     return `<p class="nb-captain"><span class="duty-badge d-captain">C</span> <b>${L.t('nb.armband')}:</b> ${esc(L.t(o.key, { k: L.name(p.name) }))}</p>`;
   }
+  /** v3.25: the Notebook's tabs — the match (as before) and "Locker room" (what the coach knows about the bonds). */
+  nbTabs() {
+    if (!this.state.bonds) return '';
+    const t = this.nbTab || 'match';
+    return `<div class="nb-tabs" role="tablist">${['match', 'locker'].map(k => `<button type="button" class="nb-tab${t === k ? ' on' : ''}" role="tab" aria-selected="${t === k}" data-nbtab="${k}">${L.t('nb.tab.' + k)}</button>`).join('')}</div>`;
+  }
+  /** "Locker room": loners on top, then every known link (icon · both names · the band word · source · date), both kids'
+      words side by side, yard roots, the twins line. Never a number. */
+  renderLockerTab() {
+    const s = this.state, nm = id => esc(squadName(s.player(id), s.squad)), day = d => esc(fmtDate(d, { day: 'numeric', month: 'short' }));
+    const notes = [];
+    for (const p of s.squad) for (const n of p.bondNotes || []) notes.push({ owner: p.id, ...n });
+    const lone = s.squad.map(p => ({ p, n: [...(p.bondNotes || [])].reverse().find(n => n.band === 'alone') })).filter(x => x.n);
+    const pairs = new Map();
+    for (const n of notes) if (n.with && s.player(n.with) && n.band !== 'yard') { const k = bondKey(n.owner, n.with); if (!pairs.has(k)) pairs.set(k, []); pairs.get(k).push(n); }
+    const rows = [...pairs.entries()].map(([k, list]) => { const [a, b] = k.split('|'); return { a, b, list, kb: s.knownBond(a, b) }; })
+      .sort((x, y) => ((y.kb?.date || '') > (x.kb?.date || '') ? 1 : -1));
+    const stale = d => d && isoDays(d, s.calendar.date) > BOND.STALE_DAYS;
+    const words = list => {   // both kids' own words side by side (talk notes), the rest as a list
+      const own = list.filter(n => n.source === 'talk' && n.by), other = list.filter(n => !(n.source === 'talk' && n.by));
+      const side = own.length ? `<div class="bn-sides">${[...new Set(own.map(n => n.by.pid))].map(pid => { const n = own.filter(x => x.by.pid === pid).pop();
+        return `<div class="bn-side${stale(n.date) ? ' stale' : ''}">${esc(bondNoteText(s, n))} <small>${day(n.date)}</small></div>`; }).join('')}</div>` : '';
+      return side + (other.length ? `<ul class="bn-list">${other.slice(-4).reverse().map(n => `<li class="${stale(n.date) ? 'stale' : ''}${n.mix ? ' mix' + (s.twinsKnown(s.player(n.owner)) ? ' struck' : '') : ''}">`
+        + `<span class="cl-src" title="${esc(L.t('bn.src.' + n.source))}">${BOND_SRC[n.source] || '\u2022'}</span> ${esc(bondNoteText(s, n))} <small>${day(n.date)}</small>${stale(n.date) ? ` <em class="bn-stale">${L.t('bn.staleTag')}</em>` : ''}</li>`).join('')}</ul>` : '');
+    };
+    const yard = notes.filter(n => n.band === 'yard' && s.player(n.with));
+    const twins = s.squad.filter(p => p.twinId && s.player(p.twinId) && p.id < p.twinId && s.twinsKnown(p));
+    const body = `
+      ${lone.length ? `<fieldset class="bn-lone"><legend>${L.t('bn.loneHead')}</legend><ul>${lone.map(({ p, n }) => `<li class="${stale(n.date) ? 'stale' : ''}">${esc(L.t('bn.note.alone', { a: L.name(p.name) }))} <small>${day(n.date)}</small></li>`).join('')}</ul></fieldset>` : ''}
+      <fieldset class="bn-pairs"><legend>${L.t('bn.pairsHead')}</legend>${rows.length ? rows.map(r => `<div class="bn-pair${r.kb?.stale ? ' stale' : ''}">
+        <div class="bn-ph"><span class="bn-ico">${BOND_ICONS[r.kb?.band] || BOND_ICONS[r.list[r.list.length - 1].band] || '\u2022'}</span> <b>${nm(r.a)}</b> &amp; <b>${nm(r.b)}</b> — ${esc(L.t('bn.band.' + (r.kb?.band || r.list[r.list.length - 1].band)))}${r.kb?.confirmed ? ` <b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}${r.kb?.stale ? ` <em class="bn-stale">${L.t('bn.staleTag')}</em>` : ''}</div>
+        ${words(r.list)}</div>`).join('') : `<p class="pi-none">${L.t('bn.pairsNone')}</p>`}</fieldset>
+      ${yard.length ? `<fieldset class="bn-yard"><legend>${L.t('bn.yardHead')}</legend><ul>${yard.map(n => `<li>${BOND_SRC.yard} ${esc(L.t('bn.note.yard', { a: L.name(s.player(n.owner).name), b: L.name(s.player(n.with).name), y: L.t('yard.street.' + kidRoots(s.player(n.owner)).yard) }))}</li>`).join('')}</ul></fieldset>` : ''}
+      ${twins.length ? `<fieldset class="bn-twins"><legend>${L.t('bn.twinsHead')}</legend><ul>${twins.map(p => { const c = twinCowlick(p, s.player(p.twinId)); return `<li>${esc(L.t('twins.line', { k: L.name(c.name) }))}</li>`; }).join('')}</ul></fieldset>` : ''}`;
+    return `<div class="nb-locker">${body}</div>`;
+  }
   renderNotebook() {
     const body = this.$('notes-body');
     const rep = this.state.lastReport;
+    if (this.state.bonds && this.nbTab === 'locker') {   // v3.25 (between matches show() opens this tab; the Match tab then shows the lock)
+      body.innerHTML = this.nbTabs() + `<p class="nb-hint">${L.t('bn.hint')}</p>` + this.renderLockerTab();
+      this.$('notes-status').textContent = L.t('bn.status');
+      return;
+    }
     if (!this.state.notebookUnlocked || !rep) {
-      body.innerHTML = `<div class="locked-msg">${L.t('notes.lockedMsg')}</div>`;
+      body.innerHTML = this.nbTabs() + `<div class="locked-msg">${L.t('notes.lockedMsg')}</div>`;
       this.$('notes-status').textContent = L.t('notes.locked');
       return;
     }
@@ -1861,7 +1970,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${p.tags.map(t => this.tagChip(t, p.id, false)).join('')}${this.clueBadge(p)}</summary>
         ${this.cluesBlock(p)}</details>`).join('')}</fieldset>` : '';
     const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t(this.state.afterPending ? 'notes.backAfter' : this.state.reviewPending ? 'notes.backReview' : 'notes.back')}</button></div>` : '';
-    body.innerHTML = `
+    body.innerHTML = this.nbTabs() + `
       <div class="nb-head">
         <h2>${L.t('notes.head', { n: rep.md, o: esc(L.team(rep.opponent)) })}</h2>
         <span class="res ${rep.result}">${L.t('res.' + rep.result)} &nbsp;${rep.gf} - ${rep.ga}</span>

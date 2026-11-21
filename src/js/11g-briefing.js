@@ -165,9 +165,12 @@ class MorningBriefing {
       so two weeks in a row never repeat). Words only. */
   static cohLine(s) { return L.t('coh.line', { b: L.t('coh.band.' + cohBand(s.cohesion)) }); }
   static cohNews(s, date) {
-    if (s.phase !== 'calendar' || (s.cohesion ?? COH.START) >= COH.LOW) return [];
-    const n = Math.floor(isoDays('2000-01-03', weekStartOf(date)) / 7);
-    return [L.t('coh.low.' + (((n % 3) + 3) % 3))];
+    if (s.phase !== 'calendar') return [];
+    const n = Math.floor(isoDays('2000-01-03', weekStartOf(date)) / 7), out = [];
+    if ((s.cohesion ?? COH.START) < COH.LOW) out.push(L.t('coh.low.' + (((n % 3) + 3) % 3)));
+    const ln = s.bonds ? s.lonerLine(weekStartOf(date)) : null;   // v3.25: "[A] seems to be on his own at training" (+ an exact note)
+    if (ln && s.player(ln.pid)) out.push(L.t('bond.loner.' + ln.v, { k: L.name(s.player(ln.pid).name) }));
+    return out;
   }
   /** v3.13: "Base 4 · Carried 1 · Win +1 = 6 AP" */
   static apLine(src) {

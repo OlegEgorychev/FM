@@ -26,6 +26,11 @@
  *                                     side 0, as in the game), averaged over the main pair + 4 other pairs (or --pairs K).
  *                                     Targets (win share W / (W + L)): C=10 → 25–30 %, C=90 → 58–62 % (exit 1 if not).
  *                                     --cohmax X tries another COH.MAX (tuning).
+ *   node test/balance.js --bonds      v3.25: also the BONDS table (not default): equal squads, mirrored; the first team has a few ADJACENT
+ *                                     pairs (bondNeighbours of 4-4-2) at v = +80 or −80, the other none. Hooks: pass target weight, pass duel,
+ *                                     interception (BOND.MAX). Averaged over the main pair + 4 other pairs (or --pairs K).
+ *                                     Targets (win share): 3 pairs at +80 → 53–56 %, 2 pairs at −80 → 42–46 % (exit 1 if not).
+ *                                     --bondmax X / --bondneg Y try another BOND.MAX (v > 0) / BOND.MAX_NEG (v < 0) (tuning).
  * Exit code 1 if the Attack-vs-Defense win share (wins / (wins + losses)) is outside 45–55%.
  */
 'use strict';
@@ -35,7 +40,7 @@ const vm = require('vm');
 
 const argv = process.argv.slice(2);
 const flag = k => { const i = argv.indexOf(k); return i < 0 ? null : argv[i + 1]; };
-const nums = argv.filter((a, i) => /^\d+$/.test(a) && !['--pairs', '--log', '--cohmax', '--cohup'].includes(argv[i - 1]));
+const nums = argv.filter((a, i) => /^\d+$/.test(a) && !['--pairs', '--log', '--cohmax', '--cohup', '--bondmax', '--bondneg'].includes(argv[i - 1]));
 const N = Math.max(4, parseInt(nums[0], 10) || 500);
 const SEED = parseInt(nums[1], 10) || 33;
 const PAIRS = parseInt(flag('--pairs'), 10) || 0;
@@ -45,6 +50,7 @@ const LOG = LOG_FILE ? { rows: [], matches: [] } : null;
 const ROLES_MODE = argv.includes('--roles');   // v3.19
 const COH_MODE = argv.includes('--cohesion');   // v3.21
 const COH_MAX = flag('--cohmax'), COH_UP = flag('--cohup'), COH_PAIRS = 4;
+const BOND_MODE = argv.includes('--bonds'), BOND_MAX = flag('--bondmax'), BOND_NEG = flag('--bondneg');   // v3.25
 const TEAM_SEED = 5;   // a pair of equal-level (mod 0) 4-4-2 squads whose Neutral-vs-Neutral scoring ≈ the league average (~2.3)
 
 function mulberry32(a) {
@@ -62,7 +68,8 @@ function loadEngine(seed) {
   }
   const api = vm.runInContext('({ MatchEngine, Player, formationSlots, LINE_POS, SHOUT: typeof SHOUT === "undefined" ? null : SHOUT, fatigueMult: typeof fatigueMult === "function" ? fatigueMult : null,'
     + ' ROLES_DEF: typeof ROLES_DEF === "undefined" ? null : ROLES_DEF, roleClash: typeof roleClash === "function" ? roleClash : null, trueSignals: typeof trueSignals === "function" ? trueSignals : null,'
-    + ' roleFit: typeof roleFit === "function" ? roleFit : null, seeded, COH: typeof COH === "undefined" ? null : COH })', ctx);
+    + ' roleFit: typeof roleFit === "function" ? roleFit : null, seeded, COH: typeof COH === "undefined" ? null : COH,'
+    + ' BOND: typeof BOND === "undefined" ? null : BOND, bondNeighbours: typeof bondNeighbours === "function" ? bondNeighbours : null })', ctx);
   return Object.assign(api, { reseed: s => { gen = mulberry32(s); } });
 }
 
@@ -211,6 +218,29 @@ function runCohesion(E, A, B, c, n, seed) {
 const COH_LEVELS = [10, 30, 50, 70, 90];
 function cohesionRows(E, A, B, n, seed) { return COH_LEVELS.map((c, k) => runCohesion(E, A, B, c, n, seed + k)); }
 
+/* ---------- v3.25 bonds: the side `xs` has `pairs` adjacent pairs at v, the other none ---------- */
+const BOND_SETUPS = [{ setup: '3 pairs +80 vs none', n: 3, v: 80 }, { setup: '1 pair +80 vs none', n: 1, v: 80 }, { setup: '0 pairs (control)', n: 0, v: 0 },
+  { setup: '2 pairs -80 vs none', n: 2, v: -80 }, { setup: '3 pairs -80 vs none', n: 3, v: -80 }];
+const BOND_PAIRS = [[2, 3], [6, 7], [9, 10]];   // 4-4-2: centre backs, central mids, the two forwards (all neighbours)
+function runBonds(E, A, B, cfg, n, seed) {
+  E.reseed(seed);
+  const r = { setup: cfg.setup, n, w: 0, d: 0, l: 0, gf: 0, ga: 0, shF: 0, shA: 0, otF: 0, otA: 0 };
+  const nb = E.bondNeighbours('4-4-2').map(x => x.join());
+  for (const pr of BOND_PAIRS) if (!nb.includes(pr.join())) throw new Error('not neighbours: ' + pr);
+  const table = team => { const m = new Map(); for (const [i, j] of BOND_PAIRS.slice(0, cfg.n)) m.set([team.players[i].id, team.players[j].id].sort().join('|'), cfg.v); return m; };
+  const tA = table(A), tB = table(B);
+  for (let i = 0; i < n; i++) {
+    const { home, away, xs } = fixture(i, A, B), ys = 1 - xs, t = (xs === 0 ? home : away) === A ? tA : tB;
+    const eng = new E.MatchEngine(home, away, HOOKS, cfg.n ? { bonds: { side: xs, v: (a, b) => t.get([a, b].sort().join('|')) || 0 } } : {});
+    eng.runInstant();
+    const gx = eng.sides[xs].score, gy = eng.sides[ys].score, tx = eng.teamTotals(xs), ty = eng.teamTotals(ys);
+    r.gf += gx; r.ga += gy; r.shF += tx.shots; r.shA += ty.shots; r.otF += tx.onTarget; r.otA += ty.onTarget;
+    if (gx > gy) r.w++; else if (gx === gy) r.d++; else r.l++;
+  }
+  r.winShare = r.w + r.l ? r.w / (r.w + r.l) : 0.5;
+  return r;
+}
+
 const pct = v => (v * 100).toFixed(1).padStart(5) + '%';
 const per = (v, n) => (v / n).toFixed(2).padStart(5);
 const rowSetup = r => `${r.setup.padEnd(20)} | ${pct(r.w / r.n)} ${pct(r.d / r.n)} ${pct(r.l / r.n)} | ${pct(r.winShare)}   | ${per(r.gf, r.n)} ${per(r.ga, r.n)} ${per(r.gf + r.ga, r.n)} | ${per(r.shF, r.n)} ${per(r.shA, r.n)} | ${per(r.otF, r.n)} ${per(r.otA, r.n)}`;
@@ -249,7 +279,19 @@ if (COH_MODE) {   // v3.21
     r.winShare = r.w / (r.w + r.l); return r; });
 }
 
-if (JSON_OUT) console.log(JSON.stringify({ setups: main.setups, states: main.states, fatigue: main.fatigue, pairs, roles: roleRows, cohesion: cohRows }, null, 1));
+let bondRows = null;
+if (BOND_MODE) {   // v3.25
+  const engines = [main.E];
+  for (let k = 1; k <= (PAIRS || COH_PAIRS); k++) engines.push(loadEngine(TEAM_SEED * 100 + k));
+  if (BOND_MAX != null) for (const E of engines) E.BOND.MAX = parseFloat(BOND_MAX);
+  if (BOND_NEG != null) for (const E of engines) E.BOND.MAX_NEG = parseFloat(BOND_NEG);
+  const sets = engines.map((E, k) => { const T = k ? makeTeams(E) : main.teams; return BOND_SETUPS.map((cfg, j) => runBonds(E, ...T, cfg, N, SEED + 1300 + k)); });
+  bondRows = sets[0].map((r0, j) => { const r = { setup: r0.setup, n: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, shF: 0, shA: 0, otF: 0, otA: 0 };
+    for (const set of sets) for (const f of ['n', 'w', 'd', 'l', 'gf', 'ga', 'shF', 'shA', 'otF', 'otA']) r[f] += set[j][f];
+    r.winShare = r.w / (r.w + r.l); return r; });
+}
+
+if (JSON_OUT) console.log(JSON.stringify({ setups: main.setups, states: main.states, fatigue: main.fatigue, pairs, roles: roleRows, cohesion: cohRows, bonds: bondRows }, null, 1));
 else {
   const head = 'Setup                | Win    Draw   Loss  | WinShare | GF/m  GA/m  Tot/m | ShF   ShA   | OnTgF OnTgA';
   console.log(`Balance: ${N} instant matches per setup, seed ${SEED}, team seed ${TEAM_SEED}, mirrored (first team's view)`);
@@ -271,6 +313,10 @@ else {
     console.log(`\nCohesion (v3.21): the first team plays with C, the other with 50 — COH.MAX ${main.E.COH.MAX} below 50 / MAX_UP ${main.E.COH.MAX_UP} above (${N} matches × ${(PAIRS || COH_PAIRS) + 1} team pairs, mirrored; target = WinShare)`);
     console.log(head); cohRows.forEach(r => console.log(rowSetup(r)));
   }
+  if (bondRows) {
+    console.log(`\nBonds (v3.25): the first team has adjacent pairs at v, the other none — BOND.MAX ${main.E.BOND.MAX} above 0 / MAX_NEG ${main.E.BOND.MAX_NEG} below, TARGET ${main.E.BOND.TARGET} (${N} matches × ${(PAIRS || COH_PAIRS) + 1} team pairs, mirrored; target = WinShare)`);
+    console.log(head); bondRows.forEach(r => console.log(rowSetup(r)));
+  }
   if (LOG) console.log(`\nMatch log written: ${LOG_FILE} (+ .matches.csv)`);
   if (main.E.fatigueMult) console.log('\nfatigueMult: ' + [100, 75, 50, 25, 0].map(e => `${e}%→${main.E.fatigueMult(e).toFixed(3)}`).join('  '));
 }
@@ -282,5 +328,11 @@ if (cohRows) {   // v3.21 targets: share of matches won by the C side
   const lo = w(10), hi = w(90), okC = lo >= 0.25 && lo <= 0.30 && hi >= 0.58 && hi <= 0.62;
   if (!JSON_OUT) console.log(`${okC ? 'OK' : 'FAIL'}: cohesion win share C=10 ${pct(lo).trim()} (target 25–30%), C=90 ${pct(hi).trim()} (target 58–62%)`);
   ok = ok && okC;
+}
+if (bondRows) {   // v3.25 targets
+  const w = s => bondRows.find(x => x.setup === s).winShare;
+  const hi = w('3 pairs +80 vs none'), lo = w('2 pairs -80 vs none'), okB = hi >= 0.53 && hi <= 0.56 && lo >= 0.42 && lo <= 0.46;
+  if (!JSON_OUT) console.log(`${okB ? 'OK' : 'FAIL'}: bonds win share 3 pairs +80 ${pct(hi).trim()} (target 53–56%), 2 pairs −80 ${pct(lo).trim()} (target 42–46%)`);
+  ok = ok && okB;
 }
 process.exit(ok ? 0 : 1);

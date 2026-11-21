@@ -13,6 +13,7 @@ class DraftView {
       if (!b || b.disabled) return;
       this.ui.state.toggleDraft(b.dataset.sign);
       this.render();
+      this.askTwin(b.dataset.sign);   // v3.25: his twin is still on the board → his mum asks
     });
     document.getElementById('dr-start').addEventListener('click', () => this.start());
   }
@@ -29,6 +30,19 @@ class DraftView {
     }
     return out.length ? out : ['quiet'];
   }
+  /** v3.25: "[Surname]'s mum: please take his brother too, they can't do things apart" — before the next pick. */
+  askTwin(id) {
+    const s = this.ui.state, t = s.draftTwinAsk(id);
+    if (!t) return false;
+    const p = s.globalPlayers.find(x => x.id === id);
+    this.ui.modal.show({ title: L.t('draft.twin.title'), icon: 'info',
+      html: `<p>${esc(L.t('draft.twin.text', { s: L.name(p.surname), k: L.name(p.name), b: L.name(t.name) }))}</p>`,
+      buttons: [
+        { label: L.t('draft.twin.take', { b: esc(L.name(t.name)) }), primary: true, onClick: () => { s.draftTwinAnswer(id, true); this.render(); } },
+        { label: L.t('draft.twin.refuse'), onClick: () => { s.draftTwinAnswer(id, false); this.render(); } },
+      ] });
+    return true;
+  }
   open() { this.render(); this.layer.hidden = false; }
   close() { this.layer.hidden = true; }
   render() {
@@ -38,12 +52,13 @@ class DraftView {
     const pool = s.draft.pool.map(id => s.globalPlayers.find(p => p.id === id)).filter(Boolean);
     this.grid.innerHTML = pool.map(p => {
       const on = signed.includes(p.id), notes = DraftView.notes(p);
+      const mate = notes.length < YARD.MAX || notes[0] === 'quiet' ? s.draftYardMate(p, s.draft.pool) : null;   // v3.25: counts towards YARD.MAX
       return `<div class="dr-card${on ? ' on' : ''}" data-pid="${p.id}">
         <span class="portrait dr-face">${p.portraitSvg}</span>
         <div class="dr-name">${esc(L.name(p.name))}</div>
         <dl class="dr-bio"><dt>${L.t('pi.age')}</dt><dd>${p.bio.age}</dd><dt>${L.t('pi.height')}</dt><dd>${L.t('pi.cm', { n: p.bio.height })}</dd>
           <dt>${L.t('pi.weight')}</dt><dd>${L.t('pi.kg', { n: p.bio.weight })}</dd></dl>
-        <ul class="dr-notes" title="${esc(L.t('draft.notesTip'))}">${notes.map(k => `<li class="${k === 'quiet' ? 'quiet' : ''}">${esc(L.t('yard.' + k))}</li>`).join('')}</ul>
+        <ul class="dr-notes" title="${esc(L.t('draft.notesTip'))}">${notes.filter(k => !(mate && k === 'quiet')).map(k => `<li class="${k === 'quiet' ? 'quiet' : ''}">${esc(L.t('yard.' + k))}</li>`).join('')}${mate ? `<li class="yardmate">${esc(L.t('draft.yardMate', { y: L.t('yard.street.' + kidRoots(p).yard), k: squadName(mate, pool) }))}</li>` : ''}</ul>
         <button type="button" class="dr-btn" data-sign="${p.id}"${!on && full ? ' disabled' : ''}>${L.t(on ? 'draft.release' : 'draft.sign')}</button>
       </div>`;
     }).join('');

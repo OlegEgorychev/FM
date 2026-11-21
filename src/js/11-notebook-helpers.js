@@ -93,7 +93,7 @@ function clueConfirmed(list, c) { const k = clueClaim(c); return !!k && list.som
 const clueBy = c => c.by?.name ? L.t(c.by.parent ? 'clue.by.' + c.by.parent : 'clue.by.kid', { k: L.name(c.by.name) }) : '';
 /** The clue's line as shown (v3.20: voice clues fill {s} = the signal's phrase, {r} = the role, plus who said it). */
 function clueText(c) {
-  if (c.source !== 'voice') return L.t(c.textKey);
+  if (c.source !== 'voice' && c.source !== 'talk') return L.t(c.textKey);   // v3.25: a talk clue reads like a voice clue
   const t = L.t(c.textKey, { s: c.signal ? L.t('af.sig.' + c.signal) : '', r: c.role ? L.tag(c.role) : '' }), by = clueBy(c);
   return by ? by + ': ' + t : t;
 }

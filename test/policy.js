@@ -7,6 +7,10 @@
  *   node test/policy.js --baseline           v3.20 behaviour for the "before" table: cohesion has no effect (COH.MAX 0,
  *                                            no knock term), the empty-week penalty stays flat −2, no low-training fee rule.
  *                                            Gates are reported but never fail the run in this mode.
+ *   node test/policy.js --nobonds            v3.25: bonds have no effect (duel terms, ATMOS, morale, attendance; the world, the twins
+ *                                            and the coach's notes stay) — the "without bonds" column. --notwins: no twins in the world
+ *                                            (the v3.24 world and draft for every seed). Gates reported, never fail in these modes.
+ *                                            --bondset K=V,… overrides BOND.* constants in the page (tuning).
  *   node test/policy.js --json
  *   node test/policy.js --no-force           v3.22: don't force the money offers (see below); --offers K = their chances × K
  *   node test/policy.js --file other.html    run against another build (v3.22 "before" table: the v3.21 index.html; the v3.22
@@ -50,6 +54,8 @@ const SEEDS = parseInt(flag('--seeds', 20), 10);
 const WEEKS = parseInt(flag('--weeks', 8), 10);
 const LOG = flag('--log', null);
 const BASELINE = argv.includes('--baseline');
+const NOBONDS = argv.includes('--nobonds'), NOTWINS = argv.includes('--notwins');   // v3.25 "without" columns
+const BONDSET = flag('--bondset', '');   // v3.25 tuning: --bondset MAX=2,ATMOS_K=0.5 overrides BOND.* in the page
 const JSON_OUT = argv.includes('--json');
 const POLICIES = (flag('--policies', 'first,empty,reference,overload,greedy')).split(',');
 const OFFERS = parseFloat(flag('--offers', 1));
@@ -59,7 +65,7 @@ const MONEY_IDS = ['dad', 'scout', 'pool'], TAKE = { dad: 'ev.dad.a', scout: 'ev
 
 /** One seed of one policy: returns the run's numbers (or throws). */
 async function playOne(page, policy, seed) {
-  await page.goto(`${FILE}?noboot&seed=${seed}&offers=${OFFERS}${FORCE ? '&force' : ''}${BASELINE ? '&baseline' : ''}`);
+  await page.goto(`${FILE}?noboot&seed=${seed}&offers=${OFFERS}${FORCE ? '&force' : ''}${BASELINE ? '&baseline' : ''}${NOBONDS ? '&nobonds' : ''}${NOTWINS ? '&notwins' : ''}${BONDSET ? '&bondset=' + encodeURIComponent(BONDSET) : ''}`);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await page.waitForFunction(() => window.YAM && window.YAM.ui);
@@ -95,7 +101,7 @@ async function playOne(page, policy, seed) {
     await page.evaluate(p => {
       const s = YAM.game, before = s.lastReport;
       YAM.ui.autoSim({ policy: p });
-      if (s.lastReport && s.lastReport !== before) window.__m.push({ md: s.lastReport.md, r: s.lastReport.result, gf: s.lastReport.gf, ga: s.lastReport.ga, coh: s.lastReport.coh });
+      if (s.lastReport && s.lastReport !== before) window.__m.push({ md: s.lastReport.md, r: s.lastReport.result, gf: s.lastReport.gf, ga: s.lastReport.ga, coh: s.lastReport.coh, atmos: s.lastReport.atmos });
     }, policy);
     await page.waitForFunction(() => { const s = YAM.game, ui = YAM.ui;
       return !ui.cal.running && !ui.events.view.autoT && (s.phase !== 'calendar' || !s.pendingEvent); }, null, { timeout: 60000, polling: 20 });
@@ -111,7 +117,13 @@ async function playOne(page, policy, seed) {
       dBudget: s.budget - st.budget, ledger: led, cohEnd: s.cohesion,
       money: s.eventLog.filter(e => /\.a$/.test(e.choice) && ['dad', 'scout', 'pool', 'ulti'].includes(e.id)).map(e => e.id),   // the money offers taken
       choices: window.__ch, rv: window.__rv || [], leaks: s.eventLog.filter(e => e.id === 'poolleak').length,
-      firstShare: a ? a.first : null, clicks: a ? a.clicks : 0 };
+      firstShare: a ? a.first : null, clicks: a ? a.clicks : 0,
+      bonds: (() => {   // v3.25: the squad's bonds at the end (hidden v) + what the coach knows
+        const v = Object.entries(s.bonds || {}).filter(([k]) => k.split('|').every(id => s.player(id))).map(([, e]) => e.v);
+        let known = 0; for (let i = 0; i < s.squad.length; i++) for (let j = i + 1; j < s.squad.length; j++) if (s.knownBond(s.squad[i].id, s.squad[j].id)) known++;
+        return { best: v.filter(x => x >= 60).length, mates: v.filter(x => x >= 20 && x < 60).length, rivals: v.filter(x => x <= -20).length, war: v.filter(x => x <= -60).length,
+          talkAP: s.stats?.talkAP || 0, known };
+      })() };
   }, { policy, seed, startDate });
 }
 
@@ -139,7 +151,9 @@ function summarise(runs) {
     dParents: avg(r => r.dParents), dSquad: avg(r => r.dSquad), dBoard: avg(r => r.dBoard), dBudget: avg(r => r.dBudget),
     perWeek: avg(r => r.perWeek), attend: avg(r => r.attend), coh: all.length ? all.reduce((a, m) => a + (m.coh ?? 50), 0) / all.length : 0,
     ledger: led, money, offers, firstShare: avg(r => r.firstShare), dRep: avg(r => r.dParents + r.dSquad + r.dBoard),
-    rvN: avg(r => r.rv.length), rvAny: avg(r => r.rv.filter(x => x.any).length), rvGot: avg(r => r.rv.filter(x => x.got).length) };
+    rvN: avg(r => r.rv.length), rvAny: avg(r => r.rv.filter(x => x.any).length), rvGot: avg(r => r.rv.filter(x => x.got).length),
+    bonds: Object.fromEntries(['best', 'mates', 'rivals', 'war', 'talkAP', 'known'].map(k => [k, avg(r => r.bonds?.[k])])),   // v3.25
+    atmos: all.filter(m => m.atmos != null).length ? all.filter(m => m.atmos != null).reduce((a, m) => a + m.atmos, 0) / all.filter(m => m.atmos != null).length : 0 };
 }
 
 (async () => {
@@ -181,6 +195,11 @@ function summarise(runs) {
             UIController.POLICY_PICK[w] = (o, st) => ((window.YAM.ui.autoPolicy === 'greedy' && G[w]) || R[w])?.(o, st) ?? null;
         }
       });
+      if (q.has('nobonds')) window.addEventListener('DOMContentLoaded', () => {   // v3.25: bonds without effect
+        Object.assign(BOND, { MAX: 0, MAX_NEG: 0, TARGET: 0, ATMOS_K: 0, LONER_ATTEND: 0, LONER_TRUANT: 1, FRIEND_AWAY: 0, MORALE_MATE: 0, MORALE_ENEMY: 0, FRIEND_LEAVES: 0, AFTER_W: 1, AFTER_REL: 0, STRESS_WAR: 1, RALLY_WAR: -1000 });
+      });
+      if (q.get('bondset')) window.addEventListener('DOMContentLoaded', () => { for (const kv of q.get('bondset').split(',')) { const [k, v] = kv.split('='); BOND[k] = parseFloat(v); } });
+      if (q.has('notwins')) window.YAM_NO_TWINS = true;   // v3.25: the v3.24 world (read by makeTwins at boot)
       if (q.has('baseline')) window.addEventListener('DOMContentLoaded', () => {   // v3.20 behaviour (see the header)
         COH.MAX = 0; COH.MAX_UP = 0; COH.KNOCK_DIV = 1e12; WEEK.EMPTY_CAP = WEEK.EMPTY_BOARD; FINANCE.LOW_TRAINING_PAY = 1;
       });
@@ -229,7 +248,7 @@ function summarise(runs) {
   }
   if (JSON_OUT) console.log(JSON.stringify({ seeds: SEEDS, weeks: WEEKS, baseline: BASELINE, summary: sum, gates, errors }, null, 1));
   else {
-    console.log(`Policy harness${BASELINE ? ' (BASELINE = v3.20 behaviour)' : ''}: ${SEEDS} seeds × ${WEEKS} weeks per policy, offers ${FORCE ? 'forced once' : 'not forced'}${OFFERS !== 1 ? ' ×' + OFFERS : ''}, ${FILE.split('/').slice(-2).join('/')}, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+    console.log(`Policy harness${BASELINE ? ' (BASELINE = v3.20 behaviour)' : ''}${NOBONDS ? ' (NO BOND EFFECTS)' : ''}${NOTWINS ? ' (NO TWINS)' : ''}: ${SEEDS} seeds × ${WEEKS} weeks per policy, offers ${FORCE ? 'forced once' : 'not forced'}${OFFERS !== 1 ? ' ×' + OFFERS : ''}, ${FILE.split('/').slice(-2).join('/')}, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
     console.log('Policy     | W      D      L     | W wk3-8 D wk3-8 L wk3-8 | GF   GA   | ΔParents ΔSquad ΔBoard  ΣRep | ΔBudget | Trn/wk Attend | Cohesion');
     for (const p of POLICIES) { const x = sum[p];
       console.log(`${p.padEnd(10)} | ${pct(x.W)} ${pct(x.D)} ${pct(x.L)} | ${pct(x.W38)}  ${pct(x.D38)}  ${pct(x.L38)}  | ${x.gf.toFixed(2)} ${x.ga.toFixed(2)} | ${sg(x.dParents).padStart(8)} ${sg(x.dSquad).padStart(6)} ${sg(x.dBoard).padStart(6)} ${sg(x.dRep).padStart(6)} | ${sg(x.dBudget, 0).padStart(7)} | ${x.perWeek.toFixed(2).padStart(6)} ${x.attend ? pct(x.attend) : '    —'} | ${x.coh.toFixed(1)}`); }
@@ -243,11 +262,14 @@ function summarise(runs) {
     console.log('');
     console.log('REVIEW (v3.23) per run, windows opened / with a ✓ confirmed card on offer / a confirmed card taken:');
     for (const p of POLICIES) { const x = sum[p]; console.log(`${p.padEnd(10)} | ${x.rvN.toFixed(2)} / ${x.rvAny.toFixed(2)} / ${x.rvGot.toFixed(2)}`); }
+    console.log('\nBonds (v3.25) per run at the end: best mates (v ≥ 60) · mates (20–59) · rivals (≤ −20) · at war (≤ −60) · mean ATMOS at kick-off · AP on talks · pairs the coach knows:');
+    for (const p of POLICIES) { const b = sum[p].bonds; console.log(`${p.padEnd(10)} | ${b.best.toFixed(2)} · ${b.mates.toFixed(2)} · ${b.rivals.toFixed(2)} · ${b.war.toFixed(2)} · ${sum[p].atmos.toFixed(3)} · ${b.talkAP.toFixed(2)} · ${b.known.toFixed(2)}`); }
+    if (sum.reference && sum.first) console.log(`expectation (not a gate yet): reference knows more pairs than first ${sum.reference.bonds.known > sum.first.bonds.known ? 'yes' : 'NO'} (${sum.reference.bonds.known.toFixed(2)} vs ${sum.first.bonds.known.toFixed(2)}), ATMOS not lower ${sum.reference.atmos >= sum.first.atmos ? 'yes' : 'NO'}`);
     console.log('');
     for (const g of gates) console.log(`${g.ok ? 'OK  ' : g.warn ? 'WARN' : 'FAIL'} ${g.name}: ${g.v.toFixed(1)}${g.se != null ? ` (seed-paired SE ${g.se.toFixed(1)}, n=${g.n})` : ''}`);
     if (gates.some(g => g.warn)) console.log('greedy gates are warnings until money sinks');
     if (errors.length) console.log('\nErrors:\n' + errors.slice(0, 20).join('\n'));
   }
-  const fail = errors.length > 0 || (!BASELINE && gates.some(g => !g.ok && !g.warn));
+  const fail = errors.length > 0 || (!BASELINE && !NOBONDS && !NOTWINS && !BONDSET && gates.some(g => !g.ok && !g.warn));
   process.exit(fail ? 1 : 0);
 })();

@@ -39,6 +39,11 @@ class MatchEngine {
     this.cohesion = Array.isArray(opts.cohesion) ? opts.cohesion.map(c => c ?? null) : [null, null];
     this.cohB = this.cohesion.map(c => cohBonus(c));
     this.knockMult = 1 + Math.max(0, 50 - (this.cohesion[0] ?? 50)) / COH.KNOCK_DIV;
+    // v3.25 bonds (one side only — AI clubs have none): { side, v(idA, idB) → −100…100, twin(idA, idB) → bool }. null = no term at all
+    // (test/balance.js default). Hooks: pass target weight, the pass duel (passer ↔ receiver), the interception (same-line neighbours),
+    // the leader's rally / anxious captain's stress. No Math.random added or moved.
+    this.bonds = opts.bonds && typeof opts.bonds.v === 'function' ? opts.bonds : null;
+    this.ownLoss = null; this.keyLosses = []; this.blames = [];   // v3.25: our lost balls that led to a chance / goal against (no RNG)
     // v3.7 hidden captain trait state + its OWN seeded stream (never Math.random → the match RNG order is untouched;
     // visual and Quick Sim run the same tick(), so the same match gives the same captain moments)
     this.capRng = seeded('cap|' + home.name + '|' + away.name + '|' + (opts.md ?? ''));
@@ -140,7 +145,38 @@ class MatchEngine {
   captainStress(p) {
     const c = this.captain();
     if (!c || c !== p || p.captainTrait !== 'anxious' || this.cap.broken === p.id) return 0;
-    return -(CAPTAIN.STRESS + Math.max(0, 10 - (p.psych?.composure ?? 10)) * CAPTAIN.STRESS_COMP);
+    const war = this.bonds && this.sides[0].players.some(q => q !== p && !this.sentOff.has(q.id) && this.bondV(p, q) <= BOND.RALLY_WAR);   // v3.25
+    return -(CAPTAIN.STRESS + Math.max(0, 10 - (p.psych?.composure ?? 10)) * CAPTAIN.STRESS_COMP) * (war ? BOND.STRESS_WAR : 1);
+  }
+  /* ---------- v3.25 BONDS ---------- */
+  bondV(a, b) { return this.bonds && a && b && a !== b ? this.bonds.v(a.id, b.id) || 0 : 0; }
+  /** Kids next to p on the tactics board right now (bondNeighbours of the formation, live entries: subs take the slot). */
+  bondNbrs(side, p, sameLine = false) {
+    const s = this.sides[side], i = s.entries.findIndex(e => e.p === p);
+    if (i < 0) return [];
+    return bondNeighbours(s.formation).filter(([x, y]) => x === i || y === i).map(([x, y]) => s.entries[x === i ? y : x])
+      .filter(e => e.p && !this.sentOff.has(e.p.id) && (!sameLine || e.line === s.entries[i].line)).map(e => e.p);
+  }
+  /** Pass duel between XI neighbours: + bondTerm(v) (v/100 × MAX, or × MAX_NEG below 0; × TWINS.LINK for twins). */
+  bondPass(side, a, b) {
+    if (!this.bonds || side !== this.bonds.side) return 0;
+    const v = this.bondV(a, b);
+    if (!v || !this.bondNbrs(side, a).includes(b)) return 0;   // only between XI neighbours (see DESIGN.md: a free buff from scattered yard mates otherwise)
+    return bondTerm(v) * (this.bonds.twin?.(a.id, b.id) ? TWINS.LINK : 1);
+  }
+  /** Interception: + avg(bondTerm(v) with same-line neighbours) × 0.5. */
+  bondRead(side, d) {
+    if (!this.bonds || side !== this.bonds.side) return 0;
+    const n = this.bondNbrs(side, d, true);
+    return n.length ? n.reduce((t, q) => t + bondTerm(this.bondV(d, q)), 0) / n.length * 0.5 : 0;
+  }
+  /** Pass target: weight × (1 + v/100 × TARGET), one Math.random like pick() (no bonds → pick() itself). */
+  bondPick(side, c, mates) {
+    if (!this.bonds || side !== this.bonds.side || mates.length < 2) return pick(mates);
+    const w = mates.map(m => Math.max(0.05, 1 + this.bondV(c, m) / 100 * BOND.TARGET));
+    let x = Math.random() * w.reduce((t, v) => t + v, 0);
+    for (let i = 0; i < mates.length; i++) if ((x -= w[i]) < 0) return mates[i];
+    return mates[mates.length - 1];
   }
   /** Log line + speech bubble that never touch Math.random (r comes from the captain's own stream). */
   capLog(type, key, p, cls = '', bark = null) {
@@ -288,12 +324,15 @@ class MatchEngine {
     if (stress) flat = { ...flat, stress };
     let fl = 0; for (const k in flat) fl += flat[k];
     const coh = opt.coh || 0;   // v3.21: team cohesion (pass duels only)
-    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, coh, total: stat + mood + rand + fl + m.v + coh };
+    const bond = opt.bond || 0;   // v3.25: passer ↔ receiver / interceptor ↔ same-line neighbours
+    if (side === 0 && this.bonds && m.cap) { const c = this.captain();   // v3.25: a kid at war with the captain doesn't answer his rally
+      if (c && c !== p && c.captainTrait === 'leader' && this.minute <= this.cap.rallyUntil && this.bondV(p, c) <= BOND.RALLY_WAR) { m.cap -= CAPTAIN.RALLY; m.v -= CAPTAIN.RALLY; } }
+    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, coh, bond, total: stat + mood + rand + fl + m.v + coh + bond };
   }
   /** v3.4: record a duel in the match log (A = side in possession). */
   tr(kind, side, A, D, out) {
     const pack = r => ({ id: r.p.id, name: r.p.name, energy: Math.round(this.energy.get(r.p.id) ?? r.p.energy ?? 100), rating: r.rating, fat: r.fat, tag: r.tag, stat: r.stat, mood: r.mood, rand: r.rand,
-      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, coh: r.coh || 0, cheat: r.cheat, total: r.total });
+      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, coh: r.coh || 0, bond: r.bond || 0, cheat: r.cheat, total: r.total });
     this.trace.push({ min: this.minute, kind, side, zone: this.zone, A: pack(A), D: pack(D), margin: A.total - D.total, out });
   }
   counts(side) {
@@ -475,6 +514,7 @@ class MatchEngine {
   /* ---------- possession helpers ---------- */
   kickoff(side) {
     this.poss = side;
+    if (side === 0) this.ownLoss = null;
     this.zone = 1;
     this.carrier = pick(this.inZone(side, 1));
     this.boxBonus = 0;
@@ -483,6 +523,7 @@ class MatchEngine {
   }
   turnover(newCarrier, zone) {
     this.poss = 1 - this.poss;
+    if (this.poss === 0) this.ownLoss = null;   // v3.25: we have the ball back
     this.carrier = newCarrier;
     this.zone = zone;
     this.boxBonus = 0;
@@ -533,7 +574,7 @@ class MatchEngine {
     else tz = Math.random() < 0.7 ? 2 : 1;
     let mates = this.inZone(side, tz).filter(p => p !== c);
     if (!mates.length) { tz = 1; mates = this.active(side).filter(p => p !== c && !this.isGK(p)); }
-    const recv = pick(mates);
+    const recv = this.bondPick(side, c, mates);   // v3.25: friends look for each other (no bonds → pick())
     const def = pick(this.inZone(opp, 2 - tz));
     const forward = tz > z;
 
@@ -541,8 +582,8 @@ class MatchEngine {
     // a forward ball into the final third leans on crossing.
     const touch = ((recv.skill?.('firstTouch') ?? 10) - 10) * 0.15;
     const cross = forward && tz === 2 ? ((c.skill?.('crossing') ?? 10) - 10) * 0.1 : 0;
-    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) }, { coh: this.cohB[side] });
-    const D = this.rs(def, 'Mark', opp, 'def', {}, { coh: this.cohB[opp] });   // v3.21: the interception side's cohesion
+    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) }, { coh: this.cohB[side], bond: this.bondPass(side, c, recv) });
+    const D = this.rs(def, 'Mark', opp, 'def', {}, { coh: this.cohB[opp], bond: this.bondRead(opp, def) });   // v3.21: the interception side's cohesion; v3.25: + bonds
     const vars = { a: c, b: recv, d: def };
     this.tr(forward ? 'passFwd' : 'pass', side, A, D, A.total >= D.total ? 'ok' : 'intercepted');
 
@@ -557,6 +598,7 @@ class MatchEngine {
       this.st(def).intercepts++;
       this.log('turn', 'passFail', vars, side);
       this.turnover(def, 2 - tz);
+      if (side === 0) this.ownLoss = { kind: 'pass', a: c.id, b: recv.id, min: this.minute, chance: false };   // v3.25
       this.setEv({ kind: 'intercept', a: c, b: recv, d: def });
       if (side === 0) this.captainMoment(c === this.captain() ? 'mistake' : 'lost');   // v3.7
     }
@@ -593,6 +635,7 @@ class MatchEngine {
       this.log('turn', 'drFail', vars, side);
       this.maybeInjure(c, side);
       this.turnover(def, 2 - z);
+      if (side === 0) this.ownLoss = { kind: 'dribble', a: c.id, min: this.minute, chance: false };   // v3.25
       this.setEv({ kind: 'tackle', a: c, d: def });
       if (side === 0) this.captainMoment(c === this.captain() ? 'mistake' : 'lost');   // v3.7
     }
@@ -620,6 +663,7 @@ class MatchEngine {
     const side = this.poss;
     const long = !freeKick && !sp.penalty && !sp.corner && this.zone < 2;
     this.st(c).shots++;
+    if (side === 1 && this.ownLoss && !this.ownLoss.chance) { this.ownLoss.chance = true; this.keyLosses.push(this.ownLoss); }   // v3.25: a chance against followed
     const lp = this.lastPass, assist = !freeKick && !sp.penalty && lp && lp.side === side && lp.p !== c ? lp.p : null;
     this.pendingShot = { shooter: c, side, long, freeKick, assist, penalty: !!sp.penalty, corner: !!sp.corner,
       bonus: sp.penalty ? SETPIECE.PEN_BONUS + (c.psych?.composure ?? 10) * 0.2 : sp.corner ? sp.bonus || 0 : freeKick ? 1 : this.boxBonus, phase: 1 };
@@ -667,7 +711,8 @@ class MatchEngine {
       this.st(keeper).conceded++;   // v3.18.1: the keeper's line in the Notebook weighs goals against him too
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
-      this.addEvent('goal', shooter, side, { ...(assist ? { assist: assist.name } : {}), ...(penalty ? { pen: true } : {}), ...(corner ? { corner: true } : {}) });
+      if (side === 1 && this.ownLoss) { this.ownLoss.goal = true; this.blames.push({ id: this.ownLoss.a, min: this.minute }); }   // v3.25: the error before a goal conceded
+      this.addEvent('goal', shooter, side, { ...(assist ? { assist: assist.name, assistId: assist.id } : {}), ...(penalty ? { pen: true } : {}), ...(corner ? { corner: true } : {}) });
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
       if (!this.instant) this.hooks.onGoal?.(side);
       this.kickoff(opp);
@@ -713,7 +758,7 @@ class MatchEngine {
       const avg = f => own.length ? r2(own.reduce((a, x) => a + f(x), 0) / own.length) : 0;
       return { name: s.name, formation: s.formation, score: s.score, user: s.user, possession: r2(this.possTicks[i] / ((this.possTicks[0] + this.possTicks[1]) || 1)),
         totals: this.teamTotals(i), duels: kinds,
-        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cohesion: avg(x => x.coh || 0), cheat: avg(x => x.cheat) },
+        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cohesion: avg(x => x.coh || 0), bond: avg(x => x.bond || 0), cheat: avg(x => x.cheat) },
         players: s.all.map(p => ({ id: p.id, name: p.name, line: this.lineOf.get(p.id), sentOff: this.sentOff.has(p.id), subbedOff: this.subbedOff.has(p.id),
           energyStart: Math.round(this.startEnergy?.get(p.id) ?? p.energy ?? 100), energyEnd: Math.round(this.energy.get(p.id) ?? 0),
           fatigueStart: r2(fatigueMult(this.startEnergy?.get(p.id) ?? p.energy ?? 100)), fatigueEnd: r2(fatigueMult(this.energy.get(p.id) ?? 0)), stats: { ...this.st(p) } })) };
@@ -726,7 +771,7 @@ class MatchEngine {
   /** One CSV row per duel (comma-separated, dot decimals, UTF-8). `pre` = extra leading columns (e.g. setup / match no.). */
   static traceCsv(trace, sides, pre = null) {
     const f = v => (typeof v === 'number' ? String(Math.round(v * 100) / 100) : `"${String(v ?? '').replace(/"/g, '""')}"`);
-    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'coh', 'cheat', 'total'];   // v3.21: + coh
+    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'coh', 'bond', 'cheat', 'total'];   // v3.21: + coh; v3.25: + bond
     const head = [...(pre ? Object.keys(pre) : []), 'minute', 'kind', 'team', 'zone', ...part.map(k => 'atk_' + k), ...part.map(k => 'def_' + k), 'margin', 'outcome'];
     const cell = (x, k) => k === 'flat' ? f(Object.entries(x.flat || {}).filter(([, v]) => v).map(([n, v]) => `${n}:${Math.round(v * 100) / 100}`).join(' ')) : f(x[k]);
     const rows = trace.map(t => [...(pre ? Object.values(pre).map(f) : []), t.min, f(t.kind), f(sides?.[t.side] ?? t.side), t.zone,

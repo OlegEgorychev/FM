@@ -115,6 +115,11 @@ class LockerRoom {
       <span class="lr-kind ${match ? 'k-match' : 'k-training'}">${match ? L.t('lr.kindMatch', { o: esc(L.team(ctx?.opp.name || '')) }) : L.t('lr.kindTraining')}</span>
       <span class="lr-count${present < 11 ? ' low' : ''}">${L.t('lr.arrived', { n: present, t: squad.length })}</span>
       <span class="lr-ap" title="${esc(L.t('ap.tip'))}">${L.t('ap.left')} <b>${s.ap}/${this.ui.apTotal()}</b></span>`;   // v3.13: weekly wallet
+    const came = !match && lk.came && s.player(lk.came.a) && s.player(lk.came.b) ? lk.came : null, warn = match ? s.lockerBondWarning() : null;   // v3.25
+    const nm = id => esc(L.name(s.player(id).name));
+    if (came || warn) document.getElementById('lr-head').insertAdjacentHTML('beforeend', `<span class="lr-bond">${came
+      ? L.t('lr.bond.came', { a: nm(came.a), b: nm(came.b) })
+      : L.t('lr.bond.warn', { a: nm(warn.a), b: nm(warn.b), l: L.t('lr.bond.line.' + warn.line), d: esc(fmtDate(warn.date, { weekday: 'long' })) })}</span>`);
     this.renderFees(match, squad, lk);   // v3.15
     document.getElementById('lr-proceed').innerHTML = L.t('lr.toPitch');   // v2.8: [ HEAD TO PITCH ]
     document.getElementById('lr-status').textContent = L.t(present < 11 ? 'lr.statusShort' : 'lr.status');

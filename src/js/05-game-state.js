@@ -32,6 +32,8 @@ class GameState {
     this.lineup = [];
     const free = shuffle(this.globalPlayers.filter(p => p.teamId === 'free_agent'));
     this.draft = { pool: free.slice(0, WORLD.DRAFT_POOL).map(p => p.id), signed: [] };
+    makeTwins(this.globalPlayers, this.draft.pool);   // v3.25: two pairs of twins, own seeded stream (world RNG order untouched)
+    this.bonds = null; this.bondMeta = { known: {}, matches: {} }; this.draft.twins = {};   // v3.25 bonds (built at the end of the draft)
     this.newSeason(SEASON.FIRST_YEAR);
     this.phase = 'draft';
     this.save();
@@ -66,6 +68,8 @@ class GameState {
     this.lineup = [keeper.id, ...this.squad.filter(p => p !== keeper).slice(0, 10).map(p => p.id)];
     for (const p of this.squad) p.energy = 100;
     for (const p of this.squad) this.addYardClues(p, this.calendar.date);   // v3.23: the draft notes → clues
+    this.initBonds(this.calendar.date);   // v3.25: yard / school / twins → the starting bonds
+    this.draftBondNotes(this.calendar.date);
     this.draft = null;
     this.phase = 'calendar';
     this.addDiary({ date: this.calendar.date, key: 'draft.diary', vars: { n: this.squad.length }, cls: 'ev' });
@@ -141,6 +145,7 @@ class GameState {
       assigned[i] = free.shift();
     });
     this.lineup = [gk.id, ...assigned.slice(1).map(p => p.id)];
+    this.bondSeparate?.();   // v3.25: two kids the coach KNOWS don't get on are not put side by side (if it costs ≤ 0.5)
   }
   setFormation(f) { if (!FORMATIONS[f]) return; this.formation = f; this.autoArrange(); this.save(); }
   /** Unified lineup swap used by both the roster list and the pitch.
@@ -230,6 +235,7 @@ class GameState {
   confirmCaptain(id, keep = true) {
     const p = this.player(id);
     if (!p || !keep) return 0;
+    this.notePraise(p);   // v3.25: the armband counts as praise
     if (this.duties.captain !== id) this.setDuty('captain', id);
     const t = this.captainTier(p);
     const d = this.captainReaction(p, t === 'high' ? LEADERSHIP.HIGH_MORALE : t === 'mid' ? LEADERSHIP.MID_MORALE : LEADERSHIP.LOW_KEEP_MORALE);
@@ -393,6 +399,7 @@ class GameState {
     else if (c.type === 'up') { const r = p.roles.find(x => x.id === c.role); if (!r || r.level >= ROLES.LEVELS) return false; r.level++; vars.l = r.level; }
     else if (c.type === 'swap') { const i2 = p.roles.findIndex(x => x.id === c.replaces); if (i2 < 0) return false; p.roles[i2] = { id: c.role, level: 1, m: 0 }; vars.o = { role: c.replaces }; }
     else return false;
+    this.notePraise(p);   // v3.25: a REVIEW card counts as praise (the favourite)
     this.pruneComplaints();   // v3.20: a replaced role ends a parent's complaint
     this.addDiary({ date: this.calendar.date, key: 'rv.' + c.type, vars, cls: 'ev' });
     this.endReview();
@@ -482,9 +489,16 @@ class GameState {
     }
     let x = r() * Object.values(w).reduce((a, b) => a + b, 0), type = Object.keys(w)[0];
     for (const k in w) { if (!w[k]) continue; type = k; if ((x -= w[k]) < 0) break; }
-    const target = type === 'other' ? this.player(mates[Math.floor(r() * mates.length)]) : null;
+    // v3.25: a kid is twice as likely to talk about a mate he doesn't get on with (one r() either way)
+    const wt = mates.map(id => this.bondV?.(kid.id, id) <= -20 ? BOND.AFTER_W : 1), wsum = wt.reduce((a, b) => a + b, 0);
+    let target = null;
+    if (type === 'other') {
+      if (wsum === mates.length) target = this.player(mates[Math.floor(r() * mates.length)]);
+      else { let x = r() * wsum; for (let i = 0; i < mates.length; i++) if ((x -= wt[i]) < 0 || i === mates.length - 1) { target = this.player(mates[i]); break; } }
+    }
     const v = seeded(af.date + '#voice#' + (sp.parent ? 'par:' : '') + kid.id);
-    const rel = AFTER.FORCE_REL ?? (sp.parent ? (type === 'parentCoach' ? AFTER.PARENT_MISFIT : AFTER.PARENT_OWN) : kidReliability(kid));
+    const grudge = target && this.bondV?.(kid.id, target.id) <= -20 ? BOND.AFTER_REL : 0;   // v3.25: that remark is less reliable
+    const rel = AFTER.FORCE_REL ?? (sp.parent ? (type === 'parentCoach' ? AFTER.PARENT_MISFIT : AFTER.PARENT_OWN) : clamp(kidReliability(kid) + grudge, 0, 1));
     const ok = v() < rel, one = a => a[Math.floor(v() * a.length)];
     const rm = { pid: kid.id, parent: sp.parent, type, about: (target || kid).id, kind: AFTER_REMARKS[type].kind, signal: null, role: null, claim: null, ok };
     const about = this.player(rm.about);
@@ -534,6 +548,10 @@ class GameState {
       kind: rm.kind, claim: rm.kind === 'role' ? null : rm.claim, role: rm.role, by });
     if (rm.parent) this.addRep('parents', AFTER.PARENT_REP);
     else kid.dyn.morale = clamp(kid.dyn.morale + AFTER.LISTEN_MORALE, 0, 100);
+    if (!rm.parent && rm.about !== rm.pid && this.bonds && this.bondV(kid.id, about.id) <= -20) {   // v3.25: "according to Petya, Kolya let him down"
+      const real = bondBand(this.bondV(kid.id, about.id));
+      this.addBondNote(kid, { with: about.id, band: rm.ok ? real : real === 'war' ? 'cold' : 'war', source: 'after', date: af.date, by: { pid: kid.id, name: kid.name } });
+    }
     if (rm.type === 'parentCoach' && rm.role) {
       this.parentComplaints = (this.parentComplaints || []).filter(c => c.pid !== about.id);
       this.parentComplaints.push({ pid: about.id, role: rm.role, parent: rm.parent, n: 0, date: af.date });
@@ -613,8 +631,10 @@ class GameState {
   /** v3.18: keep a clue in the kid's Notebook (last CLUES.MAX_PER_KID). */
   addClue(p, c) {
     if (!p || !c) return;
-    const v = c.source === 'voice' ? { kind: c.kind, claim: c.claim || null, role: c.role || null, by: c.by || null } : {};   // v3.20 voice clue extras
-    (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, ...v, seen: false });
+    const tw = this.mixTwin?.(p, c.source + '#' + c.ref + '#' + c.date + '#' + c.textKey);   // v3.25: the coach mixes the twins up
+    if (tw) { c = { ...c, mix: p.id }; p = tw; }
+    const v = c.source === 'voice' || c.source === 'talk' ? { kind: c.kind, claim: c.claim || null, role: c.role || null, by: c.by || null } : {};   // v3.20 voice clue extras
+    (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, ...v, ...(c.mix ? { mix: c.mix } : {}), seen: false });
     if (p.clues.length > CLUES.MAX_PER_KID) p.clues.splice(0, p.clues.length - CLUES.MAX_PER_KID);
   }
   /** v3.23: his yard notes (DraftView.notes — seeded by id, already lying with YARD.WRONG) become clues: source 'yard', ref 'draft'.
@@ -835,6 +855,7 @@ class GameState {
   weekReview(date) {
     const w = this.weekState(), first = this.calendar.events[0] && isoAdd(this.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
     if (weekKey(date) !== 'sun' || weekStartOf(date) !== w.start || (first && w.start < first)) return null;
+    this.bondWeek(date);   // v3.25: envy, decay, friends' morale — before the cohesion that reads ATMOS
     this.updateCohesion(date);
     if (!w.present) {   // no training with a kid in it this week
       const k = w.emptyStreak = (w.emptyStreak || 0) + 1;
@@ -853,7 +874,7 @@ class GameState {
   /** v3.21: Sunday — C ← clamp(C × DECAY + GAIN × T_eff, 0, 100); a diary line only when the band word changes. */
   updateCohesion(date = this.calendar.date) {
     const w = this.weekState(), before = this.cohesion ?? COH.START, band0 = cohBand(before);
-    this.cohesion = clamp(before * COH.DECAY + COH.GAIN * Math.min(COH.T_CAP, w.teff || 0), 0, 100);
+    this.cohesion = clamp(before * COH.DECAY + COH.GAIN * Math.min(COH.T_CAP, w.teff || 0) * (1 + this.atmos()), 0, 100);   // v3.25: × (1 + ATMOS)
     const band = cohBand(this.cohesion);
     if (band !== band0) this.addDiary({ date, key: 'coh.diary.' + (this.cohesion > before ? 'up' : 'down'), vars: { b: { coh: band } }, cls: 'ev' });
     return this.cohesion;
@@ -991,7 +1012,8 @@ class GameState {
     if (p.suspensionMatches > 0) return 'suspended';
     if (p.awayDays > 0) return 'home';
     if (p.energy < LOCKER.MIN_COND) return 'exhausted';
-    if (Math.random() * 20 > p.psych.discipline + LOCKER.DISC_GRACE) return 'skipped';
+    const x = Math.random();   // (one draw, as before v3.25)
+    if (this.bonds && this.isLoner(p) ? x > 1 - Math.min(1, BOND.LONER_TRUANT * arrivalSkipChance(p)) : x * 20 > p.psych.discipline + LOCKER.DISC_GRACE) return 'skipped';   // v3.25: a loner skips ×1.3
     return null;
   }
   /** Rolls the arrivals once per day (training / match days). Absent kids are locked out until the next morning. */
@@ -1003,7 +1025,7 @@ class GameState {
       let r = this.worldAway(p.id, date) || this.arrivalCheck(p);   // v3.14: away at a school / city event — before the other checks
       // v3.13: from the 3rd training of the week the kids who'd come may be kept home (school / not recovered) — not truancy
       // v3.14: the 'tests' week multiplies that chance (×attendMult); a kid lost only to the tests gets 'world:tests'
-      const base = training && k >= ATTEND.FROM ? attendChance(p, k) : 1, m = mult < 1 && we.playerIds.includes(p.id) ? mult : 1;
+      const base = training && k >= ATTEND.FROM ? clamp(attendChance(p, k) - (this.bonds ? this.bondAttendPen(p, date) : 0), ATTEND.MIN, ATTEND.MAX) : 1, m = mult < 1 && we.playerIds.includes(p.id) ? mult : 1;   // v3.25: a loner / a best mate away −0.1
       if (!r && training && (base < 1 || m < 1)) { const x = seeded(date + '#load#' + p.id)(); r = x >= base ? 'overload' : x >= base * m ? 'world:' + we.id : null; }
       p.absentToday = ['exhausted', 'skipped', 'overload'].includes(r) || r?.startsWith('world:') ? r : null;   // injured / banned / home are locked by their own status
       p.skipped_training = training && r === 'skipped';                   // feeds The Truant
@@ -1016,6 +1038,7 @@ class GameState {
     }
     d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent, date), posRequest: this.rollPositionRequest(absent) };   // v3.6
     d.locker.capRequest = d.locker.request || d.locker.posRequest ? null : this.rollCaptainRequest(absent);   // v3.8: urgent kid requests come first
+    if (training && this.bonds) d.locker.came = this.bondArrivals(date, this.squad.filter(p => !absent[p.id]));   // v3.25: "came in together again"
     this.save();
     return d.locker;
   }
@@ -1048,9 +1071,17 @@ class GameState {
     if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null;
       if ([lk.capRequest?.pid, lk.capRequest?.mate, lk.capRequest?.hint].includes(id)) lk.capRequest = null; }   // v3.8
     if (this.worldEvent) this.worldEvent.playerIds = this.worldEvent.playerIds.filter(x => x !== id);   // v3.14
+    this.bondLeave(p);   // v3.25: best mates are upset; his pairs go
     p.teamId = to;   // v3.1: he stays in the world database (future transfers)
     p.flags = p.flags.filter(f => f !== 'Promised_Start'); p.promiseBy = null; p.promiseChoice = null;
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
+    const tw = p.twinId && this.player(p.twinId);   // v3.25 shared fate: his brother leaves with him (50 %) or takes it hard
+    if (tw && !this.twinFollowing) {
+      if (seeded('twinleave#' + id + '#' + this.calendar.date)() < (this.twinLeaveForce ?? TWINS.LEAVE_P) && !this.expelBlock(tw.id)) {
+        this.twinFollowing = true; this.expel(tw.id, { to }); this.twinFollowing = false;
+        this.addDiary({ date: this.calendar.date, key: 'twins.follow', vars: { k: { pid: tw.id } }, cls: 'ev' });
+      } else tw.dyn.morale = clamp(tw.dyn.morale + TWINS.LEAVE_MORALE, 0, 100);
+    }
     this.save();
     return true;
   }
@@ -1132,6 +1163,8 @@ class GameState {
       }
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
+    if (training && date) this.bondTraining(date, trained);   // v3.25: neighbours + the pair drill
+    for (const p of hurt) { const t = p.twinId && this.player(p.twinId); if (t) t.dyn.morale = clamp(t.dyn.morale + TWINS.HURT_MORALE, 0, 100); }   // v3.25 shared fate
     if (thisWeek && attended) {   // v3.21 cohesion: the share of the squad that trained; a kid present ends the empty-week streak
       this.week.teff = (this.week.teff || 0) + attended / Math.max(1, this.squad.length);
       this.week.present = true; this.week.emptyStreak = 0;
@@ -1141,7 +1174,7 @@ class GameState {
     // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
     const observed = training && plan === 'match'
       ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
-    for (const o of observed) this.addClue(this.player(o.pid), o.clue);   // v3.18
+    for (const o of observed) { this.addClue(this.player(o.pid), o.clue); if (this.bonds) o.bond = this.bondObserve(this.player(o.pid), date || this.calendar.date); }   // v3.18; v3.25: + who he sticks with
     const lesson = !training && date ? this.runLesson(date) : null;   // v3.16: the evening lesson (no CONTINUE stop)
     return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed, lesson };
   }
@@ -1269,6 +1302,7 @@ class GameState {
     }
     for (const k of ['board', 'parents', 'squad']) if (fx[k]) this.addRep(k, fx[k]);
     rep.talk = key;
+    if (key === 'praise' && rep.motm) this.notePraise(this.player(rep.motm));   // v3.25: the praise lands on the man of the match
     this.addDiary({ date: this.calendar.date, key: 'tt.diary', vars: { o: { team: rep.opponent }, t: { talk: key }, r: { talkReact: key + '.' + talkOutcome(rep) } }, cls: 'ev' });   // v3.9: + the dressing-room reaction
     this.save();
     return fx;
@@ -1396,7 +1430,7 @@ class GameState {
       const chance = (half ? FINANCE.HALF_CHANCE : f.next[id] ?? feeChance(p.wealth, kind || (f.reminded[id] ? 'reminded' : 'later'), f.level))
         * (low ? FINANCE.LOW_TRAINING_PAY : 1);   // v3.21: "what are we paying for?" 
       delete f.reminded[id]; delete f.next[id];   // consumed by this roll
-      if (seeded(f.month + '#fee#' + id + '#' + date)() >= chance) continue;
+      if (seeded(f.month + '#fee#' + (p.twinId && this.player(p.twinId) && p.twinId < id ? p.twinId : id) + '#' + date)() >= chance) continue;   // v3.25: twins = one family, one payment roll
       const due = this.feeDue(id), amt = half ? Math.ceil(due / 2) : due;
       this.addMoney(amt, 'fee', false, date);
       if (half) f.got[id] = amt; else { f.status[id] = 'paid'; f.got[id] = amt; }
@@ -1468,7 +1502,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, after: this.after || null, parentComplaints: this.parentComplaints || [], notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, excuseLog: this.excuseLog || [], fines: this.fines || [], gkByHand: this.gkByHand || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, excuseLog: this.excuseLog || [], fines: this.fines || [], gkByHand: this.gkByHand || null, expelled: this.expelled || [], bonds: this.bonds || null, bondMeta: this.bondMeta || null, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -1480,7 +1514,7 @@ class GameState {
       if (d.phase === 'draft' && Array.isArray(d.pool) && d.draft) {   // v3.1: reload in the middle of the Yard Match
         this.newAcademy();
         this.globalPlayers = d.pool.map(p => new Player({ ...p, tags: [] }));
-        this.draft = { pool: d.draft.pool.filter(id => this.globalPlayers.some(p => p.id === id)), signed: (d.draft.signed || []).filter(id => d.draft.pool.includes(id)) };
+        this.draft = { pool: d.draft.pool.filter(id => this.globalPlayers.some(p => p.id === id)), signed: (d.draft.signed || []).filter(id => d.draft.pool.includes(id)), twins: d.draft.twins || {} };
         this.save();
         return true;
       }
@@ -1551,6 +1585,10 @@ class GameState {
         this.newSeason(SEASON.FIRST_YEAR);   // older saves: keep the squad, start the league
       }
       for (const p of this.squad) this.addYardClues(p, `${this.season}-${SEASON.START_MONTH_DAY}`);   // v3.23: old saves get their yard clues once (dated the season start)
+      // v3.25 bonds (old saves: yard / school seeded per kid, the starting table rebuilt — the same values on every load)
+      this.bondMeta = d.bondMeta && typeof d.bondMeta === 'object' ? { known: {}, matches: {}, ...d.bondMeta } : { known: {}, matches: {} };
+      this.bonds = d.bonds && typeof d.bonds === 'object' ? Object.fromEntries(Object.entries(d.bonds).filter(([k, e]) => e && Number.isFinite(e.v) && k.split('|').every(id => this.player(id)))) : null;
+      if (!this.bonds) this.initBonds(this.calendar?.date);
       this.save();
       return true;
     } catch (e) { return false; }

@@ -2,8 +2,24 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.24';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.25';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.25', name: { en: 'Bonds', ru: 'Связи' },
+    en: [
+      'The squad is no longer 15 separate kids: some are mates from the same yard or school, some don\'t get on — and it changes with training, matches and how you treat them.',
+      'Friends find each other with a pass; kids who don\'t get on lose the ball between them. A good dressing room makes training pull the team together faster.',
+      'You never see numbers: watch who comes in together, what you notice at practice, what they say after a loss. The Notebook has a new "Locker room" tab, PLAYER_INFO.EXE shows "In the squad", the tactics board draws lines to known mates and rivals.',
+      'New in PLAYER_INFO.EXE: [ Have a word ] — 1 AP for two questions, once a week per kid. A kid who comes to see you by himself answers one question for free.',
+      'Two pairs of twins live in the world. Their mum asks you to take both; until you can tell them apart, you sometimes write a note about the wrong brother.',
+    ],
+    ru: [
+      'Команда больше не 15 отдельных ребят: кто-то дружит со двора или со школы, кто-то не ладит — и это меняется от тренировок, матчей и того, как ты с ними обходишься.',
+      'Друзья находят друг друга пасом, а те, кто не ладит, теряют мяч между собой. Хорошая атмосфера в раздевалке быстрее сплачивает команду на тренировках.',
+      'Цифр ты не видишь: смотри, кто приходит вместе, что заметно на тренировке, что говорят после поражения. В Блокноте новая вкладка «Раздевалка», в PLAYER_INFO.EXE — блок «В команде», на тактической доске — линии к известным друзьям и недругам.',
+      'Новое в PLAYER_INFO.EXE: [ Поговорить ] — 1 ОД за два вопроса, раз в неделю с каждым. Если парень пришёл к тебе сам, на один вопрос он ответит бесплатно.',
+      'В мире две пары близнецов. Их мама просит взять обоих; пока ты их не различаешь, иногда записываешь заметку не на того брата.',
+    ],
+  },
   { v: '3.24', name: { en: 'Loose ends', ru: 'Хвосты' },
     en: [
       'Morning headlines don\'t repeat for two weeks, and kids have eight kinds of excuses now (dentist, the garage, a family wedding, the school play, a little brother…) — nobody repeats his for a month.',

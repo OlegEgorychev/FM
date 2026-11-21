@@ -1,0 +1,40 @@
+/* ===== v3.25 BONDS: Notebook tabs + "Locker room", PLAYER_INFO "In the squad", tac-board lines, the talk ===== */
+.nb-tabs{ display: flex; gap: 2px; margin: 0 0 8px; border-bottom: 1px solid #808080; }
+.nb-tab{ font: inherit; padding: 3px 12px; background: #c0c0c0; border: 1px solid; border-color: #fff #404040 #c0c0c0 #fff; margin-bottom: -1px; cursor: pointer; color: #222; }
+.nb-tab.on{ background: #efe9d6; font-weight: bold; border-bottom-color: #efe9d6; position: relative; top: 1px; }
+.nb-locker fieldset{ margin: 0 0 10px; border: 1px solid #b9b19a; padding: 6px 10px; }
+.nb-locker legend{ font-weight: bold; padding: 0 4px; }
+.nb-locker ul{ margin: 2px 0; padding-left: 16px; }
+.nb-locker small{ color: #a39a80; margin-left: 4px; } .pi-bonds small{ color: #6f6754; margin-left: 4px; }
+.bn-pair{ padding: 4px 0; border-bottom: 1px dotted #c8bfa6; }
+.bn-pair:last-child{ border-bottom: 0; }
+.bn-ph .bn-ico{ display: inline-block; width: 1.4em; text-align: center; }
+.bn-sides{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 3px 0 0 1.4em; }
+.bn-side{ background: #f6f1e1; color: #2a2418; border: 1px solid #d8cfb5; padding: 3px 6px; font-style: italic; }
+.bn-side small{ color: #6f6754 !important; }
+.bn-list{ list-style: none; padding-left: 1.4em !important; }
+.bn-list .cl-src{ display: inline-block; width: 1.3em; }
+.nb-locker .stale, .bn-list li.stale{ color: #8d8775; } .bn-side.stale{ color: #7d7663; }
+.bn-stale{ font-size: .9em; color: #8d8775; }
+.bn-list li.mix{ color: #7b5b2a; }
+.bn-list li.struck{ text-decoration: line-through; color: #9a937e; }
+.bn-lone li{ color: #5b4630; }
+.pi-bonds ul{ margin: 0; padding-left: 14px; }
+.pi-bonds li{ margin: 2px 0; }
+.pi-bonds .bn-cold, .pi-bonds .bn-war{ color: #8f3b33; }
+.pi-bonds .bn-mates, .pi-bonds .bn-best{ color: #2f5f2a; }
+/* tac board: lines to the known links (no numbers) */
+#tac-board .bond-lines{ position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+#tac-board .bond-lines line{ stroke-width: 2.5; stroke-linecap: round; opacity: .85; }
+#tac-board .bond-lines .bl-good{ stroke: #5fcf6a; }
+#tac-board .bond-lines .bl-bad{ stroke: #e0504a; }
+/* the talk: kid names as buttons (up to 14) — more than 6 buttons → a compact 3-column grid */
+.talk-choices:has(.talk-btn:nth-child(7)){ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.talk-choices:has(.talk-btn:nth-child(7)) .talk-btn{ padding: 7px 8px; font-size: 12px; letter-spacing: .3px; }
+.dr-notes li.yardmate{ color: #6b5530; font-style: italic; }
+.clue .cl-t s{ color: #9a937e; }
+.lr-bond{ flex-basis: 100%; font-style: italic; color: #e7d9a8; }
+.dbg-pairs{ border-collapse: collapse; font: 11px/1.2 var(--mono); color: #111; white-space: nowrap; }
+.dbg-pairs th, .dbg-pairs td{ padding: 2px 6px; text-align: left; border-bottom: 1px solid #ecebe6; }
+.dbg-pairs td.hi{ color: #1f6b1f; font-weight: bold; } .dbg-pairs td.lo{ color: #a02a22; font-weight: bold; }
+.dbg-bonds{ margin: 6px 0; }

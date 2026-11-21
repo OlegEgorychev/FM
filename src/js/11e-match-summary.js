@@ -117,7 +117,8 @@ class MatchSummary {
         <div class="ms-score">${rep.gf} - ${rep.ga}</div>
         <div class="ms-team away">${emblemHTML(opp, 'lg')}<span>${esc(L.team(rep.opponent))}</span></div>
         <div class="ms-sub"><span class="ms-res ${rep.result}">${L.t('res.' + rep.result)}</span><span>${L.t('ms.md', { n: rep.md })} · ${L.t('venue.' + rep.venue)}</span>${rep.ht ? `<span>${L.t('ms.ht')} ${rep.ht[0]}-${rep.ht[1]}</span>` : ''}${rep.instant ? `<span>${L.t('ms.quick')}</span>` : ''}${rep.coh != null ? `<span class="ms-coh" title="${esc(L.t('coh.tip'))}">${L.t('coh.line', { b: L.t('coh.band.' + cohBand(rep.coh)) })}</span>` : ''}</div>
-        ${rep.coh != null && rep.coh < COH.LOW && rep.result !== 'W' ? `<div class="ms-cause">${L.t('coh.cause')}</div>` : ''}
+        ${rep.coh != null && rep.coh < COH.LOW && rep.result !== 'W' ? `<div class="ms-cause">${L.t('coh.cause')}</div>`
+          : rep.bondCause && this.ui.state.player(rep.bondCause.a) && this.ui.state.player(rep.bondCause.b) ? `<div class="ms-cause ms-bond">${esc(L.t('bond.cause', { a: L.name(this.ui.state.player(rep.bondCause.a).name), b: L.name(this.ui.state.player(rep.bondCause.b).name) }))}</div>` : ''}
       </div>
       <div class="ms-timeline">${col(true, L.team(s.clubName))}${col(false, L.team(rep.opponent))}</div>
       <div class="ms-stats">

@@ -293,7 +293,7 @@ const CLUE_SIGNALS = {
   screen: { role: 'Anchor',     attrs: ['Mark'],            stats: ['intercepts'],                                  min: 1, lots: 4 },
   finish: { role: 'Finisher',   attrs: ['Shoot'],           stats: ['onTarget'],                                    min: 1, lots: 3 },
 };
-const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606', voice: '\u{1F5E3}', yard: '\u{1F3DF}' } };   // v3.19 'review'; v3.20 'voice' (AFTER_GAME.EXE)
+const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606', voice: '\u{1F5E3}', yard: '\u{1F3DF}', talk: '\u{1F4AC}' } };   // v3.25 'talk' (Have a word)   // v3.19 'review'; v3.20 'voice' (AFTER_GAME.EXE)
 const KEEPER_NOTE = { ROUGH: 4 };   // v3.18.1: goals let in from which the keeper's day reads as a rough one, whatever his saves
 /* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free.
    v3.19 GROWTH: p.roles = [{ id, level, m }] (m = league matches he played with it since he got it), at most SLOTS, levels 1–LEVELS.
@@ -467,3 +467,62 @@ const FIRST = ['Tommy', 'Jamie', 'Callum', 'Liam', 'Owen', 'Danny', 'Kieran', 'R
 const LAST = ['Smith', 'Jones', 'Walsh', 'Doyle', 'Carter', 'Hughes', 'Price', 'Barnes', 'Fletcher', 'Kenny', 'Morgan', 'Reid', 'Shaw', 'Harper', 'Quinn', 'Mason', 'Booth', 'Lowe', 'Dunn', 'Pike', 'Holt', 'Riley', 'Webb', 'Nolan', 'Cobb', 'Finch', 'Rowe', 'Sutton', 'Dale', 'Gill', 'Marsh', 'Platt', 'Varley', 'Ashworth', 'Brennan', 'Tully', 'Kemp', 'Oakes', 'Perry', 'Ward'];
 const OPPONENTS = ['Dockside Juniors', "St. Albert's U-14", 'Ironworks Colts', 'Northgate Rangers', 'Millbrook Wanderers', 'Canal Street Youth', 'Fernhill Athletic', 'Gasworks Boys', 'Crossley Athletic'];
 
+
+/* =========================================================
+   v3.25 BONDS — friendships and dislikes inside the squad. All numbers are TEST values ("tune" ones reported in DESIGN.md).
+   state.bonds = { 'idA|idB' (sorted): { v −100…100, root, cause, since, last } }; a missing pair = neutral (v 0).
+   The player never sees v: only band words through the coach's notes (p.bondNotes).
+   ========================================================= */
+const BOND = {
+  DEL: 5,                                  // an entry with |v| < DEL and root 0 is dropped
+  BANDS: [{ min: 60, key: 'best' }, { min: 20, key: 'mates' }, { min: -19, key: 'neutral' }, { min: -59, key: 'cold' }, { min: -100, key: 'war' }],
+  START: { yard: [20, 10], school: [10, 0], both: [35, 15], twins: [60, 40], grudge: [-30, 0] },   // [v, root] at the draft
+  GRUDGE: 0.06,                            // share of same-yard pairs with an old grudge (seeded per pair)
+  YARD_GAME: 0.15, YARD_GAME_DV: -5,       // the yard match: same-yard kids on opposite sides and one scored (seeded per pair)
+  YARD_NOTE: 0.4,                          // chance a draft card gets "from Canal Street, like Lee" (a clue about the root)
+  TRAIN: 1, DRILL: 2, DRILL_PAIRS: 2, SIDE: 1, SIDE_MIN: 45, ASSIST: 4, WIN: 1, BLAME: -3, BLAME_T: 1,
+  POSITION: -2, BENCH_RUN: 2, FAV: -2, FAV_PRAISES: 3, FAV_WEEKS: 4, FAV_DISC: 8, DECAY: 1,
+  FRIEND_LEAVES: -6,                       // morale for kids with v ≥ 60 to an expelled kid
+  MAX: 2.4, MAX_NEG: 6.7,                  // tune: duel term at v = +100 / −100 (test/balance.js --bonds; like COH.MAX / MAX_UP, bad blood hurts more than friendship helps)
+  DEAD: 20,                                // the pitch only feels what is beyond the neutral band: |v| ≤ DEAD → no duel term (yard mates at +20 don't win matches)
+  TARGET: 0.3,                             // pass target weight × (1 + v/100 × TARGET)
+  ADJ_DIST: 30,                            // tune: tac-board distance (% of the pitch) under which two XI slots are neighbours
+  ATMOS_K: 2.0, ATMOS_MIN: -0.25, ATMOS_MAX: 0.15,
+  MORALE_MATE: 1, MATE_V: 40, MORALE_ENEMY: -2, MORALE_ENEMY_CAP: -4,
+  LONER_ATTEND: 0.1, LONER_TRUANT: 1.3, FRIEND_AWAY: 0.1,
+  RALLY_WAR: -60, STRESS_WAR: 1.25,
+  AFTER_W: 2, AFTER_REL: -0.15,
+  CAME_V: 40, CAME_P: 0.3, STALE_DAYS: 28,
+  CAUSES: ['position', 'grudge', 'blame', 'envy'],
+  YARDS: 5, SCHOOLS: 3,
+};
+const TWINS = { PAIRS: 2, LINK: 1.5, FLOOR: -40, DECAY: 2, MIXUP: 0.25, TELL_MATCHES: 3, SKEW: 2,
+  REFUSE_MORALE: -8, REFUSE_PARENTS: -2, MISS_P: 0.2, MISS_DAYS: [14, 28], HURT_MORALE: -5, LEAVE_P: 0.5, LEAVE_MORALE: -15 };
+/* v3.25 the talk one-on-one ("Have a word", PLAYER_INFO.EXE): 1 AP for 2 questions, once a week per kid. */
+const TALK = { AP: 1, QUESTIONS: 2, WEEK_CD: 7, REPEAT_DAYS: 21, LIE: 0.1, LIE_DISC: 7, EVADE_COLD: 1.5, EVADE_MATE: 0.5,
+  GOSSIP: 0.2, GOSSIP_DAYS: 14, GOSSIP_MORALE: -2, GOSSIP_OPEN: -0.1, STIR: 0.25, STIR_DV: -3, MATE_MORALE: 1, ROLE_REL: 0.003,
+  FREE: ['excuse', 'posreq', 'capobs', 'capbench', 'capresign'] };   // manual dialogues where the kid came by himself → one free question
+/* Questions are data (v3.26 / v3.28 add rows): x = who [X] is picked from ('squad' | 'played' | 'pair' = two kids). */
+const TALK_QUESTIONS = [
+  { id: 'how', x: 'squad' },
+  { id: 'mates', x: null },
+  { id: 'hard', x: null, evade: 1.5 },
+  { id: 'pitch', x: 'played' },
+  { id: 'pair', x: 'pair' },
+];
+/** v3.25 duel term of one bond value: (|v| − DEAD) / (100 − DEAD) × MAX above 0 (× MAX_NEG below), 0 inside ±DEAD. */
+const bondTerm = v => { const x = Math.max(0, Math.abs(v || 0) - BOND.DEAD) / (100 - BOND.DEAD); return x * (v < 0 ? -BOND.MAX_NEG : BOND.MAX); };
+const bondKey = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
+const bondBand = v => BOND.BANDS.find(b => (v ?? 0) >= b.min).key;
+/** Temper (no new attribute): passion − composure + (10 − discipline)/2 → T = clamp(temper/10, 0, 1.5). */
+const bondTemper = p => clamp(((p?.psych?.passion ?? 10) - (p?.psych?.composure ?? 10) + (10 - (p?.psych?.discipline ?? 10)) / 2) / 10, 0, 1.5);
+/** Neighbours in an XI: slot index pairs closer than BOND.ADJ_DIST on the tactics board (RadarView board coordinates). */
+const _bondNbrCache = {};
+function bondNeighbours(f) {
+  const key = f + '@' + BOND.ADJ_DIST;
+  if (_bondNbrCache[key]) return _bondNbrCache[key];
+  const pos = formationSlots(f).map(s => ({ x: s.line === 'GK' ? 5 : 5 + (s.x - 5) * 1.9, y: s.y })), out = [];
+  for (let i = 0; i < pos.length; i++) for (let j = i + 1; j < pos.length; j++)
+    if (Math.hypot(pos[i].x - pos[j].x, pos[i].y - pos[j].y) < BOND.ADJ_DIST) out.push([i, j]);
+  return (_bondNbrCache[key] = out);
+}

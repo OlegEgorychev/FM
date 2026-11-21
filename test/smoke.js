@@ -15,6 +15,7 @@ const FILE = BASE + '?noboot';   // v2.1: the boot screen is tested once, separa
 const SHOTS = process.argv.includes('--shots');
 const results = [];
 const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info }); };
+const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `balance.js --cohesion` tables + OK lines (must not change)
 
 (async () => {
   const browser = await chromium.launch();
@@ -184,7 +185,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       && `${ms.homeRows}-${ms.awayRows}` === ms.score && ms.board === ms.score, JSON.stringify(ms));
     // v3.4: match log — every duel with its terms (they add up to the total), CSV / JSON export buttons
     const lg = await page.evaluate(() => {
-      const g = YAM.ui.lastMatchLog, sum = x => x.stat + x.mood + x.rand + Object.values(x.flat).reduce((a, b) => a + b, 0) + x.shout + x.rep + x.cap + (x.coh || 0) + x.cheat;   // v3.21: + cohesion
+      const g = YAM.ui.lastMatchLog, sum = x => x.stat + x.mood + x.rand + Object.values(x.flat).reduce((a, b) => a + b, 0) + x.shout + x.rep + x.cap + (x.coh || 0) + (x.bond || 0) + x.cheat;   // v3.21: + cohesion; v3.25: + bonds
       const csv = MatchEngine.traceCsv(g.trace, g.teams.map(t => t.name)).split('\n');
       return { n: g.trace.length, sums: g.trace.every(t => Math.abs(sum(t.A) - t.A.total) < 0.05 && Math.abs(sum(t.D) - t.D.total) < 0.05),
         goals: g.trace.filter(t => t.out === 'goal').length, score: g.teams[0].score + g.teams[1].score, kinds: [...new Set(g.trace.map(t => t.kind))].length,
@@ -843,7 +844,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       done: YAM.game.dayState().locker.request.done }), ex0.kid);
     await page.evaluate(() => { EXCUSE.BASE = window.__EB; YAM.game.excusesOff = true; });
     check('immediate request: a present kid interrupts the locker room (Proceed blocked); "Go home" → out of today\'s squad, Parents +5',
-      ex0.id === 'excuse' && ex0.n === 2 && ex0.blocked && ex1.parents === 55 && ex1.absent === 'excused' && ex1.slot && ex1.done, JSON.stringify({ ex0, ex1 }));
+      ex0.id === 'excuse' && ex0.n === 3 /* v3.25: + "While he's here: ask about…" */ && ex0.blocked && ex1.parents === 55 && ex1.absent === 'excused' && ex1.slot && ex1.done, JSON.stringify({ ex0, ex1 }));
     const rp = await page.evaluate(() => {
       const s = YAM.game, b0 = s.budget, lg0 = JSON.stringify(s.ledger['2002-10'] || {}); s.rep.board = 75; s.rep.parents = 80;
       const got = c => s.ledger['2002-10']?.[c] || 0;
@@ -1019,7 +1020,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       v36.streak.mid === 3 && v36.streak.def === 0 && v36.streak.cd === 1 && v36.streak.bench && v36.streak.slotMid === v36.wrongA && v36.streak.slotDef === v36.defA
       && v36.curve === '0,0.25,0.4,0.55,0.75,0.8,0.85' && v36.roll && v36.cooldown, JSON.stringify(v36.streak) + ' ' + v36.curve);
     check('v3.6 request dialogue: 3 choices (green/gray/red); yes = tag → archetype, streak 0, morale +5, diary; order = discipline +1, morale −8, cooldown 2',
-      v36d.open && v36d.n === 3 && v36d.tones === 'green,gray,red' && v36d.yesTag && v36d.yesOop === 0 && v36d.yesMorale === 55 && v36d.diary === 'pr.yes.diary'
+      v36d.open && v36d.n === 4 && v36d.tones === 'green,gray,red,gray' /* v3.25: + the free question */ && v36d.yesTag && v36d.yesOop === 0 && v36d.yesMorale === 55 && v36d.diary === 'pr.yes.diary'
       && v36d.ordMorale === 47 && v36d.ordDisc === 11 && v36d.ordCd === 2 && v36d.ordDiary === 'pr.order.diary' && v36d.closed, JSON.stringify(v36d));
     // v3.7: hidden captain traits — seeded generation + save migration, engine modifiers, Notebook / diary clues, DEBUG column
     const v37 = await page.evaluate(() => {
@@ -1213,10 +1214,10 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       v38.resignWait && v38.resign && v38.hold && v38.curve[0] > 0.15 && v38.curve[0] < 0.35 && v38.curve[1] > 0.35 && v38.curve[2] > 0.55 && v38.curve[3] > 0.55
       && v38.bench && v38.initCd && v38.obs && v38.obsLow && v38.pause && v38.off && v38.pressure, JSON.stringify(v38));
     check('v3.8 dialogues: resignation (hint names the leader; yes = armband off +8; no = disc +1, −10, pressure), captain tip (tag → archetype, +3 both, 7-day cooldown), bench promise, armband via PLAYER_INFO (mid +2; low → pick another keeps the old captain)',
-      v38d.resign.open && v38d.resign.tones === 'green,gray,red' && v38d.resign.text.includes(v38.aName) && v38d.yesCap === null && v38d.yesMor === 58 && v38d.yesDiary
+      v38d.resign.open && v38d.resign.tones === 'green,gray,red,gray' /* v3.25: + the free question */ && v38d.resign.text.includes(v38.aName) && v38d.yesCap === null && v38d.yesMor === 58 && v38d.yesDiary
       && v38d.noCap && v38d.noMor === 40 && v38d.noDisc === 11 && v38d.noPress === 1 && v38d.noHold === 1
-      && v38d.obsDlg.tones === 'green,gray,red' && v38d.obsTag && v38d.obsOop === 0 && v38d.obsMor === '53,53' && v38d.obsCd
-      && v38d.benchDlg.tones === 'green,gray,red' && v38d.promised && v38d.fired && v38d.midDlg.tones === 'green' && v38d.midCap && v38d.midMor === 52
+      && v38d.obsDlg.tones === 'green,gray,red,gray' && v38d.obsTag && v38d.obsOop === 0 && v38d.obsMor === '53,53' && v38d.obsCd
+      && v38d.benchDlg.tones === 'green,gray,red,gray' && v38d.promised && v38d.fired && v38d.midDlg.tones === 'green' && v38d.midCap && v38d.midMor === 52
       && v38d.lowDlg.tones === 'green,gray' && v38d.lowCap && v38d.lowMor === 50 && v38d.closed, JSON.stringify(v38d));
     // v3.9: a Quick Sim talk still owed survives a reload WITHOUT a forced modal, and closing the matchday skips it (no effects, no soft-lock)
     await page.evaluate(() => { const s = YAM.game; s.lastReport.talk = null; s.lastReport.instant = true; s.save(); });
@@ -1566,7 +1567,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const ids = Array.from({ length: 4000 }, (_, i) => 'w' + i), ws = ids.map(id => Player.rollWealth(id));
       out.share = WEALTH.KEYS.map(k => +(ws.filter(w => w === k).length / ids.length).toFixed(2));
       out.det = ids.slice(0, 50).every((id, i) => Player.rollWealth(id) === ws[i]);
-      out.all = [...s.globalPlayers, ...s.league.teams.filter(t => !t.user).flatMap(t => s.league.roster(t, new Set()))].every(p => WEALTH.KEYS.includes(p.wealth) && p.wealth === Player.rollWealth(p.id));
+      out.all = [...s.globalPlayers, ...s.league.teams.filter(t => !t.user).flatMap(t => s.league.roster(t, new Set()))].every(p => WEALTH.KEYS.includes(p.wealth) && (p.wealth === Player.rollWealth(p.id) || (p.twinId && p.wealth === Player.rollWealth(p.twinId))));   // v3.25: a twin shares his brother's family
       const raw = JSON.parse(JSON.stringify(s.squad[0])); delete raw.wealth; out.migrate = new Player({ ...raw, tags: [] }).wealth === s.squad[0].wealth;
       out.kept = new Player({ ...JSON.parse(JSON.stringify(s.squad[0])), wealth: 'rich', tags: [] }).wealth === 'rich';
       const gp = s.globalPlayers, avg = w => { const l = gp.filter(p => p.wealth === w); return l.reduce((a, p) => a + p.overall, 0) / Math.max(1, l.length); };
@@ -2474,11 +2475,12 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       };
       const R = Math.random, b = isoAdd(weekStartOf(s.calendar.date), 7), money = { budget: s.budget, ledger: JSON.stringify(s.ledger || {}), dn: s.diary.length };   // weeks inside this season
       Math.random = () => 0.5;
+      const kb = s.bonds; s.bonds = {};   // v3.25: ATMOS = 0 → exactly the v3.21 numbers (ATMOS has its own check)
       s.cohesion = 50; const e = week(b, 0);
       s.cohesion = 50; const t = week(isoAdd(b, 7), 2);
       s.cohesion = 50; const e2 = week(isoAdd(b, 14), 0), e3 = week(isoAdd(b, 21), 0), e4 = week(isoAdd(b, 28), 0);
       s.budget = money.budget; s.ledger = JSON.parse(money.ledger); s.diary.length = money.dn;
-      Math.random = R;
+      Math.random = R; s.bonds = kb;
       s.squad.forEach((p, i) => { [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays, p.suspensionMatches, p.psych.discipline] = keep.kids[i]; p.absentToday = null; p.skipped_training = false; });
       Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.cohesion = keep.coh; s.worldEvent = keep.we; s.worldLast = keep.wl; s.fees = keep.fees; s.save();
       const near = (a, b) => Math.abs(a - b) < 1e-9;
@@ -2510,6 +2512,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       const s = YAM.game, keep = { date: s.calendar.date, week: s.week, today: s.today, rep: { ...s.rep }, coh: s.cohesion, we: s.worldEvent, fees: s.fees, diaryN: s.diary.length,
         kids: s.squad.map(p => [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays, p.suspensionMatches, p.psych.discipline]) };
       const R = Math.random; Math.random = () => 0.5;
+      const kb = s.bonds; s.bonds = {};   // v3.25: ATMOS = 0 → the v3.21 cohesion path (and its diary lines) exactly
       s.week = null; const out = [];
       const week = (mon, days) => {
         s.calendar.date = mon; s.today = null; s.weekState(); s.worldEvent = null;
@@ -2523,7 +2526,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       [0, 7, 14, 21].forEach(k => week(isoAdd(b, k), 0));
       week(isoAdd(b, 28), 1); week(isoAdd(b, 35), 0);
       s.budget = money.budget; s.ledger = JSON.parse(money.ledger);
-      Math.random = R;
+      Math.random = R; s.bonds = kb;
       s.squad.forEach((p, i) => { [p.energy, p.dyn.sharpness, p.dyn.morale, p.injuryDays, p.awayDays, p.suspensionMatches, p.psych.discipline] = keep.kids[i]; p.absentToday = null; p.skipped_training = false; });
       Object.assign(s.rep, keep.rep); s.week = keep.week; s.today = keep.today; s.calendar.date = keep.date; s.cohesion = keep.coh; s.worldEvent = keep.we; s.fees = keep.fees; s.diary.length = keep.diaryN; s.save();
       const keys = ['week.empty', 'week.empty2', 'week.empty3'];
@@ -3264,6 +3267,283 @@ const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info });
       });
       await page.evaluate(() => { YAM.ui.autoReview = true; YAM.ui.autoAfter = true; YAM.game.excusesOff = true; });
       check('v3.24 old save without newsSeen / excuseLog / fines / gkByHand / yard notes loads (empty defaults, yard notes from DraftView)', Object.values(old).every(Boolean), JSON.stringify(old));
+    }
+    // ===== v3.25 BONDS: friendships, twins, the talk =====
+    {
+      await page.evaluate(() => { const ui = YAM.ui; ui.modal.close(); ui.profile.close(); if (YAM.game.pendingEvent) { YAM.game.pendingEvent = null; ui.events.view.close(); } });
+      // (1) starting table + old save without bonds / yard / school (seeded → the same values twice), keeps playing
+      const b1 = await page.evaluate(() => {
+        const s = YAM.game, out = {};
+        const st = s.initBonds(s.calendar.date), S = BOND.START;
+        let okYard = true, okSchool = true, okBoth = true, nY = 0, nS = 0, nB = 0;
+        for (let i = 0; i < s.squad.length; i++) for (let j = i + 1; j < s.squad.length; j++) {
+          const a = s.squad[i], b = s.squad[j], e = st[bondKey(a.id, b.id)], y = sameYard(a, b), sc = sameSchool(a, b);
+          if (areTwins(a, b) || e?.cause === 'grudge') continue;
+          const yg = e && e.v === S.yard[0] + BOND.YARD_GAME_DV || e && e.v === S.both[0] + BOND.YARD_GAME_DV;
+          if (y && sc) { nB++; okBoth &&= !!e && (e.v === S.both[0] || yg) && e.root === S.both[1]; }
+          else if (y) { nY++; okYard &&= !!e && (e.v === S.yard[0] || yg) && e.root === S.yard[1]; }
+          else if (sc && a.bio.age === b.bio.age) { nS++; okSchool &&= !!e && e.v === S.school[0] && e.root === S.school[1]; }
+          else okSchool &&= !e;
+        }
+        Object.assign(out, { okYard, okSchool, okBoth, nY, nS, nB });
+        s.save(); const d = JSON.parse(localStorage.getItem('yam_save_v1'));
+        delete d.bonds; delete d.bondMeta; for (const p of [...(d.squad || []), ...(d.pool || [])]) { delete p.yard; delete p.school; delete p.bondNotes; delete p.praiseLog; delete p.talk; }
+        localStorage.setItem('yam_save_v1', JSON.stringify(d));
+        return out;
+      });
+      const old1 = await page.evaluate(() => { const g = new GameState(); g.load(); return JSON.stringify(g.bonds) + '#' + g.squad.map(p => p.yard + '/' + p.school).join(','); });
+      const old2 = await page.evaluate(() => { const g = new GameState(); g.load(); return JSON.stringify(g.bonds) + '#' + g.squad.map(p => p.yard + '/' + p.school).join(','); });
+      await page.reload();
+      await page.waitForFunction(() => window.YAM && YAM.ui);
+      await page.evaluate(() => { YAM.ui.autoReview = true; YAM.ui.autoAfter = true; YAM.game.excusesOff = true; YAM.ui.modal.close(); });
+      const b1b = await page.evaluate(() => ({ bonds: !!YAM.game.bonds && Object.keys(YAM.game.bonds).length > 0, roots: YAM.game.squad.every(p => Number.isInteger(p.yard) && Number.isInteger(p.school)) }));
+      check('v3.25 starting bonds: same yard +20 / root 10, same school + same age +10 / root 0, both +35 / root 15 (an old grudge / the yard match aside); nothing else stored',
+        b1.okYard && b1.okSchool && b1.okBoth && b1.nY + b1.nB > 0, JSON.stringify(b1));
+      check('v3.25 old save without bonds / yard / school loads, gets the same seeded table twice in a row, keeps playing', old1 === old2 && old1.length > 10 && b1b.bonds && b1b.roots, old1.slice(0, 80));
+
+      // (2) drift: training neighbours +1, assist +4, win +1, bench rivalry −2 (position), decay stops at the root
+      const b2 = await page.evaluate(() => {
+        const s = YAM.game, out = {}, bk = JSON.stringify(s.bonds), date = s.calendar.date;
+        s.bonds = {};
+        const [a, b] = s.lineupNeighbours()[0];
+        const trained = s.squad.filter(p => [a, b].includes(p.id));
+        s.bondTraining(date, trained); out.train = s.bondV(a, b) >= BOND.TRAIN && s.bondV(a, b) <= BOND.TRAIN + 2 * BOND.DRILL;
+        s.bonds = {}; s.bondTraining('2000-01-01', s.squad.filter(p => [a, b].includes(p.id))); const withDrill = s.bondV(a, b);
+        out.trainExact = withDrill === BOND.TRAIN + BOND.DRILL * BOND.DRILL_PAIRS || withDrill === BOND.TRAIN;   // 2 kids → both drills land on them
+        s.bonds = {};
+        const xi = s.lineup.map(id => s.player(id)), x = xi[5], y = xi[9];
+        const eng = { sides: [{ entries: [] }], subs: [], everPlayed: new Set([x.id, y.id]), matchEvents: [{ type: 'goal', side: 0, playerId: y.id, assistId: x.id }], blames: [], injured: new Set() };
+        s.bondMatch(eng, 'D', date); out.assist = s.bondV(x.id, y.id) === BOND.ASSIST;
+        s.bondMatch({ ...eng, matchEvents: [] }, 'W', date); out.win = s.bondV(x.id, y.id) === BOND.ASSIST + BOND.WIN;
+        const [c, d] = s.squad.filter(p => !s.isStarter(p.id)).slice(0, 1).concat(xi.slice(1, 2));
+        const keep = [c.tag, d.tag, c.benchStreak, c.injuryDays, c.awayDays, c.suspensionMatches, c.absentToday, c.flags]; c.tag = d.tag = 'MID'; c.benchStreak = 2;
+        Object.assign(c, { injuryDays: 0, awayDays: 0, suspensionMatches: 0, absentToday: null, flags: c.flags.filter(f => f !== 'Benched') });   // fit, just not picked
+        s.bondMatch({ ...eng, everPlayed: new Set([d.id]), matchEvents: [] }, 'L', date);
+        const e = s.bond(c, d); out.position = e?.v === BOND.POSITION && e.cause === 'position';
+        [c.tag, d.tag, c.benchStreak, c.injuryDays, c.awayDays, c.suspensionMatches, c.absentToday, c.flags] = keep;
+        s.bonds = { [bondKey(x.id, y.id)]: { v: 13, root: 10, cause: null, since: date, last: '2000-01-01' } };
+        for (let k = 0; k < 6; k++) s.bondWeek(isoAdd(date, 7 * (k + 1)));
+        out.decay = s.bondV(x.id, y.id) === 10;
+        s.bonds = JSON.parse(bk);
+        return out;
+      });
+      check('v3.25 bonds drift: XI neighbours who trained +1 (+ the pair drill), assist → goal +4, a win +1 to existing friends, bench rivalry −2 with cause "position", decay stops at the root',
+        Object.values(b2).every(Boolean), JSON.stringify(b2));
+
+      // (3) a fixed seeded duel: v = +100 vs −100 moves pass / interception only; AI side none
+      const b3 = await page.evaluate(() => {
+        const s = YAM.game, ctx = s.matchContext() || { team: { name: 'X', players: s.squad.slice(0, 11), formation: '4-4-2' } };
+        const home = { name: 'H', players: s.starters(), formation: s.formation }, away = { name: ctx.team.name, players: ctx.team.players, formation: ctx.team.formation };
+        const run = v => {
+          const saved = Math.random; let a = 12345; Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+          const e = new MatchEngine(home, away, { onUpdate() {}, onEnd() {}, onLog() {}, onSpeed() {} }, v == null ? {} : { bonds: { side: 0, v: () => v } });
+          e.instant = true; e.begin(); for (let i = 0; i < 400 && !e.finished; i++) e.tick();   // the whole match
+          Math.random = saved;
+          return e.trace;
+        };
+        const hi = run(100), lo = run(-100), none = run(null);
+        const kinds = (t, k) => t.filter(x => x.kind === k);
+        const passHi = kinds(hi, 'pass').concat(kinds(hi, 'passFwd')), passLo = kinds(lo, 'pass').concat(kinds(lo, 'passFwd'));
+        return {
+          passUs: passHi.filter(x => x.side === 0).every(x => x.A.bond === 0 || Math.abs(x.A.bond - BOND.MAX) < 1e-9 || Math.abs(x.A.bond - BOND.MAX * TWINS.LINK) < 1e-9)
+            && passHi.some(x => x.side === 0 && x.A.bond > 0) && passLo.filter(x => x.side === 0).every(x => x.A.bond <= 0) && passLo.some(x => x.side === 0 && x.A.bond < 0),   // XI neighbours only
+          readUs: passHi.filter(x => x.side === 1).some(x => x.D.bond > 0) && passHi.filter(x => x.side === 1).every(x => x.D.bond >= 0 && x.A.bond === 0),
+          ai: passHi.filter(x => x.side === 1).every(x => x.A.bond === 0) && passHi.filter(x => x.side === 0).every(x => x.D.bond === 0),
+          other: [...hi, ...lo].filter(x => !['pass', 'passFwd'].includes(x.kind)).every(x => x.A.bond === 0 && x.D.bond === 0),
+          none: none.every(x => x.A.bond === 0 && x.D.bond === 0) && none.length > 10,
+          csv: MatchEngine.traceCsv(hi.slice(0, 2), ['a', 'b']).split('\n')[0].includes('atk_bond'),
+        };
+      });
+      check('v3.25 seeded duel: v = +100 / −100 changes the pass duel (passer ↔ receiver, XI neighbours) and the interception (same-line neighbours), never shots / dribbles / tackles; the AI side has no bonds; no bonds = no term; bond column in the match log',
+        Object.values(b3).every(Boolean), JSON.stringify(b3));
+
+      // (4) ATMOS = 0 → the v3.24 cohesion number; enemies lower the weekly gain
+      const b4 = await page.evaluate(() => {
+        const s = YAM.game, w = s.weekState(), keep = { c: s.cohesion, teff: w.teff, b: s.bonds };
+        s.cohesion = 50; w.teff = 2; s.bonds = {}; const a0 = s.atmos(); s.updateCohesion(); const c0 = s.cohesion;
+        const v324 = clamp(50 * COH.DECAY + COH.GAIN * 2, 0, 100);
+        const ids = s.squad.map(p => p.id); s.bonds = {};
+        for (let i = 0; i < 6; i++) s.bonds[bondKey(ids[i], ids[i + 6])] = { v: -70, root: 0, cause: 'grudge', since: '', last: '' };
+        s.cohesion = 50; const a1 = s.atmos(); s.updateCohesion(); const c1 = s.cohesion;
+        Object.assign(s, { cohesion: keep.c, bonds: keep.b }); w.teff = keep.teff;
+        return { a0, c0, v324, a1, c1, ok: a0 === 0 && Math.abs(c0 - v324) < 1e-9 && a1 < 0 && c1 < c0 };
+      });
+      check('v3.25 ATMOS: no bonds → ATMOS 0 and the v3.24 Sunday cohesion number; kids at war lower the weekly gain (× (1 + ATMOS))', b4.ok, JSON.stringify(b4));
+
+      // (5) the loner: attendance down, the Monday line (3 phrasings, never the same two weeks running) + an exact note
+      const b5 = await page.evaluate(() => {
+        const s = YAM.game, keep = s.bonds, p = s.squad[3], q = s.squad[4];
+        s.bonds = { [bondKey(p.id, q.id)]: { v: -30, root: 0, cause: 'blame', since: '', last: '' } };
+        const lon = s.isLoner(p) && s.isLoner(q) && !s.isLoner(s.squad[5]);
+        const r6 = s.squad[6], keep6 = r6.injuryDays, mate = s.squad[7];
+        const penL = s.bondAttendPen(p), pen0 = s.bondAttendPen(mate);
+        s.bonds[bondKey(r6.id, mate.id)] = { v: 70, root: 0, cause: null, since: '', last: '' }; r6.injuryDays = 3;
+        const penF = s.bondAttendPen(mate); r6.injuryDays = keep6;
+        const pens = { penL, pen0, penF };
+        const m1 = weekStartOf(s.calendar.date), m2 = isoAdd(m1, 7);
+        (s.bondMeta ||= {}).lonerLast = null;
+        const l1 = MorningBriefing.cohNews({ ...s, phase: 'calendar', cohesion: 80, bonds: s.bonds, lonerLine: s.lonerLine.bind(s), player: s.player.bind(s) }, m1);
+        const l2 = MorningBriefing.cohNews({ ...s, phase: 'calendar', cohesion: 80, bonds: s.bonds, lonerLine: s.lonerLine.bind(s), player: s.player.bind(s) }, m2);
+        const note = (p.bondNotes || []).concat(q.bondNotes || []).some(n => n.band === 'alone' && n.source === 'loner');
+        s.bonds = keep;
+        return { lon, pens, l1, l2, note, ok: lon && penL === BOND.LONER_ATTEND && pen0 === 0 && penF === BOND.FRIEND_AWAY && l1.length === 1 && l2.length === 1 && l1[0] !== l2[0] && note };
+      });
+      check('v3.25 loner (no friend, one rival): the attendance chance −0.1 (and −0.1 when a best mate is injured / away), the Monday line "seems to be on his own at training" (a different phrasing next week) + an exact note', b5.ok, JSON.stringify(b5));
+
+      // (6) twins: 2 pairs in a new world, same surname, different initials, twinId both ways; the other 96 kids unchanged + no Math.random; the mum's request
+      const b6 = await page.evaluate(() => {
+        const saved = Math.random; let a = 777; Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+        const used = new Set(), world = GameState.buildWorld(used), pool = world.filter(p => p.teamId === 'free_agent').slice(0, WORLD.DRAFT_POOL).map(p => p.id);
+        const hash = list => { let h = 0; for (const p of list) for (const c of p.name + JSON.stringify([p.physical, p.technical, p.tactical, p.psych])) h = (Math.imul(h, 31) + c.charCodeAt(0)) | 0; return h; };
+        const before = new Map(world.map(p => [p.id, hash([p])]));
+        let calls = 0; const r0 = Math.random; Math.random = () => { calls++; return r0(); };
+        const made = makeTwins(world, pool);
+        Math.random = saved;
+        const tw = new Set(made.flat().map(p => p.id)), rest = world.filter(p => !tw.has(p.id));
+        return { pairs: made.length, same: made.every(([x, y]) => x.surname === y.surname && x.name[0] !== y.name[0] && x.twinId === y.id && y.twinId === x.id && x.bio.age === y.bio.age && x.archetype === y.archetype && x.wealth === y.wealth && kidRoots(x).yard === kidRoots(y).yard && kidRoots(x).school === kidRoots(y).school),
+          face: made.every(([x, y]) => x.face.filter((v, i) => v !== y.face[i]).length === 1), inPool: made[0].every(p => pool.includes(p.id)),
+          rest: rest.length === 96 && rest.every(p => before.get(p.id) === hash([p])), calls };
+      });
+      check('v3.25 twins: 2 pairs (same surname / yard / school / family / archetype, different initials, twinId both ways, one face difference); the other 96 kids unchanged (hash of names + skills), no Math.random call',
+        b6.pairs === 2 && b6.same && b6.face && b6.inPool && b6.rest && b6.calls === 0, JSON.stringify(b6));
+      const b6b = await page.evaluate(() => {
+        const raw = localStorage.getItem(GameState.KEY), g = new GameState(), ui = YAM.ui, real = ui.state;
+        g.newAcademy();
+        const t = g.globalPlayers.find(p => p.twinId && g.draft.pool.includes(p.id)), b = g.globalPlayers.find(p => p.id === t.twinId);
+        g.toggleDraft(t.id);
+        const ask = g.draftTwinAsk(t.id) === b;
+        const m0 = t.dyn.morale, par = g.rep.parents;
+        g.draftTwinAnswer(t.id, false);
+        const ref = t.dyn.morale === clamp(m0 + TWINS.REFUSE_MORALE, 0, 100) && g.rep.parents === par + TWINS.REFUSE_PARENTS && !g.draftSigned().includes(b.id) && !g.draftTwinAsk(t.id);
+        const g2 = new GameState(); g2.newAcademy(); const t2 = g2.globalPlayers.find(p => p.twinId && g2.draft.pool.includes(p.id));
+        g2.toggleDraft(t2.id); g2.draftTwinAnswer(t2.id, true);
+        const take = g2.draftSigned().includes(t2.twinId) && g2.draftSigned().length === 2;
+        ui.state = g2; ui.draft.render?.(); const hasModal = ui.draft.askTwin(t2.id); ui.state = real;   // already answered → no second ask
+        localStorage.setItem(GameState.KEY, raw);
+        return { ask, ref, take, noRepeat: !hasModal };
+      });
+      await page.evaluate(() => { YAM.game.save(); YAM.ui.modal.close(); });
+      check('v3.25 draft: signing one twin while the other is free → the mum\'s request; take = the brother uses the next pick; refuse = morale −8, Parents −2, asked once', Object.values(b6b).every(Boolean), JSON.stringify(b6b));
+
+      // (7) twin mix-up: MIXUP forced to 1 → a clue lands on the brother, marked; a talk teaches the coach → the line + struck through
+      const b7 = await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui, [x, y] = s.squad.filter(p => !p.twinId).slice(-2), keep = { xt: x.twinId, yt: y.twinId, xc: x.clues, yc: y.clues, bm: JSON.stringify(s.bondMeta) };
+        x.twinId = y.id; y.twinId = x.id; s.bondMeta = { known: {}, matches: {} }; s.twinMixForce = 1;
+        const n0 = y.clues.length;
+        s.addClue(x, { date: s.calendar.date, source: 'match', ref: 99, signal: 'pass', textKey: 'clue.pass.0' });
+        const landed = y.clues.at(-1)?.mix === x.id && y.clues.at(-1).ref === 99 && !x.clues.some(c => c.ref === 99);   // (the list is capped: compare the last one)
+        ui.profile.open(y.id); const mark = document.getElementById('pinfo-body').innerHTML.includes(esc(L.t('twins.mix', { k: L.name(y.name) })));
+        const struck0 = document.getElementById('pinfo-body').innerHTML.includes('<s>'); ui.profile.close();
+        s.weekState().ap = Math.max(1, s.ap); x.talk = {};
+        ui.haveWord(x.id); ui.events.view.finishTyping();
+        const learned = s.twinsKnown(x) === false;
+        const pe = s.pendingEvent; const q = [...document.querySelectorAll('#talk-choices .talk-btn')].findIndex(b => b.textContent.includes(L.t('btalk.q.mates')));
+        document.querySelectorAll('#talk-choices .talk-btn')[q].click(); ui.events.view.finishTyping();
+        const known = s.twinsKnown(x) && s.diary.some(d => d.key === 'twins.learned');
+        s.pendingEvent = null; ui.events.view.close();
+        ui.profile.open(y.id); const struck = document.getElementById('pinfo-body').innerHTML.includes('<s>'); ui.profile.close();
+        ui.nbTab = 'locker'; ui.renderNotebook(); const line = document.getElementById('notes-body').textContent.includes(L.t('twins.line', { k: L.name(twinCowlick(x, y).name) }).slice(0, 12)); ui.nbTab = 'match';
+        s.twinMixForce = null; Object.assign(x, { twinId: keep.xt, clues: keep.xc }); Object.assign(y, { twinId: keep.yt, clues: keep.yc }); s.bondMeta = JSON.parse(keep.bm);
+        if (!x.twinId) delete x.twinId; if (!y.twinId) delete y.twinId;
+        return { landed, mark, struck0: !struck0, learned, pe: pe?.id === 'bondtalk', known, struck, line };
+      });
+      check('v3.25 twin mix-up: with MIXUP forced to 1 a clue lands on the brother marked "I think it was…"; after a talk the coach tells them apart (diary + Notebook line) and the mixed clue is struck through',
+        Object.values(b7).every(Boolean), JSON.stringify(b7));
+
+      // (8) the talk: 1 AP, 2 questions then closed; greyed at 0 AP and for 7 days; free office question; O = 1 / O = 0; gossip; repeat; notes source 'talk'
+      const b8 = await page.evaluate(async () => {
+        const s = YAM.game, ui = YAM.ui, out = {}, kid = s.squad.find(p => !p.twinId && p.available), other = s.squad.find(p => p !== kid && !p.twinId);
+        const keepB = JSON.stringify(s.bonds);
+        s.bonds[bondKey(kid.id, other.id)] = { v: 45, root: 0, cause: null, since: '', last: '' };
+        const btns = () => [...document.querySelectorAll('#talk-choices .talk-btn')];
+        const clickLabel = t => { const b = btns().find(x => x.textContent.includes(t)); b?.click(); ui.events.view.finishTyping(); return !!b; };
+        s.weekState().ap = 2; kid.talk = {}; s.talkForceO = 1;
+        ui.modal.close(); ui.profile.open(kid.id); out.pOpen = ui.profile.isOpen; const tb = document.getElementById('pinfo-talk'); out.btn = !tb.hidden && !tb.disabled && !/\d+\s*%/.test(tb.textContent);
+        tb.click(); ui.events.view.finishTyping();
+        out.ap = s.ap === 1 && s.pendingEvent?.id === 'bondtalk';
+        clickLabel(L.t('btalk.q.how')); clickLabel(L.name(other.name).split(' ')[0]) || btns().find(b => b.textContent.includes(squadName(other, s.squad)))?.click(); ui.events.view.finishTyping();
+        out.honest = (kid.bondNotes || []).some(n => n.with === other.id && n.band === 'mates' && n.source === 'talk' && n.by?.pid === kid.id);
+        out.more = btns().length === 2;
+        clickLabel(L.t('btalk.more')); clickLabel(L.t('btalk.q.mates'));
+        out.last = btns().length === 1 && btns()[0].textContent.includes(L.t('btalk.bye'));
+        btns()[0].click();
+        out.closed = !s.pendingEvent && document.getElementById('talk-layer').hidden;
+        ui.profile.open(kid.id); out.cd = document.getElementById('pinfo-talk').disabled && s.talkBlock(kid.id) === 'btalk.cooldown'; ui.profile.close();
+        const other2 = s.squad.find(p => p !== kid && p !== other); other2.talk = {}; s.weekState().ap = 0;
+        out.noAp = s.talkBlock(other2.id) === 'talk.noAp' && !ui.haveWord(other2.id);
+        // O forced to 0 → every answer evasive; repeat; gossip
+        s.talkForceO = 0; let ev = 0; for (const q of ['how', 'how']) { const a = s.talkAnswer(other2, q, other.id, null, isoAdd(s.calendar.date, ev * 30)); if (a.kind === 'evade') ev++; }
+        out.evade = ev === 2;
+        s.talkForceO = 1; out.repeat = s.talkAnswer(other2, 'how', other.id, null, isoAdd(s.calendar.date, 31))?.kind === 'repeat' || s.talkAnswer(other2, 'how', other.id, null, isoAdd(s.calendar.date, 32))?.kind === 'repeat';
+        s.bonds[bondKey(other2.id, other.id)] = { v: -40, root: 0, cause: 'position', since: '', last: '' };
+        s.talkForceGossip = 1; const m0 = other.dyn.morale;
+        const g = s.talkAnswer(other2, 'how', other.id, null, isoAdd(s.calendar.date, 90));
+        out.gossip = g.kind === 'honest' && g.cause === 'position' && other.dyn.morale === clamp(m0 + TALK.GOSSIP_MORALE, 0, 100) && other.talk.closedUntil > s.calendar.date;
+        s.talkForceGossip = null; s.talkForceO = null;
+        // the free question when he came by himself (an excuse request)
+        s.weekState().ap = 0; const k2 = s.squad.find(p => p.available && p !== kid);
+        ui.events.fire('posreq', s.calendar.date, { cast: { kid: k2.id } }); ui.events.view.finishTyping();
+        const free = btns().find(b => b.textContent.includes(L.t('btalk.free')));
+        out.freeBtn = !!free && !free.disabled; free?.click(); ui.events.view.finishTyping();
+        clickLabel(L.t('btalk.q.mates'));
+        out.freeAns = btns().length === 1 && btns()[0].textContent.includes(L.t('btalk.back')) && s.ap === 0;
+        btns()[0].click(); ui.events.view.finishTyping();
+        out.freeBack = s.pendingEvent?.id === 'posreq' && !btns().some(b => b.textContent.includes(L.t('btalk.free')));
+        btns()[1]?.click();   // pr.wait
+        if (s.pendingEvent) { s.pendingEvent = null; ui.events.view.close(); }
+        s.bonds = JSON.parse(keepB);
+        return out;
+      });
+      check('v3.25 Have a word: 1 AP, two questions then only "Thanks"; greyed for 7 days and at 0 AP; O = 1 answers by the band (note source \'talk\'), O = 0 always evasive; "you already asked"; gossip (morale −2, closed for 14 days); the free question when he came by himself (no AP, back to his request)',
+        Object.values(b8).every(Boolean), JSON.stringify(b8));
+
+      // (9) no digits next to a bond word: Notebook "Locker room", PLAYER_INFO "In the squad", the locker room line, the Match Summary cause line
+      const b9 = await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui, [a, b, c] = s.lineupNeighbours()[0].map(id => s.player(id)).concat([s.squad.find(p => !s.isStarter(p.id))]);
+        const keep = { an: a.bondNotes, bn: b.bondNotes };
+        s.addBondNote(a, { with: b.id, band: 'cold', source: 'talk', date: s.calendar.date, by: { pid: a.id, name: a.name }, cause: 'position' });
+        s.addBondNote(b, { with: a.id, band: 'war', source: 'after', date: s.calendar.date, by: { pid: b.id, name: b.name } });
+        s.addBondNote(a, { with: c.id, band: 'best', source: 'came', date: '2001-01-01' });
+        ui.nbTab = 'locker'; ui.renderNotebook(); const nb = document.getElementById('notes-body').innerText; ui.nbTab = 'match';
+        ui.profile.open(a.id); const pi = document.querySelector('#pinfo-body .pi-bonds')?.innerText || ''; ui.profile.close();
+        const warn = s.lockerBondWarning(), lr = warn ? L.t('lr.bond.warn', { a: 'A', b: 'B', l: L.t('lr.bond.line.' + warn.line), d: fmtDate(warn.date, { weekday: 'long' }) }) : '';
+        const cause = L.t('bond.cause', { a: L.name(a.name), b: L.name(b.name) });
+        const dig = t => /\d/.test(t.replace(/\d{1,2}\s+\S+\.?/g, '').replace(/#\d+/g, ''));   // dates ("12 Dec") and shirt numbers aside
+        Object.assign(a, { bondNotes: keep.an }); Object.assign(b, { bondNotes: keep.bn });
+        return { nb: nb.length > 50 && !dig(nb.split('\n').filter(l => /mates|get on|war|приятел|ладят|ножах|друз|сам по себе|on his own/i.test(l)).join('\n')),
+          pi: pi.length > 5 && !/\d/.test(pi), warn: !!warn && !/\d/.test(lr), cause: !/\d/.test(cause), stale: nb.includes(L.t('bn.staleTag')), avail: ui.notesAvail };   // (the Notebook's "Locker room" is there between matches too)
+      });
+      check('v3.25 no numbers next to any bond word: Notebook "Locker room" (+ "haven\'t checked for a while" on old notes), PLAYER_INFO "In the squad", the locker room warning, the Match Summary cause line',
+        Object.values(b9).every(Boolean), JSON.stringify(b9));
+
+      // (10) auto lineup: separates a KNOWN bad pair when a swap costs ≤ 0.5 overall; nothing for an unknown one
+      const b10 = await page.evaluate(() => {
+        const s = YAM.game, keep = { lu: [...s.lineup], f: s.formation }, out = {};
+        s.formation = '4-4-2';
+        const [a, b] = s.lineupNeighbours().find(([x, y]) => s.lineup.indexOf(x) > 0 && s.lineup.indexOf(y) > 0);
+        const ia = s.lineup.indexOf(a), sl = s.slots();
+        const mate = s.lineup.findIndex((id, j) => j > 0 && j !== ia && j !== s.lineup.indexOf(b) && sl[j].line === sl[ia].line && !s.lineupNeighbours().some(([x, y]) => (x === id && y === b) || (y === id && x === b)));
+        const pa = s.player(a), pm = s.player(s.lineup[mate]), keepO = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(pa), 'overall');
+        Object.defineProperty(pa, 'overall', { value: 10, configurable: true }); Object.defineProperty(pm, 'overall', { value: 10.3, configurable: true });
+        const allNotes = s.squad.map(p => p.bondNotes); s.squad.forEach(p => { p.bondNotes = []; });   // only this pair is known
+        const notes = [pa.bondNotes, s.player(b).bondNotes];
+        const lu0 = [...s.lineup];
+        out.unknown = s.bondSeparate() === 0 && s.lineup.join() === lu0.join();
+        s.addBondNote(pa, { with: b, band: 'war', source: 'talk', date: s.calendar.date, by: { pid: a, name: pa.name } });
+        out.swapped = s.bondSeparate() >= 1 && !s.lineupNeighbours().some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+        delete pa.overall; delete pm.overall; s.squad.forEach((p, i) => { p.bondNotes = allNotes[i]; });
+        s.lineup = keep.lu; s.formation = keep.f;
+        return out;
+      });
+      check('v3.25 auto lineup: two kids with a KNOWN bad bond side by side are separated by a swap that costs ≤ 0.5 overall; an unknown bad bond changes nothing', b10.unknown && b10.swapped, JSON.stringify(b10));
+
+      // (11) the balance harness: default and --cohesion tables identical to v3.24, --bonds on target
+      const bb = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js'), '--cohesion', '--bonds'], { encoding: 'utf8' });
+      const hsh = t => require('crypto').createHash('sha256').update(t).digest('hex').slice(0, 16);
+      const base = bb.stdout.split(/\n(?:Bonds \(v3\.25\)|fatigueMult)/)[0] + '\n' + bb.stdout.split('\n').filter(l => /^OK: (Attack|cohesion)/.test(l)).join('\n');   // what the v3.24 harness printed for --cohesion
+      check('v3.25 test/balance.js --cohesion --bonds: the v3.24 tables unchanged (sha), bonds on target (3 pairs +80 → 53–56 %, 2 pairs −80 → 42–46 %)',
+        bb.status === 0 && hsh(base) === BAL_V324_COH && /OK: bonds win share/.test(bb.stdout), hsh(base) + ' ' + (bb.stdout.trim().split('\n').pop() || bb.stderr).slice(0, 140));
+      await page.evaluate(() => { YAM.ui.modal.close(); YAM.ui.profile.close(); });
     }
     const bal = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js')], { encoding: 'utf8' });
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));

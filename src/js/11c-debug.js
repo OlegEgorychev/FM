@@ -38,6 +38,11 @@ class DebugConsole {
     add('ENGINE', 'TRN-SKIP', p => Math.round(arrivalSkipChance(p) * 100), null, 'v2.6 chance (%) to skip a training / the locker room (from discipline); v3.21: renamed from SKIP%');
     add('ENGINE', 'ABS', p => p.absentToday || '—', null, 'v2.6 absent today');
     add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
+    const gs = () => window.YAM?.game;   // v3.25 bonds (the state is read live)
+    add('BONDS', 'BONDS', p => { const l = gs()?.bondsOf(p.id) || []; return `${l.filter(x => x.v >= 20).length}/${l.filter(x => x.v <= -20).length}`; }, null, 'v3.25 friends (v ≥ 20) / rivals (v ≤ −20) in the squad');
+    add('BONDS', 'OPEN', p => gs()?.bonds ? +gs().openness(p).toFixed(2) : '—', 1, 'v3.25 hidden openness in a talk (0.1–0.9)');
+    add('BONDS', 'YARD', p => { kidRoots(p); return `${p.yard}/${p.school}`; }, null, 'v3.25 hidden yard (0–4) / school (0–2)');
+    add('BONDS', 'TWIN', p => p.twinId ? `${p.twinId}${gs()?.twinsKnown(p) ? '' : ' MIX'}` : '—', null, 'v3.25 twin brother id; MIX = the coach still mixes them up');
     return c;
   })();
 
@@ -114,7 +119,21 @@ class DebugConsole {
         m: a.median == null ? '—' : a.median.toFixed(2) + ' s', x: pc(a.fast) }) : L.t('dbg.att.none', { w: w0 }); };
     return `<div class="dbg-team" id="dbg-team"><span title="${esc(L.t('dbg.cohTip'))}"><b>${L.t('dbg.coh')}</b> <span id="dbg-coh">${Math.round(s.cohesion ?? COH.START)}</span> (${esc(L.t('coh.band.' + cohBand(s.cohesion)))})</span>
       <span>${esc(L.t('dbg.streak'))}: <b>${w.emptyStreak || 0}</b></span>
-      <span class="dbg-att" id="dbg-att"><b>${esc(L.t('dbg.att'))}</b> · ${esc(row('week'))} &nbsp;|&nbsp; ${esc(row('season'))}</span></div>`;
+      ${s.bonds ? `<span title="v3.25 ATMOS = clamp((F − 1.5 × E) / squad × K): × (1 + ATMOS) on the weekly cohesion gain"><b>ATMOS</b> <span id="dbg-atmos">${s.atmos().toFixed(3)}</span></span>` : ''}
+      <span class="dbg-att" id="dbg-att"><b>${esc(L.t('dbg.att'))}</b> · ${esc(row('week'))} &nbsp;|&nbsp; ${esc(row('season'))}</span></div>${this.bondsHTML()}`;
+  }
+  /** v3.25: every stored pair (v, root, cause, what the coach knows: band + source) + the twins. */
+  bondsHTML() {
+    const s = this.ui.state;
+    if (!s.bonds) return '';
+    const nm = id => esc(squadName(s.player(id), s.squad));
+    const rows = Object.entries(s.bonds).filter(([k]) => k.split('|').every(id => s.player(id))).sort((a, b) => b[1].v - a[1].v).map(([k, e]) => {
+      const [a, b] = k.split('|'), kb = s.knownBond(a, b);
+      return `<tr><td>${nm(a)}</td><td>${nm(b)}</td><td class="${e.v >= 20 ? 'hi' : e.v <= -20 ? 'lo' : ''}">${e.v}</td><td>${e.root}</td><td>${e.cause || '—'}</td><td>${bondBand(e.v)}</td><td>${kb ? kb.band + ' · ' + kb.source + (kb.confirmed ? ' ✓' : '') : '—'}</td></tr>`;
+    }).join('');
+    const tw = s.squad.filter(p => p.twinId && s.player(p.twinId) && p.id < p.twinId).map(p => `${nm(p.id)} + ${nm(p.twinId)} ${s.twinsKnown(p) ? '(told apart)' : '(MIX ' + TWINS.MIXUP + ')'}`).join(' · ');
+    return `<details class="dbg-bonds" id="dbg-bonds"><summary><b>BONDS</b> — ${Object.keys(s.bonds).length} pairs${tw ? ' · twins: ' + tw : ''}</summary>
+      <div class="dbg-scroll"><table class="dbg-pairs"><thead><tr><th>A</th><th>B</th><th>v</th><th>root</th><th>cause</th><th>band</th><th>coach knows</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
   }
 
   godHTML() {

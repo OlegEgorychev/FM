@@ -690,7 +690,88 @@ const NARRATIVE_EVENTS = [
         ] });
     },
   },
+
+  /* ---------- v3.25 HAVE A WORD — the talk one-on-one (PLAYER_INFO.EXE, 1 AP = 2 questions, once a week per kid) ---------- */
+  {
+    id: 'bondtalk', when: 'manual',
+    trigger: () => false,
+    cast: () => null,   // fired by UIController.haveWord with the kid
+    execute(ctx) { bondTalkStep(ctx, ctx.step === 'start' ? 'menu' : ctx.step, ''); },
+  },
+
+  /* ---------- v3.25 MISSES HIS BROTHER — 2–4 weeks after the coach refused the twin at the draft (20 %, scheduled) ---------- */
+  {
+    id: 'twinmiss', when: 'scheduled',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast, name = L.name(kid.name), blk = s.expelBlock(kid.id);
+      const face = kid.portraitSvg, role = L.t('talk.roleOffice', { n: kid.number, p: L.pos(kid.position) });
+      if (ctx.step === 'stay' || ctx.step === 'go') {
+        ctx.show({ face, name, role, text: L.t('ev.twinmiss.' + ctx.step, { k: name }),
+          choices: [{ key: 'ev.twinmiss.' + ctx.step + 'Ok', tone: 'gray', who: kid.id,
+            run: () => { if (ctx.step === 'go') { s.expel(kid.id); return { k: { name: kid.name } }; } kid.dyn.morale = clamp(kid.dyn.morale + 5, 0, 100); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
+      ctx.show({ face, name, role, text: L.t('ev.twinmiss.text', { k: name }),
+        choices: [
+          { key: 'ev.twinmiss.a', tone: 'gray', who: kid.id, blocked: blk ? 'ev.scoutpoach.blk' : null, run: () => { s.expel(kid.id); return { k: { name: kid.name } }; } },   // let him go (no expel penalties)
+          { key: 'ev.twinmiss.b', tone: 'green', ap: 1, who: kid.id, next: () => (blk || seeded(ctx.date + '#twinmiss#' + kid.id)() < clamp(0.5 + (kid.dyn.morale - 50) / 100, 0.2, 0.8) ? 'stay' : 'go') },
+          { key: 'ev.twinmiss.c', tone: 'red', who: kid.id, run: () => { kid.dyn.morale = clamp(kid.dyn.morale - 10, 0, 100); return { k: { pid: kid.id } }; } },
+        ] });
+    },
+  },
 ];
+
+/* ---------- v3.25 the talk window (shared by "Have a word" and the free question when a kid came by himself) ----------
+   pe.talk = { left, free }; steps: 'menu' → 'pick:<qid>' (→ 'pick2:pair:<x>') → 'ans' (the answer, rolled once in `next`). */
+function bondTalkStep(ctx, step, prefix) {
+  const s = ctx.state, pe = s.pendingEvent, { kid } = ctx.cast, name = L.name(kid.name);
+  const t = (pe.talk ||= { left: TALK.QUESTIONS, free: false });
+  const face = kid.portraitSvg, role = L.t(t.free ? 'btalk.roleFree' : 'btalk.role', { n: kid.number, p: L.pos(kid.position) });
+  const others = s.squad.filter(p => p.id !== kid.id).sort((a, b) => a.number - b.number);
+  const nm = p => squadName(p, s.squad);
+  const ask = (qid, x = null, y = null) => () => { pe.ans = s.talkAnswer(kid, qid, x, y, ctx.date); t.left--; s.learnTwins(kid, ctx.date); return prefix + 'ans'; };
+  const back = t.free ? { key: 'btalk.back', tone: 'gray', next: () => { const r = pe.ret || 'start'; delete pe.talk; delete pe.ans; return r; } }
+    : { key: 'btalk.bye', tone: 'gray', who: kid.id, diary: 'btalk.end', run: () => ({ k: { pid: kid.id } }) };
+  if (step === 'ans') {
+    ctx.show({ face, name, role, text: bondTalkText(s, kid, pe.ans),
+      choices: t.left > 0 ? [{ key: 'btalk.more', tone: 'green', next: prefix + 'menu' }, back] : [back] });
+    return;
+  }
+  if (step.startsWith('pick:') || step.startsWith('pick2:')) {
+    const [, qid, x] = step.split(':'), q = TALK_QUESTIONS.find(r => r.id === qid);
+    const pool = step.startsWith('pick2:') ? others.filter(p => p.id !== x)
+      : q.x === 'played' ? others.filter(p => (s.seasonOf(p.id).apps || 0) >= 1) : others;
+    ctx.show({ face, name, role, text: L.t(step.startsWith('pick2:') ? 'btalk.pick2' : 'btalk.pick', { x: x ? nm(s.player(x)) : '' }),
+      choices: [...pool.map(p => ({ key: 'btalk.kid', vars: { x: nm(p) }, tone: 'gray',
+        next: qid === 'pair' && !step.startsWith('pick2:') ? prefix + 'pick2:pair:' + p.id : ask(qid, qid === 'pair' ? x : p.id, qid === 'pair' ? p.id : null) })),
+        { key: 'btalk.cancel', tone: 'gray', next: prefix + 'menu' }] });
+    return;
+  }
+  const played = others.some(p => (s.seasonOf(p.id).apps || 0) >= 1);
+  ctx.show({ face, name, role, text: L.t(pe.ans ? 'btalk.again' : t.free ? 'btalk.introFree' : 'btalk.intro', { k: name, n: t.left }),
+    choices: [...TALK_QUESTIONS.filter(q => q.x !== 'played' || played).map(q => ({ key: 'btalk.q.' + q.id, tone: 'green', next: q.x ? prefix + 'pick:' + q.id : ask(q.id) })), back] });
+}
+/** The kid's words for one answer (no numbers; phrasings by band × root / cause, picked by a seeded roll). */
+function bondTalkText(s, kid, a) {
+  if (!a) return L.t('bt.a.evade.0');
+  const x = a.about && s.player(a.about), y = a.y && s.player(a.y), xn = x ? L.name(x.name) : '', yn = y ? L.name(y.name) : '';
+  const v = (key, n) => key + '.' + Math.floor(seeded(kid.id + '#bt#' + (a.qid || '') + (a.about || '') + (s.calendar?.date || ''))() * n);
+  if (a.kind === 'repeat') return L.t('bt.a.repeat');
+  if (a.kind === 'none') return L.t(a.qid === 'mates' ? 'bt.a.noMates' : 'bt.a.noHard');
+  if (a.kind === 'evade') return L.t(v('bt.a.evade', 3), { x: xn });
+  if (a.qid === 'pair') return L.t('bt.a.pair.' + bondClass(a.band), { x: xn, y: yn });
+  if (a.qid === 'pitch') return L.t(v('bt.a.pitch.' + a.tone, 2), { x: xn, s: a.signal ? L.t('af.sig.' + a.signal) : '' });
+  const band = a.kind === 'lie' ? 'neutral' : a.band;
+  let key;
+  if (band === 'best' || band === 'mates') key = a.root ? v('bt.a.mates.' + a.root, 2) : band === 'best' ? v('bt.a.best', 2) : a.assist ? v('bt.a.mates.club', 2) : v('bt.a.mates', 3);
+  else if (band === 'cold') key = a.cause ? v('bt.a.cold.' + a.cause, 2) : v('bt.a.cold', 2);
+  else if (band === 'war') key = v('bt.a.war', 3);
+  else key = v('bt.a.neutral', 3);
+  const lead = a.qid === 'mates' ? L.t('bt.who.mates', { x: xn }) + ' ' : a.qid === 'hard' ? L.t('bt.who.hard', { x: xn }) + ' ' : '';
+  return lead + L.t(key, { x: xn }) + (a.stirred ? ' ' + L.t('bt.a.stirred') : '');
+}
 
 class EventEngine {
   constructor(ui) {
@@ -761,9 +842,15 @@ class EventEngine {
     const cast = {};
     for (const k in pe?.cast || {}) cast[k] = Array.isArray(pe.cast[k]) ? pe.cast[k].map(id => this.state.player(id)) : this.state.player(pe.cast[k]);
     if (!ev || Object.values(cast).some(p => !p || (Array.isArray(p) && p.some(x => !x)))) { this.state.pendingEvent = null; this.state.save(); return; }
-    ev.execute({ state: this.state, date: pe.date, step: pe.step || 'start', cast, ui: this.ui,
+    const ctx = { state: this.state, date: pe.date, step: pe.step || 'start', cast, ui: this.ui,
       show: spec => this.view.show(spec),
-      schedule: (id, opt) => this.schedule(id, { from: pe.date, by: pe.id, ...opt }) });
+      schedule: (id, opt) => this.schedule(id, { from: pe.date, by: pe.id, ...opt }) };
+    if (String(pe.step || '').startsWith('bq:')) { bondTalkStep(ctx, pe.step.slice(3), 'bq:'); return; }   // v3.25: the free question
+    if (TALK.FREE.includes(pe.id) && cast.kid && !pe.freeAsked && (pe.step || 'start') === 'start' && this.state.bonds) {   // v3.25: he came by himself → one free question
+      ctx.show = spec => this.view.show({ ...spec, choices: [...spec.choices, { key: 'btalk.free', tone: 'gray',
+        next: () => { pe.freeAsked = true; pe.ret = 'start'; pe.talk = { left: 1, free: true }; delete pe.ans; return 'bq:menu'; } }] });
+    }
+    ev.execute(ctx);
   }
   /** Applies a choice: money, effect, (next step | diary line + log), closes and resumes. */
   choose(choice) {

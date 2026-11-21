@@ -14,6 +14,7 @@ class ProfileCard {
     document.getElementById('pinfo-x').addEventListener('click', () => this.close());
     document.getElementById('pinfo-ok').addEventListener('click', () => this.close());
     document.getElementById('pinfo-office').addEventListener('click', () => this.ui.callIntoOffice(this.id));   // v2.5
+    document.getElementById('pinfo-talk').addEventListener('click', () => this.ui.haveWord(this.id));   // v3.25: [ Have a word ] (1 AP)
     this.body.addEventListener('click', e => {   // v3.0: coach's assignment (visual tag + exclusive duties)
       const t = e.target.closest('[data-postag]'), d = e.target.closest('[data-duty]');
       if (!t && !d) return;
@@ -66,7 +67,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && JSON.stringify(p.roles), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale), own && ui.officeBlock(p.id)].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && JSON.stringify(p.roles), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale), own && ui.officeBlock(p.id), own && JSON.stringify(p.bondNotes || []), own && ui.talkBlock(p.id), own && s.twinsKnown(p)].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -137,6 +138,7 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
         <fieldset><legend>${L.t('pi.tags')}</legend><div class="pi-role">${roleHtml}</div></fieldset>
         <fieldset><legend>${L.t('pi.stats')}</legend>${table}</fieldset>
         <fieldset class="pi-note"><legend>${L.t('nb.coachNote')}</legend>${noteHtml}</fieldset>
+        ${own ? ui.squadBondsBlock(p) : ''}
         ${own ? ui.cluesBlock(p) : ''}
       </div>`;
     document.getElementById('pinfo-status').textContent = L.t('pi.status.bar');
@@ -146,5 +148,10 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
     ob.disabled = !!blk;
     ob.innerHTML = blk ? L.t(blk + '.btn') : L.t('office.btn', { n: s.ap });
     ob.title = L.t(blk || 'office.btnTip');
+    const tb = document.getElementById('pinfo-talk'), tblk = own ? ui.talkBlock(p.id) : null;   // v3.25: [ Have a word ] — 1 AP, once a week per kid
+    tb.hidden = !own || !s.bonds;
+    tb.disabled = !!tblk;
+    tb.innerHTML = tblk === 'btalk.cooldown' ? L.t('btalk.btnCd') : L.t('btalk.btn', { n: TALK.AP });
+    tb.title = L.t(tblk || 'btalk.btnTip');
   }
 }

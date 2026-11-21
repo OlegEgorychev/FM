@@ -150,6 +150,15 @@ class Player {
       this.teamId = o.teamId || 'player_team';   // v3.1: 'player_team' | 'free_agent' | 'rival_N'   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
+    // v3.25 BONDS: hidden yard / school (lazy: kidRoots), twin link; academy kids also keep praise dates, the coach's bond notes, talks
+    if (Number.isInteger(o.yard)) this.yard = o.yard;
+    if (Number.isInteger(o.school)) this.school = o.school;
+    if (typeof o.twinId === 'string') this.twinId = o.twinId;
+    if (tags) {
+      if (Array.isArray(o.praiseLog)) this.praiseLog = o.praiseLog.filter(d => typeof d === 'string');
+      if (Array.isArray(o.bondNotes)) this.bondNotes = o.bondNotes.filter(n => n && typeof n.band === 'string' && typeof n.source === 'string');
+      if (o.talk && typeof o.talk === 'object') this.talk = { ...o.talk, asked: { ...(o.talk.asked || {}) } };
+    }
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
     const fresh = SKILL_KEYS.every(g => AttrGen.validGroup(o[g], g)) && AttrGen.validGroup(o.psych, 'psych') ? null
       : o.attrs ? AttrGen.fromLegacy(position, o.attrs, id + name + '#v18', o.age)

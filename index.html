@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.24</title>
+<title>Youth Academy Manager v3.25</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1948,6 +1948,46 @@ li.mb-cohlow{ color: #7a3a00; }
    (last month's ledger + the fee choice); the window body (.pl-scroll) scrolls instead. */
 .pl-top:has(> .pl-kassa:not([hidden])){ flex: none; min-height: min-content; overflow: visible; }
 .pl-top > .pl-kassa:not([hidden]){ min-height: min-content; }
+/* ===== v3.25 BONDS: Notebook tabs + "Locker room", PLAYER_INFO "In the squad", tac-board lines, the talk ===== */
+.nb-tabs{ display: flex; gap: 2px; margin: 0 0 8px; border-bottom: 1px solid #808080; }
+.nb-tab{ font: inherit; padding: 3px 12px; background: #c0c0c0; border: 1px solid; border-color: #fff #404040 #c0c0c0 #fff; margin-bottom: -1px; cursor: pointer; color: #222; }
+.nb-tab.on{ background: #efe9d6; font-weight: bold; border-bottom-color: #efe9d6; position: relative; top: 1px; }
+.nb-locker fieldset{ margin: 0 0 10px; border: 1px solid #b9b19a; padding: 6px 10px; }
+.nb-locker legend{ font-weight: bold; padding: 0 4px; }
+.nb-locker ul{ margin: 2px 0; padding-left: 16px; }
+.nb-locker small{ color: #a39a80; margin-left: 4px; } .pi-bonds small{ color: #6f6754; margin-left: 4px; }
+.bn-pair{ padding: 4px 0; border-bottom: 1px dotted #c8bfa6; }
+.bn-pair:last-child{ border-bottom: 0; }
+.bn-ph .bn-ico{ display: inline-block; width: 1.4em; text-align: center; }
+.bn-sides{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 3px 0 0 1.4em; }
+.bn-side{ background: #f6f1e1; color: #2a2418; border: 1px solid #d8cfb5; padding: 3px 6px; font-style: italic; }
+.bn-side small{ color: #6f6754 !important; }
+.bn-list{ list-style: none; padding-left: 1.4em !important; }
+.bn-list .cl-src{ display: inline-block; width: 1.3em; }
+.nb-locker .stale, .bn-list li.stale{ color: #8d8775; } .bn-side.stale{ color: #7d7663; }
+.bn-stale{ font-size: .9em; color: #8d8775; }
+.bn-list li.mix{ color: #7b5b2a; }
+.bn-list li.struck{ text-decoration: line-through; color: #9a937e; }
+.bn-lone li{ color: #5b4630; }
+.pi-bonds ul{ margin: 0; padding-left: 14px; }
+.pi-bonds li{ margin: 2px 0; }
+.pi-bonds .bn-cold, .pi-bonds .bn-war{ color: #8f3b33; }
+.pi-bonds .bn-mates, .pi-bonds .bn-best{ color: #2f5f2a; }
+/* tac board: lines to the known links (no numbers) */
+#tac-board .bond-lines{ position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+#tac-board .bond-lines line{ stroke-width: 2.5; stroke-linecap: round; opacity: .85; }
+#tac-board .bond-lines .bl-good{ stroke: #5fcf6a; }
+#tac-board .bond-lines .bl-bad{ stroke: #e0504a; }
+/* the talk: kid names as buttons (up to 14) — more than 6 buttons → a compact 3-column grid */
+.talk-choices:has(.talk-btn:nth-child(7)){ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.talk-choices:has(.talk-btn:nth-child(7)) .talk-btn{ padding: 7px 8px; font-size: 12px; letter-spacing: .3px; }
+.dr-notes li.yardmate{ color: #6b5530; font-style: italic; }
+.clue .cl-t s{ color: #9a937e; }
+.lr-bond{ flex-basis: 100%; font-style: italic; color: #e7d9a8; }
+.dbg-pairs{ border-collapse: collapse; font: 11px/1.2 var(--mono); color: #111; white-space: nowrap; }
+.dbg-pairs th, .dbg-pairs td{ padding: 2px 6px; text-align: left; border-bottom: 1px solid #ecebe6; }
+.dbg-pairs td.hi{ color: #1f6b1f; font-weight: bold; } .dbg-pairs td.lo{ color: #a02a22; font-weight: bold; }
+.dbg-bonds{ margin: 6px 0; }
 /* =========================================================
    RESPONSIVE
    ========================================================= */
@@ -2251,7 +2291,7 @@ li.mb-cohlow{ color: #7a3a00; }
       <div class="titlebar"><span class="t-ico">i</span><span class="t-txt" id="pinfo-title">PLAYER_INFO.EXE</span><button class="tb-btn" id="pinfo-x" data-i18n-aria="ui.close">&times;</button></div>
       <div class="pinfo-tabs"><span class="pinfo-tab" data-i18n="pi.tab"></span></div>
       <div class="win-body pinfo-body" id="pinfo-body"></div>
-      <div class="row-btns pinfo-btns"><button class="btn ff office-btn" id="pinfo-office" type="button" hidden></button><button class="btn go" id="pinfo-ok" type="button" data-i18n="ui.ok"></button></div>
+      <div class="row-btns pinfo-btns"><button class="btn ff office-btn" id="pinfo-office" type="button" hidden></button><button class="btn ff office-btn" id="pinfo-talk" type="button" hidden></button><button class="btn go" id="pinfo-ok" type="button" data-i18n="ui.ok"></button></div>
       <div class="statusbar"><span id="pinfo-status"></span></div>
     </section>
   </div>
@@ -2738,7 +2778,7 @@ const CLUE_SIGNALS = {
   screen: { role: 'Anchor',     attrs: ['Mark'],            stats: ['intercepts'],                                  min: 1, lots: 4 },
   finish: { role: 'Finisher',   attrs: ['Shoot'],           stats: ['onTarget'],                                    min: 1, lots: 3 },
 };
-const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606', voice: '\u{1F5E3}', yard: '\u{1F3DF}' } };   // v3.19 'review'; v3.20 'voice' (AFTER_GAME.EXE)
+const CLUES = { WRONG: 0.2, MAX_PER_KID: 8, PHRASES: 4, NEUTRAL: 3, FIT_TIE: 0.5, TIP: 3, SOURCES: { match: '\u26BD', training: '\u{1F3C3}', review: '\u2606', voice: '\u{1F5E3}', yard: '\u{1F3DF}', talk: '\u{1F4AC}' } };   // v3.25 'talk' (Have a word)   // v3.19 'review'; v3.20 'voice' (AFTER_GAME.EXE)
 const KEEPER_NOTE = { ROUGH: 4 };   // v3.18.1: goals let in from which the keeper's day reads as a rough one, whatever his saves
 /* v3.18: changing / removing a role that already played a match costs morale (0–100); first assignment and same-week fixes are free.
    v3.19 GROWTH: p.roles = [{ id, level, m }] (m = league matches he played with it since he got it), at most SLOTS, levels 1–LEVELS.
@@ -2912,6 +2952,65 @@ const FIRST = ['Tommy', 'Jamie', 'Callum', 'Liam', 'Owen', 'Danny', 'Kieran', 'R
 const LAST = ['Smith', 'Jones', 'Walsh', 'Doyle', 'Carter', 'Hughes', 'Price', 'Barnes', 'Fletcher', 'Kenny', 'Morgan', 'Reid', 'Shaw', 'Harper', 'Quinn', 'Mason', 'Booth', 'Lowe', 'Dunn', 'Pike', 'Holt', 'Riley', 'Webb', 'Nolan', 'Cobb', 'Finch', 'Rowe', 'Sutton', 'Dale', 'Gill', 'Marsh', 'Platt', 'Varley', 'Ashworth', 'Brennan', 'Tully', 'Kemp', 'Oakes', 'Perry', 'Ward'];
 const OPPONENTS = ['Dockside Juniors', "St. Albert's U-14", 'Ironworks Colts', 'Northgate Rangers', 'Millbrook Wanderers', 'Canal Street Youth', 'Fernhill Athletic', 'Gasworks Boys', 'Crossley Athletic'];
 
+
+/* =========================================================
+   v3.25 BONDS — friendships and dislikes inside the squad. All numbers are TEST values ("tune" ones reported in DESIGN.md).
+   state.bonds = { 'idA|idB' (sorted): { v −100…100, root, cause, since, last } }; a missing pair = neutral (v 0).
+   The player never sees v: only band words through the coach's notes (p.bondNotes).
+   ========================================================= */
+const BOND = {
+  DEL: 5,                                  // an entry with |v| < DEL and root 0 is dropped
+  BANDS: [{ min: 60, key: 'best' }, { min: 20, key: 'mates' }, { min: -19, key: 'neutral' }, { min: -59, key: 'cold' }, { min: -100, key: 'war' }],
+  START: { yard: [20, 10], school: [10, 0], both: [35, 15], twins: [60, 40], grudge: [-30, 0] },   // [v, root] at the draft
+  GRUDGE: 0.06,                            // share of same-yard pairs with an old grudge (seeded per pair)
+  YARD_GAME: 0.15, YARD_GAME_DV: -5,       // the yard match: same-yard kids on opposite sides and one scored (seeded per pair)
+  YARD_NOTE: 0.4,                          // chance a draft card gets "from Canal Street, like Lee" (a clue about the root)
+  TRAIN: 1, DRILL: 2, DRILL_PAIRS: 2, SIDE: 1, SIDE_MIN: 45, ASSIST: 4, WIN: 1, BLAME: -3, BLAME_T: 1,
+  POSITION: -2, BENCH_RUN: 2, FAV: -2, FAV_PRAISES: 3, FAV_WEEKS: 4, FAV_DISC: 8, DECAY: 1,
+  FRIEND_LEAVES: -6,                       // morale for kids with v ≥ 60 to an expelled kid
+  MAX: 2.4, MAX_NEG: 6.7,                  // tune: duel term at v = +100 / −100 (test/balance.js --bonds; like COH.MAX / MAX_UP, bad blood hurts more than friendship helps)
+  DEAD: 20,                                // the pitch only feels what is beyond the neutral band: |v| ≤ DEAD → no duel term (yard mates at +20 don't win matches)
+  TARGET: 0.3,                             // pass target weight × (1 + v/100 × TARGET)
+  ADJ_DIST: 30,                            // tune: tac-board distance (% of the pitch) under which two XI slots are neighbours
+  ATMOS_K: 2.0, ATMOS_MIN: -0.25, ATMOS_MAX: 0.15,
+  MORALE_MATE: 1, MATE_V: 40, MORALE_ENEMY: -2, MORALE_ENEMY_CAP: -4,
+  LONER_ATTEND: 0.1, LONER_TRUANT: 1.3, FRIEND_AWAY: 0.1,
+  RALLY_WAR: -60, STRESS_WAR: 1.25,
+  AFTER_W: 2, AFTER_REL: -0.15,
+  CAME_V: 40, CAME_P: 0.3, STALE_DAYS: 28,
+  CAUSES: ['position', 'grudge', 'blame', 'envy'],
+  YARDS: 5, SCHOOLS: 3,
+};
+const TWINS = { PAIRS: 2, LINK: 1.5, FLOOR: -40, DECAY: 2, MIXUP: 0.25, TELL_MATCHES: 3, SKEW: 2,
+  REFUSE_MORALE: -8, REFUSE_PARENTS: -2, MISS_P: 0.2, MISS_DAYS: [14, 28], HURT_MORALE: -5, LEAVE_P: 0.5, LEAVE_MORALE: -15 };
+/* v3.25 the talk one-on-one ("Have a word", PLAYER_INFO.EXE): 1 AP for 2 questions, once a week per kid. */
+const TALK = { AP: 1, QUESTIONS: 2, WEEK_CD: 7, REPEAT_DAYS: 21, LIE: 0.1, LIE_DISC: 7, EVADE_COLD: 1.5, EVADE_MATE: 0.5,
+  GOSSIP: 0.2, GOSSIP_DAYS: 14, GOSSIP_MORALE: -2, GOSSIP_OPEN: -0.1, STIR: 0.25, STIR_DV: -3, MATE_MORALE: 1, ROLE_REL: 0.003,
+  FREE: ['excuse', 'posreq', 'capobs', 'capbench', 'capresign'] };   // manual dialogues where the kid came by himself → one free question
+/* Questions are data (v3.26 / v3.28 add rows): x = who [X] is picked from ('squad' | 'played' | 'pair' = two kids). */
+const TALK_QUESTIONS = [
+  { id: 'how', x: 'squad' },
+  { id: 'mates', x: null },
+  { id: 'hard', x: null, evade: 1.5 },
+  { id: 'pitch', x: 'played' },
+  { id: 'pair', x: 'pair' },
+];
+/** v3.25 duel term of one bond value: (|v| − DEAD) / (100 − DEAD) × MAX above 0 (× MAX_NEG below), 0 inside ±DEAD. */
+const bondTerm = v => { const x = Math.max(0, Math.abs(v || 0) - BOND.DEAD) / (100 - BOND.DEAD); return x * (v < 0 ? -BOND.MAX_NEG : BOND.MAX); };
+const bondKey = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
+const bondBand = v => BOND.BANDS.find(b => (v ?? 0) >= b.min).key;
+/** Temper (no new attribute): passion − composure + (10 − discipline)/2 → T = clamp(temper/10, 0, 1.5). */
+const bondTemper = p => clamp(((p?.psych?.passion ?? 10) - (p?.psych?.composure ?? 10) + (10 - (p?.psych?.discipline ?? 10)) / 2) / 10, 0, 1.5);
+/** Neighbours in an XI: slot index pairs closer than BOND.ADJ_DIST on the tactics board (RadarView board coordinates). */
+const _bondNbrCache = {};
+function bondNeighbours(f) {
+  const key = f + '@' + BOND.ADJ_DIST;
+  if (_bondNbrCache[key]) return _bondNbrCache[key];
+  const pos = formationSlots(f).map(s => ({ x: s.line === 'GK' ? 5 : 5 + (s.x - 5) * 1.9, y: s.y })), out = [];
+  for (let i = 0; i < pos.length; i++) for (let j = i + 1; j < pos.length; j++)
+    if (Math.hypot(pos[i].x - pos[j].x, pos[i].y - pos[j].y) < BOND.ADJ_DIST) out.push([i, j]);
+  return (_bondNbrCache[key] = out);
+}
 /* =========================================================
    LOCALISATION (EN / RU)
    ========================================================= */
@@ -4861,6 +4960,172 @@ Object.assign(I18N.ru, {
   'ev.knock.medicOk': 'Поблагодарить',
   'xi.autoGK': '{a} недоступен: в ворота встаёт {b}, его место в основе занимает {c}.',
 });
+
+/* ---------- v3.25 "Bonds": friendships, twins, the talk ---------- */
+Object.assign(I18N.en, {
+  'yard.street.0': 'Canal Street', 'yard.street.1': 'Mill Lane', 'yard.street.2': 'Station Road', 'yard.street.3': 'Gasworks Row', 'yard.street.4': 'Fern Close',
+  'draft.yardMate': 'from {y}, like {k}',
+  'draft.twin.title': 'A word from the touchline',
+  'draft.twin.text': '{s}\'s mum: "Please take his brother too, coach. {k} and {b} — they can\'t do things apart."',
+  'draft.twin.take': 'Take {b} too', 'draft.twin.refuse': 'One is enough',
+  'twins.learned': '{k} has a cowlick — I won\'t mix him up with {b} again.',
+  'twins.line': '{k} has a cowlick — I won\'t mix them up again.',
+  'twins.mix': 'I think it was {k}…',
+  'twins.follow': '{k} left with his brother. "We go together, coach."',
+  'ev.twinmiss.text': '{k} stands in the doorway, cap in his hands. "Coach… I miss my brother. Maybe I should go and play where he plays?"',
+  'ev.twinmiss.a': 'Let him go to his brother', 'ev.twinmiss.b': 'Talk him round', 'ev.twinmiss.c': 'Promise nothing',
+  'ev.twinmiss.stay': '{k} wipes his nose on his sleeve. "Alright. I\'ll stay. But I\'m telling him you said so."',
+  'ev.twinmiss.go': '{k} shakes his head. "I can\'t, coach. It\'s not the same without him." He leaves with his kit bag.',
+  'ev.twinmiss.stayOk': 'Good lad', 'ev.twinmiss.goOk': 'Wish him luck',
+  'ev.twinmiss.a.diary': '{k} left to play next to his brother.', 'ev.twinmiss.c.diary': '{k} asked to go to his brother. The coach promised nothing.',
+  'ev.twinmiss.stayOk.diary': 'Talked {k} round: he stays.', 'ev.twinmiss.goOk.diary': 'Talked to {k}, but he left to play next to his brother.',
+  'btalk.btn': 'Have a word [{n} AP]', 'btalk.btnCd': 'Had a word this week', 'btalk.btnTip': 'Two questions one-on-one. Once a week per kid.',
+  'btalk.cooldown': 'You already had a word with him this week.',
+  'btalk.role': '#{n} · {p} · a word on the bench', 'btalk.roleFree': '#{n} · {p} · while he\'s here',
+  'btalk.intro': '{k} sits down next to you, swinging his boots. "What is it, coach?"',
+  'btalk.introFree': 'Before {k} goes, you nod at the bench. "One thing while you\'re here…"',
+  'btalk.again': '{k} waits for the next question.',
+  'btalk.free': 'While he\'s here: ask about…',
+  'btalk.q.how': 'How do you get on with…?', 'btalk.q.mates': 'Who are you mates with?', 'btalk.q.hard': 'Who\'s hard for you?',
+  'btalk.q.pitch': 'What do you think of… on the pitch?', 'btalk.q.pair': 'And … and … — how do they get on?',
+  'btalk.pick': 'Who about?', 'btalk.pick2': '{x} and who?', 'btalk.kid': '{x}', 'btalk.cancel': 'Never mind',
+  'btalk.more': 'Ask about…', 'btalk.bye': 'Thanks, off you go', 'btalk.back': 'Back to it',
+  'btalk.end.diary': 'Had a word with {k}.',
+  'btalk.gossip': '{k} heard the coach was asking about him. He keeps to himself now.',
+  'bt.a.repeat': '"You already asked, coach."',
+  'bt.a.noMates': '"Dunno… everyone, I guess. Nobody special."', 'bt.a.noHard': '"Nobody, really. It\'s fine."',
+  'bt.a.evade.0': '"It\'s fine…"', 'bt.a.evade.1': '"Dunno." He looks at his boots.', 'bt.a.evade.2': '"Why d\'you ask?" He shrugs and says nothing more.',
+  'bt.a.mates.yard.0': '"Me and {x}? Since nursery! Every evening in the yard."', 'bt.a.mates.yard.1': '"{x} lives two doors down. We walk here together."',
+  'bt.a.mates.school.0': '"Same class as {x}. He lets me copy maths."', 'bt.a.mates.school.1': '"We sit together at school. He\'s alright."',
+  'bt.a.mates.twins.0': '"He\'s my brother, coach. Course we\'re fine."', 'bt.a.mates.twins.1': '"Me and him? We\'re the same person, Mum says."',
+  'bt.a.mates.club.0': '"After that goal we always play as a pair now."', 'bt.a.mates.club.1': '"We got close here at the club. He\'s a good lad."',
+  'bt.a.best.0': '"{x}\'s my best mate. Don\'t split us up, coach."', 'bt.a.best.1': '"Me and {x}? Always. Even on the bus."',
+  'bt.a.mates.0': '"He\'s alright. We talk."', 'bt.a.mates.1': '"{x}\'s fine. We have a laugh."', 'bt.a.mates.2': '"Yeah, we get on."',
+  'bt.a.neutral.0': '"Dunno, we don\'t really talk."', 'bt.a.neutral.1': '"He\'s… fine. Not really my mate."', 'bt.a.neutral.2': '"Never really thought about it."',
+  'bt.a.cold.position.0': '"He took my place and now he\'s showing off."', 'bt.a.cold.position.1': '"I sit on the bench and he gets to play. Every time."',
+  'bt.a.cold.envy.0': '"You praise him all the time, and he…"', 'bt.a.cold.envy.1': '"He\'s the coach\'s favourite. Everyone knows."',
+  'bt.a.cold.blame.0': '"He made me look guilty in front of everyone."', 'bt.a.cold.blame.1': '"He shouted at me after that goal. Like it was all me."',
+  'bt.a.cold.grudge.0': '"It\'s from the yard. You wouldn\'t get it."', 'bt.a.cold.grudge.1': '"That\'s old stuff, coach. From home."',
+  'bt.a.cold.0': '"We don\'t get on. That\'s all."', 'bt.a.cold.1': '"He\'s… not my sort."',
+  'bt.a.war.0': '"I don\'t want to talk about him."', 'bt.a.war.1': 'He goes red. "Don\'t put me next to him. Please."', 'bt.a.war.2': '"Him? No. Just no."',
+  'bt.a.stirred': 'He walks off still angry — maybe you shouldn\'t have brought it up.',
+  'bt.who.mates': '"{x}."', 'bt.who.hard': '"…{x}."',
+  'bt.a.pair.good': '"{x} and {y}? They\'re mates. Always together."', 'bt.a.pair.bad': '"{x} and {y}? They don\'t talk. Something happened."', 'bt.a.pair.neutral': '"{x} and {y}? Dunno, they\'re fine I guess."',
+  'bt.a.pitch.praise.0': '"{x}? He\'s great — he should {s}."', 'bt.a.pitch.praise.1': '"Give {x} the ball, coach. He can {s}."',
+  'bt.a.pitch.plain.0': '"{x}? He\'s alright. Maybe he should {s}."', 'bt.a.pitch.plain.1': '"Dunno… {x} could {s}, I suppose."',
+  'bt.a.pitch.down.0': '"{x}? He\'s useless, coach. Everyone can see it."', 'bt.a.pitch.down.1': '"Don\'t ask me about {x}. He just loses the ball."',
+  'clue.voice.down': 'he\'s no good out there.',
+  'clue.src.talk': 'A word one-on-one',
+  'nb.tab.match': 'Match', 'nb.tab.locker': 'Locker room',
+  'bn.hint': 'Who gets on with whom — only what you saw, heard or were told. Old notes go grey.',
+  'bn.status': 'Locker room — your notes on the bonds',
+  'bn.loneHead': 'On his own', 'bn.pairsHead': 'Known links', 'bn.pairsNone': 'Nothing yet. Watch who comes in together, listen, have a word.',
+  'bn.yardHead': 'From the same yard', 'bn.twinsHead': 'Twins',
+  'bn.staleTag': 'haven\'t checked for a while',
+  'bn.band.best': 'best mates', 'bn.band.mates': 'mates', 'bn.band.neutral': 'nothing special', 'bn.band.cold': 'don\'t get on', 'bn.band.war': 'at war',
+  'bn.band.alone': 'on his own', 'bn.band.evade': 'won\'t talk about it', 'bn.band.yard': 'same yard',
+  'bn.src.came': 'Locker room', 'bn.src.obs': 'Practice', 'bn.src.after': 'After the game', 'bn.src.loner': 'Training', 'bn.src.yard': 'Yard match', 'bn.src.talk': 'A word', 'bn.src.rumour': 'Rumour',
+  'bn.note.came': '{a} and {b} came in together again.',
+  'bn.note.obs.good': '{a} sticks close to {b}.', 'bn.note.obs.bad': '{a} won\'t even look at {b}.', 'bn.note.obs.neutral': '{a} and {b} keep to themselves.',
+  'bn.note.alone': '{a} seems to be on his own all the time.',
+  'bn.note.yard': '{a} is from {y} too, like {b}.',
+  'bn.note.evade': '{a} avoided talking about {b}.',
+  'bn.note.rumour': '{k} says {a} and {b}: {w}.',
+  'bn.by': 'From {k}',
+  'bn.say.best': 'best mates with {b}', 'bn.say.mates': 'gets on with {b}', 'bn.say.neutral': '{b} is nothing special to him',
+  'bn.say.cold': 'doesn\'t get on with {b}', 'bn.say.war': 'won\'t hear a word about {b}',
+  'bn.say.cold.position': '{b} took his place', 'bn.say.cold.envy': '{b} is the coach\'s favourite', 'bn.say.cold.blame': '{b} made him look guilty', 'bn.say.cold.grudge': 'something with {b} from the yard',
+  'bn.say.mates.yard': 'mates with {b} since the yard', 'bn.say.mates.school': 'mates with {b} from school', 'bn.say.mates.twins': '{b} is his brother',
+  'bn.legend': 'In the squad', 'bn.friends': 'Friends with:', 'bn.cold': 'Doesn\'t get on with:', 'bn.alone': 'Seems to be on his own.', 'bn.none': 'You don\'t know yet who he gets on with.',
+  'bn.twin': 'Twin brother: {x}.',
+  'lr.bond.came': '{a} and {b} came in together again.',
+  'lr.bond.warn': '{a} and {b} side by side in {l} — after what happened on {d}.',
+  'lr.bond.line.DEF': 'defence', 'lr.bond.line.MID': 'midfield', 'lr.bond.line.ATT': 'attack', 'lr.bond.line.GK': 'goal',
+  'bond.loner.0': '{k} seems to be on his own at training.', 'bond.loner.1': 'Nobody waits for {k} after training.', 'bond.loner.2': '{k} warms up alone again.',
+  'bond.cause': '{a} didn\'t pass to {b} again — they aren\'t talking.',
+});
+Object.assign(I18N.ru, {
+  'yard.street.0': 'Канал-стрит', 'yard.street.1': 'Милл-лейн', 'yard.street.2': 'Стейшн-роуд', 'yard.street.3': 'Гасворкс-роу', 'yard.street.4': 'Ферн-клоуз',
+  'draft.yardMate': 'с {y}, как и {k}',
+  'draft.twin.title': 'Голос с бровки',
+  'draft.twin.text': 'Мама {s}: «Возьмите и второго, тренер. {k} и {b} — они порознь не умеют».',
+  'draft.twin.take': 'Взять и {b}', 'draft.twin.refuse': 'Хватит одного',
+  'twins.learned': 'У него вихор — больше не перепутаю. Игрок: {k} (брат: {b}).',
+  'twins.line': 'Вихор у одного — больше не перепутаю. Игрок: {k}.',
+  'twins.mix': 'кажется, это был {k}…',
+  'twins.follow': 'Ушёл вместе с братом: «Мы вдвоём, тренер». Игрок: {k}.',
+  'ev.twinmiss.text': '{k} стоит в дверях, мнёт кепку. «Тренер… я по брату скучаю. Может, мне перейти туда, где он играет?»',
+  'ev.twinmiss.a': 'Отпустить к брату', 'ev.twinmiss.b': 'Уговорить остаться', 'ev.twinmiss.c': 'Ничего не обещать',
+  'ev.twinmiss.stay': '{k} вытирает нос рукавом. «Ладно. Останусь. Но я ему скажу, что это вы сказали».',
+  'ev.twinmiss.go': '{k} мотает головой. «Не могу, тренер. Без него всё не то». Уходит с сумкой.',
+  'ev.twinmiss.stayOk': 'Молодец', 'ev.twinmiss.goOk': 'Пожелать удачи',
+  'ev.twinmiss.a.diary': 'Ушёл играть рядом с братом. Игрок: {k}.', 'ev.twinmiss.c.diary': 'Просился к брату. Тренер ничего не пообещал. Игрок: {k}.',
+  'ev.twinmiss.stayOk.diary': 'Уговорил остаться. Игрок: {k}.', 'ev.twinmiss.goOk.diary': 'Поговорили, но он ушёл играть рядом с братом. Игрок: {k}.',
+  'btalk.btn': 'Поговорить [{n} ОД]', 'btalk.btnCd': 'На этой неделе уже говорили', 'btalk.btnTip': 'Два вопроса один на один. Раз в неделю с каждым.',
+  'btalk.cooldown': 'На этой неделе вы с ним уже говорили.',
+  'btalk.role': '№{n} · {p} · разговор на скамейке', 'btalk.roleFree': '№{n} · {p} · пока он здесь',
+  'btalk.intro': '{k} садится рядом, болтает бутсами. «Что, тренер?»',
+  'btalk.introFree': '{k} уже собирается уходить, ты киваешь на скамейку. «Раз уж ты здесь…»',
+  'btalk.again': '{k} ждёт следующего вопроса.',
+  'btalk.free': 'Пока он здесь: спросить о…',
+  'btalk.q.how': 'Как тебе с…?', 'btalk.q.mates': 'С кем ты дружишь в команде?', 'btalk.q.hard': 'С кем тебе тяжело?',
+  'btalk.q.pitch': 'Что скажешь про… на поле?', 'btalk.q.pair': 'А … и … как между собой?',
+  'btalk.pick': 'О ком?', 'btalk.pick2': '{x} и кто ещё?', 'btalk.kid': '{x}', 'btalk.cancel': 'Неважно',
+  'btalk.more': 'Спросить о…', 'btalk.bye': 'Спасибо, беги', 'btalk.back': 'Вернуться к делу',
+  'btalk.end.diary': 'Поговорили один на один. Игрок: {k}.',
+  'btalk.gossip': 'Узнал, что тренер о нём расспрашивал, и замкнулся. Игрок: {k}.',
+  'bt.a.repeat': '«Вы же уже спрашивали, тренер».',
+  'bt.a.noMates': '«Не знаю… со всеми. Ни с кем особо».', 'bt.a.noHard': '«Ни с кем. Всё нормально».',
+  'bt.a.evade.0': '«Да нормально всё…»', 'bt.a.evade.1': '«Не знаю». Смотрит на бутсы.', 'bt.a.evade.2': '«А что?» Пожимает плечами и молчит.',
+  'bt.a.mates.yard.0': '«Да мы с ним с садика! Каждый вечер во дворе».', 'bt.a.mates.yard.1': '«Он через дом от меня живёт. Мы вместе сюда ходим».',
+  'bt.a.mates.school.0': '«Мы в одном классе. Он мне математику даёт списать».', 'bt.a.mates.school.1': '«За одной партой сидим. Нормальный он».',
+  'bt.a.mates.twins.0': '«Он же мой брат, тренер. Конечно, всё нормально».', 'bt.a.mates.twins.1': '«Мы с ним? Мама говорит, мы как один человек».',
+  'bt.a.mates.club.0': '«После того гола мы теперь всегда в паре».', 'bt.a.mates.club.1': '«Мы здесь, в клубе, сдружились. Хороший парень».',
+  'bt.a.best.0': '«Он мой лучший друг. Не разлучайте нас, тренер».', 'bt.a.best.1': '«Мы с ним? Всегда. Даже в автобусе».',
+  'bt.a.mates.0': '«Нормальный, общаемся».', 'bt.a.mates.1': '«С ним весело. Нормально».', 'bt.a.mates.2': '«Ага, ладим».',
+  'bt.a.neutral.0': '«Не знаю, мы особо не общаемся».', 'bt.a.neutral.1': '«Ну… нормальный. Не друг, просто».', 'bt.a.neutral.2': '«Не думал об этом».',
+  'bt.a.cold.position.0': '«Он моё место занял и теперь выпендривается».', 'bt.a.cold.position.1': '«Я на скамейке, а он играет. Каждый раз».',
+  'bt.a.cold.envy.0': '«Вы его всё время хвалите, а он…»', 'bt.a.cold.envy.1': '«Он же любимчик тренера. Все знают».',
+  'bt.a.cold.blame.0': '«Он меня тогда при всех виноватым сделал».', 'bt.a.cold.blame.1': '«Он на меня наорал после того гола. Как будто всё я».',
+  'bt.a.cold.grudge.0': '«Это ещё со двора, вы не поймёте».', 'bt.a.cold.grudge.1': '«Это старое, тренер. Дворовое».',
+  'bt.a.cold.0': '«Не ладим мы. И всё».', 'bt.a.cold.1': '«Он… не мой человек».',
+  'bt.a.war.0': '«Не хочу про него говорить».', 'bt.a.war.1': 'Краснеет. «Не ставьте меня с ним рядом. Пожалуйста».', 'bt.a.war.2': '«Он? Нет. Просто нет».',
+  'bt.a.stirred': 'Уходит ещё злее — зря, наверное, ты это затронул.',
+  'bt.who.mates': '«{x}».', 'bt.who.hard': '«…{x}».',
+  'bt.a.pair.good': '«{x} и {y}? Друзья. Всегда вместе».', 'bt.a.pair.bad': '«{x} и {y}? Не разговаривают. Что-то было».', 'bt.a.pair.neutral': '«{x} и {y}? Не знаю, вроде нормально».',
+  'bt.a.pitch.praise.0': '«{x}? Классный — ему бы {s}».', 'bt.a.pitch.praise.1': '«Давайте ему мяч, тренер. Он умеет {s}».',
+  'bt.a.pitch.plain.0': '«{x}? Нормальный. Может, ему бы {s}».', 'bt.a.pitch.plain.1': '«Не знаю… {x} мог бы {s}, наверное».',
+  'bt.a.pitch.down.0': '«{x}? Да никакой он, тренер. Все же видят».', 'bt.a.pitch.down.1': '«Не спрашивайте про него. Только мяч теряет».',
+  'clue.voice.down': 'на поле от него толку нет.',
+  'clue.src.talk': 'Разговор один на один',
+  'nb.tab.match': 'Матч', 'nb.tab.locker': 'Раздевалка',
+  'bn.hint': 'Кто с кем ладит — только то, что ты видел, слышал или тебе сказали. Старые заметки сереют.',
+  'bn.status': 'Раздевалка — твои заметки об отношениях',
+  'bn.loneHead': 'Сам по себе', 'bn.pairsHead': 'Известные связи', 'bn.pairsNone': 'Пока ничего. Смотри, кто приходит вместе, слушай, поговори.',
+  'bn.yardHead': 'Из одного двора', 'bn.twinsHead': 'Близнецы',
+  'bn.staleTag': 'давно не проверял',
+  'bn.band.best': 'друзья не разлей вода', 'bn.band.mates': 'приятели', 'bn.band.neutral': 'ничего особенного', 'bn.band.cold': 'не ладят', 'bn.band.war': 'на ножах',
+  'bn.band.alone': 'сам по себе', 'bn.band.evade': 'не хочет об этом', 'bn.band.yard': 'из одного двора',
+  'bn.src.came': 'Раздевалка', 'bn.src.obs': 'Тренировка', 'bn.src.after': 'После игры', 'bn.src.loner': 'Тренировка', 'bn.src.yard': 'Дворовый матч', 'bn.src.talk': 'Разговор', 'bn.src.rumour': 'Слухи',
+  'bn.note.came': '{a} и {b} снова пришли вдвоём.',
+  'bn.note.obs.good': '{a} и {b} всё время держатся вместе.', 'bn.note.obs.bad': '{a} и {b} друг на друга даже не смотрят.', 'bn.note.obs.neutral': '{a} и {b} держатся порознь.',
+  'bn.note.alone': 'Кажется, {a} всё время один.',
+  'bn.note.yard': '{a} — тоже с {y}, как и {b}.',
+  'bn.note.evade': '{a} ушёл от ответа. О ком: {b}.',
+  'bn.note.rumour': '{k} говорит, что {a} и {b}: {w}.',
+  'bn.by': 'Со слов: {k}',
+  'bn.say.best': 'лучший друг — {b}', 'bn.say.mates': 'ладит: {b}', 'bn.say.neutral': 'ничего особенного: {b}',
+  'bn.say.cold': 'не ладит: {b}', 'bn.say.war': 'слышать не хочет: {b}',
+  'bn.say.cold.position': '{b} занял его место', 'bn.say.cold.envy': '{b} — любимчик тренера', 'bn.say.cold.blame': '{b} сделал его виноватым', 'bn.say.cold.grudge': 'что-то старое, ещё со двора: {b}',
+  'bn.say.mates.yard': 'дружат со двора: {b}', 'bn.say.mates.school': 'дружат со школы: {b}', 'bn.say.mates.twins': '{b} — его брат',
+  'bn.legend': 'В команде', 'bn.friends': 'Дружит:', 'bn.cold': 'Не ладит:', 'bn.alone': 'Кажется, сам по себе.', 'bn.none': 'Пока не знаешь, с кем он ладит.',
+  'bn.twin': 'Брат-близнец: {x}.',
+  'lr.bond.came': '{a} и {b} снова пришли вдвоём.',
+  'lr.bond.warn': '{a} и {b} рядом в {l} — после того, что было ({d}).',
+  'lr.bond.line.DEF': 'обороне', 'lr.bond.line.MID': 'полузащите', 'lr.bond.line.ATT': 'атаке', 'lr.bond.line.GK': 'воротах',
+  'bond.loner.0': 'Кажется, {k} на тренировках всё время один.', 'bond.loner.1': 'После тренировки {k} уходит один — никто его не ждёт.', 'bond.loner.2': '{k} снова разминается в одиночку.',
+  'bond.cause': '{a} и {b} снова не нашли друг друга пасом — они не разговаривают.',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -5157,6 +5422,15 @@ class Player {
       this.teamId = o.teamId || 'player_team';   // v3.1: 'player_team' | 'free_agent' | 'rival_N'   // v2.6: didn't turn up at the locker room today ('exhausted' | 'skipped'); cleared every morning                                         // v2.3: who was promised his start ('dad' | 'pool')
     }
     this.face = PortraitGenerator.valid(face) ? face : PortraitGenerator.hashFace(id + name);
+    // v3.25 BONDS: hidden yard / school (lazy: kidRoots), twin link; academy kids also keep praise dates, the coach's bond notes, talks
+    if (Number.isInteger(o.yard)) this.yard = o.yard;
+    if (Number.isInteger(o.school)) this.school = o.school;
+    if (typeof o.twinId === 'string') this.twinId = o.twinId;
+    if (tags) {
+      if (Array.isArray(o.praiseLog)) this.praiseLog = o.praiseLog.filter(d => typeof d === 'string');
+      if (Array.isArray(o.bondNotes)) this.bondNotes = o.bondNotes.filter(n => n && typeof n.band === 'string' && typeof n.source === 'string');
+      if (o.talk && typeof o.talk === 'object') this.talk = { ...o.talk, asked: { ...(o.talk.asked || {}) } };
+    }
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
     const fresh = SKILL_KEYS.every(g => AttrGen.validGroup(o[g], g)) && AttrGen.validGroup(o.psych, 'psych') ? null
       : o.attrs ? AttrGen.fromLegacy(position, o.attrs, id + name + '#v18', o.age)
@@ -5677,6 +5951,8 @@ class GameState {
     this.lineup = [];
     const free = shuffle(this.globalPlayers.filter(p => p.teamId === 'free_agent'));
     this.draft = { pool: free.slice(0, WORLD.DRAFT_POOL).map(p => p.id), signed: [] };
+    makeTwins(this.globalPlayers, this.draft.pool);   // v3.25: two pairs of twins, own seeded stream (world RNG order untouched)
+    this.bonds = null; this.bondMeta = { known: {}, matches: {} }; this.draft.twins = {};   // v3.25 bonds (built at the end of the draft)
     this.newSeason(SEASON.FIRST_YEAR);
     this.phase = 'draft';
     this.save();
@@ -5711,6 +5987,8 @@ class GameState {
     this.lineup = [keeper.id, ...this.squad.filter(p => p !== keeper).slice(0, 10).map(p => p.id)];
     for (const p of this.squad) p.energy = 100;
     for (const p of this.squad) this.addYardClues(p, this.calendar.date);   // v3.23: the draft notes → clues
+    this.initBonds(this.calendar.date);   // v3.25: yard / school / twins → the starting bonds
+    this.draftBondNotes(this.calendar.date);
     this.draft = null;
     this.phase = 'calendar';
     this.addDiary({ date: this.calendar.date, key: 'draft.diary', vars: { n: this.squad.length }, cls: 'ev' });
@@ -5786,6 +6064,7 @@ class GameState {
       assigned[i] = free.shift();
     });
     this.lineup = [gk.id, ...assigned.slice(1).map(p => p.id)];
+    this.bondSeparate?.();   // v3.25: two kids the coach KNOWS don't get on are not put side by side (if it costs ≤ 0.5)
   }
   setFormation(f) { if (!FORMATIONS[f]) return; this.formation = f; this.autoArrange(); this.save(); }
   /** Unified lineup swap used by both the roster list and the pitch.
@@ -5875,6 +6154,7 @@ class GameState {
   confirmCaptain(id, keep = true) {
     const p = this.player(id);
     if (!p || !keep) return 0;
+    this.notePraise(p);   // v3.25: the armband counts as praise
     if (this.duties.captain !== id) this.setDuty('captain', id);
     const t = this.captainTier(p);
     const d = this.captainReaction(p, t === 'high' ? LEADERSHIP.HIGH_MORALE : t === 'mid' ? LEADERSHIP.MID_MORALE : LEADERSHIP.LOW_KEEP_MORALE);
@@ -6038,6 +6318,7 @@ class GameState {
     else if (c.type === 'up') { const r = p.roles.find(x => x.id === c.role); if (!r || r.level >= ROLES.LEVELS) return false; r.level++; vars.l = r.level; }
     else if (c.type === 'swap') { const i2 = p.roles.findIndex(x => x.id === c.replaces); if (i2 < 0) return false; p.roles[i2] = { id: c.role, level: 1, m: 0 }; vars.o = { role: c.replaces }; }
     else return false;
+    this.notePraise(p);   // v3.25: a REVIEW card counts as praise (the favourite)
     this.pruneComplaints();   // v3.20: a replaced role ends a parent's complaint
     this.addDiary({ date: this.calendar.date, key: 'rv.' + c.type, vars, cls: 'ev' });
     this.endReview();
@@ -6127,9 +6408,16 @@ class GameState {
     }
     let x = r() * Object.values(w).reduce((a, b) => a + b, 0), type = Object.keys(w)[0];
     for (const k in w) { if (!w[k]) continue; type = k; if ((x -= w[k]) < 0) break; }
-    const target = type === 'other' ? this.player(mates[Math.floor(r() * mates.length)]) : null;
+    // v3.25: a kid is twice as likely to talk about a mate he doesn't get on with (one r() either way)
+    const wt = mates.map(id => this.bondV?.(kid.id, id) <= -20 ? BOND.AFTER_W : 1), wsum = wt.reduce((a, b) => a + b, 0);
+    let target = null;
+    if (type === 'other') {
+      if (wsum === mates.length) target = this.player(mates[Math.floor(r() * mates.length)]);
+      else { let x = r() * wsum; for (let i = 0; i < mates.length; i++) if ((x -= wt[i]) < 0 || i === mates.length - 1) { target = this.player(mates[i]); break; } }
+    }
     const v = seeded(af.date + '#voice#' + (sp.parent ? 'par:' : '') + kid.id);
-    const rel = AFTER.FORCE_REL ?? (sp.parent ? (type === 'parentCoach' ? AFTER.PARENT_MISFIT : AFTER.PARENT_OWN) : kidReliability(kid));
+    const grudge = target && this.bondV?.(kid.id, target.id) <= -20 ? BOND.AFTER_REL : 0;   // v3.25: that remark is less reliable
+    const rel = AFTER.FORCE_REL ?? (sp.parent ? (type === 'parentCoach' ? AFTER.PARENT_MISFIT : AFTER.PARENT_OWN) : clamp(kidReliability(kid) + grudge, 0, 1));
     const ok = v() < rel, one = a => a[Math.floor(v() * a.length)];
     const rm = { pid: kid.id, parent: sp.parent, type, about: (target || kid).id, kind: AFTER_REMARKS[type].kind, signal: null, role: null, claim: null, ok };
     const about = this.player(rm.about);
@@ -6179,6 +6467,10 @@ class GameState {
       kind: rm.kind, claim: rm.kind === 'role' ? null : rm.claim, role: rm.role, by });
     if (rm.parent) this.addRep('parents', AFTER.PARENT_REP);
     else kid.dyn.morale = clamp(kid.dyn.morale + AFTER.LISTEN_MORALE, 0, 100);
+    if (!rm.parent && rm.about !== rm.pid && this.bonds && this.bondV(kid.id, about.id) <= -20) {   // v3.25: "according to Petya, Kolya let him down"
+      const real = bondBand(this.bondV(kid.id, about.id));
+      this.addBondNote(kid, { with: about.id, band: rm.ok ? real : real === 'war' ? 'cold' : 'war', source: 'after', date: af.date, by: { pid: kid.id, name: kid.name } });
+    }
     if (rm.type === 'parentCoach' && rm.role) {
       this.parentComplaints = (this.parentComplaints || []).filter(c => c.pid !== about.id);
       this.parentComplaints.push({ pid: about.id, role: rm.role, parent: rm.parent, n: 0, date: af.date });
@@ -6258,8 +6550,10 @@ class GameState {
   /** v3.18: keep a clue in the kid's Notebook (last CLUES.MAX_PER_KID). */
   addClue(p, c) {
     if (!p || !c) return;
-    const v = c.source === 'voice' ? { kind: c.kind, claim: c.claim || null, role: c.role || null, by: c.by || null } : {};   // v3.20 voice clue extras
-    (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, ...v, seen: false });
+    const tw = this.mixTwin?.(p, c.source + '#' + c.ref + '#' + c.date + '#' + c.textKey);   // v3.25: the coach mixes the twins up
+    if (tw) { c = { ...c, mix: p.id }; p = tw; }
+    const v = c.source === 'voice' || c.source === 'talk' ? { kind: c.kind, claim: c.claim || null, role: c.role || null, by: c.by || null } : {};   // v3.20 voice clue extras
+    (p.clues ||= []).push({ date: c.date, source: c.source, ref: c.ref, signal: c.signal, textKey: c.textKey, ...v, ...(c.mix ? { mix: c.mix } : {}), seen: false });
     if (p.clues.length > CLUES.MAX_PER_KID) p.clues.splice(0, p.clues.length - CLUES.MAX_PER_KID);
   }
   /** v3.23: his yard notes (DraftView.notes — seeded by id, already lying with YARD.WRONG) become clues: source 'yard', ref 'draft'.
@@ -6480,6 +6774,7 @@ class GameState {
   weekReview(date) {
     const w = this.weekState(), first = this.calendar.events[0] && isoAdd(this.calendar.events[0].date, -SEASON.FIRST_MATCH_OFFSET);
     if (weekKey(date) !== 'sun' || weekStartOf(date) !== w.start || (first && w.start < first)) return null;
+    this.bondWeek(date);   // v3.25: envy, decay, friends' morale — before the cohesion that reads ATMOS
     this.updateCohesion(date);
     if (!w.present) {   // no training with a kid in it this week
       const k = w.emptyStreak = (w.emptyStreak || 0) + 1;
@@ -6498,7 +6793,7 @@ class GameState {
   /** v3.21: Sunday — C ← clamp(C × DECAY + GAIN × T_eff, 0, 100); a diary line only when the band word changes. */
   updateCohesion(date = this.calendar.date) {
     const w = this.weekState(), before = this.cohesion ?? COH.START, band0 = cohBand(before);
-    this.cohesion = clamp(before * COH.DECAY + COH.GAIN * Math.min(COH.T_CAP, w.teff || 0), 0, 100);
+    this.cohesion = clamp(before * COH.DECAY + COH.GAIN * Math.min(COH.T_CAP, w.teff || 0) * (1 + this.atmos()), 0, 100);   // v3.25: × (1 + ATMOS)
     const band = cohBand(this.cohesion);
     if (band !== band0) this.addDiary({ date, key: 'coh.diary.' + (this.cohesion > before ? 'up' : 'down'), vars: { b: { coh: band } }, cls: 'ev' });
     return this.cohesion;
@@ -6636,7 +6931,8 @@ class GameState {
     if (p.suspensionMatches > 0) return 'suspended';
     if (p.awayDays > 0) return 'home';
     if (p.energy < LOCKER.MIN_COND) return 'exhausted';
-    if (Math.random() * 20 > p.psych.discipline + LOCKER.DISC_GRACE) return 'skipped';
+    const x = Math.random();   // (one draw, as before v3.25)
+    if (this.bonds && this.isLoner(p) ? x > 1 - Math.min(1, BOND.LONER_TRUANT * arrivalSkipChance(p)) : x * 20 > p.psych.discipline + LOCKER.DISC_GRACE) return 'skipped';   // v3.25: a loner skips ×1.3
     return null;
   }
   /** Rolls the arrivals once per day (training / match days). Absent kids are locked out until the next morning. */
@@ -6648,7 +6944,7 @@ class GameState {
       let r = this.worldAway(p.id, date) || this.arrivalCheck(p);   // v3.14: away at a school / city event — before the other checks
       // v3.13: from the 3rd training of the week the kids who'd come may be kept home (school / not recovered) — not truancy
       // v3.14: the 'tests' week multiplies that chance (×attendMult); a kid lost only to the tests gets 'world:tests'
-      const base = training && k >= ATTEND.FROM ? attendChance(p, k) : 1, m = mult < 1 && we.playerIds.includes(p.id) ? mult : 1;
+      const base = training && k >= ATTEND.FROM ? clamp(attendChance(p, k) - (this.bonds ? this.bondAttendPen(p, date) : 0), ATTEND.MIN, ATTEND.MAX) : 1, m = mult < 1 && we.playerIds.includes(p.id) ? mult : 1;   // v3.25: a loner / a best mate away −0.1
       if (!r && training && (base < 1 || m < 1)) { const x = seeded(date + '#load#' + p.id)(); r = x >= base ? 'overload' : x >= base * m ? 'world:' + we.id : null; }
       p.absentToday = ['exhausted', 'skipped', 'overload'].includes(r) || r?.startsWith('world:') ? r : null;   // injured / banned / home are locked by their own status
       p.skipped_training = training && r === 'skipped';                   // feeds The Truant
@@ -6661,6 +6957,7 @@ class GameState {
     }
     d.locker = { done: false, revealed: false, absent, checked: [], request: this.rollExcuse(absent, date), posRequest: this.rollPositionRequest(absent) };   // v3.6
     d.locker.capRequest = d.locker.request || d.locker.posRequest ? null : this.rollCaptainRequest(absent);   // v3.8: urgent kid requests come first
+    if (training && this.bonds) d.locker.came = this.bondArrivals(date, this.squad.filter(p => !absent[p.id]));   // v3.25: "came in together again"
     this.save();
     return d.locker;
   }
@@ -6693,9 +6990,17 @@ class GameState {
     if (lk) { delete lk.absent[id]; lk.checked = lk.checked.filter(x => x !== id); if (lk.request?.pid === id) lk.request = null; if (lk.posRequest?.pid === id) lk.posRequest = null;
       if ([lk.capRequest?.pid, lk.capRequest?.mate, lk.capRequest?.hint].includes(id)) lk.capRequest = null; }   // v3.8
     if (this.worldEvent) this.worldEvent.playerIds = this.worldEvent.playerIds.filter(x => x !== id);   // v3.14
+    this.bondLeave(p);   // v3.25: best mates are upset; his pairs go
     p.teamId = to;   // v3.1: he stays in the world database (future transfers)
     p.flags = p.flags.filter(f => f !== 'Promised_Start'); p.promiseBy = null; p.promiseChoice = null;
     (this.expelled = this.expelled || []).push({ id, name: p.name, number: p.number, date: this.calendar.date });
+    const tw = p.twinId && this.player(p.twinId);   // v3.25 shared fate: his brother leaves with him (50 %) or takes it hard
+    if (tw && !this.twinFollowing) {
+      if (seeded('twinleave#' + id + '#' + this.calendar.date)() < (this.twinLeaveForce ?? TWINS.LEAVE_P) && !this.expelBlock(tw.id)) {
+        this.twinFollowing = true; this.expel(tw.id, { to }); this.twinFollowing = false;
+        this.addDiary({ date: this.calendar.date, key: 'twins.follow', vars: { k: { pid: tw.id } }, cls: 'ev' });
+      } else tw.dyn.morale = clamp(tw.dyn.morale + TWINS.LEAVE_MORALE, 0, 100);
+    }
     this.save();
     return true;
   }
@@ -6777,6 +7082,8 @@ class GameState {
       }
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
+    if (training && date) this.bondTraining(date, trained);   // v3.25: neighbours + the pair drill
+    for (const p of hurt) { const t = p.twinId && this.player(p.twinId); if (t) t.dyn.morale = clamp(t.dyn.morale + TWINS.HURT_MORALE, 0, 100); }   // v3.25 shared fate
     if (thisWeek && attended) {   // v3.21 cohesion: the share of the squad that trained; a kid present ends the empty-week streak
       this.week.teff = (this.week.teff || 0) + attended / Math.max(1, this.squad.length);
       this.week.present = true; this.week.emptyStreak = 0;
@@ -6786,7 +7093,7 @@ class GameState {
     // v3.6: Practice Match = scouting — the coach watches the marked kids (or 1–2 random ones) play
     const observed = training && plan === 'match'
       ? this.practiceObservations(date || this.calendar.date, trained, this.today?.date === date ? this.today.observe || [] : []) : [];
-    for (const o of observed) this.addClue(this.player(o.pid), o.clue);   // v3.18
+    for (const o of observed) { this.addClue(this.player(o.pid), o.clue); if (this.bonds) o.bond = this.bondObserve(this.player(o.pid), date || this.calendar.date); }   // v3.18; v3.25: + who he sticks with
     const lesson = !training && date ? this.runLesson(date) : null;   // v3.16: the evening lesson (no CONTINUE stop)
     return { training, plan: training ? plan : null, attended, skipped, improved, plateau, hurt, observed, lesson };
   }
@@ -6914,6 +7221,7 @@ class GameState {
     }
     for (const k of ['board', 'parents', 'squad']) if (fx[k]) this.addRep(k, fx[k]);
     rep.talk = key;
+    if (key === 'praise' && rep.motm) this.notePraise(this.player(rep.motm));   // v3.25: the praise lands on the man of the match
     this.addDiary({ date: this.calendar.date, key: 'tt.diary', vars: { o: { team: rep.opponent }, t: { talk: key }, r: { talkReact: key + '.' + talkOutcome(rep) } }, cls: 'ev' });   // v3.9: + the dressing-room reaction
     this.save();
     return fx;
@@ -7041,7 +7349,7 @@ class GameState {
       const chance = (half ? FINANCE.HALF_CHANCE : f.next[id] ?? feeChance(p.wealth, kind || (f.reminded[id] ? 'reminded' : 'later'), f.level))
         * (low ? FINANCE.LOW_TRAINING_PAY : 1);   // v3.21: "what are we paying for?" 
       delete f.reminded[id]; delete f.next[id];   // consumed by this roll
-      if (seeded(f.month + '#fee#' + id + '#' + date)() >= chance) continue;
+      if (seeded(f.month + '#fee#' + (p.twinId && this.player(p.twinId) && p.twinId < id ? p.twinId : id) + '#' + date)() >= chance) continue;   // v3.25: twins = one family, one payment roll
       const due = this.feeDue(id), amt = half ? Math.ceil(due / 2) : due;
       this.addMoney(amt, 'fee', false, date);
       if (half) f.got[id] = amt; else { f.status[id] = 'paid'; f.got[id] = amt; }
@@ -7113,7 +7421,7 @@ class GameState {
         pool: (this.globalPlayers || []).filter(p => !this.squad.includes(p)), draft: this.draft || null,   // v3.1 world database
         season: this.season, league: this.league, calendar: this.calendar, phase: this.phase,
         lastReport: this.lastReport, review: this.review || null, lossStreak: this.lossStreak || 0, after: this.after || null, parentComplaints: this.parentComplaints || [], notebookUnlocked: this.notebookUnlocked, diary: this.diary, seasonStats: this.seasonStats, coachNotes: this.coachNotes, cheats: this.cheats,
-        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, excuseLog: this.excuseLog || [], fines: this.fines || [], gkByHand: this.gkByHand || null, expelled: this.expelled || [], pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
+        budget: this.budget, rep: this.rep, duties: this.duties, captaincy: this.captaincy, today: this.today, week: this.week || null, away: this.away || null, worldEvent: this.worldEvent || null, worldLast: this.worldLast || null, worldSalt: this.worldSalt || null, ledger: this.ledger || {}, fees: this.fees || null, cohesion: this.cohesion ?? COH.START, stats: this.stats || {}, newsSeen: this.newsSeen || {}, excuseLog: this.excuseLog || [], fines: this.fines || [], gkByHand: this.gkByHand || null, expelled: this.expelled || [], bonds: this.bonds || null, bondMeta: this.bondMeta || null, pendingEvent: this.pendingEvent, eventLog: this.eventLog, eventQueue: this.eventQueue,
       }));
     } catch (e) { /* storage unavailable: play in memory */ }
   }
@@ -7125,7 +7433,7 @@ class GameState {
       if (d.phase === 'draft' && Array.isArray(d.pool) && d.draft) {   // v3.1: reload in the middle of the Yard Match
         this.newAcademy();
         this.globalPlayers = d.pool.map(p => new Player({ ...p, tags: [] }));
-        this.draft = { pool: d.draft.pool.filter(id => this.globalPlayers.some(p => p.id === id)), signed: (d.draft.signed || []).filter(id => d.draft.pool.includes(id)) };
+        this.draft = { pool: d.draft.pool.filter(id => this.globalPlayers.some(p => p.id === id)), signed: (d.draft.signed || []).filter(id => d.draft.pool.includes(id)), twins: d.draft.twins || {} };
         this.save();
         return true;
       }
@@ -7196,6 +7504,10 @@ class GameState {
         this.newSeason(SEASON.FIRST_YEAR);   // older saves: keep the squad, start the league
       }
       for (const p of this.squad) this.addYardClues(p, `${this.season}-${SEASON.START_MONTH_DAY}`);   // v3.23: old saves get their yard clues once (dated the season start)
+      // v3.25 bonds (old saves: yard / school seeded per kid, the starting table rebuilt — the same values on every load)
+      this.bondMeta = d.bondMeta && typeof d.bondMeta === 'object' ? { known: {}, matches: {}, ...d.bondMeta } : { known: {}, matches: {} };
+      this.bonds = d.bonds && typeof d.bonds === 'object' ? Object.fromEntries(Object.entries(d.bonds).filter(([k, e]) => e && Number.isFinite(e.v) && k.split('|').every(id => this.player(id)))) : null;
+      if (!this.bonds) this.initBonds(this.calendar?.date);
       this.save();
       return true;
     } catch (e) { return false; }
@@ -7206,6 +7518,506 @@ class GameState {
   }
 }
 
+/* =========================================================
+   v3.25 "BONDS" — friendships and dislikes inside the squad (GameState mixin).
+   state.bonds = { 'idA|idB' (ids sorted): { v −100…100, root, cause, since, last, cd, cdate } }; missing = neutral (v 0).
+   Roots come from the yard (5 streets) and the school (3 schools) — hidden, seeded per kid; twins are made after world
+   generation on their own stream. v moves with training, matches, praise and time (BOND.*). The coach never sees v:
+   he collects notes (p.bondNotes) from the locker room, practice, after-game remarks, the loner hint, the yard and his talks.
+   All randomness here is seeded() — Math.random is never touched.
+   ========================================================= */
+
+/** Hidden yard / school, lazily from a seeded stream (old saves get the same values on every load). */
+function kidRoots(p) {
+  if (!p) return { yard: 0, school: 0 };
+  if (!Number.isInteger(p.yard) || !Number.isInteger(p.school)) {
+    const r = seeded('yard' + p.id + '#home');   // own stream: 'yard' + id alone is the v3.12 yard-notes stream
+    p.yard = Math.floor(r() * BOND.YARDS); p.school = Math.floor(r() * BOND.SCHOOLS);
+  }
+  return { yard: p.yard, school: p.school };
+}
+const sameYard = (a, b) => kidRoots(a).yard === kidRoots(b).yard;
+const sameSchool = (a, b) => kidRoots(a).school === kidRoots(b).school;
+const areTwins = (a, b) => !!a && !!b && a.twinId === b.id && b.twinId === a.id;
+
+/** v3.25 twins: after the world is built, a private stream seeded('twins' + worldSeed) turns TWINS.PAIRS kids into twins of
+    another kid of the same age (pair 1 inside the draft pool, pair 2 elsewhere in the world). The first kid of a pair is
+    untouched; the second gets his surname, yard, school, family (wealth), archetype and face (one visible difference: the hair),
+    a different first initial and skills re-rolled from that archetype with the strong group swapped. Never Math.random. */
+function makeTwins(world, pool = []) {
+  if (typeof window !== 'undefined' && window.YAM_NO_TWINS) return [];   // test/policy.js --notwins (the v3.24 world)
+  const seed = world.map(p => p.name).join(',');
+  const r = seeded('twins' + seed), inPool = new Set(pool), made = [];
+  const free = p => !p.twinId && !made.some(m => m.includes(p));
+  const pairsOf = list => { const out = []; for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++)
+    if (list[i].bio.age === list[j].bio.age && list[i].teamId === list[j].teamId && free(list[i]) && free(list[j])) out.push([list[i], list[j]]); return out; };
+  const groups = [world.filter(p => inPool.has(p.id)), world.filter(p => !inPool.has(p.id))];
+  for (let k = 0; k < TWINS.PAIRS; k++) {
+    let cand = pairsOf(groups[Math.min(k, 1)]);
+    if (!cand.length) cand = pairsOf(world);
+    if (!cand.length) break;
+    const [a, b] = cand[Math.floor(r() * cand.length)];
+    twinOf(a, b, r);
+    made.push([a, b]);
+  }
+  return made;
+}
+function twinOf(a, b, r) {
+  const ini = a.name[0];
+  let first = b.name.split(' ')[0];
+  if (first[0] === ini) { const opts = FIRST.filter(f => f[0] !== ini); first = opts[Math.floor(r() * opts.length)]; }
+  b.name = `${first} ${a.surname}`;
+  b.archetype = a.archetype;
+  const kr = kidRoots(a); b.yard = kr.yard; b.school = kr.school;
+  b.wealth = a.wealth;
+  const fresh = AttrGen.roll(a.archetype, r, 0, a.bio.age), P = PROFILES[a.archetype] || PROFILES.MID;
+  const skew = g => ATTR_GROUPS[g].reduce((t, k) => t + (a[g][k] - (P[k][0] + P[k][1]) / 2) / Math.max(1, P[k][1] - P[k][0]), 0) / ATTR_GROUPS[g].length;
+  const techA = skew('technical') >= skew('physical');   // a is the technical one → b is the physical one (and back)
+  for (const g of ['physical', 'technical', 'tactical']) b[g] = { ...fresh[g] };
+  for (const k of ATTR_GROUPS.physical) b.physical[k] = clamp(b.physical[k] + (techA ? TWINS.SKEW : -TWINS.SKEW), 1, 20);
+  for (const k of ATTR_GROUPS.technical) b.technical[k] = clamp(b.technical[k] + (techA ? -TWINS.SKEW : TWINS.SKEW), 1, 20);
+  b.psych = { ...fresh.psych };   // growth room is rolled separately (fresh.psych.potential)
+  b.bio = { ...fresh.bio, age: a.bio.age };
+  b.face = [...a.face]; b.face[5] = a.face[5] === 0 ? 1 : 0;   // the same face; one of them has the messy hair ("the cowlick")
+  b.twinId = a.id; a.twinId = b.id;
+  b.refreshPortrait?.();
+}
+/** The twin with the messy hair (face[5] === 0) is the one with "the cowlick". */
+const twinCowlick = (a, b) => (a.face?.[5] === 0 ? a : b);
+
+const BondsMixin = {
+  /* ---------- store ---------- */
+  bond(a, b) { const ia = a?.id ?? a, ib = b?.id ?? b; return ia && ib && ia !== ib ? this.bonds?.[bondKey(ia, ib)] || null : null; },
+  bondV(a, b) { return this.bond(a, b)?.v || 0; },
+  /** Every change goes through here: clamp −100…100, last date, the cause of the strongest recent drop; twins never below FLOOR.
+      An entry with |v| < BOND.DEL and root 0 is deleted on Sunday (bondWeek), after the decay. */
+  addBond(a, b, dv, cause = null, date = this.calendar?.date) {
+    const ia = a?.id ?? a, ib = b?.id ?? b;
+    if (!ia || !ib || ia === ib || !dv) return 0;
+    this.bonds ||= {};
+    const k = bondKey(ia, ib), e = this.bonds[k] || { v: 0, root: 0, cause: null, since: date, last: null };
+    let v = clamp(Math.round(e.v + dv), -100, 100);
+    if (areTwins(this.player(ia), this.player(ib))) v = Math.max(TWINS.FLOOR, v);
+    if (dv < 0 && cause && (!e.cause || dv <= (e.cd ?? 0) || !e.cdate || isoDays(e.cdate, date) > BOND.STALE_DAYS)) { e.cause = cause; e.cd = dv; e.cdate = date; }
+    e.v = v; e.last = date;
+    this.bonds[k] = e;   // (small entries are dropped by the Sunday decay — dropping them here would stop any +1 from ever adding up)
+    return v;
+  },
+  bondBand(v) { return bondBand(v); },
+  /** [{ id, v, e }] of this kid's stored pairs with kids still in the squad. */
+  bondsOf(id) {
+    const out = [];
+    for (const k in this.bonds || {}) { const [a, b] = k.split('|'); if (a !== id && b !== id) continue; const o = a === id ? b : a; if (this.player(o)) out.push({ id: o, v: this.bonds[k].v, e: this.bonds[k] }); }
+    return out;
+  },
+  /** The draft / an old save: starting bonds for the squad (BOND.START), seeded per pair — the same values on every call. */
+  initBonds(date = this.calendar?.date) {
+    this.bonds = {};
+    const S = BOND.START, sq = this.squad;
+    for (let i = 0; i < sq.length; i++) for (let j = i + 1; j < sq.length; j++) {
+      const a = sq[i], b = sq[j], k = bondKey(a.id, b.id), y = sameYard(a, b), sc = sameSchool(a, b);
+      let st = areTwins(a, b) ? S.twins : y && sc ? S.both : y ? S.yard : sc && a.bio.age === b.bio.age ? S.school : null, cause = null;
+      if (y && !areTwins(a, b)) {
+        if (seeded('grudge#' + k)() < BOND.GRUDGE) { st = S.grudge; cause = 'grudge'; }
+        else if (seeded('yardgame#' + k)() < BOND.YARD_GAME) st = [st[0] + BOND.YARD_GAME_DV, st[1]];   // the yard match: opposite sides, one scored
+      }
+      if (st) this.bonds[k] = { v: st[0], root: st[1], cause, since: date, last: date, ...(cause ? { cd: st[0], cdate: date } : {}) };
+    }
+    return this.bonds;
+  },
+  /** Pairs of XI neighbours in the current lineup ([idA, idB]). */
+  lineupNeighbours(lineup = this.lineup, formation = this.formation) {
+    return bondNeighbours(formation).map(([i, j]) => [lineup[i], lineup[j]]).filter(([a, b]) => a && b && this.player(a) && this.player(b));
+  },
+  /** For MatchEngine opts.bonds (our side only; AI clubs have none). */
+  engineBonds() {
+    return { side: 0, v: (a, b) => this.bondV(a, b), twin: (a, b) => areTwins(this.player(a), this.player(b)) };
+  },
+
+  /* ---------- sources of change ---------- */
+  /** Training day: XI neighbours who both trained +TRAIN; 2 seeded "pair drill" pairs among the trainees +DRILL. */
+  bondTraining(date, trained) {
+    if (!this.bonds || !trained?.length) return;
+    const ids = new Set(trained.map(p => p.id));
+    for (const [a, b] of this.lineupNeighbours()) if (ids.has(a) && ids.has(b)) this.addBond(a, b, BOND.TRAIN, null, date);
+    const list = trained.map(p => p.id).sort(), r = seeded(date + '#drill');
+    for (let k = 0; k < BOND.DRILL_PAIRS && list.length >= 2; k++) {
+      const i = Math.floor(r() * list.length); let j = Math.floor(r() * (list.length - 1)); if (j >= i) j++;
+      this.addBond(list[i], list[j], BOND.DRILL, null, date);
+    }
+  },
+  /** After a match (visual and Quick Sim): side by side, assists, a win, the error before a goal, the fight for a place, twins. */
+  bondMatch(eng, result, date = this.calendar.date) {
+    if (!this.bonds) this.initBonds(date);
+    const side = eng.sides[0], mins = new Map();
+    for (const e of side.entries) if (e.p && !eng.subs.some(s => s.in === e.p.id)) mins.set(e.p.id, 90);
+    for (const s of eng.subs) { mins.set(s.out, s.minute); mins.set(s.in, 90 - s.minute); }
+    for (const [a, b] of this.lineupNeighbours()) if ((mins.get(a) || 0) >= BOND.SIDE_MIN && (mins.get(b) || 0) >= BOND.SIDE_MIN) this.addBond(a, b, BOND.SIDE, null, date);
+    for (const ev of eng.matchEvents) if (ev.type === 'goal' && ev.side === 0 && ev.assistId && this.player(ev.assistId)) this.addBond(ev.assistId, ev.playerId, BOND.ASSIST, null, date);
+    const played = [...eng.everPlayed].filter(id => this.player(id));
+    if (result === 'W') for (let i = 0; i < played.length; i++) for (let j = i + 1; j < played.length; j++) if (this.bondV(played[i], played[j]) > 0) this.addBond(played[i], played[j], BOND.WIN, null, date);
+    for (const bl of eng.blames || []) {   // the erring kid and a hot-headed neighbour
+      const err = this.player(bl.id); if (!err) continue;
+      for (const q of this.lineupNeighbours().filter(([a, b]) => a === err.id || b === err.id).map(([a, b]) => this.player(a === err.id ? b : a)))
+        if (q && bondTemper(q) >= BOND.BLAME_T) this.addBond(err.id, q.id, BOND.BLAME, 'blame', date);
+    }
+    const starters = this.squad.filter(p => eng.everPlayed.has(p.id) && p.tag);   // the fight for a place (same position tag)
+    for (const b of this.squad.filter(p => !eng.everPlayed.has(p.id) && p.tag && p.available && (p.benchStreak || 0) >= BOND.BENCH_RUN))
+      for (const s of starters) if (s.tag === b.tag) this.addBond(b.id, s.id, BOND.POSITION, 'position', date);
+    for (const p of this.squad) {   // twins: 3 matches together and the coach can tell them apart
+      const t = p.twinId && this.player(p.twinId);
+      if (!t || p.id > t.id || !eng.everPlayed.has(p.id) || !eng.everPlayed.has(t.id)) continue;
+      const k = bondKey(p.id, t.id), tw = (this.bondMeta ||= { known: {}, matches: {} });
+      tw.matches[k] = (tw.matches[k] || 0) + 1;
+      if (tw.matches[k] >= TWINS.TELL_MATCHES) this.learnTwins(p, date);
+    }
+    for (const id of eng.injured || []) { const p = this.player(id), t = p?.twinId && this.player(p.twinId); if (t) t.dyn.morale = clamp(t.dyn.morale + TWINS.HURT_MORALE, 0, 100); }
+    this.bondMatchNotes(eng, date);
+  },
+  /** A praise for one kid (Coach's Word praise → the man of the match, a REVIEW card, the armband, the office praise). */
+  notePraise(p, date = this.calendar?.date) {
+    if (!p || !date) return;
+    p.praiseLog = [...(p.praiseLog || []).filter(d => isoDays(d, date) < BOND.FAV_WEEKS * 7), date];
+  },
+  /** Sunday (weekReview, before cohesion): the favourite's envy, decay, morale from friends / enemies. */
+  bondWeek(date) {
+    if (!this.bonds) this.initBonds(date);
+    const start = weekStartOf(date);
+    for (const p of this.squad) {   // the favourite
+      const n = (p.praiseLog || []).filter(d => isoDays(d, date) < BOND.FAV_WEEKS * 7).length;
+      if (n < BOND.FAV_PRAISES) continue;
+      for (const q of this.squad) if (q !== p && q.psych.discipline <= BOND.FAV_DISC) this.addBond(p.id, q.id, BOND.FAV, 'envy', date);
+    }
+    for (const k of Object.keys(this.bonds)) {   // decay towards the root (twins faster)
+      const e = this.bonds[k]; if (e.last && e.last >= start) continue;
+      const [a, b] = k.split('|'), tw = areTwins(this.player(a), this.player(b)), step = tw ? TWINS.DECAY : BOND.DECAY, to = e.root || 0;
+      if (e.v === to) { if (!e.root && Math.abs(e.v) < BOND.DEL) delete this.bonds[k]; continue; }
+      e.v = e.v > to ? Math.max(to, e.v - step) : Math.min(to, e.v + step);
+      if (Math.abs(e.v) < BOND.DEL && !e.root) delete this.bonds[k];
+    }
+    for (const k of Object.keys(this.bonds)) if (Math.abs(this.bonds[k].v) < BOND.DEL && !this.bonds[k].root) delete this.bonds[k];
+    for (const p of this.squad) {   // morale: a mate in the squad / kids he is at war with
+      const list = this.bondsOf(p.id);
+      let d = list.some(x => x.v >= BOND.MATE_V) ? BOND.MORALE_MATE : 0;
+      d += Math.max(BOND.MORALE_ENEMY_CAP, list.filter(x => x.v <= -60).length * BOND.MORALE_ENEMY);
+      if (d) p.dyn.morale = clamp(p.dyn.morale + d, 0, 100);
+    }
+  },
+  /** ATMOS = clamp((F − 1.5 × E) / squad × K, MIN, MAX): F = best mates 1 + mates 0.5, E = at war 1 + don't get on 0.5. */
+  atmos() {
+    if (!this.bonds || !this.squad.length) return 0;
+    let F = 0, E = 0;
+    for (const k in this.bonds) {
+      const [a, b] = k.split('|'); if (!this.player(a) || !this.player(b)) continue;
+      const v = this.bonds[k].v;
+      if (v >= 60) F += 1; else if (v >= 20) F += 0.5; else if (v <= -60) E += 1; else if (v <= -20) E += 0.5;
+    }
+    return clamp((F - 1.5 * E) / this.squad.length * BOND.ATMOS_K, BOND.ATMOS_MIN, BOND.ATMOS_MAX);
+  },
+  /** v3.25 the attendance chance (attendChance, from the week's 3rd training) − LONER_ATTEND for a loner, − FRIEND_AWAY when a best
+      mate (v ≥ 60) is away with a good reason (injured, kept at home, banned, at a school / city event). */
+  bondAttendPen(p, date = this.calendar?.date) {
+    let pen = this.isLoner(p) ? BOND.LONER_ATTEND : 0;
+    if (this.bondsOf(p.id).some(x => { const q = x.v >= 60 && this.player(x.id); return q && (q.injuryDays > 0 || q.awayDays > 0 || q.suspensionMatches > 0 || !!this.worldAway(q.id, date)); })) pen += BOND.FRIEND_AWAY;
+    return pen;
+  },
+  /** No bond ≥ 20 and at least one ≤ −20. */
+  isLoner(p) { const l = this.bondsOf(p.id); return !l.some(x => x.v >= 20) && l.some(x => x.v <= -20); },
+  /** A kid leaves (expel / the scout / "misses his brother"): best mates are upset, the twin may follow. */
+  bondLeave(p, date = this.calendar?.date) {
+    for (const x of this.bondsOf(p.id)) if (x.v >= 60 && !areTwins(p, this.player(x.id))) { const q = this.player(x.id); q.dyn.morale = clamp(q.dyn.morale + BOND.FRIEND_LEAVES, 0, 100); }
+    for (const k of Object.keys(this.bonds || {})) if (k.split('|').includes(p.id)) delete this.bonds[k];
+  },
+
+  /* ---------- the draft ---------- */
+  /** The twin still on the draft board when the coach signs `id` (and there is room for him) — or null. */
+  draftTwinAsk(id) {
+    const d = this.draft, p = this.globalPlayers.find(x => x.id === id), t = p?.twinId && this.globalPlayers.find(x => x.id === p.twinId);
+    if (!d || !t || !d.pool.includes(t.id) || d.signed.includes(t.id) || !d.signed.includes(id) || d.signed.length >= WORLD.DRAFT_SIGN) return null;
+    if ((d.twins ||= {})[bondKey(id, t.id)]) return null;   // asked once
+    return t;
+  },
+  /** The mum's request: take → the brother uses the next pick; refuse → morale −8 for the taken twin, Parents −2 (+ maybe a delayed event). */
+  draftTwinAnswer(id, take) {
+    const d = this.draft, p = this.globalPlayers.find(x => x.id === id), t = p && this.globalPlayers.find(x => x.id === p.twinId);
+    if (!d || !t) return false;
+    d.twins[bondKey(id, t.id)] = take ? 'take' : 'refuse';
+    if (take && d.signed.length < WORLD.DRAFT_SIGN && !d.signed.includes(t.id)) d.signed.push(t.id);
+    if (!take) { p.dyn.morale = clamp(p.dyn.morale + TWINS.REFUSE_MORALE, 0, 100); this.addRep('parents', TWINS.REFUSE_PARENTS); }
+    this.save();
+    return true;
+  },
+  /** finishDraft: the yard notes become root notes; a refused twin may miss his brother in 2–4 weeks. */
+  draftBondNotes(date) {
+    const board = [...(this.draft?.pool || [])];
+    for (const p of this.squad) {
+      const yn = typeof DraftView !== 'undefined' ? DraftView.notes(p) : [];
+      if (!(yn.length < YARD.MAX || yn[0] === 'quiet')) continue;   // the card had no room for it
+      const m = this.draftYardMate(p, board);
+      if (m && this.player(m.id)) this.addBondNote(p, { with: m.id, band: 'yard', source: 'yard', date, root: 'yard' });
+    }
+    for (const [k, ans] of Object.entries(this.draft?.twins || {})) {
+      if (ans !== 'refuse') continue;
+      const kid = k.split('|').map(id => this.player(id)).find(Boolean);
+      if (!kid || this.player(kid.twinId)) continue;
+      const r = seeded('twinmiss#' + k);
+      if (r() < (this.twinMissForce ?? TWINS.MISS_P)) this.eventQueue.push({ id: 'twinmiss', due: isoAdd(date, rndR(r, ...TWINS.MISS_DAYS)), matchDay: false, from: null, cast: { kid: kid.id } });
+    }
+    this.eventQueue.sort((a, b) => a.due.localeCompare(b.due));
+  },
+
+  /* ---------- twins ---------- */
+  twinsKnown(p) { const t = p?.twinId && this.player(p.twinId); return !t || !!this.bondMeta?.known?.[bondKey(p.id, t.id)]; },
+  /** The coach can tell them apart now: a Notebook line, mixed-up clues / notes get struck through. */
+  learnTwins(p, date = this.calendar?.date) {
+    const t = p?.twinId && this.player(p.twinId);
+    if (!t || this.twinsKnown(p)) return false;
+    (this.bondMeta ||= { known: {}, matches: {} }).known[bondKey(p.id, t.id)] = date || true;
+    const c = twinCowlick(p, t);
+    this.addDiary({ date, key: 'twins.learned', vars: { k: { pid: c.id }, b: { pid: (c === p ? t : p).id } }, cls: 'ev' });
+    return true;
+  },
+  /** Until the coach can tell them apart, a clue / note about a twin lands on his brother with TWINS.MIXUP. → the kid it lands on. */
+  mixTwin(p, salt) {
+    const t = p?.twinId && this.player(p.twinId);
+    if (!t || this.twinsKnown(p)) return null;
+    const m = this.twinMixForce ?? TWINS.MIXUP;
+    return seeded('mix#' + p.id + '#' + salt)() < m ? t : null;
+  },
+
+  /* ---------- the coach's notes (p.bondNotes) ---------- */
+  /** { with, band, source, date, by } on kid p (band: a BOND.BANDS key, 'alone' for the loner hint, 'yard' for a root clue). */
+  addBondNote(p, n) {
+    if (!p) return null;
+    let owner = p, mix = null;
+    const tw = n.with && this.mixTwin(p, (n.source || '') + '#' + n.with + '#' + n.date);
+    if (tw && tw.id !== n.with) { mix = p.id; owner = tw; }
+    const note = { with: n.with || null, band: n.band, source: n.source, date: n.date, by: n.by || null, ...(n.cause ? { cause: n.cause } : {}), ...(n.root ? { root: n.root } : {}), ...(mix ? { mix } : {}) };
+    owner.bondNotes = [...(owner.bondNotes || []), note].slice(-24);
+    return note;
+  },
+  /** All notes about the pair (a, b) from both kids' lists, oldest first. */
+  pairNotes(a, b) {
+    const pa = this.player(a?.id ?? a), pb = this.player(b?.id ?? b);
+    if (!pa || !pb) return [];
+    return [...(pa.bondNotes || []).filter(n => n.with === pb.id), ...(pb.bondNotes || []).filter(n => n.with === pa.id)].sort((x, y) => (x.date || '').localeCompare(y.date || ''));
+  },
+  /** What the coach believes about the pair: the latest note's band (+ confirmed: two notes of the same kind from different
+      sources or days, the v3.18 rule) — or null. Rumours and the yard's root clue never count as a band of their own. */
+  knownBond(a, b) {
+    const list = this.pairNotes(a, b).filter(n => n.band !== 'yard' && !n.mix);
+    if (!list.length) return null;
+    const last = list[list.length - 1], cls = bondClass(last.band);
+    const confirmed = list.some(n => n !== last && bondClass(n.band) === cls && (n.source !== last.source || n.date !== last.date));
+    const stale = !!last.date && !!this.calendar?.date && isoDays(last.date, this.calendar.date) > BOND.STALE_DAYS;
+    return { band: last.band, cls, source: last.source, date: last.date, confirmed, stale };
+  },
+  /** Known links of a kid (for PLAYER_INFO, the tac board, the Notebook): [{ id, band, cls, … }]. */
+  knownLinks(id) {
+    const out = [];
+    for (const q of this.squad) { if (q.id === id) continue; const k = this.knownBond(id, q.id); if (k && k.cls !== 'neutral') out.push({ id: q.id, ...k }); }
+    return out;
+  },
+  /** Training (the locker room): pairs v ≥ CAME_V arrive together — 30 % per pair, max one line per training. */
+  bondArrivals(date, present) {
+    if (!this.bonds) return null;
+    const ids = new Set(present.map(p => p.id)), r = seeded(date + '#came');
+    for (const k of Object.keys(this.bonds).sort()) {
+      const [a, b] = k.split('|'), e = this.bonds[k];
+      if (e.v < BOND.CAME_V || !ids.has(a) || !ids.has(b)) continue;
+      if (r() < BOND.CAME_P) { this.addBondNote(this.player(a), { with: b, band: bondBand(e.v), source: 'came', date }); return { a, b }; }
+    }
+    return null;
+  },
+  /** v3.24 auto lineup + v3.25: two kids with a KNOWN bad bond next to each other → swap one of them with a starter of the same
+      line (or a fit bench kid of the same tag) whose overall differs by ≤ 0.5, if that separates them. Never the hidden v. */
+  bondSeparate() {
+    if (!this.bonds) return 0;
+    const slots = this.slots(), bad = (a, b) => this.knownBond(a, b)?.cls === 'bad';
+    const clash = lu => this.lineupNeighbours(lu).filter(([a, b]) => bad(a, b));
+    let n = 0;
+    for (let guard = 0; guard < 4; guard++) {
+      const now = clash(this.lineup);
+      if (!now.length) break;
+      let best = null;
+      for (const who of [...new Set(now.flat())]) {
+        const i = this.lineup.indexOf(who), p = this.player(who);
+        if (i <= 0) continue;
+        const tryLu = lu => { const c = clash(lu).length; if (c < now.length && (!best || c < best.c)) best = { lu, c }; };
+        this.lineup.forEach((id, j) => {
+          const q = this.player(id);
+          if (j <= 0 || j === i || slots[j].line !== slots[i].line || !q || Math.abs(q.overall - p.overall) > 0.5) return;
+          const lu = [...this.lineup]; [lu[i], lu[j]] = [lu[j], lu[i]]; tryLu(lu);
+        });
+        for (const q of this.bench()) {
+          if (!q.available || p.hasFlag('Showcase') || q.position !== p.position || q.hasFlag('Promised_Start') || Math.abs(q.overall - p.overall) > 0.5) continue;
+          const lu = [...this.lineup]; lu[i] = q.id; tryLu(lu);
+        }
+      }
+      if (!best) break;
+      this.lineup = best.lu; n++;
+    }
+    return n;
+  },
+  /** Match day locker room: one warning when two kids the coach KNOWS don't get on stand next to each other in the XI. */
+  lockerBondWarning() {
+    if (!this.bonds) return null;
+    for (const [a, b] of this.lineupNeighbours()) {
+      const k = this.knownBond(a, b);
+      if (k?.cls !== 'bad') continue;
+      const i = this.lineup.indexOf(a), j = this.lineup.indexOf(b), sl = this.slots(), line = sl[i].line === sl[j].line ? sl[i].line : sl[Math.max(i, j)].line;
+      return { a, b, line, date: k.date };
+    }
+    return null;
+  },
+  /** v3.6 practice observation: "stays near Lee, doesn't even look at Finn" — wrong with CLUES.WRONG. */
+  bondObserve(p, date) {
+    const list = this.bondsOf(p.id).filter(x => Math.abs(x.v) >= 20);
+    if (!list.length) return null;
+    const r = seeded(date + '#bobs#' + p.id), x = list[Math.floor(r() * list.length)];
+    let band = bondBand(x.v);
+    if (r() < CLUES.WRONG) band = BOND.BANDS.map(b => b.key).filter(k => k !== band)[Math.floor(r() * (BOND.BANDS.length - 1))];
+    return this.addBondNote(p, { with: x.id, band, source: 'obs', date });
+  },
+  /** Match notes are written elsewhere (after-game remarks); kept as a hook for v3.26. */
+  bondMatchNotes() {},
+  /** Match Summary: a pass between two kids with v ≤ −20 lost before a chance / goal against — only a pair the coach knows about. */
+  bondCauseOf(eng) {
+    for (const l of [...(eng.keyLosses || [])].sort((x, y) => (y.goal ? 1 : 0) - (x.goal ? 1 : 0))) {
+      if (l.kind !== 'pass' || !this.player(l.a) || !this.player(l.b) || this.bondV(l.a, l.b) > -20) continue;
+      if (this.knownBond(l.a, l.b)?.cls === 'bad') return { a: l.a, b: l.b, goal: !!l.goal };
+    }
+    return null;
+  },
+  /** Monday briefing: one loner line (3 phrasings, the week number picks one → never the same two weeks running) + an exact 'alone' note. */
+  lonerLine(date) {
+    const kids = this.squad.filter(p => this.isLoner(p)).sort((a, b) => a.number - b.number);
+    const tw = (this.bondMeta ||= { known: {}, matches: {} }), last = tw.lonerLast || null;
+    if (last?.date === date) return kids.some(k => k.id === last.pid) ? { pid: last.pid, v: last.v } : null;
+    const p = kids[0];
+    if (!p) return null;
+    const v = Math.floor(isoDays('2000-01-03', date) / 7) % 3;   // the week number picks the phrasing → never the same two weeks running
+    tw.lonerLast = { pid: p.id, date, v };
+    this.addBondNote(p, { with: null, band: 'alone', source: 'loner', date });
+    return { pid: p.id, v: tw.lonerLast.v };
+  },
+  /** The draft (v3.12 yard notes): "from Canal Street, like Lee" — a clue about the root. */
+  draftYardMate(p, ids) {
+    if (seeded('yardnote' + p.id)() >= BOND.YARD_NOTE) return null;
+    const mates = ids.filter(id => id !== p.id).map(id => this.globalPlayers.find(x => x.id === id)).filter(q => q && sameYard(p, q)).sort((a, b) => a.id.localeCompare(b.id));
+    return mates[0] || null;
+  },
+
+  /* ---------- the talk (§6) ---------- */
+  /** Hidden openness 0.1–0.9 (morale, composure, discipline, Squad reputation; anxious −0.1; gossip −0.1 for 14 days). */
+  openness(p, date = this.calendar.date) {
+    if (this.talkForceO != null) return this.talkForceO;
+    let o = 0.35 + p.dyn.morale / 250 + (p.psych.composure - 10) / 40 + (p.psych.discipline - 10) / 40 + ((this.rep?.squad ?? 50) - 50) / 400;
+    if (p.leadership <= 7) o -= 0.1;
+    if (p.talk?.closedUntil && date < p.talk.closedUntil) o += TALK.GOSSIP_OPEN;
+    return clamp(o, 0.1, 0.9);
+  },
+  /** Why the [ Have a word ] button is greyed (i18n key) — or null. */
+  talkBlock(id) {
+    const p = this.player(id);
+    if (!p) return 'office.kickNo.gone';
+    if ((this.weekState?.().ap ?? this.ap ?? 0) < TALK.AP) return 'talk.noAp';
+    if (p.talk?.last && isoDays(p.talk.last, this.calendar.date) < TALK.WEEK_CD) return 'btalk.cooldown';
+    return null;
+  },
+  /** One answer. Returns { kind: 'honest' | 'evade' | 'lie' | 'repeat' | 'none', band, root, cause, about, x, y, line }. */
+  talkAnswer(kid, qid, xId = null, yId = null, date = this.calendar.date) {
+    const q = TALK_QUESTIONS.find(t => t.id === qid); if (!q || !kid) return null;
+    const t = (kid.talk ||= {}), ak = qid + '#' + (xId || '') + '#' + (yId || '');
+    t.asked ||= {};
+    if (t.asked[ak] && isoDays(t.asked[ak], date) < TALK.REPEAT_DAYS) return { kind: 'repeat', qid };
+    t.asked[ak] = date;
+    const r = seeded(date + '#talk#' + kid.id + '#' + qid + '#' + (xId || '') + (yId ? '#' + yId : ''));
+    const O = this.openness(kid, date), by = { pid: kid.id, name: kid.name };
+    let about = xId, v;
+    if (qid === 'mates' || qid === 'hard') {
+      const list = this.bondsOf(kid.id).sort((a, b) => (qid === 'mates' ? b.v - a.v : a.v - b.v) || a.id.localeCompare(b.id));
+      const top = list[0];
+      if (!top || (qid === 'mates' ? top.v < 20 : top.v > -20)) { if (r() < O) return { kind: 'none', qid }; return this.talkEvade(kid, qid, null, date); }
+      about = top.id;
+    }
+    if (qid === 'pair') return this.talkRumour(kid, xId, yId, r, date, by);
+    v = this.bondV(kid.id, about);
+    const e = this.bond(kid.id, about);
+    if (qid === 'pitch') return this.talkPitch(kid, this.player(about), v, r, date, by);
+    let evade = 1 - O;
+    if (q.evade) evade *= q.evade;
+    if (v <= -20) evade *= TALK.EVADE_COLD; else if (v >= 20) evade *= TALK.EVADE_MATE;
+    const res = { qid, about };
+    if (r() < clamp(evade, 0, 1)) Object.assign(res, this.talkEvade(kid, qid, about, date));
+    else if (v <= -20 && kid.psych.discipline <= TALK.LIE_DISC && r() < (this.talkForceLie ?? TALK.LIE)) {
+      Object.assign(res, { kind: 'lie', band: 'neutral' });
+      this.addBondNote(kid, { with: about, band: 'neutral', source: 'talk', date, by });
+    } else {
+      const band = bondBand(v), root = e?.root ? (areTwins(kid, this.player(about)) ? 'twins' : sameYard(kid, this.player(about)) ? 'yard' : 'school') : null;
+      Object.assign(res, { kind: 'honest', band, root, cause: v <= -20 ? e?.cause || null : null, assist: v >= 20 && !root });
+      this.addBondNote(kid, { with: about, band, source: 'talk', date, by, ...(res.cause ? { cause: res.cause } : {}), ...(root ? { root } : {}) });
+    }
+    if (res.kind !== 'evade' && v >= 20) kid.dyn.morale = clamp(kid.dyn.morale + TALK.MATE_MORALE, 0, 100);   // asked about a mate
+    if (v <= -60 && bondTemper(kid) >= 1 && r() < TALK.STIR) { this.addBond(kid.id, about, TALK.STIR_DV, null, date); res.stirred = true; }   // «растравил»
+    if (v <= -20) this.talkGossip(kid, about, r, date);
+    return res;
+  },
+  talkEvade(kid, qid, about, date) {
+    if (about) this.addBondNote(kid, { with: about, band: 'evade', source: 'talk', date, by: { pid: kid.id, name: kid.name } });
+    return { kind: 'evade', qid, about };
+  },
+  /** Gossip: TALK.GOSSIP that X hears "the coach was asking about you" — X morale −2, openness −0.1 for 14 days. */
+  talkGossip(kid, xId, r, date) {
+    const x = this.player(xId);
+    if (!x || r() >= (this.talkForceGossip ?? TALK.GOSSIP)) return false;
+    x.dyn.morale = clamp(x.dyn.morale + TALK.GOSSIP_MORALE, 0, 100);
+    (x.talk ||= {}).closedUntil = isoAdd(date, TALK.GOSSIP_DAYS);
+    this.addDiary({ date, key: 'btalk.gossip', vars: { k: { pid: x.id } }, cls: 'ev' });
+    return true;
+  },
+  /** "And X and Y?" — a rumour, wrong with 2 × CLUES.WRONG; always gossip-prone. */
+  talkRumour(kid, xId, yId, r, date, by) {
+    const x = this.player(xId), y = this.player(yId);
+    if (!x || !y) return null;
+    if (r() >= this.openness(kid, date)) { this.talkGossip(kid, xId, r, date); return { kind: 'evade', qid: 'pair', about: xId, y: yId }; }
+    let band = bondBand(this.bondV(xId, yId));
+    if (r() < 2 * CLUES.WRONG) band = BOND.BANDS.map(b => b.key).filter(k => k !== band)[Math.floor(r() * (BOND.BANDS.length - 1))];
+    this.addBondNote(x, { with: yId, band, source: 'rumour', date, by });
+    this.talkGossip(kid, xId, r, date);
+    return { kind: 'honest', qid: 'pair', about: xId, y: yId, band };
+  },
+  /** "What do you think of X on the pitch?" — a v3.18 role clue, reliability − 0.003 × |v|, friends praise, rivals run down. */
+  talkPitch(kid, x, v, r, date, by) {
+    if (!x) return null;
+    const rel = clamp((AFTER.FORCE_REL ?? kidReliability(kid)) - TALK.ROLE_REL * Math.abs(v), 0.05, 0.95), ok = r() < rel;
+    const truth = trueSignals(x), others = Object.keys(CLUE_SIGNALS).filter(k => !truth.includes(k));
+    const down = v <= -20, signal = (ok || !others.length ? truth : others)[Math.floor(r() * (ok || !others.length ? truth.length : others.length))] || null;
+    if (down) { this.addClue(x, { date, source: 'talk', ref: 'talk', signal: null, textKey: 'clue.voice.down', kind: 'down', claim: null, by }); }
+    else this.addClue(x, { date, source: 'talk', ref: 'talk', signal, textKey: 'clue.voice.role', kind: 'role', claim: null, by });
+    if (down) this.talkGossip(kid, x.id, r, date);
+    return { kind: 'honest', qid: 'pitch', about: x.id, signal: down ? null : signal, down, tone: v >= 20 ? 'praise' : down ? 'down' : 'plain' };
+  },
+};
+/** 'good' (mates / best mates), 'bad' (don't get on / at war), 'neutral' or the note's own kind (alone / evade / yard). */
+const bondClass = band => (band === 'best' || band === 'mates' ? 'good' : band === 'cold' || band === 'war' ? 'bad' : band);
+Object.assign(GameState.prototype, BondsMixin);
+const BOND_ICONS = { best: '\u{1F91D}', mates: '\u{1F642}', cold: '\u{1F620}', war: '⚡', neutral: '·', alone: '…', evade: '\u{1F910}', yard: '\u{1F3E0}' };
+const BOND_SRC = { came: '\u{1F6AA}', obs: '\u{1F3C3}', after: '\u{1F5E3}', loner: '…', yard: '\u{1F3E0}', talk: '\u{1F4AC}', rumour: '\u{1F442}' };
+/** One bond note as the coach wrote it ("From Petya: Kolya took his place"). n.owner = the kid whose list holds it. */
+function bondNoteText(s, n) {
+  const a = s.player(n.owner), b = n.with && s.player(n.with), an = a ? L.name(a.name) : '', bn = b ? L.name(b.name) : '';
+  const say = () => L.t(n.band === 'cold' && n.cause ? 'bn.say.cold.' + n.cause : (n.band === 'best' || n.band === 'mates') && n.root ? 'bn.say.mates.' + n.root : 'bn.say.' + n.band, { a: an, b: bn });
+  let t;
+  if (n.source === 'came') t = L.t('bn.note.came', { a: an, b: bn });
+  else if (n.source === 'obs') t = L.t('bn.note.obs.' + bondClass(n.band), { a: an, b: bn });
+  else if (n.source === 'loner') t = L.t('bn.note.alone', { a: an });
+  else if (n.source === 'yard') t = L.t('bn.note.yard', { a: an, b: bn, y: L.t('yard.street.' + kidRoots(a).yard) });
+  else if (n.band === 'evade') t = L.t('bn.note.evade', { a: an, b: bn });
+  else if (n.source === 'rumour') t = L.t('bn.note.rumour', { k: n.by?.name ? L.name(n.by.name) : '', a: an, b: bn, w: L.t('bn.band.' + n.band) });
+  else t = (n.by?.name ? L.t('bn.by', { k: L.name(n.by.name) }) + ': ' : '') + say();
+  return n.mix ? L.t('twins.mix', { k: an }) + ' ' + t : t;
+}
 /* =========================================================
    MATCH ENGINE
    Zones are relative to the team in possession:
@@ -7247,6 +8059,11 @@ class MatchEngine {
     this.cohesion = Array.isArray(opts.cohesion) ? opts.cohesion.map(c => c ?? null) : [null, null];
     this.cohB = this.cohesion.map(c => cohBonus(c));
     this.knockMult = 1 + Math.max(0, 50 - (this.cohesion[0] ?? 50)) / COH.KNOCK_DIV;
+    // v3.25 bonds (one side only — AI clubs have none): { side, v(idA, idB) → −100…100, twin(idA, idB) → bool }. null = no term at all
+    // (test/balance.js default). Hooks: pass target weight, the pass duel (passer ↔ receiver), the interception (same-line neighbours),
+    // the leader's rally / anxious captain's stress. No Math.random added or moved.
+    this.bonds = opts.bonds && typeof opts.bonds.v === 'function' ? opts.bonds : null;
+    this.ownLoss = null; this.keyLosses = []; this.blames = [];   // v3.25: our lost balls that led to a chance / goal against (no RNG)
     // v3.7 hidden captain trait state + its OWN seeded stream (never Math.random → the match RNG order is untouched;
     // visual and Quick Sim run the same tick(), so the same match gives the same captain moments)
     this.capRng = seeded('cap|' + home.name + '|' + away.name + '|' + (opts.md ?? ''));
@@ -7348,7 +8165,38 @@ class MatchEngine {
   captainStress(p) {
     const c = this.captain();
     if (!c || c !== p || p.captainTrait !== 'anxious' || this.cap.broken === p.id) return 0;
-    return -(CAPTAIN.STRESS + Math.max(0, 10 - (p.psych?.composure ?? 10)) * CAPTAIN.STRESS_COMP);
+    const war = this.bonds && this.sides[0].players.some(q => q !== p && !this.sentOff.has(q.id) && this.bondV(p, q) <= BOND.RALLY_WAR);   // v3.25
+    return -(CAPTAIN.STRESS + Math.max(0, 10 - (p.psych?.composure ?? 10)) * CAPTAIN.STRESS_COMP) * (war ? BOND.STRESS_WAR : 1);
+  }
+  /* ---------- v3.25 BONDS ---------- */
+  bondV(a, b) { return this.bonds && a && b && a !== b ? this.bonds.v(a.id, b.id) || 0 : 0; }
+  /** Kids next to p on the tactics board right now (bondNeighbours of the formation, live entries: subs take the slot). */
+  bondNbrs(side, p, sameLine = false) {
+    const s = this.sides[side], i = s.entries.findIndex(e => e.p === p);
+    if (i < 0) return [];
+    return bondNeighbours(s.formation).filter(([x, y]) => x === i || y === i).map(([x, y]) => s.entries[x === i ? y : x])
+      .filter(e => e.p && !this.sentOff.has(e.p.id) && (!sameLine || e.line === s.entries[i].line)).map(e => e.p);
+  }
+  /** Pass duel between XI neighbours: + bondTerm(v) (v/100 × MAX, or × MAX_NEG below 0; × TWINS.LINK for twins). */
+  bondPass(side, a, b) {
+    if (!this.bonds || side !== this.bonds.side) return 0;
+    const v = this.bondV(a, b);
+    if (!v || !this.bondNbrs(side, a).includes(b)) return 0;   // only between XI neighbours (see DESIGN.md: a free buff from scattered yard mates otherwise)
+    return bondTerm(v) * (this.bonds.twin?.(a.id, b.id) ? TWINS.LINK : 1);
+  }
+  /** Interception: + avg(bondTerm(v) with same-line neighbours) × 0.5. */
+  bondRead(side, d) {
+    if (!this.bonds || side !== this.bonds.side) return 0;
+    const n = this.bondNbrs(side, d, true);
+    return n.length ? n.reduce((t, q) => t + bondTerm(this.bondV(d, q)), 0) / n.length * 0.5 : 0;
+  }
+  /** Pass target: weight × (1 + v/100 × TARGET), one Math.random like pick() (no bonds → pick() itself). */
+  bondPick(side, c, mates) {
+    if (!this.bonds || side !== this.bonds.side || mates.length < 2) return pick(mates);
+    const w = mates.map(m => Math.max(0.05, 1 + this.bondV(c, m) / 100 * BOND.TARGET));
+    let x = Math.random() * w.reduce((t, v) => t + v, 0);
+    for (let i = 0; i < mates.length; i++) if ((x -= w[i]) < 0) return mates[i];
+    return mates[mates.length - 1];
   }
   /** Log line + speech bubble that never touch Math.random (r comes from the captain's own stream). */
   capLog(type, key, p, cls = '', bark = null) {
@@ -7496,12 +8344,15 @@ class MatchEngine {
     if (stress) flat = { ...flat, stress };
     let fl = 0; for (const k in flat) fl += flat[k];
     const coh = opt.coh || 0;   // v3.21: team cohesion (pass duels only)
-    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, coh, total: stat + mood + rand + fl + m.v + coh };
+    const bond = opt.bond || 0;   // v3.25: passer ↔ receiver / interceptor ↔ same-line neighbours
+    if (side === 0 && this.bonds && m.cap) { const c = this.captain();   // v3.25: a kid at war with the captain doesn't answer his rally
+      if (c && c !== p && c.captainTrait === 'leader' && this.minute <= this.cap.rallyUntil && this.bondV(p, c) <= BOND.RALLY_WAR) { m.cap -= CAPTAIN.RALLY; m.v -= CAPTAIN.RALLY; } }
+    return { p, rating, fat, tag, stat, mood, rand, flat, fl, cheat: m.cheat, rep: m.rep, cap: m.cap, shout: m.shout, coh, bond, total: stat + mood + rand + fl + m.v + coh + bond };
   }
   /** v3.4: record a duel in the match log (A = side in possession). */
   tr(kind, side, A, D, out) {
     const pack = r => ({ id: r.p.id, name: r.p.name, energy: Math.round(this.energy.get(r.p.id) ?? r.p.energy ?? 100), rating: r.rating, fat: r.fat, tag: r.tag, stat: r.stat, mood: r.mood, rand: r.rand,
-      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, coh: r.coh || 0, cheat: r.cheat, total: r.total });
+      flat: r.flat, shout: r.shout, rep: r.rep, cap: r.cap, coh: r.coh || 0, bond: r.bond || 0, cheat: r.cheat, total: r.total });
     this.trace.push({ min: this.minute, kind, side, zone: this.zone, A: pack(A), D: pack(D), margin: A.total - D.total, out });
   }
   counts(side) {
@@ -7683,6 +8534,7 @@ class MatchEngine {
   /* ---------- possession helpers ---------- */
   kickoff(side) {
     this.poss = side;
+    if (side === 0) this.ownLoss = null;
     this.zone = 1;
     this.carrier = pick(this.inZone(side, 1));
     this.boxBonus = 0;
@@ -7691,6 +8543,7 @@ class MatchEngine {
   }
   turnover(newCarrier, zone) {
     this.poss = 1 - this.poss;
+    if (this.poss === 0) this.ownLoss = null;   // v3.25: we have the ball back
     this.carrier = newCarrier;
     this.zone = zone;
     this.boxBonus = 0;
@@ -7741,7 +8594,7 @@ class MatchEngine {
     else tz = Math.random() < 0.7 ? 2 : 1;
     let mates = this.inZone(side, tz).filter(p => p !== c);
     if (!mates.length) { tz = 1; mates = this.active(side).filter(p => p !== c && !this.isGK(p)); }
-    const recv = pick(mates);
+    const recv = this.bondPick(side, c, mates);   // v3.25: friends look for each other (no bonds → pick())
     const def = pick(this.inZone(opp, 2 - tz));
     const forward = tz > z;
 
@@ -7749,8 +8602,8 @@ class MatchEngine {
     // a forward ball into the final third leans on crossing.
     const touch = ((recv.skill?.('firstTouch') ?? 10) - 10) * 0.15;
     const cross = forward && tz === 2 ? ((c.skill?.('crossing') ?? 10) - 10) * 0.1 : 0;
-    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) }, { coh: this.cohB[side] });
-    const D = this.rs(def, 'Mark', opp, 'def', {}, { coh: this.cohB[opp] });   // v3.21: the interception side's cohesion
+    const A = this.rs(c, 'Pass', side, 'atk', { base: 3, fwd: forward ? -2 : 0, gk: this.isGK(c) ? 2 : 0, touch, cross, sup: this.sup(side, tz) }, { coh: this.cohB[side], bond: this.bondPass(side, c, recv) });
+    const D = this.rs(def, 'Mark', opp, 'def', {}, { coh: this.cohB[opp], bond: this.bondRead(opp, def) });   // v3.21: the interception side's cohesion; v3.25: + bonds
     const vars = { a: c, b: recv, d: def };
     this.tr(forward ? 'passFwd' : 'pass', side, A, D, A.total >= D.total ? 'ok' : 'intercepted');
 
@@ -7765,6 +8618,7 @@ class MatchEngine {
       this.st(def).intercepts++;
       this.log('turn', 'passFail', vars, side);
       this.turnover(def, 2 - tz);
+      if (side === 0) this.ownLoss = { kind: 'pass', a: c.id, b: recv.id, min: this.minute, chance: false };   // v3.25
       this.setEv({ kind: 'intercept', a: c, b: recv, d: def });
       if (side === 0) this.captainMoment(c === this.captain() ? 'mistake' : 'lost');   // v3.7
     }
@@ -7801,6 +8655,7 @@ class MatchEngine {
       this.log('turn', 'drFail', vars, side);
       this.maybeInjure(c, side);
       this.turnover(def, 2 - z);
+      if (side === 0) this.ownLoss = { kind: 'dribble', a: c.id, min: this.minute, chance: false };   // v3.25
       this.setEv({ kind: 'tackle', a: c, d: def });
       if (side === 0) this.captainMoment(c === this.captain() ? 'mistake' : 'lost');   // v3.7
     }
@@ -7828,6 +8683,7 @@ class MatchEngine {
     const side = this.poss;
     const long = !freeKick && !sp.penalty && !sp.corner && this.zone < 2;
     this.st(c).shots++;
+    if (side === 1 && this.ownLoss && !this.ownLoss.chance) { this.ownLoss.chance = true; this.keyLosses.push(this.ownLoss); }   // v3.25: a chance against followed
     const lp = this.lastPass, assist = !freeKick && !sp.penalty && lp && lp.side === side && lp.p !== c ? lp.p : null;
     this.pendingShot = { shooter: c, side, long, freeKick, assist, penalty: !!sp.penalty, corner: !!sp.corner,
       bonus: sp.penalty ? SETPIECE.PEN_BONUS + (c.psych?.composure ?? 10) * 0.2 : sp.corner ? sp.bonus || 0 : freeKick ? 1 : this.boxBonus, phase: 1 };
@@ -7875,7 +8731,8 @@ class MatchEngine {
       this.st(keeper).conceded++;   // v3.18.1: the keeper's line in the Notebook weighs goals against him too
       if (assist) this.st(assist).assists++;
       this.sides[side].score++;
-      this.addEvent('goal', shooter, side, { ...(assist ? { assist: assist.name } : {}), ...(penalty ? { pen: true } : {}), ...(corner ? { corner: true } : {}) });
+      if (side === 1 && this.ownLoss) { this.ownLoss.goal = true; this.blames.push({ id: this.ownLoss.a, min: this.minute }); }   // v3.25: the error before a goal conceded
+      this.addEvent('goal', shooter, side, { ...(assist ? { assist: assist.name, assistId: assist.id } : {}), ...(penalty ? { pen: true } : {}), ...(corner ? { corner: true } : {}) });
       this.log('goal', 'goal', vars, side, `  ${this.sides[0].score}-${this.sides[1].score}`);
       if (!this.instant) this.hooks.onGoal?.(side);
       this.kickoff(opp);
@@ -7921,7 +8778,7 @@ class MatchEngine {
       const avg = f => own.length ? r2(own.reduce((a, x) => a + f(x), 0) / own.length) : 0;
       return { name: s.name, formation: s.formation, score: s.score, user: s.user, possession: r2(this.possTicks[i] / ((this.possTicks[0] + this.possTicks[1]) || 1)),
         totals: this.teamTotals(i), duels: kinds,
-        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cohesion: avg(x => x.coh || 0), cheat: avg(x => x.cheat) },
+        avgInDuels: { rating: avg(x => x.rating), fatigue: avg(x => x.fat), stat: avg(x => x.stat), mood: avg(x => x.mood), shout: avg(x => x.shout), rep: avg(x => x.rep), captain: avg(x => x.cap), cohesion: avg(x => x.coh || 0), bond: avg(x => x.bond || 0), cheat: avg(x => x.cheat) },
         players: s.all.map(p => ({ id: p.id, name: p.name, line: this.lineOf.get(p.id), sentOff: this.sentOff.has(p.id), subbedOff: this.subbedOff.has(p.id),
           energyStart: Math.round(this.startEnergy?.get(p.id) ?? p.energy ?? 100), energyEnd: Math.round(this.energy.get(p.id) ?? 0),
           fatigueStart: r2(fatigueMult(this.startEnergy?.get(p.id) ?? p.energy ?? 100)), fatigueEnd: r2(fatigueMult(this.energy.get(p.id) ?? 0)), stats: { ...this.st(p) } })) };
@@ -7934,7 +8791,7 @@ class MatchEngine {
   /** One CSV row per duel (comma-separated, dot decimals, UTF-8). `pre` = extra leading columns (e.g. setup / match no.). */
   static traceCsv(trace, sides, pre = null) {
     const f = v => (typeof v === 'number' ? String(Math.round(v * 100) / 100) : `"${String(v ?? '').replace(/"/g, '""')}"`);
-    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'coh', 'cheat', 'total'];   // v3.21: + coh
+    const part = ['name', 'energy', 'rating', 'fat', 'tag', 'stat', 'mood', 'rand', 'flat', 'shout', 'rep', 'cap', 'coh', 'bond', 'cheat', 'total'];   // v3.21: + coh; v3.25: + bond
     const head = [...(pre ? Object.keys(pre) : []), 'minute', 'kind', 'team', 'zone', ...part.map(k => 'atk_' + k), ...part.map(k => 'def_' + k), 'margin', 'outcome'];
     const cell = (x, k) => k === 'flat' ? f(Object.entries(x.flat || {}).filter(([, v]) => v).map(([n, v]) => `${n}:${Math.round(v * 100) / 100}`).join(' ')) : f(x[k]);
     const rows = trace.map(t => [...(pre ? Object.values(pre).map(f) : []), t.min, f(t.kind), f(sides?.[t.side] ?? t.side), t.zone,
@@ -8023,8 +8880,24 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.24';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.25';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.25', name: { en: 'Bonds', ru: 'Связи' },
+    en: [
+      'The squad is no longer 15 separate kids: some are mates from the same yard or school, some don\'t get on — and it changes with training, matches and how you treat them.',
+      'Friends find each other with a pass; kids who don\'t get on lose the ball between them. A good dressing room makes training pull the team together faster.',
+      'You never see numbers: watch who comes in together, what you notice at practice, what they say after a loss. The Notebook has a new "Locker room" tab, PLAYER_INFO.EXE shows "In the squad", the tactics board draws lines to known mates and rivals.',
+      'New in PLAYER_INFO.EXE: [ Have a word ] — 1 AP for two questions, once a week per kid. A kid who comes to see you by himself answers one question for free.',
+      'Two pairs of twins live in the world. Their mum asks you to take both; until you can tell them apart, you sometimes write a note about the wrong brother.',
+    ],
+    ru: [
+      'Команда больше не 15 отдельных ребят: кто-то дружит со двора или со школы, кто-то не ладит — и это меняется от тренировок, матчей и того, как ты с ними обходишься.',
+      'Друзья находят друг друга пасом, а те, кто не ладит, теряют мяч между собой. Хорошая атмосфера в раздевалке быстрее сплачивает команду на тренировках.',
+      'Цифр ты не видишь: смотри, кто приходит вместе, что заметно на тренировке, что говорят после поражения. В Блокноте новая вкладка «Раздевалка», в PLAYER_INFO.EXE — блок «В команде», на тактической доске — линии к известным друзьям и недругам.',
+      'Новое в PLAYER_INFO.EXE: [ Поговорить ] — 1 ОД за два вопроса, раз в неделю с каждым. Если парень пришёл к тебе сам, на один вопрос он ответит бесплатно.',
+      'В мире две пары близнецов. Их мама просит взять обоих; пока ты их не различаешь, иногда записываешь заметку не на того брата.',
+    ],
+  },
   { v: '3.24', name: { en: 'Loose ends', ru: 'Хвосты' },
     en: [
       'Morning headlines don\'t repeat for two weeks, and kids have eight kinds of excuses now (dentist, the garage, a family wedding, the school play, a little brother…) — nobody repeats his for a month.',
@@ -9437,7 +10310,7 @@ function clueConfirmed(list, c) { const k = clueClaim(c); return !!k && list.som
 const clueBy = c => c.by?.name ? L.t(c.by.parent ? 'clue.by.' + c.by.parent : 'clue.by.kid', { k: L.name(c.by.name) }) : '';
 /** The clue's line as shown (v3.20: voice clues fill {s} = the signal's phrase, {r} = the role, plus who said it). */
 function clueText(c) {
-  if (c.source !== 'voice') return L.t(c.textKey);
+  if (c.source !== 'voice' && c.source !== 'talk') return L.t(c.textKey);   // v3.25: a talk clue reads like a voice clue
   const t = L.t(c.textKey, { s: c.signal ? L.t('af.sig.' + c.signal) : '', r: c.role ? L.tag(c.role) : '' }), by = clueBy(c);
   return by ? by + ': ' + t : t;
 }
@@ -9481,6 +10354,7 @@ class ProfileCard {
     document.getElementById('pinfo-x').addEventListener('click', () => this.close());
     document.getElementById('pinfo-ok').addEventListener('click', () => this.close());
     document.getElementById('pinfo-office').addEventListener('click', () => this.ui.callIntoOffice(this.id));   // v2.5
+    document.getElementById('pinfo-talk').addEventListener('click', () => this.ui.haveWord(this.id));   // v3.25: [ Have a word ] (1 AP)
     this.body.addEventListener('click', e => {   // v3.0: coach's assignment (visual tag + exclusive duties)
       const t = e.target.closest('[data-postag]'), d = e.target.closest('[data-duty]');
       if (!t && !d) return;
@@ -9533,7 +10407,7 @@ class ProfileCard {
     const { p, own } = r, ui = this.ui, s = ui.state, eng = ui.engine;
     const live = eng?.stats.get(p.id) && !eng.finished ? eng.stats.get(p.id) : null;
     const energy = Math.round(eng?.energy?.get(p.id) ?? p.energy ?? 100);
-    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && JSON.stringify(p.roles), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale), own && ui.officeBlock(p.id)].join('|');
+    const sig = [L.code, energy, JSON.stringify(live), own && JSON.stringify(s.seasonOf(p.id)), own && JSON.stringify(p.roles), own && p.flags.join(), s.budget, own && p.injuryDays, own && p.suspensionMatches, own && p.awayDays, s.ap, own && p.tag, own && JSON.stringify(s.duties), own && Math.round(p.dyn.morale), own && ui.officeBlock(p.id), own && JSON.stringify(p.bondNotes || []), own && ui.talkBlock(p.id), own && s.twinsKnown(p)].join('|');
     if (sig === this.lastSig) return;
     this.lastSig = sig;
 
@@ -9604,6 +10478,7 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
         <fieldset><legend>${L.t('pi.tags')}</legend><div class="pi-role">${roleHtml}</div></fieldset>
         <fieldset><legend>${L.t('pi.stats')}</legend>${table}</fieldset>
         <fieldset class="pi-note"><legend>${L.t('nb.coachNote')}</legend>${noteHtml}</fieldset>
+        ${own ? ui.squadBondsBlock(p) : ''}
         ${own ? ui.cluesBlock(p) : ''}
       </div>`;
     document.getElementById('pinfo-status').textContent = L.t('pi.status.bar');
@@ -9613,6 +10488,11 @@ ${own ? '' : `          <dt>${L.t('pi.pos')}</dt><dd><span class="pos ${p.positi
     ob.disabled = !!blk;
     ob.innerHTML = blk ? L.t(blk + '.btn') : L.t('office.btn', { n: s.ap });
     ob.title = L.t(blk || 'office.btnTip');
+    const tb = document.getElementById('pinfo-talk'), tblk = own ? ui.talkBlock(p.id) : null;   // v3.25: [ Have a word ] — 1 AP, once a week per kid
+    tb.hidden = !own || !s.bonds;
+    tb.disabled = !!tblk;
+    tb.innerHTML = tblk === 'btalk.cooldown' ? L.t('btalk.btnCd') : L.t('btalk.btn', { n: TALK.AP });
+    tb.title = L.t(tblk || 'btalk.btnTip');
   }
 }
 /* =========================================================
@@ -9727,6 +10607,11 @@ class DebugConsole {
     add('ENGINE', 'TRN-SKIP', p => Math.round(arrivalSkipChance(p) * 100), null, 'v2.6 chance (%) to skip a training / the locker room (from discipline); v3.21: renamed from SKIP%');
     add('ENGINE', 'ABS', p => p.absentToday || '—', null, 'v2.6 absent today');
     add('ENGINE', 'FLAGS', p => (p.flags || []).join(' ') || '—', null, 'v1.9 story flags');
+    const gs = () => window.YAM?.game;   // v3.25 bonds (the state is read live)
+    add('BONDS', 'BONDS', p => { const l = gs()?.bondsOf(p.id) || []; return `${l.filter(x => x.v >= 20).length}/${l.filter(x => x.v <= -20).length}`; }, null, 'v3.25 friends (v ≥ 20) / rivals (v ≤ −20) in the squad');
+    add('BONDS', 'OPEN', p => gs()?.bonds ? +gs().openness(p).toFixed(2) : '—', 1, 'v3.25 hidden openness in a talk (0.1–0.9)');
+    add('BONDS', 'YARD', p => { kidRoots(p); return `${p.yard}/${p.school}`; }, null, 'v3.25 hidden yard (0–4) / school (0–2)');
+    add('BONDS', 'TWIN', p => p.twinId ? `${p.twinId}${gs()?.twinsKnown(p) ? '' : ' MIX'}` : '—', null, 'v3.25 twin brother id; MIX = the coach still mixes them up');
     return c;
   })();
 
@@ -9803,7 +10688,21 @@ class DebugConsole {
         m: a.median == null ? '—' : a.median.toFixed(2) + ' s', x: pc(a.fast) }) : L.t('dbg.att.none', { w: w0 }); };
     return `<div class="dbg-team" id="dbg-team"><span title="${esc(L.t('dbg.cohTip'))}"><b>${L.t('dbg.coh')}</b> <span id="dbg-coh">${Math.round(s.cohesion ?? COH.START)}</span> (${esc(L.t('coh.band.' + cohBand(s.cohesion)))})</span>
       <span>${esc(L.t('dbg.streak'))}: <b>${w.emptyStreak || 0}</b></span>
-      <span class="dbg-att" id="dbg-att"><b>${esc(L.t('dbg.att'))}</b> · ${esc(row('week'))} &nbsp;|&nbsp; ${esc(row('season'))}</span></div>`;
+      ${s.bonds ? `<span title="v3.25 ATMOS = clamp((F − 1.5 × E) / squad × K): × (1 + ATMOS) on the weekly cohesion gain"><b>ATMOS</b> <span id="dbg-atmos">${s.atmos().toFixed(3)}</span></span>` : ''}
+      <span class="dbg-att" id="dbg-att"><b>${esc(L.t('dbg.att'))}</b> · ${esc(row('week'))} &nbsp;|&nbsp; ${esc(row('season'))}</span></div>${this.bondsHTML()}`;
+  }
+  /** v3.25: every stored pair (v, root, cause, what the coach knows: band + source) + the twins. */
+  bondsHTML() {
+    const s = this.ui.state;
+    if (!s.bonds) return '';
+    const nm = id => esc(squadName(s.player(id), s.squad));
+    const rows = Object.entries(s.bonds).filter(([k]) => k.split('|').every(id => s.player(id))).sort((a, b) => b[1].v - a[1].v).map(([k, e]) => {
+      const [a, b] = k.split('|'), kb = s.knownBond(a, b);
+      return `<tr><td>${nm(a)}</td><td>${nm(b)}</td><td class="${e.v >= 20 ? 'hi' : e.v <= -20 ? 'lo' : ''}">${e.v}</td><td>${e.root}</td><td>${e.cause || '—'}</td><td>${bondBand(e.v)}</td><td>${kb ? kb.band + ' · ' + kb.source + (kb.confirmed ? ' ✓' : '') : '—'}</td></tr>`;
+    }).join('');
+    const tw = s.squad.filter(p => p.twinId && s.player(p.twinId) && p.id < p.twinId).map(p => `${nm(p.id)} + ${nm(p.twinId)} ${s.twinsKnown(p) ? '(told apart)' : '(MIX ' + TWINS.MIXUP + ')'}`).join(' · ');
+    return `<details class="dbg-bonds" id="dbg-bonds"><summary><b>BONDS</b> — ${Object.keys(s.bonds).length} pairs${tw ? ' · twins: ' + tw : ''}</summary>
+      <div class="dbg-scroll"><table class="dbg-pairs"><thead><tr><th>A</th><th>B</th><th>v</th><th>root</th><th>cause</th><th>band</th><th>coach knows</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
   }
 
   godHTML() {
@@ -10565,7 +11464,88 @@ const NARRATIVE_EVENTS = [
         ] });
     },
   },
+
+  /* ---------- v3.25 HAVE A WORD — the talk one-on-one (PLAYER_INFO.EXE, 1 AP = 2 questions, once a week per kid) ---------- */
+  {
+    id: 'bondtalk', when: 'manual',
+    trigger: () => false,
+    cast: () => null,   // fired by UIController.haveWord with the kid
+    execute(ctx) { bondTalkStep(ctx, ctx.step === 'start' ? 'menu' : ctx.step, ''); },
+  },
+
+  /* ---------- v3.25 MISSES HIS BROTHER — 2–4 weeks after the coach refused the twin at the draft (20 %, scheduled) ---------- */
+  {
+    id: 'twinmiss', when: 'scheduled',
+    trigger: () => false,
+    cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, { kid } = ctx.cast, name = L.name(kid.name), blk = s.expelBlock(kid.id);
+      const face = kid.portraitSvg, role = L.t('talk.roleOffice', { n: kid.number, p: L.pos(kid.position) });
+      if (ctx.step === 'stay' || ctx.step === 'go') {
+        ctx.show({ face, name, role, text: L.t('ev.twinmiss.' + ctx.step, { k: name }),
+          choices: [{ key: 'ev.twinmiss.' + ctx.step + 'Ok', tone: 'gray', who: kid.id,
+            run: () => { if (ctx.step === 'go') { s.expel(kid.id); return { k: { name: kid.name } }; } kid.dyn.morale = clamp(kid.dyn.morale + 5, 0, 100); return { k: { pid: kid.id } }; } }] });
+        return;
+      }
+      ctx.show({ face, name, role, text: L.t('ev.twinmiss.text', { k: name }),
+        choices: [
+          { key: 'ev.twinmiss.a', tone: 'gray', who: kid.id, blocked: blk ? 'ev.scoutpoach.blk' : null, run: () => { s.expel(kid.id); return { k: { name: kid.name } }; } },   // let him go (no expel penalties)
+          { key: 'ev.twinmiss.b', tone: 'green', ap: 1, who: kid.id, next: () => (blk || seeded(ctx.date + '#twinmiss#' + kid.id)() < clamp(0.5 + (kid.dyn.morale - 50) / 100, 0.2, 0.8) ? 'stay' : 'go') },
+          { key: 'ev.twinmiss.c', tone: 'red', who: kid.id, run: () => { kid.dyn.morale = clamp(kid.dyn.morale - 10, 0, 100); return { k: { pid: kid.id } }; } },
+        ] });
+    },
+  },
 ];
+
+/* ---------- v3.25 the talk window (shared by "Have a word" and the free question when a kid came by himself) ----------
+   pe.talk = { left, free }; steps: 'menu' → 'pick:<qid>' (→ 'pick2:pair:<x>') → 'ans' (the answer, rolled once in `next`). */
+function bondTalkStep(ctx, step, prefix) {
+  const s = ctx.state, pe = s.pendingEvent, { kid } = ctx.cast, name = L.name(kid.name);
+  const t = (pe.talk ||= { left: TALK.QUESTIONS, free: false });
+  const face = kid.portraitSvg, role = L.t(t.free ? 'btalk.roleFree' : 'btalk.role', { n: kid.number, p: L.pos(kid.position) });
+  const others = s.squad.filter(p => p.id !== kid.id).sort((a, b) => a.number - b.number);
+  const nm = p => squadName(p, s.squad);
+  const ask = (qid, x = null, y = null) => () => { pe.ans = s.talkAnswer(kid, qid, x, y, ctx.date); t.left--; s.learnTwins(kid, ctx.date); return prefix + 'ans'; };
+  const back = t.free ? { key: 'btalk.back', tone: 'gray', next: () => { const r = pe.ret || 'start'; delete pe.talk; delete pe.ans; return r; } }
+    : { key: 'btalk.bye', tone: 'gray', who: kid.id, diary: 'btalk.end', run: () => ({ k: { pid: kid.id } }) };
+  if (step === 'ans') {
+    ctx.show({ face, name, role, text: bondTalkText(s, kid, pe.ans),
+      choices: t.left > 0 ? [{ key: 'btalk.more', tone: 'green', next: prefix + 'menu' }, back] : [back] });
+    return;
+  }
+  if (step.startsWith('pick:') || step.startsWith('pick2:')) {
+    const [, qid, x] = step.split(':'), q = TALK_QUESTIONS.find(r => r.id === qid);
+    const pool = step.startsWith('pick2:') ? others.filter(p => p.id !== x)
+      : q.x === 'played' ? others.filter(p => (s.seasonOf(p.id).apps || 0) >= 1) : others;
+    ctx.show({ face, name, role, text: L.t(step.startsWith('pick2:') ? 'btalk.pick2' : 'btalk.pick', { x: x ? nm(s.player(x)) : '' }),
+      choices: [...pool.map(p => ({ key: 'btalk.kid', vars: { x: nm(p) }, tone: 'gray',
+        next: qid === 'pair' && !step.startsWith('pick2:') ? prefix + 'pick2:pair:' + p.id : ask(qid, qid === 'pair' ? x : p.id, qid === 'pair' ? p.id : null) })),
+        { key: 'btalk.cancel', tone: 'gray', next: prefix + 'menu' }] });
+    return;
+  }
+  const played = others.some(p => (s.seasonOf(p.id).apps || 0) >= 1);
+  ctx.show({ face, name, role, text: L.t(pe.ans ? 'btalk.again' : t.free ? 'btalk.introFree' : 'btalk.intro', { k: name, n: t.left }),
+    choices: [...TALK_QUESTIONS.filter(q => q.x !== 'played' || played).map(q => ({ key: 'btalk.q.' + q.id, tone: 'green', next: q.x ? prefix + 'pick:' + q.id : ask(q.id) })), back] });
+}
+/** The kid's words for one answer (no numbers; phrasings by band × root / cause, picked by a seeded roll). */
+function bondTalkText(s, kid, a) {
+  if (!a) return L.t('bt.a.evade.0');
+  const x = a.about && s.player(a.about), y = a.y && s.player(a.y), xn = x ? L.name(x.name) : '', yn = y ? L.name(y.name) : '';
+  const v = (key, n) => key + '.' + Math.floor(seeded(kid.id + '#bt#' + (a.qid || '') + (a.about || '') + (s.calendar?.date || ''))() * n);
+  if (a.kind === 'repeat') return L.t('bt.a.repeat');
+  if (a.kind === 'none') return L.t(a.qid === 'mates' ? 'bt.a.noMates' : 'bt.a.noHard');
+  if (a.kind === 'evade') return L.t(v('bt.a.evade', 3), { x: xn });
+  if (a.qid === 'pair') return L.t('bt.a.pair.' + bondClass(a.band), { x: xn, y: yn });
+  if (a.qid === 'pitch') return L.t(v('bt.a.pitch.' + a.tone, 2), { x: xn, s: a.signal ? L.t('af.sig.' + a.signal) : '' });
+  const band = a.kind === 'lie' ? 'neutral' : a.band;
+  let key;
+  if (band === 'best' || band === 'mates') key = a.root ? v('bt.a.mates.' + a.root, 2) : band === 'best' ? v('bt.a.best', 2) : a.assist ? v('bt.a.mates.club', 2) : v('bt.a.mates', 3);
+  else if (band === 'cold') key = a.cause ? v('bt.a.cold.' + a.cause, 2) : v('bt.a.cold', 2);
+  else if (band === 'war') key = v('bt.a.war', 3);
+  else key = v('bt.a.neutral', 3);
+  const lead = a.qid === 'mates' ? L.t('bt.who.mates', { x: xn }) + ' ' : a.qid === 'hard' ? L.t('bt.who.hard', { x: xn }) + ' ' : '';
+  return lead + L.t(key, { x: xn }) + (a.stirred ? ' ' + L.t('bt.a.stirred') : '');
+}
 
 class EventEngine {
   constructor(ui) {
@@ -10636,9 +11616,15 @@ class EventEngine {
     const cast = {};
     for (const k in pe?.cast || {}) cast[k] = Array.isArray(pe.cast[k]) ? pe.cast[k].map(id => this.state.player(id)) : this.state.player(pe.cast[k]);
     if (!ev || Object.values(cast).some(p => !p || (Array.isArray(p) && p.some(x => !x)))) { this.state.pendingEvent = null; this.state.save(); return; }
-    ev.execute({ state: this.state, date: pe.date, step: pe.step || 'start', cast, ui: this.ui,
+    const ctx = { state: this.state, date: pe.date, step: pe.step || 'start', cast, ui: this.ui,
       show: spec => this.view.show(spec),
-      schedule: (id, opt) => this.schedule(id, { from: pe.date, by: pe.id, ...opt }) });
+      schedule: (id, opt) => this.schedule(id, { from: pe.date, by: pe.id, ...opt }) };
+    if (String(pe.step || '').startsWith('bq:')) { bondTalkStep(ctx, pe.step.slice(3), 'bq:'); return; }   // v3.25: the free question
+    if (TALK.FREE.includes(pe.id) && cast.kid && !pe.freeAsked && (pe.step || 'start') === 'start' && this.state.bonds) {   // v3.25: he came by himself → one free question
+      ctx.show = spec => this.view.show({ ...spec, choices: [...spec.choices, { key: 'btalk.free', tone: 'gray',
+        next: () => { pe.freeAsked = true; pe.ret = 'start'; pe.talk = { left: 1, free: true }; delete pe.ans; return 'bq:menu'; } }] });
+    }
+    ev.execute(ctx);
   }
   /** Applies a choice: money, effect, (next step | diary line + log), closes and resumes. */
   choose(choice) {
@@ -10882,7 +11868,8 @@ class MatchSummary {
         <div class="ms-score">${rep.gf} - ${rep.ga}</div>
         <div class="ms-team away">${emblemHTML(opp, 'lg')}<span>${esc(L.team(rep.opponent))}</span></div>
         <div class="ms-sub"><span class="ms-res ${rep.result}">${L.t('res.' + rep.result)}</span><span>${L.t('ms.md', { n: rep.md })} · ${L.t('venue.' + rep.venue)}</span>${rep.ht ? `<span>${L.t('ms.ht')} ${rep.ht[0]}-${rep.ht[1]}</span>` : ''}${rep.instant ? `<span>${L.t('ms.quick')}</span>` : ''}${rep.coh != null ? `<span class="ms-coh" title="${esc(L.t('coh.tip'))}">${L.t('coh.line', { b: L.t('coh.band.' + cohBand(rep.coh)) })}</span>` : ''}</div>
-        ${rep.coh != null && rep.coh < COH.LOW && rep.result !== 'W' ? `<div class="ms-cause">${L.t('coh.cause')}</div>` : ''}
+        ${rep.coh != null && rep.coh < COH.LOW && rep.result !== 'W' ? `<div class="ms-cause">${L.t('coh.cause')}</div>`
+          : rep.bondCause && this.ui.state.player(rep.bondCause.a) && this.ui.state.player(rep.bondCause.b) ? `<div class="ms-cause ms-bond">${esc(L.t('bond.cause', { a: L.name(this.ui.state.player(rep.bondCause.a).name), b: L.name(this.ui.state.player(rep.bondCause.b).name) }))}</div>` : ''}
       </div>
       <div class="ms-timeline">${col(true, L.team(s.clubName))}${col(false, L.team(rep.opponent))}</div>
       <div class="ms-stats">
@@ -11017,6 +12004,11 @@ class LockerRoom {
       <span class="lr-kind ${match ? 'k-match' : 'k-training'}">${match ? L.t('lr.kindMatch', { o: esc(L.team(ctx?.opp.name || '')) }) : L.t('lr.kindTraining')}</span>
       <span class="lr-count${present < 11 ? ' low' : ''}">${L.t('lr.arrived', { n: present, t: squad.length })}</span>
       <span class="lr-ap" title="${esc(L.t('ap.tip'))}">${L.t('ap.left')} <b>${s.ap}/${this.ui.apTotal()}</b></span>`;   // v3.13: weekly wallet
+    const came = !match && lk.came && s.player(lk.came.a) && s.player(lk.came.b) ? lk.came : null, warn = match ? s.lockerBondWarning() : null;   // v3.25
+    const nm = id => esc(L.name(s.player(id).name));
+    if (came || warn) document.getElementById('lr-head').insertAdjacentHTML('beforeend', `<span class="lr-bond">${came
+      ? L.t('lr.bond.came', { a: nm(came.a), b: nm(came.b) })
+      : L.t('lr.bond.warn', { a: nm(warn.a), b: nm(warn.b), l: L.t('lr.bond.line.' + warn.line), d: esc(fmtDate(warn.date, { weekday: 'long' })) })}</span>`);
     this.renderFees(match, squad, lk);   // v3.15
     document.getElementById('lr-proceed').innerHTML = L.t('lr.toPitch');   // v2.8: [ HEAD TO PITCH ]
     document.getElementById('lr-status').textContent = L.t(present < 11 ? 'lr.statusShort' : 'lr.status');
@@ -11236,9 +12228,12 @@ class MorningBriefing {
       so two weeks in a row never repeat). Words only. */
   static cohLine(s) { return L.t('coh.line', { b: L.t('coh.band.' + cohBand(s.cohesion)) }); }
   static cohNews(s, date) {
-    if (s.phase !== 'calendar' || (s.cohesion ?? COH.START) >= COH.LOW) return [];
-    const n = Math.floor(isoDays('2000-01-03', weekStartOf(date)) / 7);
-    return [L.t('coh.low.' + (((n % 3) + 3) % 3))];
+    if (s.phase !== 'calendar') return [];
+    const n = Math.floor(isoDays('2000-01-03', weekStartOf(date)) / 7), out = [];
+    if ((s.cohesion ?? COH.START) < COH.LOW) out.push(L.t('coh.low.' + (((n % 3) + 3) % 3)));
+    const ln = s.bonds ? s.lonerLine(weekStartOf(date)) : null;   // v3.25: "[A] seems to be on his own at training" (+ an exact note)
+    if (ln && s.player(ln.pid)) out.push(L.t('bond.loner.' + ln.v, { k: L.name(s.player(ln.pid).name) }));
+    return out;
   }
   /** v3.13: "Base 4 · Carried 1 · Win +1 = 6 AP" */
   static apLine(src) {
@@ -11279,6 +12274,7 @@ class DraftView {
       if (!b || b.disabled) return;
       this.ui.state.toggleDraft(b.dataset.sign);
       this.render();
+      this.askTwin(b.dataset.sign);   // v3.25: his twin is still on the board → his mum asks
     });
     document.getElementById('dr-start').addEventListener('click', () => this.start());
   }
@@ -11295,6 +12291,19 @@ class DraftView {
     }
     return out.length ? out : ['quiet'];
   }
+  /** v3.25: "[Surname]'s mum: please take his brother too, they can't do things apart" — before the next pick. */
+  askTwin(id) {
+    const s = this.ui.state, t = s.draftTwinAsk(id);
+    if (!t) return false;
+    const p = s.globalPlayers.find(x => x.id === id);
+    this.ui.modal.show({ title: L.t('draft.twin.title'), icon: 'info',
+      html: `<p>${esc(L.t('draft.twin.text', { s: L.name(p.surname), k: L.name(p.name), b: L.name(t.name) }))}</p>`,
+      buttons: [
+        { label: L.t('draft.twin.take', { b: esc(L.name(t.name)) }), primary: true, onClick: () => { s.draftTwinAnswer(id, true); this.render(); } },
+        { label: L.t('draft.twin.refuse'), onClick: () => { s.draftTwinAnswer(id, false); this.render(); } },
+      ] });
+    return true;
+  }
   open() { this.render(); this.layer.hidden = false; }
   close() { this.layer.hidden = true; }
   render() {
@@ -11304,12 +12313,13 @@ class DraftView {
     const pool = s.draft.pool.map(id => s.globalPlayers.find(p => p.id === id)).filter(Boolean);
     this.grid.innerHTML = pool.map(p => {
       const on = signed.includes(p.id), notes = DraftView.notes(p);
+      const mate = notes.length < YARD.MAX || notes[0] === 'quiet' ? s.draftYardMate(p, s.draft.pool) : null;   // v3.25: counts towards YARD.MAX
       return `<div class="dr-card${on ? ' on' : ''}" data-pid="${p.id}">
         <span class="portrait dr-face">${p.portraitSvg}</span>
         <div class="dr-name">${esc(L.name(p.name))}</div>
         <dl class="dr-bio"><dt>${L.t('pi.age')}</dt><dd>${p.bio.age}</dd><dt>${L.t('pi.height')}</dt><dd>${L.t('pi.cm', { n: p.bio.height })}</dd>
           <dt>${L.t('pi.weight')}</dt><dd>${L.t('pi.kg', { n: p.bio.weight })}</dd></dl>
-        <ul class="dr-notes" title="${esc(L.t('draft.notesTip'))}">${notes.map(k => `<li class="${k === 'quiet' ? 'quiet' : ''}">${esc(L.t('yard.' + k))}</li>`).join('')}</ul>
+        <ul class="dr-notes" title="${esc(L.t('draft.notesTip'))}">${notes.filter(k => !(mate && k === 'quiet')).map(k => `<li class="${k === 'quiet' ? 'quiet' : ''}">${esc(L.t('yard.' + k))}</li>`).join('')}${mate ? `<li class="yardmate">${esc(L.t('draft.yardMate', { y: L.t('yard.street.' + kidRoots(p).yard), k: squadName(mate, pool) }))}</li>` : ''}</ul>
         <button type="button" class="dr-btn" data-sign="${p.id}"${!on && full ? ' disabled' : ''}>${L.t(on ? 'draft.release' : 'draft.sign')}</button>
       </div>`;
     }).join('');
@@ -12162,8 +13172,8 @@ class UIController {
     const board = this.$('tac-board');
     roster.addEventListener('mouseover', e => { const row = e.target.closest('.r-row'); if (row) this.setSwapHover(row.dataset.id); });
     roster.addEventListener('mouseleave', () => this.setSwapHover(null));
-    board.addEventListener('mouseover', e => { const d = e.target.closest('.pl[data-pid]'); this.setSwapHover(d ? d.dataset.pid : null); });
-    board.addEventListener('mouseleave', () => this.setSwapHover(null));
+    board.addEventListener('mouseover', e => { const d = e.target.closest('.pl[data-pid]'); this.setSwapHover(d ? d.dataset.pid : null); this.drawBondLines(d ? d.dataset.pid : null); });
+    board.addEventListener('mouseleave', () => { this.setSwapHover(null); this.drawBondLines(null); });
     board.addEventListener('dragstart', e => { const d = e.target.closest('.pl[data-pid]'); if (d && !this.live) this.swapDragId = d.dataset.pid; });
     board.addEventListener('dragend', () => this.endSwapDrag());
     board.addEventListener('dragover', e => { const d = e.target.closest('.pl[data-pid]'); if (d) this.setSwapHover(d.dataset.pid); });
@@ -12186,6 +13196,7 @@ class UIController {
     this.$('notes-body').addEventListener('click', e => {
       if (e.target.closest('#btn-back')) { this.closeMatchday(); return; }
       if (e.target.closest('#btn-nb-msum')) { this.summary.open(this.state.lastReport); return; }   // v3.9
+      const tab = e.target.closest('[data-nbtab]'); if (tab) { this.nbTab = tab.dataset.nbtab; this.renderNotebook(); return; }   // v3.25
       const b = e.target.closest('[data-rmrole]'); if (!b || b.disabled) return;   // v3.19: the Notebook only takes roles away
       this.state.removeRole(b.dataset.id, b.dataset.rmrole);
       this.renderNotebook(); this.renderTeam(); this.renderDash();
@@ -12352,11 +13363,14 @@ class UIController {
   }
   get matchOpen() { return this.live || this.state.phase === 'matchday' || this.state.phase === 'post'; }
   get notesOpen() { return this.state.phase === 'post' && this.state.notebookUnlocked && !!this.state.lastReport; }
+  /** v3.25: the Notebook's "Locker room" tab is there between matches too (the match tab stays locked). */
+  get notesAvail() { return this.notesOpen || (!!this.state.bonds && this.state.phase !== 'draft'); }
 
   show(view) {
     if (this.swapHoverId) { this.swapHoverId = null; this.applySwapHover(); }   // v3.10: switching screens clears the swap hover
     if (this.modalLock) return;   // v3.5: the Match Summary decides where we go next
-    if (view === 'notes' && !this.notesOpen) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'), 'warn'); return; }
+    if (view === 'notes' && !this.notesAvail) { this.alert(L.t('dlg.nbLocked'), L.t('dlg.nbTitle'), 'warn'); return; }
+    if (view === 'notes' && !this.notesOpen) this.nbTab = 'locker';   // v3.25: between matches the Notebook opens on "Locker room"
     if (view === 'match' && !this.matchOpen) { this.alert(L.t('dlg.noMatch'), L.t('nav.match'), 'warn'); return; }
     this.view = view;
     const scenes = { dash: 'scene-office', team: 'scene-squad', match: 'scene-match', table: 'scene-table', notes: 'scene-notes', readme: 'scene-office' };
@@ -12364,7 +13378,7 @@ class UIController {
     for (const id of new Set(Object.values(scenes))) this.$(id).classList.toggle('active', id === scenes[view]);
     for (const v of Object.keys(scenes)) this.$('win-' + v).classList.toggle('open', v === view);
     document.querySelectorAll('.tk[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-    if (view === 'notes') { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); this.autoOpenPost(); }   // v3.18; v3.23
+    if (view === 'notes' && this.notesOpen) { this.$('tk-notes').classList.remove('alert'); this.markNotebookSeen(); this.autoOpenPost(); }   // v3.18; v3.23
     if (view === 'match') this.$('tk-match').classList.remove('alert');
     if (view === 'table') this.renderTable();
     if (view === 'dash') this.renderDash();
@@ -12387,7 +13401,7 @@ class UIController {
 
   /** Match / Notebook only exist in the navigation while the calendar has unlocked them. */
   syncLocks() {
-    const m = this.matchOpen, n = this.notesOpen;
+    const m = this.matchOpen, n = this.notesAvail;   // v3.25: the "Locker room" tab keeps the Notebook in the navigation
     for (const id of ['tk-match', 'icon-match', 'sm-match']) this.$(id).hidden = !m;
     for (const id of ['tk-notes', 'icon-notes', 'sm-notes']) this.$(id).hidden = !n;
     this.$('dyn-sep').hidden = !(m || n);
@@ -12744,7 +13758,26 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (s.phase === 'post') this.policyPost();
       return;
     }
-    if (s.phase === 'calendar') this.runCalendar();
+    if (s.phase === 'calendar') { this.policyTalk(); this.runCalendar(); }
+  }
+  /** v3.25: every policy but `first` has one talk a week (1 AP): "How do you get on with X?" about the pair with the worst known
+      note (else a random XI neighbour), then "Who are you mates with?". Straight through the state (the window is the human's). */
+  policyTalk() {
+    const s = this.state, w = s.weekState();
+    if (this.autoPolicy === 'first' || !s.bonds || w.talked || s.ap < TALK.AP || this.events.active) return false;
+    const worst = s.squad.flatMap(p => s.squad.filter(q => q.id > p.id).map(q => ({ a: p.id, b: q.id, k: s.knownBond(p.id, q.id) })))
+      .filter(x => x.k && x.k.cls === 'bad').sort((x, y) => (x.k.band === 'war' ? 0 : 1) - (y.k.band === 'war' ? 0 : 1) || (y.k.date || '').localeCompare(x.k.date || ''))[0];
+    let pair = worst ? [worst.a, worst.b] : null;
+    if (!pair) { const nb = s.lineupNeighbours(); pair = nb.length ? nb[Math.floor(seeded(w.start + '#poltalk')() * nb.length)] : null; }
+    const kid = pair && s.player(pair[0]);
+    if (!kid || s.talkBlock(kid.id)) return false;
+    s.spendAP(); w.talked = true;
+    (kid.talk ||= {}).last = s.calendar.date;
+    s.talkAnswer(kid, 'how', pair[1]); s.talkAnswer(kid, 'mates');
+    s.learnTwins(kid);
+    const st = (s.stats ||= {}); st.talkAP = (st.talkAP || 0) + TALK.AP;
+    s.save();
+    return true;
   }
   /** v3.21: after the whistle — Coach's Word (not offered to `first`: Quick Sim never opens the summary), AFTER_GAME, REVIEW, close. */
   policyPost() {
@@ -12805,6 +13838,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     'talk:scoutvisit': o => o.findIndex(x => x.key === 'ev.scoutvisit.a'),
     'talk:scoutpoach': o => { const t = o.findIndex(x => x.key === 'ev.scoutpoach.b'); return o[t]?.enabled !== false ? t : o.findIndex(x => x.key === 'ev.scoutpoach.a'); },
     'talk:promise': () => 0,   // keep
+    'talk:twinmiss': o => { const t = o.findIndex(x => x.key === 'ev.twinmiss.b'); return o[t]?.enabled !== false ? t : o.findIndex(x => x.key === 'ev.twinmiss.c'); },   // v3.25
   };
   /** v3.22 `greedy`: takes every money offer, keeps every promise, accepts the showcase, lets a poached kid go. */
   static POLICY_GREEDY = {
@@ -12853,6 +13887,31 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (this.events.active || (this.engine && !this.engine.finished)) { s.confirmCaptain(id, true); return false; }
     this.profile.close();
     return this.events.fire('capassign', s.calendar.date, { cast: { kid: id } });
+  }
+  /** v3.25: why [ Have a word ] is greyed (busy like the office, 0 AP, talked this week) — or null. */
+  talkBlock(id) {
+    if (this.events.active || (this.engine && !this.engine.finished) || this.cal.running || this.state.phase === 'draft') return 'office.blk.busy';
+    return this.state.talkBlock(id);
+  }
+  /** v3.25 the talk one-on-one: 1 AP for TALK.QUESTIONS questions, then the window closes. */
+  haveWord(id) {
+    const s = this.state, p = s.player(id);
+    if (!p || this.talkBlock(id) || !s.spendAP()) return false;
+    (p.talk ||= {}).last = s.calendar.date;
+    this.profile.close();
+    this.events.fire('bondtalk', s.calendar.date, { cast: { kid: id } });
+    this.renderBudget();
+    return true;
+  }
+  /** v3.25 PLAYER_INFO.EXE "In the squad": friends / doesn't get on — only what the coach's notes say (no numbers). */
+  squadBondsBlock(p) {
+    const s = this.state, links = s.knownLinks(p.id), nm = id => esc(squadName(s.player(id), s.squad));
+    const good = links.filter(l => l.cls === 'good'), bad = links.filter(l => l.cls === 'bad');
+    const tw = p.twinId && s.player(p.twinId);
+    const line = (key, list) => list.length ? `<li><b>${L.t(key)}</b> ${list.map(l => `<span class="bn-${l.band}${l.stale ? ' stale' : ''}" title="${esc(L.t('bn.src.' + l.source))}">${BOND_ICONS[l.band] || ''} ${nm(l.id)}${l.confirmed ? ' ' + L.t('clue.confirmed') : ''}</span>`).join(', ')}</li>` : '';
+    const body = (tw ? `<li>${L.t('bn.twin', { x: nm(tw.id) })}</li>` : '') + line('bn.friends', good) + line('bn.cold', bad)
+      + (s.isLoner(p) && (p.bondNotes || []).some(n => n.band === 'alone') ? `<li>${L.t('bn.alone')}</li>` : '');
+    return `<fieldset class="pi-bonds"><legend>${L.t('bn.legend')}</legend>${body ? `<ul>${body}</ul>` : `<p class="pi-none">${L.t('bn.none')}</p>`}</fieldset>`;
   }
   callIntoOffice(id) {
     if (!this.canCallIn(id) || !this.state.spendAP()) return;
@@ -13186,6 +14245,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     for (const d of this.$('tac-board').querySelectorAll('.pl[data-pid]')) { const b = this.clueBadge(s.player(d.dataset.pid)); if (b) d.insertAdjacentHTML('beforeend', b); }   // v3.18 📝
     this.board.highlight(this.selected, id => this.swapClass(s.player(id)));
     this.setSwapHover(this.swapHoverId);   // v3.10: re-apply (or drop, if nothing is selected any more) after the re-render
+    this.drawBondLines(null);   // v3.25: the selected kid's known links
     const boardEl = this.$('tac-board');
     boardEl.classList.toggle('locked', live);
     boardEl.classList.toggle('armed', !!this.selected);
@@ -13215,6 +14275,19 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     this.$('tac-board').querySelector(`.pl[data-pid="${id}"]`)?.classList.add('swap-hover-target');   // bench kids have no dot: list only
   }
   endSwapDrag() { this.swapDragId = null; this.setSwapHover(null); }
+  /** v3.25: lines from the hovered (else the selected) kid to his KNOWN links on the board — green solid = mates / best mates,
+      red dashed = don't get on / at war. Only the coach's notes, never the hidden value. */
+  drawBondLines(id) {
+    const el = this.$('tac-board'), s = this.state;
+    el.querySelector('.bond-lines')?.remove();
+    id ||= this.selected;
+    const me = id && this.board.dots.get(id);
+    if (!me || !s.bonds) return;
+    const lines = s.knownLinks(id).map(l => ({ l, d: this.board.dots.get(l.id) })).filter(x => x.d && (x.l.cls === 'good' || x.l.cls === 'bad'));
+    if (!lines.length) return;
+    el.insertAdjacentHTML('beforeend', `<svg class="bond-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines.map(({ l, d }) =>
+      `<line class="bl-${l.cls}" data-with="${l.id}" x1="${me.base.x}" y1="${me.base.y}" x2="${d.base.x}" y2="${d.base.y}" vector-effect="non-scaling-stroke"${l.cls === 'bad' ? ' stroke-dasharray="5 4"' : ''}/>`).join('')}</svg>`);
+  }
 
   /** Smart swap highlighting: same natural position as the selected player = suggested, anything else = dimmed
       (still clickable — out-of-position swaps are allowed, just not recommended). */
@@ -13415,7 +14488,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       onHalfTime: eng => this.onHalfTime(eng),
       onSub: (out, inP) => this.onSub(out, inP),
     }, { mentality: this.mentality, speed: this.speed, forceWin: !!this.state.cheats?.forceWin, missing, squadRep: this.state.rep.squad, duties: () => this.state.duties, md: ctx.md,
-      cohesion: [this.state.cohesion ?? COH.START, COH.AI] });   // v3.21: our cohesion vs the AI clubs' fixed value
+      cohesion: [this.state.cohesion ?? COH.START, COH.AI],   // v3.21: our cohesion vs the AI clubs' fixed value
+      bonds: this.state.bonds ? this.state.engineBonds() : null });   // v3.25: our bonds only (AI clubs have none)
     if (missing.length) this.engine.log('turn', 'lr.shortHanded', { n: 11 - missing.length }, 0);
     if (this.engine.forceWin) this.engine.log('coach', 'dbg.forceLog', {}, 0);
     this.checkPromises();   // v1.9
@@ -13498,6 +14572,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (motm && !sample.some(p => p.id === motm) && sample.length) sample[sample.length - 1] = played.find(p => p.id === motm);   // he replaces the last of the three
     s.lastReport = {
       md: ctx.md, opponent: ctx.opp.name, venue: ctx.venue, gf: a.score, ga: b.score, result, coh: Math.round(s.cohesion ?? COH.START),   // v3.21
+      atmos: s.bonds ? +s.atmos().toFixed(3) : null,   // v3.25 (harness only — never shown)
       // v2.1: Match Summary data (identical for visual and instant matches: both come from the same tick())
       events: eng.matchEvents.map(e => ({ ...e })), ht: eng.htScore || null, instant: !!eng.instant,
       talk: null,   // v3.5: post-match team talk still owed (forced in the Match Summary)
@@ -13527,11 +14602,14 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.applyMatchDynamics(eng, result, capRep);
     s.trackPositions(eng);   // v3.6: out-of-position streaks (live + Quick Sim)
     s.trackCaptaincy(eng, result, capRep);   // v3.8: armband tenure, bench streaks, promised pitch time (before bans tick down)
+    s.bondMatch(eng, result);   // v3.25: side by side, assists, the win, blame, the fight for a place, twins
+    s.lastReport.bondCause = s.bondCauseOf(eng);   // v3.25: a lost pass between two kids the coach knows don't get on
     this.applyAvailabilityAfterMatch(eng, ctx);   // v2.2
     if (s.cheats?.forceWin) s.cheats.forceWin = false;   // v1.8: one-shot debug cheat
     this.debug?.render();
     s.phase = 'post';
     s.notebookUnlocked = true;
+    this.nbTab = 'match';   // v3.25: a new match opens on its own tab
     s.save();
     this.tableMd = ctx.md;
     this.renderAll();
@@ -13551,7 +14629,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
   clueLine(p, c) {
     const ok = clueConfirmed(p.clues, c), src = L.t('clue.src.' + c.source, { r: c.ref });
     return `<li class="clue${c.seen ? '' : ' new'}${ok ? ' ok' : ''}" data-sig="${c.signal || ''}"><span class="cl-d">${esc(fmtDate(c.date, { day: 'numeric', month: 'short' }))}</span>`
-      + `<span class="cl-src" title="${esc(src)}" aria-label="${esc(src)}">${CLUES.SOURCES[c.source] || '\u2022'}</span><span class="cl-t">${esc(clueText(c))}</span>`
+      + `<span class="cl-src" title="${esc(src)}" aria-label="${esc(src)}">${CLUES.SOURCES[c.source] || '\u2022'}</span><span class="cl-t">${c.mix ? (this.state.twinsKnown(p) ? '<s>' : '') + esc(L.t('twins.mix', { k: L.name(p.name) })) + ' ' : ''}${esc(clueText(c))}${c.mix && this.state.twinsKnown(p) ? '</s>' : ''}</span>`
       + `${ok ? `<b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}</li>`;
   }
   /** Clues block, newest first; max → the rest folds into "All clues (n)". */
@@ -13586,11 +14664,52 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (!p) return '';
     return `<p class="nb-captain"><span class="duty-badge d-captain">C</span> <b>${L.t('nb.armband')}:</b> ${esc(L.t(o.key, { k: L.name(p.name) }))}</p>`;
   }
+  /** v3.25: the Notebook's tabs — the match (as before) and "Locker room" (what the coach knows about the bonds). */
+  nbTabs() {
+    if (!this.state.bonds) return '';
+    const t = this.nbTab || 'match';
+    return `<div class="nb-tabs" role="tablist">${['match', 'locker'].map(k => `<button type="button" class="nb-tab${t === k ? ' on' : ''}" role="tab" aria-selected="${t === k}" data-nbtab="${k}">${L.t('nb.tab.' + k)}</button>`).join('')}</div>`;
+  }
+  /** "Locker room": loners on top, then every known link (icon · both names · the band word · source · date), both kids'
+      words side by side, yard roots, the twins line. Never a number. */
+  renderLockerTab() {
+    const s = this.state, nm = id => esc(squadName(s.player(id), s.squad)), day = d => esc(fmtDate(d, { day: 'numeric', month: 'short' }));
+    const notes = [];
+    for (const p of s.squad) for (const n of p.bondNotes || []) notes.push({ owner: p.id, ...n });
+    const lone = s.squad.map(p => ({ p, n: [...(p.bondNotes || [])].reverse().find(n => n.band === 'alone') })).filter(x => x.n);
+    const pairs = new Map();
+    for (const n of notes) if (n.with && s.player(n.with) && n.band !== 'yard') { const k = bondKey(n.owner, n.with); if (!pairs.has(k)) pairs.set(k, []); pairs.get(k).push(n); }
+    const rows = [...pairs.entries()].map(([k, list]) => { const [a, b] = k.split('|'); return { a, b, list, kb: s.knownBond(a, b) }; })
+      .sort((x, y) => ((y.kb?.date || '') > (x.kb?.date || '') ? 1 : -1));
+    const stale = d => d && isoDays(d, s.calendar.date) > BOND.STALE_DAYS;
+    const words = list => {   // both kids' own words side by side (talk notes), the rest as a list
+      const own = list.filter(n => n.source === 'talk' && n.by), other = list.filter(n => !(n.source === 'talk' && n.by));
+      const side = own.length ? `<div class="bn-sides">${[...new Set(own.map(n => n.by.pid))].map(pid => { const n = own.filter(x => x.by.pid === pid).pop();
+        return `<div class="bn-side${stale(n.date) ? ' stale' : ''}">${esc(bondNoteText(s, n))} <small>${day(n.date)}</small></div>`; }).join('')}</div>` : '';
+      return side + (other.length ? `<ul class="bn-list">${other.slice(-4).reverse().map(n => `<li class="${stale(n.date) ? 'stale' : ''}${n.mix ? ' mix' + (s.twinsKnown(s.player(n.owner)) ? ' struck' : '') : ''}">`
+        + `<span class="cl-src" title="${esc(L.t('bn.src.' + n.source))}">${BOND_SRC[n.source] || '\u2022'}</span> ${esc(bondNoteText(s, n))} <small>${day(n.date)}</small>${stale(n.date) ? ` <em class="bn-stale">${L.t('bn.staleTag')}</em>` : ''}</li>`).join('')}</ul>` : '');
+    };
+    const yard = notes.filter(n => n.band === 'yard' && s.player(n.with));
+    const twins = s.squad.filter(p => p.twinId && s.player(p.twinId) && p.id < p.twinId && s.twinsKnown(p));
+    const body = `
+      ${lone.length ? `<fieldset class="bn-lone"><legend>${L.t('bn.loneHead')}</legend><ul>${lone.map(({ p, n }) => `<li class="${stale(n.date) ? 'stale' : ''}">${esc(L.t('bn.note.alone', { a: L.name(p.name) }))} <small>${day(n.date)}</small></li>`).join('')}</ul></fieldset>` : ''}
+      <fieldset class="bn-pairs"><legend>${L.t('bn.pairsHead')}</legend>${rows.length ? rows.map(r => `<div class="bn-pair${r.kb?.stale ? ' stale' : ''}">
+        <div class="bn-ph"><span class="bn-ico">${BOND_ICONS[r.kb?.band] || BOND_ICONS[r.list[r.list.length - 1].band] || '\u2022'}</span> <b>${nm(r.a)}</b> &amp; <b>${nm(r.b)}</b> — ${esc(L.t('bn.band.' + (r.kb?.band || r.list[r.list.length - 1].band)))}${r.kb?.confirmed ? ` <b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}${r.kb?.stale ? ` <em class="bn-stale">${L.t('bn.staleTag')}</em>` : ''}</div>
+        ${words(r.list)}</div>`).join('') : `<p class="pi-none">${L.t('bn.pairsNone')}</p>`}</fieldset>
+      ${yard.length ? `<fieldset class="bn-yard"><legend>${L.t('bn.yardHead')}</legend><ul>${yard.map(n => `<li>${BOND_SRC.yard} ${esc(L.t('bn.note.yard', { a: L.name(s.player(n.owner).name), b: L.name(s.player(n.with).name), y: L.t('yard.street.' + kidRoots(s.player(n.owner)).yard) }))}</li>`).join('')}</ul></fieldset>` : ''}
+      ${twins.length ? `<fieldset class="bn-twins"><legend>${L.t('bn.twinsHead')}</legend><ul>${twins.map(p => { const c = twinCowlick(p, s.player(p.twinId)); return `<li>${esc(L.t('twins.line', { k: L.name(c.name) }))}</li>`; }).join('')}</ul></fieldset>` : ''}`;
+    return `<div class="nb-locker">${body}</div>`;
+  }
   renderNotebook() {
     const body = this.$('notes-body');
     const rep = this.state.lastReport;
+    if (this.state.bonds && this.nbTab === 'locker') {   // v3.25 (between matches show() opens this tab; the Match tab then shows the lock)
+      body.innerHTML = this.nbTabs() + `<p class="nb-hint">${L.t('bn.hint')}</p>` + this.renderLockerTab();
+      this.$('notes-status').textContent = L.t('bn.status');
+      return;
+    }
     if (!this.state.notebookUnlocked || !rep) {
-      body.innerHTML = `<div class="locked-msg">${L.t('notes.lockedMsg')}</div>`;
+      body.innerHTML = this.nbTabs() + `<div class="locked-msg">${L.t('notes.lockedMsg')}</div>`;
       this.$('notes-status').textContent = L.t('notes.locked');
       return;
     }
@@ -13641,7 +14760,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
         <span class="pos ${p.position || 'none'}">${L.pos(p.position)}</span>${p.tags.map(t => this.tagChip(t, p.id, false)).join('')}${this.clueBadge(p)}</summary>
         ${this.cluesBlock(p)}</details>`).join('')}</fieldset>` : '';
     const back = this.state.phase === 'post' ? `<div class="row-btns"><button class="btn go big" id="btn-back">${L.t(this.state.afterPending ? 'notes.backAfter' : this.state.reviewPending ? 'notes.backReview' : 'notes.back')}</button></div>` : '';
-    body.innerHTML = `
+    body.innerHTML = this.nbTabs() + `
       <div class="nb-head">
         <h2>${L.t('notes.head', { n: rep.md, o: esc(L.team(rep.opponent)) })}</h2>
         <span class="res ${rep.result}">${L.t('res.' + rep.result)} &nbsp;${rep.gf} - ${rep.ga}</span>
