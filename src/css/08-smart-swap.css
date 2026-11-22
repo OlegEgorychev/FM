@@ -2,9 +2,9 @@
    ITERATION 7 — SMART SWAP HIGHLIGHTING
    ========================================================= */
 .r-line{ display: flex; align-items: center; gap: 7px; min-width: 0; }
-.r-line .pos{ flex: none; min-width: 38px; font-size: 11px; font-weight: bold; }
+.r-line .pos{ flex: none; min-width: 38px; font-size: var(--fs-xs); font-weight: bold; }
 .r-line b{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.swap-hint{ flex: 1 1 220px; font-size: 12px; color: #c9f7b8; padding: 2px 8px; border-left: 3px solid #39ff14; background: rgba(57,255,20,.08); }
+.swap-hint{ flex: 1 1 220px; font-size: var(--fs-s); color: #c9f7b8; padding: 2px 8px; border-left: 3px solid #39ff14; background: rgba(57,255,20,.08); }
 
 /* the selected player: solid bright yellow */
 .r-row.sel{ background: rgba(255,230,0,.2); border-left-color: #ffe600; box-shadow: inset 0 0 0 2px #ffe600; }
@@ -24,7 +24,7 @@
 
 /* natural position badge above each dot on the tactics board */
 .pl-pos{ position: absolute; bottom: calc(100% + 1px); left: 50%; transform: translateX(-50%); padding: 0 3px;
-  font: bold 9px/12px var(--ui); color: #fff; background: rgba(0,0,0,.6); border: 1px solid rgba(255,255,255,.25); white-space: nowrap; }
+  font: bold var(--fs-xs)/12px var(--ui); color: #fff; background: rgba(0,0,0,.6); border: 1px solid rgba(255,255,255,.25); white-space: nowrap; }
 .pl-pos.GK{ color: #e2b85a; } .pl-pos.DEF{ color: #8fb4d6; } .pl-pos.MID{ color: #9cc58a; } .pl-pos.FWD{ color: #e08b7f; }
 @media (prefers-reduced-motion: reduce){ .r-row.suggested-swap, .pitch.board .pl.suggested-swap{ animation: none; } }
 
@@ -37,5 +37,5 @@
 .pitch.board .pl.swap-hover-target{ opacity: 1; filter: none; z-index: 6; outline: 3px solid #fff; outline-offset: 2px;
   transform: translate(-50%, -50%) scale(1.12); }
 .pitch.board .pl.swap-hover-target::after{ content: '\21C4'; position: absolute; top: -9px; right: -12px; width: 15px; height: 15px; display: grid; place-items: center;
-  font: bold 11px/1 var(--mono); color: #000; background: #fff; border: 1px solid #000; box-shadow: 1px 1px 0 #000; }
+  font: bold var(--fs-xs)/1 var(--mono); color: #000; background: #fff; border: 1px solid #000; box-shadow: 1px 1px 0 #000; }
 .pitch.board .pl.swap-hover-target .pl-nm{ color: #000; background: #fff; text-shadow: none; }

@@ -14,7 +14,7 @@
 /* training report = the briefing panel in "report" mode */
 .briefing-layer.mb-report .mb-cupbox, .briefing-layer.mb-report .mb-news, .briefing-layer.mb-report .mb-repbox,
 .briefing-layer.mb-report .mb-weather, .briefing-layer.mb-report .mb-ap{ display: none; }
-.briefing-layer.mb-report .mb-away ul{ max-height: 46vh; }
+.briefing-layer.mb-report .mb-away ul{ max-height: calc(46 * var(--vh)); }
 .mb-away li.trr{ color: #e3e8dc; }
 
 /* PLANNER.EXE: Monday's briefing + cash blocks above the plan; the window scrolls, the plan never collapses */
@@ -24,18 +24,18 @@
 .pl-top:empty, .pl-top:not(:has(> :not([hidden]))){ display: none; }
 .pl-scroll > .pl-head, .pl-scroll > .pl-grid{ flex: none; }
 .pl-top > .pl-kassa:last-child, .pl-top > .pl-brief:last-child{ margin-bottom: 2px; }
-.pl-brief{ margin: 8px 8px 0; padding: 6px 10px; background: #fff; border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); font-size: 13px; }
+.pl-brief{ margin: 8px 8px 0; padding: 6px 10px; background: #fff; border: 2px solid; border-color: var(--shadow) #fff #fff var(--shadow); font-size: var(--fs-s); }
 .pl-brief[hidden], .pl-kassa[hidden]{ display: none; }
 .pl-world{ font-weight: bold; color: #5a3a00; padding: 2px 0; }
 .pl-sec > summary{ font-weight: bold; padding: 2px 0; }
-.pl-away{ margin: 2px 0 0; padding: 0 0 0 1.2em; list-style: none; max-height: 140px; overflow-y: auto; font: 12px/1.45 var(--mono); }
+.pl-away{ margin: 2px 0 0; padding: 0 0 0 1.2em; list-style: none; max-height: 140px; overflow-y: auto; font: var(--fs-s)/1.45 var(--mono); }
 .pl-away li .d{ color: #666; text-transform: capitalize; }
 .pl-away li.more, .pl-away .mb-routine summary, .pl-away .mb-routine li{ color: #777; }
 .pl-away .mb-routine ul{ border-left-color: #aaa; }
-.pl-kassa{ margin: 8px 8px 0; padding: 4px 8px; background: #ece9e2; border: 1px solid #b8b3a8; font-size: 13px; }
+.pl-kassa{ margin: 8px 8px 0; padding: 4px 8px; background: #ece9e2; border: 1px solid #b8b3a8; font-size: var(--fs-s); }
 .pl-kassa .ks-body{ margin: 4px 0; }
 .pl-kassa .ks-report, .pl-kassa .ks-levels{ padding: 6px 8px; }
-@media (max-height: 800px){ .pl-kassa .ks-lvl small{ display: none; } .pl-away{ max-height: 96px; } }
+/* v3.26: removed @media (max-height: 800px) — never true on the ≥1440×900 canvas */
 
 /* locker room: [ Remind everyone ] */
 .lrf-head .lrf-all{ margin-left: auto; }
@@ -49,22 +49,16 @@
 .pl-kassa .ks-lvl{ padding: 3px 8px; margin: 2px 0; }
 .pl-kassa .ks-budget{ margin-top: 4px; }
 .pl-brief{ padding: 3px 10px; }
-@media (max-height: 800px){   /* short screens: last month's six ledger rows in two columns */
-  .pl-kassa .ks-table tbody{ display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
-  .pl-kassa .ks-table tr{ display: flex; justify-content: space-between; }
-  .pl-kassa .ks-table td{ border-bottom: none; }
-  .pl-kassa .ks-table tr.tot td{ border-top: none; }
-  .pl-col .pl-opt{ padding: 3px 4px; }
-}
+/* v3.26: removed @media (max-height: 800px) — never true on the ≥1440×900 canvas */
 /* both blocks on Monday: side by side (briefing | cash desk) so the window keeps its height */
-@media (min-width: 900px){
+/* v3.26: was @media (min-width: 900px) — always true on the ≥1440×900 canvas */
   .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])){ display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
   .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])) .pl-brief{ margin-right: 0; }
   .pl-top .pl-kassa .ks-lvl small{ display: none; }
-}
-@media (min-width: 900px){
+
+/* v3.26: was @media (min-width: 900px) — always true on the ≥1440×900 canvas */
   .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])) .ks-table tbody{ display: table-row-group; }
   .pl-top:has(> .pl-brief:not([hidden])):has(> .pl-kassa:not([hidden])) .ks-table tr{ display: table-row; }
-  .pl-top .pl-kassa .ks-table{ font-size: 12px; } .pl-top .pl-kassa .ks-table td{ padding: 0 4px; line-height: 1.25; }
+  .pl-top .pl-kassa .ks-table{ font-size: var(--fs-s); } .pl-top .pl-kassa .ks-table td{ padding: 0 4px; line-height: 1.25; }
   .pl-top .pl-kassa .ks-table td + td{ white-space: nowrap; }
-}
+

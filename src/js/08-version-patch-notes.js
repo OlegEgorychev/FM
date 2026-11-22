@@ -2,8 +2,22 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.25';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.26';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.26', name: { en: 'Holst', ru: 'Холст' },
+    en: [
+      'The whole game is now drawn on one canvas that scales to your browser window: from 1366×768 to 2560×1440 the taskbar is always visible and the page never scrolls.',
+      'Main windows (Office, Team, League, Match, Notebook) use the full width of the screen instead of a narrow column in the middle.',
+      'One set of text sizes everywhere; nothing is smaller than 12 px any more.',
+      'Developer tools out of the way: LOG .CSV / LOG .JSON moved from the match summary to DEBUG.EXE → GOD MODE.',
+    ],
+    ru: [
+      'Вся игра теперь рисуется на одном холсте, который подстраивается под окно браузера: от 1366×768 до 2560×1440 панель задач всегда видна, а страница не прокручивается.',
+      'Главные окна (Штаб, Команда, Лига, Матч, Блокнот) занимают всю ширину экрана, а не узкую колонку посередине.',
+      'Единая шкала размеров текста; ничего мельче 12 px больше нет.',
+      'Инструменты разработчика убраны с глаз: ЛОГ .CSV / ЛОГ .JSON переехали из итогов матча в DEBUG.EXE → GOD MODE.',
+    ],
+  },
   { v: '3.25', name: { en: 'Bonds', ru: 'Связи' },
     en: [
       'The squad is no longer 15 separate kids: some are mates from the same yard or school, some don\'t get on — and it changes with training, matches and how you treat them.',

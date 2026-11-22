@@ -1,0 +1,16 @@
+/* =========================================================
+   v3.26 HOLST — main windows use the whole canvas
+   Free area = right of the desktop icon column … canvas edge − 12 px, top + 8 px … taskbar − 8 px (#desktop already
+   stops at the taskbar). Capped at 1760 px and centred inside the free area. Dialogs / layers keep their own sizes.
+   ========================================================= */
+#win-dash, #win-team, #win-table, #win-match, #win-notes{
+  --frame-r: var(--sp-3);
+  top: var(--sp-2); bottom: var(--sp-2); right: auto; max-height: none; transform: none;
+  width: min(1760px, calc(100% - var(--icon-col) - var(--frame-r)));
+  left: calc(var(--icon-col) + max(0px, (100% - var(--icon-col) - var(--frame-r) - 1760px) / 2));
+}
+/* league: the table stretches, the side column keeps its width */
+#win-table .tbl-wrap{ max-height: none; }
+/* locker room: the swung-open door (::after, rotateY −100°, opacity 0) still counted as overflow → a 14-px phantom
+   scrollbar. 15 lockers = 2 rows always fit the 900-px canvas, so the grid clips instead of scrolling (same clip as before). */
+.lr-grid{ overflow: hidden; }

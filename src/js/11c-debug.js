@@ -61,6 +61,8 @@ class DebugConsole {
     this.body.addEventListener('click', e => {
       const th = e.target.closest('th[data-col]');
       if (th) { const i = +th.dataset.col; this.sort = { i, dir: this.sort.i === i ? -this.sort.dir : 1 }; this.render(); return; }
+      const lg = e.target.closest('[data-log]');   // v3.26: match log export (was in MATCH_SUMMARY.EXE)
+      if (lg) { this.exportLog(lg.dataset.log); return; }
       const b = e.target.closest('[data-cheat]');
       if (b) this.cheat(b.dataset.cheat);
     });
@@ -143,6 +145,7 @@ class DebugConsole {
       ${btn('energy', L.t('dbg.energy'), L.t('dbg.energyD'))}
       ${btn('maxms', L.t('dbg.maxMs'), L.t('dbg.maxMsD'))}
       ${btn('force', L.t('dbg.force') + ` <b class="dbg-flag ${on ? 'on' : ''}">[${L.t(on ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.forceD'), on ? ' armed' : '')}
+      <div class="dbg-cheat dbg-log"><span class="dbg-logbtns"><button class="btn" type="button" id="dbg-csv" data-log="csv"${this.log ? '' : ' disabled'}>${L.t('ms.logCsv')}</button><button class="btn" type="button" id="dbg-json" data-log="json"${this.log ? '' : ' disabled'}>${L.t('ms.logJson')}</button></span><span>${esc(L.t('ms.logTip'))}</span></div>
       <hr class="dbg-hr">
       ${btn('autosim', L.t('dbg.autosim'), L.t('dbg.autosimD'))}
       ${btn('ap', L.t('dbg.ap'), L.t('dbg.apD'))}
@@ -156,6 +159,14 @@ class DebugConsole {
     </div>`;
   }
 
+  /** v3.4 → v3.26: the duel-by-duel log of the last match (kept in memory only, not in the save). */
+  get log() { return this.ui.lastMatchLog || null; }
+  exportLog(kind) {
+    const g = this.log; if (!g) return;
+    const base = `yam-log-md${g.md}-${String(g.opponent).replace(/[^\w]+/g, '_').toLowerCase()}`;
+    if (kind === 'json') this.ui.download(base + '.json', JSON.stringify(g, null, 1), 'application/json');
+    else this.ui.download(base + '.csv', MatchEngine.traceCsv(g.trace, g.teams.map(t => t.name)), 'text/csv');
+  }
   cheat(id) {
     const ui = this.ui, s = ui.state, eng = ui.engine && !ui.engine.finished ? ui.engine : null;
     if (id === 'energy') {

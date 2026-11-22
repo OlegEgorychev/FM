@@ -15,6 +15,7 @@ const FILE = BASE + '?noboot';   // v2.1: the boot screen is tested once, separa
 const SHOTS = process.argv.includes('--shots');
 const results = [];
 const check = (name, ok, info = '') => { results.push({ name, ok: !!ok, info }); };
+const fitWarn = [];   // v3.26: screens that still scroll inside (WARN, not a failure)
 const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `balance.js --cohesion` tables + OK lines (must not change)
 
 (async () => {
@@ -41,6 +42,42 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
   const shot = async name => { if (SHOTS) { fs.mkdirSync(path.join(__dirname, 'shots'), { recursive: true }); await page.screenshot({ path: path.join(__dirname, 'shots', name + '.png') }); } };
   const modalOpen = () => page.evaluate(() => !document.getElementById('modal-layer').hidden);
   const closeModal = async () => { if (await modalOpen()) await page.keyboard.press('Escape'); };
+
+  /* v3.26 HOLST fit check: at each viewport the screen's own root must not scroll inside (overflow-y auto/scroll with
+     scrollHeight > clientHeight + 2), except the chronological feeds; no page scroll; the canvas is 900 logical px tall.
+     FIT_SCREENS fail hard; the rest are printed as WARN (overflow in px) until their redesign versions land. */
+  const FIT_VIEWPORTS = [[1440, 900], [1920, 870], [1366, 768]];
+  const FIT_SCREENS = ['table', 'locker', 'locker-talk', 'summary', 'after', 'planner', 'briefing', 'report'];
+  const FIT_ROOTS = { dash: '#win-dash', team: '#win-team', table: '#win-table', match: '#win-match', notes: '#win-notes', briefing: '#morning-briefing-view',
+    report: '#morning-briefing-view', locker: '#locker-room-view', 'locker-talk': '#talk-layer', summary: '#msum-layer', after: '#after-view', planner: '#planner-view' };
+  const FIT_FEEDS = '#ticker, #log';   // Diary, match log
+  const fitSeen = {};   // screen → { worst: px, where: 'WxH sel', page: bool, h: bool }
+  const fit = async name => {
+    const vp0 = page.viewportSize();
+    const r = fitSeen[name] || (fitSeen[name] = { worst: 0, where: '', pageScroll: [], canvasH: [] });
+    for (const [w, h] of FIT_VIEWPORTS) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.waitForTimeout(140);   // Canvas.fit is debounced (60 ms)
+      const m = await page.evaluate(([root, feeds]) => {
+        const box = document.querySelector(root), out = [];
+        const vis = el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
+        if (box && vis(box)) for (const el of [box, ...box.querySelectorAll('*')]) {
+          if (!vis(el) || el.closest(feeds)) continue;
+          const oy = getComputedStyle(el).overflowY;
+          if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 2)
+            out.push({ sel: el.id ? '#' + el.id : el.tagName.toLowerCase() + '.' + [...el.classList].join('.'), px: el.scrollHeight - el.clientHeight });
+        }
+        const d = document.scrollingElement;
+        return { out, shown: !!box && !!vis(box), page: d.scrollHeight > innerHeight || d.scrollWidth > innerWidth, cvH: document.getElementById('screen').offsetHeight, cv: Canvas.H };
+      }, [FIT_ROOTS[name], FIT_FEEDS]);
+      if (!m.shown) r.where = r.where || `${w}x${h} root ${FIT_ROOTS[name]} not visible`;
+      if (m.page) r.pageScroll.push(`${w}x${h}`);
+      if (m.cvH !== 900 || m.cv !== 900) r.canvasH.push(`${w}x${h}:${m.cvH}`);
+      for (const o of m.out) if (o.px > r.worst) { r.worst = o.px; r.where = `${w}x${h} ${o.sel}`; }
+    }
+    await page.setViewportSize(vp0);
+    await page.waitForTimeout(140);
+  };
 
   try {
     // v2.1: boot screen — visible at once, phases change, bar 5–8 s, then fades out and is removed
@@ -108,6 +145,8 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
       out.flag = s.squad.every(p => p.yardDone); return out; });
     check('v3.23 START SEASON writes every signed kid\'s yard notes as clues (only traits with a role signal, draft date, read), nothing for pace / strong / hands / quiet',
       yc.n === 15 && yc.exact && yc.seen && yc.flag && yc.mapped > 0, JSON.stringify(yc));
+    for (const v of ['dash', 'team', 'table']) { await page.evaluate(v => YAM.ui.show(v), v); await fit(v); }   // v3.26 fit check
+    await page.evaluate(() => YAM.ui.show('dash'));
 
     // fast match for testing
     await page.evaluate(() => { for (const k of [1, 2, 5]) { YAM.MatchEngine.SPEED[k] = 6; YAM.MatchEngine.HIGHLIGHT[k] = 12; } });
@@ -124,6 +163,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
     await shot('1-dashboard');
     // v3.24 (2): match day = morning briefing → (match-day event) → "Match day" dialog → locker room
     const md0 = await page.evaluate(() => ({ brief: YAM.ui.briefing.isOpen, modal: !document.getElementById('modal-layer').hidden, wait: !!YAM.game.dayState().mdWait, kassa: YAM.ui.kassa.isOpen }));
+    if (md0.brief) await fit('briefing');   // v3.26
     if (md0.brief) await page.click('#mb-go');
     const md1 = await page.evaluate(() => ({ brief: YAM.ui.briefing.isOpen, modal: !document.getElementById('modal-layer').hidden, briefed: !!YAM.game.dayState().briefed, wait: !!YAM.game.dayState().mdWait,
       title: document.getElementById('modal-layer').textContent.includes(L.t('dlg.matchdayTitle')) }));
@@ -132,6 +172,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
     await closeModal();
     await toLocker(); await page.click('#lr-proceed');   // v2.6: roll call before kick-off
     await page.click('.tk[data-view=match]');
+    await fit('match');   // v3.26: before kick-off
 
     // layout: three columns, no scrolling
     const lay = await page.evaluate(() => {
@@ -172,6 +213,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
     check('full-time + all 5 fixtures resolved', fin.md, fin.score);
     // v2.1: Match Summary before the Notebook — goals in the timeline match the score
     await page.waitForFunction(() => !document.getElementById('msum-layer').hidden, null, { timeout: 5000 });
+    await fit('summary');   // v3.26
     const ms = await page.evaluate(() => {
       const e = YAM.ui.engine, ev = e.matchEvents, rep = YAM.game.lastReport;
       const g = side => ev.filter(x => x.type === 'goal' && x.isHomeTeam === (side === 0)).length;
@@ -190,12 +232,8 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
       return { n: g.trace.length, sums: g.trace.every(t => Math.abs(sum(t.A) - t.A.total) < 0.05 && Math.abs(sum(t.D) - t.D.total) < 0.05),
         goals: g.trace.filter(t => t.out === 'goal').length, score: g.teams[0].score + g.teams[1].score, kinds: [...new Set(g.trace.map(t => t.kind))].length,
         csvRows: csv.length - 1, head: csv[0].startsWith('minute,kind,team,zone,atk_name'), players: g.teams[0].players.every(p => 'energyStart' in p && 'fatigueEnd' in p),
-        btn: !document.getElementById('msum-csv').disabled && !document.getElementById('msum-json').disabled };
+        noSumBtn: !document.getElementById('msum-csv') && !document.getElementById('msum-json') };   // v3.26 G7: the export lives in DEBUG.EXE
     });
-    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#msum-csv')]);
-    const dlName = dl.suggestedFilename(), dlText = fs.readFileSync(await dl.path(), 'utf8');
-    check('match log: duels add up, goals = score, CSV header + 1 row per duel, download works', lg.n > 50 && lg.sums && lg.goals === lg.score && lg.kinds >= 4
-      && lg.csvRows === lg.n && lg.head && lg.players && lg.btn && /^yam-log-md1-.*\.csv$/.test(dlName) && dlText.split('\n').length - 1 === lg.n, JSON.stringify({ ...lg, dlName }));
     const aiAfter = await page.evaluate(n => { const t = YAM.game.league.teams.find(x => x.name === n), e = YAM.ui.engine;
       return t.squad.map(k => ({ en: k.en, played: e.sides[1].all.some(p => p.id === k.id), end: Math.round(e.energy.get(k.id) ?? -1) })); }, opp0.name);
     check('AI fatigue: the opponent XI keeps its end-of-match energy, the rest +6 (capped)', aiAfter.filter(k => k.played).length === 11
@@ -248,7 +286,19 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
     tt.unlocked = await page.evaluate(() => !YAM.ui.modalLock && YAM.ui.view === 'notes' && !document.getElementById('taskbar').inert && !document.body.classList.contains('modal-lock'));
     check('v3.5 team talk: praise applies morale + factions once, diary + save, reaction line, buttons locked, Proceed enabled → Notebook unlocks the desktop',
       Object.values(tt).every(Boolean), JSON.stringify(tt));
+    // v3.4 → v3.26: LOG .CSV / .JSON — DEBUG.EXE → GOD MODE (moved out of MATCH_SUMMARY.EXE)
+    await page.evaluate(() => { YAM.ui.debug.open(); YAM.ui.debug.tab = 'god'; YAM.ui.debug.render(); });
+    lg.btn = await page.evaluate(() => !document.getElementById('dbg-csv').disabled && !document.getElementById('dbg-json').disabled);
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#dbg-csv')]);
+    const dlName = dl.suggestedFilename(), dlText = fs.readFileSync(await dl.path(), 'utf8');
+    const [dlj] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#dbg-json')]);
+    const dljName = dlj.suggestedFilename(), dljN = (JSON.parse(fs.readFileSync(await dlj.path(), 'utf8')).trace || []).length;
+    await page.evaluate(() => YAM.ui.debug.close());
+    check('match log: duels add up, goals = score, CSV header + 1 row per duel; LOG .CSV / .JSON in DEBUG.EXE (not in MATCH_SUMMARY.EXE), downloads work', lg.n > 50 && lg.sums && lg.goals === lg.score && lg.kinds >= 4
+      && lg.csvRows === lg.n && lg.head && lg.players && lg.btn && lg.noSumBtn && /^yam-log-md1-.*\.csv$/.test(dlName) && dlText.split('\n').length - 1 === lg.n
+      && /^yam-log-md1-.*\.json$/.test(dljName) && dljN === lg.n, JSON.stringify({ ...lg, dlName, dljName, dljN }));
 
+    await fit('notes');   // v3.26: Notebook after the match
     // notebook
     await closeModal();
     await page.click('.tk[data-view=notes]');
@@ -270,7 +320,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
     check('v3.18 Notebook: the coach\'s note is an episode with no role names (EN + RU), one stored clue per outfield card (unique phrasing), Clues block on each card, read once the Notebook is open',
       cl0.clean && cl0.stored && cl0.uniq && cl0.blocks && cl0.seen, JSON.stringify(cl0));
     const pt = await page.evaluate(() => ({
-      nb: [...document.querySelectorAll('.card .portrait.lg svg')].map(s => s.getBoundingClientRect().width),
+      nb: [...document.querySelectorAll('.card .portrait.lg svg')].map(s => s.getBoundingClientRect().width / Canvas.scale),   // v3.26: logical px (the canvas is scaled)
       lr: document.querySelectorAll('#live-roster .portrait.sm svg').length,
       uniq: new Set(YAM.game.squad.map(p => p.portraitSvg)).size, n: YAM.game.squad.length,
       saved: !/portraitSvg/.test(localStorage.getItem('yam_save_v1') || ''),
@@ -283,7 +333,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
       const p = YAM.game.player(id), st = YAM.game.seasonOf(id);
       return { open: !document.getElementById('pinfo-layer').hidden, apps: st.apps, age: p.age,
         txt: b.textContent.includes(String(p.age)) && /1/.test(b.querySelector('.pi-stats td').textContent),
-        note: !!b.querySelector('.pi-note-h'), svg: b.querySelector('.portrait.xl svg').getBoundingClientRect().width };
+        note: !!b.querySelector('.pi-note-h'), svg: b.querySelector('.portrait.xl svg').getBoundingClientRect().width / Canvas.scale };   // v3.26: logical px
     });
     await shot('5-profile');
     await page.keyboard.press('Escape');
@@ -496,6 +546,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
       return r;
     });
     await shot('12-planner');
+    await fit('planner');   // v3.26
     // v3.13: the office is open on Monday for every kid (here: over the planner), 1 AP from the weekly wallet
     const ofPost = await page.evaluate(() => YAM.ui.officeBlock(YAM.game.squad.find(x => x.available).id));
     const kidO = await page.evaluate(() => { const s = YAM.game, p = s.squad.find(x => x.available && x.archetype !== 'GK'); s.weekState().ap = 1; p.dyn.sharpness = 30; p.dyn.morale = 60;
@@ -554,6 +605,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
         faces: g.querySelectorAll('.lk.here .lk-face svg').length, why: [lk.absent[ids.tired], lk.absent[ids.lazy], lk.absent[ids.hurt]], skipFlag: YAM.game.player(ids.lazy).skipped_training };
     }, lr0);
     await shot('10-locker');
+    await fit('locker');   // v3.26
     // v3.2 → v3.13: in the locker room the office is open only for kids who turned up
     const ofLk = await page.evaluate(ids => {
       const ui = YAM.ui, here = YAM.game.squad.find(p => !YAM.game.dayState().locker.absent[p.id]);
@@ -583,6 +635,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
       && (await page.evaluate(() => !document.getElementById('locker-room-view').hidden)), JSON.stringify({ zz, esc1, viaI }));
     await page.click(`#lr-grid .lk.empty[data-pid="${lr0.lazy}"]`);   // roll call: 1 AP
     const lr2 = await page.evaluate(() => ({ ap: YAM.game.ap, talk: !document.getElementById('talk-layer').hidden, n: document.querySelectorAll('#talk-choices .talk-btn').length, b: YAM.game.budget }));
+    await finishTyping(); await fit('locker-talk');   // v3.26: locker-room dialogue
     const disc0 = await page.evaluate(id => YAM.game.player(id).psych.discipline, lr0.lazy);
     await talk(0);   // fine him
     const lr3 = await page.evaluate(([id, t]) => ({ b: YAM.game.budget, disc: YAM.game.player(id).psych.discipline, still: !document.getElementById('locker-room-view').hidden,
@@ -900,7 +953,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
     await page.waitForFunction(() => window.YAM && window.YAM.ui);
     await page.evaluate(() => { YAM.game.excusesOff = true; });
     const rl = await page.evaluate(() => ({ open: !document.getElementById('msum-layer').hidden, lock: YAM.ui.modalLock && document.getElementById('taskbar').inert,
-      go: document.getElementById('msum-go').disabled, csv: document.getElementById('msum-csv').disabled,
+      go: document.getElementById('msum-go').disabled, csv: !document.getElementById('msum-csv'),
       disc: YAM.game.squad.map(p => p.psych.discipline) }));
     await page.click('#msum-body [data-talk="tough"]');
     const rl2 = await page.evaluate(d => ({ talk: YAM.game.lastReport.talk, board: YAM.game.rep.board, parents: YAM.game.rep.parents,
@@ -1494,6 +1547,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
         checked: document.querySelector('#pl-ks-levels input:checked')?.value, budget: document.getElementById('pl-ks-report').textContent.includes('$400'), top: YAM.ui.topLayer()?.el.id,
         title: document.getElementById('pl-kassa-h').textContent, block: !document.getElementById('pl-kassa').hidden, parents: YAM.game.rep.parents };
     });
+    await fit('planner');   // v3.26: Monday = planner + cash desk
     await page.click('#pl-ks-levels input[value="high"]');
     await page.evaluate(() => { YAM.game.setWeekPlan('tue', 'match'); YAM.ui.planner.render(); });
     await page.click('#pl-confirm');   // one button: the fee level + the plan
@@ -1762,10 +1816,12 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
     await page.evaluate(() => { document.getElementById('win-match').classList.add('open'); });   // (no match today: just lay the window out)
     await page.waitForTimeout(200);
     const narrow = await page.evaluate(() => { const b = document.getElementById('btn-start'), r = b.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return { w: Math.round(r.width), top: hit === b || b.contains(hit), cols: getComputedStyle(document.querySelector('#win-match .match-body')).gridTemplateColumns.split(' ').length }; });
+      return { w: Math.round(r.width / Canvas.scale), top: hit === b || b.contains(hit), cols: getComputedStyle(document.querySelector('#win-match .match-body')).gridTemplateColumns.split(' ').length,
+        cvW: Canvas.W, cvH: document.getElementById('screen').offsetHeight, page: document.scrollingElement.scrollHeight <= innerHeight }; });
     await page.setViewportSize({ width: 1440, height: 860 });
     await page.evaluate(() => { document.getElementById('win-match').classList.remove('open'); YAM.ui.show('dash'); });
-    check('v3.17 bug: at 800×600 the match window is one column and [ START MATCH ] is visible on top', narrow.top && narrow.w > 60 && narrow.cols === 1, JSON.stringify(narrow));
+    check('v3.17 bug → v3.26 canvas: at 800×600 the game is the same 1440×900 canvas scaled down — the match window keeps its 3 columns, [ START MATCH ] visible on top, no page scroll',
+      narrow.top && narrow.w > 60 && narrow.cols === 3 && narrow.cvW === 1440 && narrow.cvH === 900 && narrow.page, JSON.stringify(narrow));
     // (4) the briefing: only with news; important first, routine collapsed; 14-day mute (never for money / rep / injuries…)
     const nw = await page.evaluate(() => {
       const s = YAM.game, ui = YAM.ui, out = {};
@@ -1815,6 +1871,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
       return { open: !L1.hidden, report: L1.classList.contains('mb-report'), date: s.calendar.date, title: document.getElementById('mb-date').textContent,
         lines: [...document.querySelectorAll('#mb-away li')].map(x => x.textContent), news: getComputedStyle(document.querySelector('#morning-briefing-view .mb-news')).display,
         awayTue: (s.away || []).some(e => e.date === '2002-11-19') }; });
+    await fit('report');   // v3.26: training report
     await page.click('#mb-go');
     await page.waitForTimeout(200);
     const tr1 = await page.evaluate(() => { const s = YAM.game; YAM.ui.skipReports = undefined;
@@ -2195,6 +2252,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
     a1.esc = await afOpen();
     await page.keyboard.press(' ');
     a1.space = await page.evaluate(() => { const L2 = document.getElementById('after-view'); return !L2.hidden && !L2.classList.contains('af-typing') && [...L2.querySelectorAll('button[data-act]')].every(b => !b.disabled); });
+    await fit('after');   // v3.26: after-game picker
     await shot('20-after-game');
     check('v3.20 a loss → AFTER_GAME.EXE "After the game", 3 remark cards; Return / [ CONTINUE ] blocked until a choice; no OK / × button; Escape does not close it; the cards wait for the typewriter (Space finishes it)',
       Object.values(a1).every(Boolean), JSON.stringify({ res1, ...a1 }));
@@ -3549,6 +3607,16 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
     check('balance.js: Attack vs Defense win share within 45–55%', bal.status === 0, (bal.stdout.trim().split('\n').pop() || bal.stderr).slice(0, 120));
     await page.click('#btn-lang'); await page.click('#btn-lang');
     check('frame loop cost < 2 ms', await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0) < 2), (await page.evaluate(() => (YAM.ui.radar.frameCost ?? 0).toFixed(2))) + ' ms');
+    // v3.26 HOLST: fit summary — FIT_SCREENS must not scroll; the rest is a WARN list for the redesign versions
+    {
+      const all = Object.keys(FIT_ROOTS), miss = all.filter(k => !fitSeen[k]);
+      const hard = FIT_SCREENS.filter(k => fitSeen[k] && fitSeen[k].worst > 0).map(k => `${k} +${fitSeen[k].worst}px (${fitSeen[k].where})`);
+      const pg = all.filter(k => fitSeen[k]?.pageScroll.length).map(k => `${k}: ${fitSeen[k].pageScroll.join(',')}`);
+      const cv = all.filter(k => fitSeen[k]?.canvasH.length).map(k => `${k}: ${fitSeen[k].canvasH.join(',')}`);
+      fitWarn.push(...all.filter(k => !FIT_SCREENS.includes(k) && fitSeen[k]?.worst > 0).map(k => `${k} +${fitSeen[k].worst}px (${fitSeen[k].where})`));
+      check(`v3.26 fit: ${FIT_SCREENS.join(', ')} have no inner scroll at ${FIT_VIEWPORTS.map(v => v.join('x')).join(' / ')} (feeds #ticker, #log allowed); no page scroll and a 900-px canvas on every screen; all ${all.length} screens measured`,
+        !hard.length && !pg.length && !cv.length && !miss.length, JSON.stringify({ hard, pageScroll: pg, canvas: cv, missing: miss }));
+    }
   } catch (e) {
     check('no exception during run', false, e.message.split('\n').slice(0, 3).join(' / '));
   }
@@ -3557,6 +3625,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
 
   const failed = results.filter(r => !r.ok);
   for (const r of results) console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.name}${r.info ? '  (' + r.info + ')' : ''}`);
+  for (const w of fitWarn) console.log(`WARN  fit: ${w}`);
   console.log(failed.length ? `\n${failed.length} check(s) failed` : `\nAll ${results.length} checks passed`);
   process.exit(failed.length ? 1 : 0);
 })();

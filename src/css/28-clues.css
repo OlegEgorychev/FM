@@ -1,21 +1,21 @@
 /* =========================================================
    v3.18 "CLUES" — clue lists (Notebook, PLAYER_INFO.EXE), 📝 badge (roster + tactics board), role-change cost
    ========================================================= */
-.nb-clues{ margin: 8px 0 4px 22px; min-width: 0; box-sizing: border-box; padding: 2px 8px 6px; border: 2px groove #d8d0b8; font: 13px/1.4 var(--ui); color: #2b2618; }
+.nb-clues{ margin: 8px 0 4px 22px; min-width: 0; box-sizing: border-box; padding: 2px 8px 6px; border: 2px groove #d8d0b8; font: var(--fs-s)/1.4 var(--ui); color: #2b2618; }
 .nb-clues legend{ padding: 0 4px; font-weight: bold; color: #13213a; }
 .nb-clues ul{ list-style: none; margin: 0; padding: 0; }
-.card .nb-clues li, .nb-clues li{ display: flex; gap: 6px; align-items: baseline; font-size: 13px; line-height: 18px; padding: 1px 0; }
+.card .nb-clues li, .nb-clues li{ display: flex; gap: 6px; align-items: baseline; font-size: var(--fs-s); line-height: 18px; padding: 1px 0; }
 .card .nb-clues li::before{ content: none; }
 /* narrow Notebook cards / PLAYER_INFO: date + icon + text flow as one paragraph, the ✓ chip wraps after it */
 .card .nb-clues li, .pinfo .nb-clues li{ display: block; }
 .card .nb-clues li > span, .pinfo .nb-clues li > span{ display: inline; width: auto; margin-right: 4px; }
 .card .nb-clues .cl-ok, .pinfo .nb-clues .cl-ok{ display: inline-block; margin-left: 2px; }
-.nb-clues .cl-d{ flex: none; width: 46px; color: #6f6754; font-size: 12px; }
+.nb-clues .cl-d{ flex: none; width: 46px; color: #6f6754; font-size: var(--fs-s); }
 .nb-clues .cl-src{ flex: none; width: 18px; text-align: center; }
 .nb-clues .cl-t{ flex: 1; font-style: italic; }
-.nb-clues .cl-ok{ flex: none; padding: 0 4px; font-size: 11px; color: #10200c; background: #8fae7f; border: 1px solid; border-color: #c4dcb8 #4c6a40 #4c6a40 #c4dcb8; white-space: nowrap; }
+.nb-clues .cl-ok{ flex: none; padding: 0 4px; font-size: var(--fs-xs); color: #10200c; background: #8fae7f; border: 1px solid; border-color: #c4dcb8 #4c6a40 #4c6a40 #c4dcb8; white-space: nowrap; }
 .nb-clues li.new .cl-t{ font-weight: bold; }
-.nb-clues .nb-more summary{ cursor: pointer; font-size: 12px; color: #2c3a52; }
+.nb-clues .nb-more summary{ cursor: pointer; font-size: var(--fs-s); color: #2c3a52; }
 .nb-clues .pi-none{ margin: 2px 0; }
 .card .btn .role-cost{ margin-left: 6px; font-style: normal; color: #a63b30; font-weight: bold; }
 
@@ -24,24 +24,24 @@
 .nb-others legend{ padding: 0 4px; background: #e9e4d3; font-weight: bold; color: #13213a; }
 .nb-others .nb-legend{ margin: 0 0 6px; color: #5e5a4c; }
 .nb-kid{ margin: 2px 0; }
-.nb-kid summary{ cursor: pointer; padding: 2px 4px; font: 13px/20px var(--ui); }
+.nb-kid summary{ cursor: pointer; padding: 2px 4px; font: var(--fs-s)/20px var(--ui); }
 .nb-kid summary:hover{ background: #dcd5c0; }
 .nb-kid summary .num{ display: inline-block; min-width: 20px; }
-.nb-kid summary .pos{ font-size: 11px; padding: 0 3px; margin: 0 4px; }
+.nb-kid summary .pos{ font-size: var(--fs-xs); padding: 0 3px; margin: 0 4px; }
 .nb-kid .nb-clues{ margin-left: 18px; background: #f3eedc; }
 
 /* 📝 new clues — plain symbol, no animation */
-.clue-badge{ display: inline-block; margin-left: 4px; font-size: 12px; line-height: 1; cursor: help; vertical-align: 1px; }
-.pitch.board .pl .clue-badge{ position: absolute; top: -9px; right: -11px; margin: 0; font-size: 12px; padding: 1px; background: #fffbe6;
+.clue-badge{ display: inline-block; margin-left: 4px; font-size: var(--fs-s); line-height: 1; cursor: help; vertical-align: 1px; }
+.pitch.board .pl .clue-badge{ position: absolute; top: -9px; right: -11px; margin: 0; font-size: var(--fs-s); padding: 1px; background: #fffbe6;
   border: 1px solid #000; line-height: 12px; }
 
 /* PLAYER_INFO.EXE: same list, read-only, in the CRT panel style of the other fieldsets */
 .pinfo .nb-clues{ margin: 0; padding: 2px 8px 8px; font: inherit; color: inherit; border: 1px solid; border-color: var(--shadow) #fff #fff var(--shadow); }
 .pinfo .nb-clues legend{ font-weight: normal; color: #111; }
 .pinfo .nb-clues > ul, .pinfo .nb-clues > details, .pinfo .nb-clues > p{ padding: 4px 8px; }
-.pinfo .nb-clues li{ font-size: 12px; }
-.pinfo .nb-clues .cl-d{ color: var(--muted); font-size: 11px; }
-.pinfo .nb-clues .cl-ok{ font-size: 10px; }
+.pinfo .nb-clues li{ font-size: var(--fs-s); }
+.pinfo .nb-clues .cl-d{ color: var(--muted); font-size: var(--fs-xs); }
+.pinfo .nb-clues .cl-ok{ font-size: var(--fs-xs); }
 .pinfo .nb-clues .nb-more summary{ color: var(--amber); }
 /* v3.23: the man of the match mark on his Notebook card */
-.card h3 .motm{ display: inline-block; margin-left: 6px; padding: 0 4px; font: bold 10px/14px var(--mono); vertical-align: middle; color: #111; background: #ffe58a; border: 1px solid #000; }
+.card h3 .motm{ display: inline-block; margin-left: 6px; padding: 0 4px; font: bold var(--fs-xs)/14px var(--mono); vertical-align: middle; color: #111; background: #ffe58a; border: 1px solid #000; }

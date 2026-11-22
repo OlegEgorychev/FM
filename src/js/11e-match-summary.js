@@ -16,9 +16,6 @@ class MatchSummary {
     document.getElementById('msum-x').addEventListener('click', () => this.requestClose());
     document.getElementById('msum-go').addEventListener('click', () => this.proceed());
     this.body.addEventListener('click', e => { const b = e.target.closest('[data-talk]'); if (b && !b.disabled) this.chooseTalk(b.dataset.talk); });
-    // v3.4: match log export (kept in memory for the last match only — not in the save)
-    document.getElementById('msum-csv').addEventListener('click', () => this.exportLog('csv'));
-    document.getElementById('msum-json').addEventListener('click', () => this.exportLog('json'));
     document.addEventListener('keydown', e => {
       if (!this.isOpen || e.key !== 'Escape') return;
       e.preventDefault(); e.stopImmediatePropagation(); this.requestClose();
@@ -36,7 +33,6 @@ class MatchSummary {
     this.shownAt = performance.now();   // v3.21 attention
     this.ui.setModalLock(true);   // v3.5: closes whatever was open behind and makes it inert
     (this.body.querySelector('[data-talk]:not([disabled])') || document.getElementById('msum-go')).focus();
-    for (const id of ['msum-csv', 'msum-json']) document.getElementById(id).disabled = !this.log;
   }
   close() { if (this.layer.hidden) return; this.layer.hidden = true; this.ui.setModalLock(false); }
   /** v3.5: the team talk is still owed for THIS report. */
@@ -83,15 +79,7 @@ class MatchSummary {
       : chosen ? `<div class="ms-talk-react">&#9658; ${L.t('tt.react.' + chosen + '.' + out)}</div>` : `<div class="ms-talk-react wait">${L.t('tt.prompt.' + out)}</div>`;
     return `<div class="ms-talk${chosen ? ' done' : ''}"><h4>${L.t('tt.title')}</h4><div class="ms-talk-btns">${btns}</div>${react}</div>`;
   }
-  /** v3.4: the log of THIS match, if it is still in memory (it is not saved, so a reload loses it). */
-  get log() { const g = this.ui.lastMatchLog; return g && this.rep && g.md === this.rep.md && g.opponent === this.rep.opponent ? g : null; }
-  exportLog(kind) {
-    const g = this.log; if (!g) return;
-    const base = `yam-log-md${g.md}-${String(g.opponent).replace(/[^\w]+/g, '_').toLowerCase()}`;
-    if (kind === 'json') this.ui.download(base + '.json', JSON.stringify(g, null, 1), 'application/json');
-    else this.ui.download(base + '.csv', MatchEngine.traceCsv(g.trace, g.teams.map(t => t.name)), 'text/csv');
-  }
-
+  /* v3.26: the LOG .CSV / .JSON export moved to DEBUG.EXE → GOD MODE (DebugConsole.exportLog). */
   render() {
     const rep = this.rep, ui = this.ui, s = ui.state, lg = s.league;
     if (!rep) return;

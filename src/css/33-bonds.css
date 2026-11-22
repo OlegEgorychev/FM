@@ -30,11 +30,11 @@
 #tac-board .bond-lines .bl-bad{ stroke: #e0504a; }
 /* the talk: kid names as buttons (up to 14) — more than 6 buttons → a compact 3-column grid */
 .talk-choices:has(.talk-btn:nth-child(7)){ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.talk-choices:has(.talk-btn:nth-child(7)) .talk-btn{ padding: 7px 8px; font-size: 12px; letter-spacing: .3px; }
+.talk-choices:has(.talk-btn:nth-child(7)) .talk-btn{ padding: 7px 8px; font-size: var(--fs-s); letter-spacing: .3px; }
 .dr-notes li.yardmate{ color: #6b5530; font-style: italic; }
 .clue .cl-t s{ color: #9a937e; }
 .lr-bond{ flex-basis: 100%; font-style: italic; color: #e7d9a8; }
-.dbg-pairs{ border-collapse: collapse; font: 11px/1.2 var(--mono); color: #111; white-space: nowrap; }
+.dbg-pairs{ border-collapse: collapse; font: var(--fs-xs)/1.2 var(--mono); color: #111; white-space: nowrap; }
 .dbg-pairs th, .dbg-pairs td{ padding: 2px 6px; text-align: left; border-bottom: 1px solid #ecebe6; }
 .dbg-pairs td.hi{ color: #1f6b1f; font-weight: bold; } .dbg-pairs td.lo{ color: #a02a22; font-weight: bold; }
 .dbg-bonds{ margin: 6px 0; }
