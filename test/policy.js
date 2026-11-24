@@ -11,6 +11,8 @@
  *                                            and the coach's notes stay) — the "without bonds" column. --notwins: no twins in the world
  *                                            (the v3.24 world and draft for every seed). Gates reported, never fail in these modes.
  *                                            --bondset K=V,… overrides BOND.* constants in the page (tuning).
+ *   node test/policy.js --clashset K=V,…     v3.27: overrides CLASH.* (dotted paths into CLASH.E; ESCALE=x scales every integer
+ *                                            effect in CLASH.E) — tuning; gates reported, never fail.
  *   node test/policy.js --json
  *   node test/policy.js --no-force           v3.22: don't force the money offers (see below); --offers K = their chances × K
  *   node test/policy.js --file other.html    run against another build (v3.22 "before" table: the v3.21 index.html; the v3.22
@@ -30,6 +32,12 @@
  *   overload  — Mon–Fri, 5 trainings; every other choice as `reference`.
  *   greedy    — (v3.22) takes every money offer (dad, scout, pool), keeps every promise, accepts the showcase, lets a poached kid go;
  *               everything else as `reference`.
+ *   random    — (v3.27) every event dialogue: a seeded random enabled button; everything else as `reference` (no "What happened?",
+ *               doesn't keep the obligations in the lineup).
+ * v3.27 conflicts (reference / greedy / overload / empty): a [1 AP] option when affordable — the cause-matching one, else the mediator,
+ *   else the talk; "It's your fault" → talk to the accuser; a fight → call the families (AP) else ban both; "Can I play with him?" →
+ *   yes, and the lineup keeps the word (GameState.oblKeepXI). New gate (week 8): reference ≤ 1 war pair and ≥ 4 friend pairs; first ≥ 2
+ *   war pairs; reference ATMOS > first and > random — WARNINGS (never exit 1) until the bond dynamics are retuned.
  * v3.22 FORCED OFFERS (harness only, the same for every policy): each money offer (dad, scout, pool) fires at least once in
  *   weeks 1–3 — from a target day picked from the seed (dad: day 2–14 of the run, scout / pool: day 3–18) its chance is 1 on
  *   every roll until it has fired; the event's own conditions still apply (scout / pool after matchday 1, the 6-day cooldown).
@@ -56,8 +64,9 @@ const LOG = flag('--log', null);
 const BASELINE = argv.includes('--baseline');
 const NOBONDS = argv.includes('--nobonds'), NOTWINS = argv.includes('--notwins');   // v3.25 "without" columns
 const BONDSET = flag('--bondset', '');   // v3.25 tuning: --bondset MAX=2,ATMOS_K=0.5 overrides BOND.* in the page
+const CLASHSET = flag('--clashset', '');   // v3.27 tuning: --clashset BASE=0.045,E.clash.a=-4.5,ESCALE=1.5 (ESCALE × every integer in CLASH.E)
 const JSON_OUT = argv.includes('--json');
-const POLICIES = (flag('--policies', 'first,empty,reference,overload,greedy')).split(',');
+const POLICIES = (flag('--policies', 'first,empty,reference,overload,greedy,random')).split(',');   // v3.27: + random (seeded random button in every event dialogue)
 const OFFERS = parseFloat(flag('--offers', 1));
 const FORCE = !argv.includes('--no-force');
 const FILE = 'file://' + path.resolve(flag('--file', path.resolve(__dirname, '..', 'index.html')));
@@ -65,7 +74,7 @@ const MONEY_IDS = ['dad', 'scout', 'pool'], TAKE = { dad: 'ev.dad.a', scout: 'ev
 
 /** One seed of one policy: returns the run's numbers (or throws). */
 async function playOne(page, policy, seed) {
-  await page.goto(`${FILE}?noboot&seed=${seed}&offers=${OFFERS}${FORCE ? '&force' : ''}${BASELINE ? '&baseline' : ''}${NOBONDS ? '&nobonds' : ''}${NOTWINS ? '&notwins' : ''}${BONDSET ? '&bondset=' + encodeURIComponent(BONDSET) : ''}`);
+  await page.goto(`${FILE}?noboot&seed=${seed}&offers=${OFFERS}${FORCE ? '&force' : ''}${BASELINE ? '&baseline' : ''}${NOBONDS ? '&nobonds' : ''}${NOTWINS ? '&notwins' : ''}${BONDSET ? '&bondset=' + encodeURIComponent(BONDSET) : ''}${CLASHSET ? '&clashset=' + encodeURIComponent(CLASHSET) : ''}`);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await page.waitForFunction(() => window.YAM && window.YAM.ui);
@@ -123,6 +132,15 @@ async function playOne(page, policy, seed) {
         let known = 0; for (let i = 0; i < s.squad.length; i++) for (let j = i + 1; j < s.squad.length; j++) if (s.knownBond(s.squad[i].id, s.squad[j].id)) known++;
         return { best: v.filter(x => x >= 60).length, mates: v.filter(x => x >= 20 && x < 60).length, rivals: v.filter(x => x <= -20).length, war: v.filter(x => x <= -60).length,
           talkAP: s.stats?.talkAP || 0, known };
+      })(),
+      clash: (() => {   // v3.27: clashes (incl. fights) per week of the run, fights, AP on conflicts, open clashes, known causes, conflict events
+        const m = s.bondMeta?.clash || {}, n = (m.n || []).filter(d => d >= startDate), weeks = {};
+        for (let d = weekStartOf(startDate); d <= s.calendar.date; d = isoAdd(d, 7)) weeks[d] = 0;
+        for (const d of n) weeks[weekStartOf(d)] = (weeks[weekStartOf(d)] || 0) + 1;
+        const live = Object.entries(s.bonds || {}).filter(([k]) => k.split('|').every(id => s.player(id)));
+        const ev = {}; for (const e of s.eventLog) if (['clash', 'blame', 'fight', 'envy', 'pairreq', 'twinfight', 'fightmum'].includes(e.id)) ev[e.id] = (ev[e.id] || 0) + 1;
+        return { perWeek: Object.values(weeks), fights: m.fightsN || 0, ap: m.ap || 0, open: live.filter(([, e]) => e.open && e.open >= s.calendar.date).length,
+          causes: live.filter(([k]) => { const [a, b] = k.split('|'); return s.knownCause?.(a, b); }).length, ev };
       })() };
   }, { policy, seed, startDate });
 }
@@ -153,6 +171,13 @@ function summarise(runs) {
     ledger: led, money, offers, firstShare: avg(r => r.firstShare), dRep: avg(r => r.dParents + r.dSquad + r.dBoard),
     rvN: avg(r => r.rv.length), rvAny: avg(r => r.rv.filter(x => x.any).length), rvGot: avg(r => r.rv.filter(x => x.got).length),
     bonds: Object.fromEntries(['best', 'mates', 'rivals', 'war', 'talkAP', 'known'].map(k => [k, avg(r => r.bonds?.[k])])),   // v3.25
+    clash: (() => {   // v3.27
+      const wk = runs.flatMap(r => r.clash?.perWeek || []), hist = [0, 0, 0, 0];
+      for (const x of wk) hist[Math.min(3, x)]++;
+      const ev = {}; for (const r of runs) for (const [k, v] of Object.entries(r.clash?.ev || {})) ev[k] = (ev[k] || 0) + v / runs.length;
+      return { mean: wk.length ? wk.reduce((a, b) => a + b, 0) / wk.length : 0, max: wk.length ? Math.max(...wk) : 0, hist: hist.map(h => wk.length ? h / wk.length : 0),
+        fights: avg(r => r.clash?.fights), ap: avg(r => r.clash?.ap), open: avg(r => r.clash?.open), causes: avg(r => r.clash?.causes), ev };
+    })(),
     atmos: all.filter(m => m.atmos != null).length ? all.filter(m => m.atmos != null).reduce((a, m) => a + m.atmos, 0) / all.filter(m => m.atmos != null).length : 0 };
 }
 
@@ -199,6 +224,13 @@ function summarise(runs) {
         Object.assign(BOND, { MAX: 0, MAX_NEG: 0, TARGET: 0, ATMOS_K: 0, LONER_ATTEND: 0, LONER_TRUANT: 1, FRIEND_AWAY: 0, MORALE_MATE: 0, MORALE_ENEMY: 0, FRIEND_LEAVES: 0, AFTER_W: 1, AFTER_REL: 0, STRESS_WAR: 1, RALLY_WAR: -1000 });
       });
       if (q.get('bondset')) window.addEventListener('DOMContentLoaded', () => { for (const kv of q.get('bondset').split(',')) { const [k, v] = kv.split('='); BOND[k] = parseFloat(v); } });
+      if (q.get('clashset')) window.addEventListener('DOMContentLoaded', () => {   // v3.27 tuning
+        for (const kv of q.get('clashset').split(',')) {
+          const [k, v] = kv.split('='), x = parseFloat(v);
+          if (k === 'ESCALE') { for (const ev of Object.values(CLASH.E)) for (const f in ev) if (Number.isInteger(ev[f])) ev[f] = Math.round(ev[f] * x); continue; }
+          const path = k.split('.'), last = path.pop(); let o = CLASH; for (const p of path) o = o[p]; o[last] = x;
+        }
+      });
       if (q.has('notwins')) window.YAM_NO_TWINS = true;   // v3.25: the v3.24 world (read by makeTwins at boot)
       if (q.has('baseline')) window.addEventListener('DOMContentLoaded', () => {   // v3.20 behaviour (see the header)
         COH.MAX = 0; COH.MAX_UP = 0; COH.KNOCK_DIV = 1e12; WEEK.EMPTY_CAP = WEEK.EMPTY_BOARD; FINANCE.LOW_TRAINING_PAY = 1;
@@ -234,6 +266,14 @@ function summarise(runs) {
     gates.push({ warn: true, name: 'greedy win share ≤ reference (pp)', v: (sum.greedy.W - sum.reference.W) * 100, se: b.se, n: b.n, ok: sum.greedy.W <= sum.reference.W });
   }
   if (sum.first && sum.reference) gates.push({ name: 'first ΔBudget ≤ reference + $200', v: sum.first.dBudget - sum.reference.dBudget, ok: sum.first.dBudget <= sum.reference.dBudget + 200 });
+  // v3.27 "Clashes" (week 8, averaged over the seeds): the coach who solves conflicts keeps a friendly dressing room.
+  // WARNINGS (author's decision, v3.27): unreachable with the v3.25 bond dynamics (≈ 1 pair below −20 in 8 weeks, ATMOS at its cap)
+  // — they become gates again once the bond dynamics are retuned
+  if (sum.reference) gates.push({ warn: true, name: 'reference: war pairs (v ≤ −60) ≤ 1', v: sum.reference.bonds.war, ok: sum.reference.bonds.war <= 1 });
+  if (sum.reference) gates.push({ warn: true, name: 'reference: friend pairs (v ≥ 60) ≥ 4', v: sum.reference.bonds.best, ok: sum.reference.bonds.best >= 4 });
+  if (sum.first) gates.push({ warn: true, name: 'first: war pairs (v ≤ −60) ≥ 2', v: sum.first.bonds.war, ok: sum.first.bonds.war >= 2 });
+  if (sum.reference && sum.first) gates.push({ warn: true, name: 'ATMOS reference > first (×1000)', v: (sum.reference.atmos - sum.first.atmos) * 1000, ok: sum.reference.atmos > sum.first.atmos });
+  if (sum.reference && sum.random) gates.push({ warn: true, name: 'ATMOS reference > random (×1000)', v: (sum.reference.atmos - sum.random.atmos) * 1000, ok: sum.reference.atmos > sum.random.atmos });
   if (LOG) {
     const rows = ['policy,seed,matches,W,D,L,trainings,per_week,attendance,d_parents,d_squad,d_board,d_budget,fee,grant,donation,rent,event,coh_end,first_share'];
     const wrows = ['policy,seed,md,result,gf,ga,cohesion'];
@@ -264,12 +304,15 @@ function summarise(runs) {
     for (const p of POLICIES) { const x = sum[p]; console.log(`${p.padEnd(10)} | ${x.rvN.toFixed(2)} / ${x.rvAny.toFixed(2)} / ${x.rvGot.toFixed(2)}`); }
     console.log('\nBonds (v3.25) per run at the end: best mates (v ≥ 60) · mates (20–59) · rivals (≤ −20) · at war (≤ −60) · mean ATMOS at kick-off · AP on talks · pairs the coach knows:');
     for (const p of POLICIES) { const b = sum[p].bonds; console.log(`${p.padEnd(10)} | ${b.best.toFixed(2)} · ${b.mates.toFixed(2)} · ${b.rivals.toFixed(2)} · ${b.war.toFixed(2)} · ${sum[p].atmos.toFixed(3)} · ${b.talkAP.toFixed(2)} · ${b.known.toFixed(2)}`); }
+    console.log('\nClashes (v3.27) per run: clashes / week mean · max · weeks with 0 / 1 / 2 / 3+ · fights · AP on conflicts · open clashes at the end · known causes | events per run:');
+    for (const p of POLICIES) { const c = sum[p].clash; console.log(`${p.padEnd(10)} | ${c.mean.toFixed(2)} · ${c.max} · ${c.hist.map(h => (h * 100).toFixed(0) + '%').join(' / ')} · ${c.fights.toFixed(2)} · ${c.ap.toFixed(2)} · ${c.open.toFixed(2)} · ${c.causes.toFixed(2)} | `
+      + (Object.entries(c.ev).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(', ') || '—')); }
     if (sum.reference && sum.first) console.log(`expectation (not a gate yet): reference knows more pairs than first ${sum.reference.bonds.known > sum.first.bonds.known ? 'yes' : 'NO'} (${sum.reference.bonds.known.toFixed(2)} vs ${sum.first.bonds.known.toFixed(2)}), ATMOS not lower ${sum.reference.atmos >= sum.first.atmos ? 'yes' : 'NO'}`);
     console.log('');
     for (const g of gates) console.log(`${g.ok ? 'OK  ' : g.warn ? 'WARN' : 'FAIL'} ${g.name}: ${g.v.toFixed(1)}${g.se != null ? ` (seed-paired SE ${g.se.toFixed(1)}, n=${g.n})` : ''}`);
-    if (gates.some(g => g.warn)) console.log('greedy gates are warnings until money sinks');
+    if (gates.some(g => g.warn)) console.log('greedy gates are warnings until money sinks; v3.27 clash gates are warnings until the bond dynamics are retuned');
     if (errors.length) console.log('\nErrors:\n' + errors.slice(0, 20).join('\n'));
   }
-  const fail = errors.length > 0 || (!BASELINE && !NOBONDS && !NOTWINS && !BONDSET && gates.some(g => !g.ok && !g.warn));
+  const fail = errors.length > 0 || (!BASELINE && !NOBONDS && !NOTWINS && !BONDSET && !CLASHSET && gates.some(g => !g.ok && !g.warn));
   process.exit(fail ? 1 : 0);
 })();

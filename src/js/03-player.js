@@ -46,7 +46,8 @@ const PortraitGenerator = (() => {
     roll: () => SIZES.map(n => Math.floor(Math.random() * n)),
     valid: f => Array.isArray(f) && f.length === SIZES.length && f.every((v, i) => Number.isInteger(v) && v >= 0 && v < SIZES[i]),
     hashFace,
-    svg([bg, head, skin, eyes, mouth, hair, hairC], kit = 'home') {
+    /** v3.27 mark: 'bruise' (cheek) · 'lip' (split lip) · 'eye' (black eye) · 'eyelip' (both) — a few pixels, drawn last. */
+    svg([bg, head, skin, eyes, mouth, hair, hairC], kit = 'home', mark = null) {
       const s = SKIN[skin], sd = dark(s, 0.78), hc = HAIRC[hairC], j = KIT[kit] || KIT.home;
       const rain = [0, 1, 2, 3].map(i => [(bg * 7 + i * 9 + head * 5) % 30 + 1, (i * 11 + skin * 3) % 20 + 1, 1, 2]);
       const [brows, eye, bags] = EYES[eyes];
@@ -58,6 +59,9 @@ const PortraitGenerator = (() => {
         + rects(bags, sd) + rects(eye, '#15120f') + rects(brows, dark(hc, 0.85))                                  // eyes / brows
         + rects(MOUTH[mouth], mouth === 2 ? '#2a1a16' : dark(s, 0.55)) + (mouth === 2 ? rects([[14, 17, 4, 1]], '#cfc6b0') : '')
         + rects(HAIR[hair], hc, hair === 3 ? '.55' : '')
+        + (mark === 'bruise' ? rects([[19, 16, 2, 2]], '#6b4a7a', '.85') : '')
+        + (mark === 'eye' || mark === 'eyelip' ? rects([[17, 13, 4, 1], [17, 15, 4, 1], [21, 14, 1, 1]], '#5a3a6e', '.9') : '')
+        + (mark === 'lip' || mark === 'eyelip' ? rects([[15, 19, 2, 1]], '#9e2b25') : '')
         + '</svg>';
     },
   };
@@ -158,6 +162,7 @@ class Player {
       if (Array.isArray(o.praiseLog)) this.praiseLog = o.praiseLog.filter(d => typeof d === 'string');
       if (Array.isArray(o.bondNotes)) this.bondNotes = o.bondNotes.filter(n => n && typeof n.band === 'string' && typeof n.source === 'string');
       if (o.talk && typeof o.talk === 'object') this.talk = { ...o.talk, asked: { ...(o.talk.asked || {}) } };
+      if (o.faceMark && typeof o.faceMark.until === 'string') this.faceMark = { kind: o.faceMark.kind, until: o.faceMark.until };   // v3.27: a bruise / split lip
     }
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
     const fresh = SKILL_KEYS.every(g => AttrGen.validGroup(o[g], g)) && AttrGen.validGroup(o.psych, 'psych') ? null
@@ -213,7 +218,7 @@ class Player {
   /** v3.0: what the UI calls the position — the coach's tag for academy kids, the (scouted) role for opponents. */
   get position() { return this.tags ? this.tag : this.archetype; }
   /** v3.0: the keeper kit follows the coach's tag (academy) or the role (opponents). */
-  refreshPortrait() { this.portraitSvg = PortraitGenerator.svg(this.face, this.position === 'GK' ? 'gk' : this.tags ? 'home' : 'away'); }
+  refreshPortrait() { this.portraitSvg = PortraitGenerator.svg(this.face, this.position === 'GK' ? 'gk' : this.tags ? 'home' : 'away', this.faceMark?.kind || null); }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
   get age() { return this.bio.age; }
   /** `energy` is the old name of dyn.condition — kept so every v1.1–v1.7 system keeps working. */

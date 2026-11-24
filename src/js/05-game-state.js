@@ -487,10 +487,12 @@ class GameState {
       w = { self: W.self, other: mates.length ? W.other : 0, blame: W.blame, excuse: W.excuse };
       for (const k in extra) if (w[k]) w[k] *= extra[k];
     }
+    const tilt = this.bondMeta?.clash?.tilt, tiltOn = !sp.parent && tilt && tilt.a === kid.id && tilt.date === af.date && mates.includes(tilt.b);   // v3.27: "It's your fault"
+    if (tiltOn && w.other) w.other *= CLASH_TILT.OTHER;
     let x = r() * Object.values(w).reduce((a, b) => a + b, 0), type = Object.keys(w)[0];
     for (const k in w) { if (!w[k]) continue; type = k; if ((x -= w[k]) < 0) break; }
     // v3.25: a kid is twice as likely to talk about a mate he doesn't get on with (one r() either way)
-    const wt = mates.map(id => this.bondV?.(kid.id, id) <= -20 ? BOND.AFTER_W : 1), wsum = wt.reduce((a, b) => a + b, 0);
+    const wt = mates.map(id => (this.bondV?.(kid.id, id) <= -20 ? BOND.AFTER_W : 1) * (tiltOn && id === tilt.b ? CLASH_TILT.ABOUT : 1)), wsum = wt.reduce((a, b) => a + b, 0);
     let target = null;
     if (type === 'other') {
       if (wsum === mates.length) target = this.player(mates[Math.floor(r() * mates.length)]);
@@ -827,6 +829,8 @@ class GameState {
   dayEditable(date) { const t = this.calendar.date; return !this.matchOn(date) && (date > t || (date === t && !this.weekState().confirmed)); }
   plannableDays() { return this.weekDays().filter(d => this.dayEditable(d.date)); }
   /** Does OUR club train on this day? (the weekly plan; AI clubs keep isTrainingDay) */
+  /** v3.27: the kids who trained on `date` (the day's routine has run), for the clash roll. */
+  trainedOn(date) { return this._trained?.date === date ? this._trained.ids.map(id => this.player(id)).filter(Boolean) : []; }
   isOurTraining(date) {
     if (!date) return false;
     const w = this.weekState();
@@ -1164,6 +1168,8 @@ class GameState {
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
     if (training && date) this.bondTraining(date, trained);   // v3.25: neighbours + the pair drill
+    if (date) { this._trained = { date, ids: training ? trained.map(p => p.id) : [] }; this.tickMarks(date); }   // v3.27: who trained (the clash roll), face marks fade
+    if (training && date && hurt.length && this.bonds) this.bondQuietHurt(date, hurt, trained);   // v3.27: a mate walks him home
     for (const p of hurt) { const t = p.twinId && this.player(p.twinId); if (t) t.dyn.morale = clamp(t.dyn.morale + TWINS.HURT_MORALE, 0, 100); }   // v3.25 shared fate
     if (thisWeek && attended) {   // v3.21 cohesion: the share of the squad that trained; a kid present ends the empty-week streak
       this.week.teff = (this.week.teff || 0) + attended / Math.max(1, this.squad.length);

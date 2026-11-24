@@ -147,8 +147,8 @@ const cohBand = c => COH.BANDS.find(b => (c ?? COH.START) >= b.min).key;
 /** Duel bonus for a side with cohesion c (null / undefined = neutral, so engines built without cohesion are unchanged). */
 const cohBonus = c => { if (c == null) return 0; const x = (clamp(c, 0, 100) - 50) / 50; return x * (x < 0 ? COH.MAX : COH.MAX_UP); };
 /* v3.21 POLICY HARNESS (ui.autoSim({ policy }), test/policy.js) — how each scripted coach plans his week. */
-const POLICY = { NAMES: ['first', 'empty', 'reference', 'overload', 'greedy'],   // v3.22: + greedy (takes every money offer)
-  DAYS: { first: [], empty: [], reference: ['tue', 'thu'], overload: ['mon', 'tue', 'wed', 'thu', 'fri'], greedy: ['tue', 'thu'] } };
+const POLICY = { NAMES: ['first', 'empty', 'reference', 'overload', 'greedy', 'random'],   // v3.22: + greedy (takes every money offer); v3.27: + random (event dialogues)
+  DAYS: { first: [], empty: [], reference: ['tue', 'thu'], overload: ['mon', 'tue', 'wed', 'thu', 'fri'], greedy: ['tue', 'thu'], random: ['tue', 'thu'] } };
 /* v3.13 ATTENDANCE CURVE — chance to turn up for the k-th training of the week (index 0…4), only from the 3rd one.
    chance = curve[k] + (discipline − 10)/10 × DISC − (energy < TIRED ? TIRED_PEN : 0), clamped MIN–MAX; seeded(date + '#load#' + id). */
 const ATTEND_CURVE = [1, 1, 0.7, 0.5, 0.3];
@@ -493,7 +493,10 @@ const BOND = {
   RALLY_WAR: -60, STRESS_WAR: 1.25,
   AFTER_W: 2, AFTER_REL: -0.15,
   CAME_V: 40, CAME_P: 0.3, STALE_DAYS: 28,
-  CAUSES: ['position', 'grudge', 'blame', 'envy'],
+  CAUSES: ['position', 'grudge', 'blame', 'envy', 'temper', 'unfair'],   // v3.27: + temper (a clash between hot heads), unfair (the coach sided)
+  // v3.27 skew: kid A (first id of the key) sees v + skew, kid B sees v − skew; match / cohesion / ATMOS use the shared v only
+  SKEW_MAX: 30, SKEW_DECAY: 3, SKEW_HIDDEN: 20, SKEW_START_P: 0.1, SKEW_START: 15,
+  SKEW_ENVY: 4, SKEW_BLAME: 10, SKEW_SIDED: 15,   // tune: weekly envy drift / an "It's your fault" / the coach sided with the other kid
   YARDS: 5, SCHOOLS: 3,
 };
 const TWINS = { PAIRS: 2, LINK: 1.5, FLOOR: -40, DECAY: 2, MIXUP: 0.25, TELL_MATCHES: 3, SKEW: 2,
@@ -501,7 +504,8 @@ const TWINS = { PAIRS: 2, LINK: 1.5, FLOOR: -40, DECAY: 2, MIXUP: 0.25, TELL_MAT
 /* v3.25 the talk one-on-one ("Have a word", PLAYER_INFO.EXE): 1 AP for 2 questions, once a week per kid. */
 const TALK = { AP: 1, QUESTIONS: 2, WEEK_CD: 7, REPEAT_DAYS: 21, LIE: 0.1, LIE_DISC: 7, EVADE_COLD: 1.5, EVADE_MATE: 0.5,
   GOSSIP: 0.2, GOSSIP_DAYS: 14, GOSSIP_MORALE: -2, GOSSIP_OPEN: -0.1, STIR: 0.25, STIR_DV: -3, MATE_MORALE: 1, ROLE_REL: 0.003,
-  FREE: ['excuse', 'posreq', 'capobs', 'capbench', 'capresign'] };   // manual dialogues where the kid came by himself → one free question
+  FREE: ['excuse', 'posreq', 'capobs', 'capbench', 'capresign'],   // manual dialogues where the kid came by himself → one free question
+  WHO_DAYS: 14 };   // v3.27: "Who started it?" — asked about the last fight within 14 days
 /* Questions are data (v3.26 / v3.28 add rows): x = who [X] is picked from ('squad' | 'played' | 'pair' = two kids). */
 const TALK_QUESTIONS = [
   { id: 'how', x: 'squad' },
@@ -509,7 +513,38 @@ const TALK_QUESTIONS = [
   { id: 'hard', x: null, evade: 1.5 },
   { id: 'pitch', x: 'played' },
   { id: 'pair', x: 'pair' },
+  // v3.27 "Clashes": only offered when their condition holds (GameState.talkQAvail): x = 'conflict' (a kid the coach knows he fell out
+  // with), 'fight' (the last fight, asked of a witness), 'mediate' (a pair in conflict, both known mates of this kid)
+  { id: 'what', x: 'conflict' },
+  { id: 'who', x: 'fight' },
+  { id: 'mediate', x: 'mediate' },
 ];
+/* v3.27 "CLASHES" (test values, "tune" = tuned in test/policy.js). Daily roll over present pairs v ≤ V_FROM:
+   p = BASE + max(0, −v − 20)/100 × V_K + T_K × (T_a + T_b); × OPEN_MULT while the pair has an unresolved clash. Hidden success
+   S = S_BASE + (Squad − 50)/200 + (max leadership − 10)/40 − 0.1 × (T_a + T_b)/2, clamp S_MIN…S_MAX. */
+const CLASH = {
+  BASE: 0.03, V_FROM: -20, V_K: 0.15, T_K: 0.03,          // tune
+  CD_TEAM: 4, CD_PAIR: 10, OPEN_DAYS: 14, OPEN_MULT: 2, MATCHDAY: 1,   // MATCHDAY 0 = no clash roll before kick-off (tuning)
+  S_BASE: 0.45, S_MIN: 0.2, S_MAX: 0.85, S_T: 0.1, CAUSE_S: 0.2, CAUSE_DV: 5, NEXT_S_PEN: 0.1,
+  FIGHT_V: -60, FIGHT_CD: 21, MARK_DAYS: 3, MUM_P: 0.5, MUM_DAYS: [2, 4], BOARD_P: 0.3,
+  BLAME_P: 0.4, BLAME_COMP: 9, BLAME_LEAD: 12,
+  ENVY_P: 0.3, ENVY_CD: 14, PAIRREQ_P: 0.15, PAIRREQ_V: 50, PAIRREQ_CD: 28, OBL_PAIR: 2,
+  TWIN_P: 0.25, TWIN_CD: 21, TWIN_BENCH: 2, TWIN_PRAISE: 2, TWIN_SKEW: 20, TWIN_MUM: 0.3, TWIN_APART: 7,
+  MED_S: 0.2, MED_LEAD: 14, MED_LEAD_S: 0.1, MED_DV: 15, MED_FAIL: -10,
+  QUIET_DV: 4, QUIET_V: 20, WITNESS_LIE_V: 40,
+  // the six events (dv on the shared v, m = morale, sq / par / brd = Squad / Parents / Board)
+  E: {
+    clash: { a: -3, bOk: 15, bOkM: 2, bFail: -5, c: 5, cM: -3, cSq: -1, dOk: 20, dFail: -15, d: 0.5, dT: 0.1, e: -15, eMB: 3, eMA: -8, eSq: -2, wrongM: 5, wrongSq: 1 },
+    blame: { a: -2, aMB: 2, aMA: -1, b: 8, bMA: -2, bMB: 3, bSq: 1, c: -8, cMB: -5, d: -15, dMB: -10, dMA: 2, dSq: -2, eOk: 10, eOkM: 4, eFailM: -6, eFail: -5 },
+    fight: { a: -10, aSq: -2, aBrd: -2, b: 5, bPar: -1, ok: 5, okSq: 1, bad: -20, badM: -10, badSq: -3, badPar: -2, e: 10, ePar: 1, eM: -3 },
+    envy: { a: -5, bOkM: 4, bFailM: -3, cM: 5, cSq: -1, cSharp: 50, dMF: 3, dMA: -5, d: -10, dSq: -1 },
+    pairreq: { keptM: 4, kept: 5, brokenM: -4, cM: -3, oneSidedM: -2 },
+    twinfight: { a: -5, aPar: -1, bOk: 15, bFail: -5, keptV: 10, keptM: 3, brokenV: -10, brokenPar: -2, d: 5, eM: -8, ePar: -1, bS: 0.1 },
+    mum: { truthPar: 1, truthM: -2, noPar: -1, apPar: 2 },
+  },
+};
+/** v3.27 "It's your fault": [A]'s AFTER_GAME remark leans to an `other` remark (× OTHER) about [B] (target weight × ABOUT). */
+const CLASH_TILT = { OTHER: 3, ABOUT: 4 };
 /** v3.25 duel term of one bond value: (|v| − DEAD) / (100 − DEAD) × MAX above 0 (× MAX_NEG below), 0 inside ±DEAD. */
 const bondTerm = v => { const x = Math.max(0, Math.abs(v || 0) - BOND.DEAD) / (100 - BOND.DEAD); return x * (v < 0 ? -BOND.MAX_NEG : BOND.MAX); };
 const bondKey = (a, b) => (a < b ? a + '|' + b : b + '|' + a);

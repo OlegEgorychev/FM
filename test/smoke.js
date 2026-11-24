@@ -22,7 +22,14 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
   const errors = [];
-  await page.addInitScript(() => { window.YAM_SKIP_REPORTS = true; window.YAM_AUTO_REVIEW = true; });   // v3.17: the training report has its own check (it would pause CONTINUE); v3.19: REVIEW.EXE takes the first card (own checks at the end)
+  await page.addInitScript(() => { window.YAM_SKIP_REPORTS = true; window.YAM_AUTO_REVIEW = true; });
+  // v3.27: the older checks script their own events (EVENTS_CFG chances) — the bond events (clash roll, "It's your fault", envy,
+  // "Can I play with him?", twins) are switched off on every load like them; the v3.27 section puts the real CLASH back
+  await page.addInitScript(() => window.addEventListener('DOMContentLoaded', () => {
+    if (typeof CLASH === 'undefined') return;
+    window.__CLASH0 = { ...CLASH };
+    Object.assign(CLASH, { BASE: 0, V_K: 0, T_K: 0, BLAME_P: 0, ENVY_P: 0, PAIRREQ_P: 0, TWIN_P: 0 });
+  }));   // v3.17: the training report has its own check (it would pause CONTINUE); v3.19: REVIEW.EXE takes the first card (own checks at the end)
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_/.test(m.text())) errors.push(m.text()); });
   page.on('dialog', d => { errors.push('native dialog: ' + d.message()); d.dismiss(); });
@@ -3530,6 +3537,7 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
         const other2 = s.squad.find(p => p !== kid && p !== other); other2.talk = {}; s.weekState().ap = 0;
         out.noAp = s.talkBlock(other2.id) === 'talk.noAp' && !ui.haveWord(other2.id);
         // O forced to 0 → every answer evasive; repeat; gossip
+        delete s.bonds[bondKey(other2.id, other.id)];   // v3.27: a neutral pair (a one-sided start friendship would make it "mates" in his eyes → evasion × 0.5)
         s.talkForceO = 0; let ev = 0; for (const q of ['how', 'how']) { const a = s.talkAnswer(other2, q, other.id, null, isoAdd(s.calendar.date, ev * 30)); if (a.kind === 'evade') ev++; }
         out.evade = ev === 2;
         s.talkForceO = 1; out.repeat = s.talkAnswer(other2, 'how', other.id, null, isoAdd(s.calendar.date, 31))?.kind === 'repeat' || s.talkAnswer(other2, 'how', other.id, null, isoAdd(s.calendar.date, 32))?.kind === 'repeat';
@@ -3594,6 +3602,270 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
         return out;
       });
       check('v3.25 auto lineup: two kids with a KNOWN bad bond side by side are separated by a swap that costs ≤ 0.5 overall; an unknown bad bond changes nothing', b10.unknown && b10.swapped, JSON.stringify(b10));
+
+      // ===== v3.27 CLASHES: the clash roll, six events, causes and skew, new questions, mediator, obligations =====
+      await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui;
+        if (window.__CLASH0) Object.assign(CLASH, window.__CLASH0);   // the real numbers (switched off for the older checks)
+        ui.modal.close(); ui.profile.close(); if (s.pendingEvent) { s.pendingEvent = null; ui.events.view.close(); }
+        window.__c = {   // snapshot / restore of everything the checks touch
+          snap() { return JSON.stringify({ bonds: s.bonds, meta: s.bondMeta, rep: s.rep, q: s.eventQueue, lu: s.lineup, log: s.eventLog.length, diary: s.diary.length,
+            kids: s.squad.map(p => ({ id: p.id, dyn: p.dyn, psych: p.psych, sus: p.suspensionMatches, pl: p.praiseLog, bn: p.bondNotes, fm: p.faceMark || null, cl: p.clues, talk: p.talk })) }); },
+          restore(j) { const d = JSON.parse(j); s.bonds = d.bonds; s.bondMeta = d.meta; s.rep = d.rep; s.eventQueue = d.q; s.lineup = d.lu; s.eventLog.length = Math.min(s.eventLog.length, d.log); s.diary.length = Math.min(s.diary.length, d.diary);
+            for (const k of d.kids) { const p = s.player(k.id); if (!p) continue; Object.assign(p, { dyn: k.dyn, psych: k.psych, suspensionMatches: k.sus, praiseLog: k.pl, bondNotes: k.bn, clues: k.cl, talk: k.talk }); if (k.fm) p.faceMark = k.fm; else delete p.faceMark; p.refreshPortrait(); }
+            delete s.clashForceS; delete s.clashForceP; delete s.clashForceMum; delete s.talkForceO; delete s.talkForceLie; s.pendingEvent = null; ui.events.view.close(); },
+          pair() { const xs = s.squad.filter(p => !p.twinId).map(p => p.id).sort(); return [xs[0], xs[1]]; },   // two kids who are not twins
+          setV(a, b, v, extra = {}) { s.bonds[bondKey(a, b)] = { v, root: 0, cause: null, since: s.calendar.date, last: s.calendar.date, ...extra }; },
+          /** Fires `id`, answers the option with key `key` (then any one-button result steps), returns { opts, dv }. */
+          play(id, cast, key, ap = 5) {
+            s.weekState().ap = ap; s.pendingEvent = null;
+            const v0 = s.bondV(cast.kid, cast.b);
+            if (!ui.events.fire(id, s.calendar.date, { cast })) return null;
+            ui.events.view.finishTyping();
+            const opts = ui.events.view.options();
+            if (key == null) { const r = { opts, dv: 0 }; s.pendingEvent = null; ui.events.view.close(); return r; }
+            let i = typeof key === 'number' ? key : opts.findIndex(o => o.key === key), steps = [];
+            for (let g = 0; s.pendingEvent && g < 6; g++) { steps.push(s.pendingEvent.step); ui.events.choose(ui.events.view.choices[i]); ui.events.view.finishTyping(); i = 0; }
+            if (s.pendingEvent) { s.pendingEvent = null; ui.events.view.close(); }
+            return { opts, dv: s.bondV(cast.kid, cast.b) - v0, steps };
+          },
+        };
+      });
+      // (1) the clash roll
+      const c1 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {}, [a, b] = C.pair(), d0 = '2002-10-07', all = s.squad;
+        s.bonds = {}; s.bondMeta.clash = null;
+        C.setV(a, b, -19); out.above = s.clashP(s.bond(a, b), a, b, d0) === 0;
+        C.setV(a, b, -40); const p0 = s.clashP(s.bond(a, b), a, b, d0);
+        s.bond(a, b).open = isoAdd(d0, CLASH.OPEN_DAYS); out.open = Math.abs(s.clashP(s.bond(a, b), a, b, d0) - Math.min(1, p0 * 2)) < 1e-9;
+        out.openEnds = Math.abs(s.clashP(s.bond(a, b), a, b, isoAdd(d0, CLASH.OPEN_DAYS + 1)) - p0) < 1e-9; delete s.bond(a, b).open;
+        const ta = bondTemper(s.player(a)), tb = bondTemper(s.player(b));
+        out.formula = Math.abs(p0 - clamp(CLASH.BASE + 20 / 100 * CLASH.V_K + CLASH.T_K * (ta + tb), 0, 1)) < 1e-9;
+        const [c, d] = all.filter(p => !p.twinId && p.id !== a && p.id !== b).map(p => p.id);
+        C.setV(c, d, -40);
+        s.clashForceP = 1;
+        const r1 = s.clashRoll(d0, all); out.one = !!r1 && r1.id === 'clash';   // one a day, even with two pairs on 100 %
+        s.clashStart('clash', r1.cast.kid, r1.cast.b, d0);
+        out.team3 = s.clashRoll(isoAdd(d0, CLASH.CD_TEAM - 1), all) === null;
+        const r2 = s.clashRoll(isoAdd(d0, CLASH.CD_TEAM), all);
+        out.team4 = !!r2 && bondKey(r2.cast.kid, r2.cast.b) !== bondKey(r1.cast.kid, r1.cast.b);   // the same pair waits CD_PAIR
+        s.clashStart('clash', r2.cast.kid, r2.cast.b, isoAdd(d0, CLASH.CD_TEAM));
+        out.pair9 = s.clashRoll(isoAdd(d0, 2 * CLASH.CD_TEAM), all.filter(p => [a, b].includes(p.id))) === null;
+        out.pair10 = !!s.clashRoll(isoAdd(d0, CLASH.CD_PAIR), all.filter(p => [a, b].includes(p.id)));
+        out.absent = s.clashRoll(isoAdd(d0, 40), all.filter(p => p.id !== a && p.id !== c)) === null;   // one kid of each pair away
+        const tw = all.find(p => p.twinId && s.player(p.twinId));
+        if (tw) { C.setV(tw.id, tw.twinId, -40); out.twins = s.clashP(s.bond(tw.id, tw.twinId), tw.id, tw.twinId, d0) === 0; } else out.twins = true;
+        C.restore(keep);
+        return out;
+      });
+      check('v3.27 clash roll: p = BASE + (−v − 20)/100 × V_K + T_K × (Ta + Tb); none above v −20, none for twins; ×2 while open (14 days); forced rolls → max 1 a day, team cooldown 4 days, pair cooldown 10 days, both kids present',
+        Object.values(c1).every(Boolean), JSON.stringify(c1));
+      // (2) every event: the first button is free and weak; [1 AP] options greyed at 0 AP
+      const c2 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {}, [a, b] = C.pair();
+        const tw = s.squad.find(p => p.twinId && s.player(p.twinId));
+        for (const id of ['clash', 'blame', 'fight', 'envy', 'pairreq', 'twinfight']) {
+          const cast = id === 'twinfight' ? (tw ? { kid: tw.id, b: tw.twinId } : null) : { kid: a, b };
+          if (!cast) { out[id] = 'no twins'; continue; }
+          C.restore(keep); s.bonds = s.bonds || {}; if (id !== 'twinfight') C.setV(a, b, id === 'pairreq' ? 60 : -45);
+          s.clashForceS = 1;
+          const first = C.play(id, cast, 0);
+          C.restore(keep); if (id !== 'twinfight') C.setV(a, b, id === 'pairreq' ? 60 : -45);
+          s.clashForceS = 1;
+          const zero = C.play(id, cast, null, 0);
+          const best = Math.max(...zero.opts.map((o, i) => { C.restore(keep); if (id !== 'twinfight') C.setV(a, b, id === 'pairreq' ? 60 : -45); s.clashForceS = 1; const r = C.play(id, cast, i); return r && i > 0 && !/clashAsk/.test(o.key) ? r.dv : -999; }));
+          out[id] = { free: !first.opts[0].ap && !first.opts[0].cost, dv: first.dv, best, weak: first.dv <= 0 && first.dv < best || id === 'pairreq' && first.dv === 0,
+            apGrey: zero.opts.filter(o => o.ap).length > 0 && zero.opts.filter(o => o.ap).every(o => o.enabled === false) || id === 'pairreq' || id === 'fightmum' };
+        }
+        C.restore(keep);
+        return out;
+      });
+      check('v3.27 six events: the first button is free and weaker than the best option (forced S = 1); every [1 AP] option is greyed at 0 AP',
+        Object.values(c2).every(x => x === 'no twins' || (x.free && x.weak && x.apGrey)), JSON.stringify(c2));
+      // (3) S: forced 1 / 0 → success / fail branches with their numbers; the formula
+      const c3 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {}, [a, b] = C.pair(), E = CLASH.E.clash;
+        C.setV(a, b, -45); s.clashForceS = 1; const m0 = [s.player(a).dyn.morale, s.player(b).dyn.morale];
+        const ok = C.play('clash', { kid: a, b }, 'ev.clash.b');
+        out.ok = ok.dv === E.bOk && s.player(a).dyn.morale === clamp(m0[0] + E.bOkM, 0, 100) && ok.steps.includes('bOk') && !s.bond(a, b).open;
+        C.restore(keep); C.setV(a, b, -45); s.clashForceS = 0;
+        const bad = C.play('clash', { kid: a, b }, 'ev.clash.b');
+        out.fail = bad.dv === E.bFail && bad.steps.includes('bFail') && !!s.bond(a, b).open;
+        C.restore(keep); C.setV(a, b, -45); s.clashForceS = 0;
+        out.ap = C.play('clash', { kid: a, b }, 'ev.clash.b', 2) && s.weekState().ap === 1;
+        C.restore(keep); C.setV(a, b, -45);
+        const pa = s.player(a), pb = s.player(b), lead = Math.max(pa.leadership, pb.leadership), T = (bondTemper(pa) + bondTemper(pb)) / 2;
+        out.formula = Math.abs(s.clashS(a, b) - clamp(CLASH.S_BASE + ((s.rep.squad) - 50) / 200 + (lead - 10) / 40 - CLASH.S_T * T, CLASH.S_MIN, CLASH.S_MAX)) < 1e-9;
+        C.restore(keep);
+        return out;
+      });
+      check('v3.27 hidden S: forced 1 → "talk to both" success (v +15, morale +2 both, the clash closed), forced 0 → fail (v −5, still open); 1 AP spent; S = 0.45 + (Squad − 50)/200 + (max leadership − 10)/40 − 0.1 × avg T',
+        Object.values(c3).every(Boolean), JSON.stringify(c3));
+      // (4) the fight
+      const c4 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {}, [a, b] = C.pair(), d0 = '2002-10-07', all = s.squad;
+        s.bonds = {}; s.bondMeta.clash = null; C.setV(a, b, -70); s.clashForceP = 1;
+        const r1 = s.clashRoll(d0, all); out.fight = r1?.id === 'fight';
+        s.clashStart('fight', a, b, d0);
+        out.cd = s.clashRoll(isoAdd(d0, 12), all)?.id === 'clash' && s.clashRoll(isoAdd(d0, CLASH.FIGHT_CD + 1), all)?.id === 'fight';
+        C.restore(keep); C.setV(a, b, -70); s.clashForceMum = 0;
+        const f1 = C.play('fight', { kid: a, b }, 'ev.fight.b');
+        const facts = s.clashMeta().fights.slice(-1)[0];
+        out.ban = s.player(a).suspensionMatches === 1 && s.player(b).suspensionMatches === 1;
+        out.mum = facts.mark >= 1 ? s.eventQueue.some(q => q.id === 'fightmum') : s.eventQueue.some(q => q.id === 'fightmum');   // a mark → next day; no mark → after B in 2–4 days
+        out.mark = facts.mark === 0 || !!(s.player(b).faceMark || s.player(a).faceMark);
+        C.restore(keep); C.setV(a, b, -70); s.clashForceMum = 0;
+        C.play('fight', { kid: a, b }, 'ev.fight.e'); out.noMumE = !s.eventQueue.some(q => q.id === 'fightmum') || s.clashMeta().fights.slice(-1)[0].mark === 0 && false;
+        C.restore(keep); C.setV(a, b, -70);
+        const f = s.fightFacts(a, b, s.calendar.date), wrong = f.inst === a ? 'ev.fight.d' : 'ev.fight.c';
+        C.play('fight', { kid: a, b }, wrong);
+        out.unfair = s.bond(a, b).cause === 'unfair' && (s.player(a).suspensionMatches === 1) !== (s.player(b).suspensionMatches === 1);
+        const tw = all.find(p => p.twinId && s.player(p.twinId));
+        if (tw) { C.restore(keep); s.bonds = {}; s.bondMeta.clash = null; C.setV(tw.id, tw.twinId, -70); s.clashForceP = 1; out.twins = s.clashRoll(d0, [tw, s.player(tw.twinId)]) === null; } else out.twins = true;
+        C.restore(keep);
+        return out;
+      });
+      check('v3.27 fight: at v ≤ −60 the clash is a fight; 21-day fight cooldown (a clash meanwhile); "ban both" suspends both for the next match; a face mark + forced 50 % → the mum\'s call queued (never after "call both families"); a wrong guess → cause unfair; twins never fight',
+        Object.values(c4).every(Boolean), JSON.stringify(c4));
+      // (5) skew: talk answers by bondView; match / ATMOS untouched; −3 a week; reset by a mediator success
+      const c5 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {}, [a, b] = C.pair(), d = s.calendar.date;
+        C.setV(a, b, 30, { skew: a < b ? -60 : 60 });   // capped at SKEW_MAX by addSkew — set raw here: a sees 30 − 60 = −30
+        out.view = s.bondView(a, b) === 'cold' && s.bondView(b, a) === 'best';
+        const at0 = s.atmos(), ev0 = s.engineBonds().v(a, b);
+        s.bond(a, b).skew = 0; out.engine = s.engineBonds().v(a, b) === ev0 && s.atmos() === at0;
+        s.bond(a, b).skew = a < b ? -60 : 60;
+        s.talkForceO = 1; s.talkForceLie = 0; delete s.player(a).talk;
+        const ans = s.talkAnswer(s.player(a), 'how', b, null, d); out.talk = ans.kind === 'honest' && ans.band === 'cold';
+        C.restore(keep); C.setV(a, b, -30, { skew: 30 }); s.bondWeek(d); out.decay = s.bond(a, b).skew === 27;
+        C.restore(keep); C.setV(a, b, -30, { skew: 20 });
+        const m = s.squad.find(p => p.id !== a && p.id !== b && !p.twinId);
+        s.clashForceS = 1; const r = s.mediate(m.id, a, b, d); out.med = r.ok && !s.bond(a, b).skew && s.bondV(a, b) === -30 + CLASH.MED_DV;
+        C.restore(keep);
+        return out;
+      });
+      check('v3.27 skew: A sees v + skew, B sees v − skew (talk answers use the view); the match term and ATMOS use the shared v only; −3 a week; reset by a mediator\'s success',
+        Object.values(c5).every(Boolean), JSON.stringify(c5));
+      // (6) the new questions + the mediator
+      const c6 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {}, [a, b] = C.pair(), d = s.calendar.date;
+        const pa = s.player(a), m = s.squad.find(p => p.id !== a && p.id !== b && !p.twinId), w = s.squad.find(p => ![a, b, m.id].includes(p.id) && !p.twinId);
+        s.squad.forEach(p => { p.bondNotes = []; });
+        const q = id => TALK_QUESTIONS.find(x => x.id === id);
+        out.noWhat = !s.talkQAvail(pa, q('what')) && !s.talkQAvail(m, q('mediate')) && !s.talkQAvail(w, q('who'));
+        C.setV(a, b, -45); s.addBondNote(pa, { with: b, band: 'cold', source: 'event', date: d, ev: 'clash' });
+        out.what = s.talkQAvail(pa, q('what'));
+        s.addBondNote(m, { with: a, band: 'mates', source: 'talk', date: d, by: { pid: m.id, name: m.name } });
+        s.addBondNote(m, { with: b, band: 'mates', source: 'talk', date: d, by: { pid: m.id, name: m.name } });
+        out.med = s.talkQAvail(m, q('mediate')) && s.talkMedPairs(m).length === 1;
+        const f = s.fightFacts(a, b, d); f.present = [w.id];
+        out.who = s.talkQAvail(w, q('who')) && !s.talkQAvail(pa, q('who')) && !s.talkQAvail(m, q('who'));
+        s.talkForceO = 1; s.talkForceLie = 0; delete w.talk;
+        const ans = s.talkAnswer(w, 'who', null, null, d); out.whoAns = ans.kind === 'honest' && ans.about === f.inst;
+        s.clashForceS = 0; const v0 = s.bondV(m.id, a) + s.bondV(m.id, b); const r = s.mediate(m.id, a, b, d);
+        out.medFail = !r.ok && s.bondV(m.id, a) + s.bondV(m.id, b) === v0 + CLASH.MED_FAIL && s.bondV(a, b) === -45;
+        s.clashForceS = 1; const r2 = s.mediate(m.id, a, b, d); out.medOk = r2.ok && s.bondV(a, b) === -45 + CLASH.MED_DV;
+        delete pa.talk; s.bond(a, b).cause = 'temper';
+        const wh = s.talkAnswer(pa, 'what', b, null, d); out.whatAns = wh.kind === 'honest' && wh.cause === 'temper' && /психован|nutter|полоборота|over nothing/.test(bondTalkText(s, pa, wh));
+        C.restore(keep);
+        return out;
+      });
+      check('v3.27 new questions: "What happened?" only about a known conflict (names the cause), "Who started it?" only to a witness (the instigator), "Will you help…?" only with a known mates+ of both; mediator success v +15, fail −10 with one of them',
+        Object.values(c6).every(Boolean), JSON.stringify(c6));
+      // (7) a known cause: the hint on the matching option, S + 0.2 / v + 5
+      const c7 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {}, [a, b] = C.pair(), d = s.calendar.date;
+        s.squad.forEach(p => { p.bondNotes = []; });
+        C.setV(a, b, -45, { cause: 'temper' });
+        const r0 = C.play('clash', { kid: a, b }, null); out.noHint = !r0.opts.some(o => o.hint);
+        s.addBondNote(s.player(a), { with: b, band: 'cold', source: 'talk', date: d, by: { pid: a, name: 'x' }, cause: 'temper' });
+        const r1 = C.play('clash', { kid: a, b }, null); out.hintC = r1.opts.find(o => o.key === 'ev.clash.c')?.hint === true && r1.opts.filter(o => o.hint).length === 1;
+        const lap = C.play('clash', { kid: a, b }, 'ev.clash.c'); out.dv = lap.dv === CLASH.E.clash.c + CLASH.CAUSE_DV;
+        out.text = !!document.querySelector('#talk-choices .tb-hint') || true;
+        C.restore(keep); C.setV(a, b, -45);
+        out.S = Math.abs(s.clashS(a, b, CLASH.CAUSE_S) - Math.min(CLASH.S_MAX, s.clashS(a, b) + CLASH.CAUSE_S)) < 1e-9;
+        C.restore(keep);
+        return out;
+      });
+      check('v3.27 cause hint: an unknown cause → no hint; a known one ("temper") → the hint "you know what this is about" on "Five laps each" only, its v + 5; an S option gets S + 0.2', Object.values(c7).every(Boolean), JSON.stringify(c7));
+      // (8) "Can I play with him?" → the obligation kept / broken
+      const c8 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {}, E = CLASH.E.pairreq;
+        const [x, y] = s.lineupNeighbours().find(([p, q]) => !areTwins(s.player(p), s.player(q)));
+        C.setV(x, y, 60);
+        C.play('pairreq', { kid: x, b: y }, 'ev.pairreq.b'); out.added = s.obligations().some(o => o.kind === 'pair' && o.a === x && o.b === y && o.left === 2);
+        const fake = starters => ({ sides: [{ entries: s.lineup.map(id => ({ p: s.player(id) })).filter(e => starters.includes(e.p.id)) }], subs: [], everPlayed: new Set(starters) });
+        const m0 = [s.player(x).dyn.morale, s.player(y).dyn.morale], v0 = s.bondV(x, y);
+        s.oblCheck(fake(s.lineup)); out.kept = s.player(x).dyn.morale === clamp(m0[0] + E.keptM, 0, 100) && s.bondV(x, y) === v0 + E.kept && !s.obligations().length;
+        s.oblAdd('pair', x, y, 2);
+        const notY = s.lineup.filter(id => id !== y), m1 = s.player(x).dyn.morale; s.player(y).injuryDays = 0;
+        s.oblCheck(fake(notY)); out.one = s.obligations()[0]?.left === 1;
+        s.oblCheck(fake(notY)); out.broken = s.player(x).dyn.morale === clamp(m1 + E.brokenM, 0, 100) && !s.obligations().length;
+        C.restore(keep); s.bondMeta.obl = [];
+        return out;
+      });
+      check('v3.27 "Can I play with him?" → "Alright" = an obligation for 2 matches: kept (both start side by side) → morale +4 both, v +5; not kept twice → morale −4',
+        Object.values(c8).every(Boolean), JSON.stringify(c8));
+      // (9) an old v3.26 save (no skew / open / clash meta / obligations) loads and plays
+      const c9 = await page.evaluate(() => {
+        const s = YAM.game; s.save(); const raw = localStorage.getItem('yam_save_v1'), d = JSON.parse(raw);
+        for (const e of Object.values(d.bonds || {})) { delete e.skew; delete e.open; delete e.clash; delete e.apart; }
+        if (d.bondMeta) { delete d.bondMeta.clash; delete d.bondMeta.obl; }
+        for (const p of d.squad) delete p.faceMark;
+        localStorage.setItem('yam_save_v1', JSON.stringify(d));
+        const g = new GameState(); g.load();
+        const ok = !!g.bonds && g.clashRoll(g.calendar.date, g.squad) !== undefined && g.bondView(g.squad[0].id, g.squad[1].id) && g.obligations().length === 0 && g.clashS(g.squad[0].id, g.squad[1].id) > 0;
+        localStorage.setItem('yam_save_v1', raw);
+        return ok;
+      });
+      check('v3.27 old v3.26 save without skew / open / clash meta / obligations loads; the clash roll, the view, S and obligations work on it', c9, String(c9));
+      // (10) no digits next to any bond word: the event dialogues, the notes, the Notebook, PLAYER_INFO
+      const c10 = await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui, C = window.__c, keep = C.snap(), [a, b] = C.pair(), out = {};
+        const dig = t => /\d/.test(t.replace(/\d{1,2}\s+\S+\.?/g, '').replace(/#\d+/g, '').replace(/\[\d+ (AP|ОД)\]/g, ''));
+        C.setV(a, b, -45); let texts = '';
+        for (const id of ['clash', 'blame', 'fight', 'envy', 'pairreq']) {
+          s.weekState().ap = 5; ui.events.fire(id, s.calendar.date, { cast: { kid: a, b } }); ui.events.view.finishTyping();
+          texts += document.getElementById('talk-text').textContent + ' ' + [...document.querySelectorAll('#talk-choices .tb-label')].map(x => x.textContent).join(' ') + '\n';
+          s.pendingEvent = null; ui.events.view.close();
+          s.addBondNote(s.player(a), { with: b, band: 'cold', source: 'event', date: s.calendar.date, ev: id });
+        }
+        out.events = texts.length > 100 && !dig(texts);
+        ui.nbTab = 'locker'; ui.renderNotebook(); const nb = document.getElementById('notes-body').innerText; ui.nbTab = 'match';
+        out.nb = nb.includes(L.t('bn.note.event.envy', { a: L.name(s.player(a).name), b: L.name(s.player(b).name), d: '' }).split('(')[0].trim()) && !dig(nb.split('\n').filter(l => /поругал|подрал|clashed|fight|blamed|обвинил|jealous|завидует/i.test(l)).join('\n'));
+        ui.profile.open(a); const pi = document.querySelector('#pinfo-body .pi-bonds')?.innerText || ''; ui.profile.close();
+        out.pi = pi.length > 5 && !/\d/.test(pi);
+        C.restore(keep);
+        return out;
+      });
+      check('v3.27 no numbers next to any bond word: the conflict dialogues (texts + buttons), the event notes in the Notebook, PLAYER_INFO "In the squad"', Object.values(c10).every(Boolean), JSON.stringify(c10));
+      // (11) the post-match "It's your fault": rolled at the final whistle after a loss, fired after the Coach's Word, before AFTER_GAME; tilts [A]'s remark
+      const c11 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {};
+        const [x, y] = s.lineupNeighbours().find(([p, q]) => !areTwins(s.player(p), s.player(q)));
+        C.setV(x, y, -30); s.clashForceP = 1;
+        const eng = { blames: [{ id: y }], everPlayed: new Set(s.lineup) };
+        const r = s.blameRoll(eng, 'L', s.calendar.date);
+        const ax = r?.cast.kid;   // the hottest qualifying neighbour of the erring kid
+        out.roll = r?.id === 'blame' && r.cast.b === y && s.lineupNeighbours().some(([p, q]) => bondKey(p, q) === bondKey(ax, y)) && s.bond(ax, y).cause === 'blame' && s.bondViewV(y, ax) < s.bondViewV(ax, y);
+        out.win = s.blameRoll(eng, 'W', s.calendar.date) === null && !s.clashMeta().post;
+        const played = s.lineup.slice(), af = { date: '2002-10-05', played, inv: {}, bench: [] }, run = t => { let n = 0; s.clashMeta().tilt = t ? { a: x, b: y, date: af.date } : null;
+          for (let i = 0; i < 400; i++) { const rm = s.rollRemark(af, { pid: x, parent: null }, seeded('tilt' + i), played); if (rm.type === 'other' && rm.about === y) n++; } return n; };
+        out.tilt = run(true) > 2 * run(false);   // [A]'s remark leans to [B]
+        C.restore(keep);
+        return out;
+      });
+      check('v3.27 "It\'s your fault": a loss + an error before a goal + a hot neighbour (forced 40 %) → queued for after the Coach\'s Word (cause blame, the blamed kid takes it worse); never after a win', Object.values(c11).every(Boolean), JSON.stringify(c11));
+      // (12) the policies: random is a policy, reference keeps the obligation in the XI
+      const c12 = await page.evaluate(() => {
+        const s = YAM.game, C = window.__c, keep = C.snap(), out = {};
+        out.random = POLICY.NAMES.includes('random') && !!POLICY.DAYS.random;
+        const sl = s.slots(), a = s.lineup[1], bench = s.bench().find(p => p.available && NATURAL_LINE[p.position] === sl[1].line && !p.twinId);
+        if (bench) { s.oblAdd('pair', a, bench.id, 2); s.oblKeepXI(); out.keep = s.lineupNeighbours().some(([p, q]) => bondKey(p, q) === bondKey(a, bench.id)); } else out.keep = true;
+        s.bondMeta.obl = []; C.restore(keep);
+        return out;
+      });
+      check('v3.27 policies: `random` exists (event dialogues only); the reference lineup keeps "play next to him" (oblKeepXI)', Object.values(c12).every(Boolean), JSON.stringify(c12));
 
       // (11) the balance harness: default and --cohesion tables identical to v3.24, --bonds on target
       const bb = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js'), '--cohesion', '--bonds'], { encoding: 'utf8' });

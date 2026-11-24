@@ -1,0 +1,8 @@
+/* v3.27 "Clashes": the quiet cause hint under a dialogue option, the two-sided view, DEBUG clash controls */
+.tb-hint{ flex-basis: 100%; font: italic var(--fs-xs)/1.2 var(--ui); text-transform: none; letter-spacing: 0; color: #3f6b3a; }
+.talk-typing .tb-hint{ opacity: .6; }
+.bn-twoside{ margin: 2px 0 0 1.4em; font-size: var(--fs-xs); color: #5a5242; }
+.bn-twoside.differ{ color: #8a3d1f; }
+.pi-bonds .bn-twoside{ margin: 0; }
+.dbg-clash{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; font-size: var(--fs-xs); }
+.dbg-clash select{ max-width: 220px; }

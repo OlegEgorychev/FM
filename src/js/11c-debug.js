@@ -131,11 +131,17 @@ class DebugConsole {
     const nm = id => esc(squadName(s.player(id), s.squad));
     const rows = Object.entries(s.bonds).filter(([k]) => k.split('|').every(id => s.player(id))).sort((a, b) => b[1].v - a[1].v).map(([k, e]) => {
       const [a, b] = k.split('|'), kb = s.knownBond(a, b);
-      return `<tr><td>${nm(a)}</td><td>${nm(b)}</td><td class="${e.v >= 20 ? 'hi' : e.v <= -20 ? 'lo' : ''}">${e.v}</td><td>${e.root}</td><td>${e.cause || '—'}</td><td>${bondBand(e.v)}</td><td>${kb ? kb.band + ' · ' + kb.source + (kb.confirmed ? ' ✓' : '') : '—'}</td></tr>`;
+      const open = e.open && e.open >= s.calendar.date ? '⚑ ' + e.open.slice(5) : '—';   // v3.27: skew, the open clash, the last clash
+      return `<tr><td>${nm(a)}</td><td>${nm(b)}</td><td class="${e.v >= 20 ? 'hi' : e.v <= -20 ? 'lo' : ''}">${e.v}</td><td>${e.skew ? (e.skew > 0 ? '+' : '') + e.skew : '0'}</td><td>${e.root}</td><td>${e.cause || '—'}</td><td>${bondBand(e.v)}</td><td>${open}</td><td>${e.clash ? e.clash.slice(5) : '—'}</td><td>${kb ? kb.band + ' · ' + kb.source + (kb.confirmed ? ' ✓' : '') : '—'}</td></tr>`;
     }).join('');
+    const keys = Object.keys(s.bonds).filter(k => k.split('|').every(id => s.player(id))).sort((x, y) => s.bonds[x].v - s.bonds[y].v);
+    const cm = s.clashMeta(), force = `<div class="dbg-clash"><b>CLASHES</b> last ${cm.last || '—'} · fight ${cm.fight || '—'} · n ${(cm.n || []).length} · AP ${cm.ap || 0} · obligations ${s.obligations().map(o => o.kind + ':' + o.left).join(', ') || '—'}
+      <span class="dbg-world"><select id="dbg-clash-pair" aria-label="pair">${keys.map(k => `<option value="${k}">${k.split('|').map(nm).join(' / ')} (${s.bonds[k].v})</option>`).join('')}</select>
+      <select id="dbg-clash-ev" aria-label="event">${['clash', 'fight', 'blame', 'envy', 'pairreq', 'twinfight', 'fightmum'].map(id => `<option value="${id}">${esc(L.t('dbg.ev.' + id))}</option>`).join('')}</select>
+      <button class="btn" type="button" data-cheat="clashforce">${L.t('dbg.clashForce')}</button></span></div>`;
     const tw = s.squad.filter(p => p.twinId && s.player(p.twinId) && p.id < p.twinId).map(p => `${nm(p.id)} + ${nm(p.twinId)} ${s.twinsKnown(p) ? '(told apart)' : '(MIX ' + TWINS.MIXUP + ')'}`).join(' · ');
     return `<details class="dbg-bonds" id="dbg-bonds"><summary><b>BONDS</b> — ${Object.keys(s.bonds).length} pairs${tw ? ' · twins: ' + tw : ''}</summary>
-      <div class="dbg-scroll"><table class="dbg-pairs"><thead><tr><th>A</th><th>B</th><th>v</th><th>root</th><th>cause</th><th>band</th><th>coach knows</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
+      ${force}<div class="dbg-scroll"><table class="dbg-pairs"><thead><tr><th>A</th><th>B</th><th>v</th><th title="v3.27: A (first id) sees v + skew, B sees v − skew">skew</th><th>root</th><th>cause</th><th>band</th><th title="v3.27 unresolved clash (×2) until">open</th><th>clash</th><th>coach knows</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
   }
 
   godHTML() {
@@ -153,7 +159,7 @@ class DebugConsole {
         `<option value="${e.id}"${this.ui.state.worldEvent?.id === e.id ? ' selected' : ''}>${esc(L.t('world.name.' + e.id))}</option>`).join('')}</select>
         <button class="btn" type="button" data-cheat="world">${L.t('dbg.world')}</button></span><span>${L.t('dbg.worldD')}</span></div>
       ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[${money(this.ui.state.budget)}]</b>`, L.t('dbg.moneyD'))}
-      ${NARRATIVE_EVENTS.filter(e => e.when !== 'manual').map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
+      ${NARRATIVE_EVENTS.filter(e => e.when !== 'manual' && e.when !== 'bond' && e.id !== 'fightmum').map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
       ${btn('events', L.t('dbg.events') + ` <b class="dbg-flag ${ev ? '' : 'on'}">[${L.t(ev ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.eventsD'))}
       <div class="dbg-queue"><b>EVENT_QUEUE</b> ${this.ui.state.eventQueue.length ? this.ui.state.eventQueue.map(q => `<code>${esc(q.id)} @ ${q.due}${q.matchDay ? ' (match day)' : ''}${q.from ? ' ← ' + esc(q.from) : ''}</code>`).join(' ') : '<i>empty</i>'}</div>
     </div>`;
@@ -199,6 +205,15 @@ class DebugConsole {
       ui.events.enabled = !ui.events.enabled;
       s.excusesOff = !ui.events.enabled;   // v2.8: morning requests follow the same switch
       this.msg = L.t('dbg.events') + ': ' + L.t(ui.events.enabled ? 'dbg.forceOn' : 'dbg.forceOff');
+    } else if (id === 'clashforce') {   // v3.27: a conflict event for the chosen pair (playtesting)
+      if (eng || ui.events.active || ui.cal.running) { this.msg = L.t('dbg.busy'); this.render(); return; }
+      const key = document.getElementById('dbg-clash-pair')?.value, eid = document.getElementById('dbg-clash-ev')?.value || 'clash';
+      const cast = s.debugClashCast(eid === 'fightmum' ? 'fight' : eid, key || null);
+      if (!cast) { this.msg = L.t('dbg.busy'); this.render(); return; }
+      this.close();
+      if (eid === 'fightmum') s.fightFacts(cast.kid, cast.b, s.calendar.date);   // (the mum asks about a fight: make one up)
+      ui.events.fire(eid, s.calendar.date, { cast: eid === 'fightmum' ? { kid: cast.b, b: cast.kid } : cast });
+      return;
     } else if (id.startsWith('fire:')) {
       if (eng || ui.events.active || ui.cal.running) { this.msg = L.t('dbg.busy'); this.render(); return; }
       this.close();

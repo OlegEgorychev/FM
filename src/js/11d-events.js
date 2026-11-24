@@ -739,10 +739,17 @@ function bondTalkStep(ctx, step, prefix) {
       choices: t.left > 0 ? [{ key: 'btalk.more', tone: 'green', next: prefix + 'menu' }, back] : [back] });
     return;
   }
+  if (step.startsWith('pick:') && TALK_QUESTIONS.find(r => r.id === step.split(':')[1])?.x === 'mediate') {   // v3.27: a pair in conflict
+    ctx.show({ face, name, role, text: L.t('btalk.pickMed'),
+      choices: [...s.talkMedPairs(kid).map(([a, b]) => ({ key: 'btalk.kid2', vars: { x: nm(s.player(a)), y: nm(s.player(b)) }, tone: 'gray', next: ask('mediate', a, b) })),
+        { key: 'btalk.cancel', tone: 'gray', next: prefix + 'menu' }] });
+    return;
+  }
   if (step.startsWith('pick:') || step.startsWith('pick2:')) {
     const [, qid, x] = step.split(':'), q = TALK_QUESTIONS.find(r => r.id === qid);
     const pool = step.startsWith('pick2:') ? others.filter(p => p.id !== x)
-      : q.x === 'played' ? others.filter(p => (s.seasonOf(p.id).apps || 0) >= 1) : others;
+      : q.x === 'played' ? others.filter(p => (s.seasonOf(p.id).apps || 0) >= 1)
+      : q.x === 'conflict' ? others.filter(p => s.knownConflicts(kid.id).includes(p.id)) : others;   // v3.27
     ctx.show({ face, name, role, text: L.t(step.startsWith('pick2:') ? 'btalk.pick2' : 'btalk.pick', { x: x ? nm(s.player(x)) : '' }),
       choices: [...pool.map(p => ({ key: 'btalk.kid', vars: { x: nm(p) }, tone: 'gray',
         next: qid === 'pair' && !step.startsWith('pick2:') ? prefix + 'pick2:pair:' + p.id : ask(qid, qid === 'pair' ? x : p.id, qid === 'pair' ? p.id : null) })),
@@ -751,7 +758,8 @@ function bondTalkStep(ctx, step, prefix) {
   }
   const played = others.some(p => (s.seasonOf(p.id).apps || 0) >= 1);
   ctx.show({ face, name, role, text: L.t(pe.ans ? 'btalk.again' : t.free ? 'btalk.introFree' : 'btalk.intro', { k: name, n: t.left }),
-    choices: [...TALK_QUESTIONS.filter(q => q.x !== 'played' || played).map(q => ({ key: 'btalk.q.' + q.id, tone: 'green', next: q.x ? prefix + 'pick:' + q.id : ask(q.id) })), back] });
+    choices: [...TALK_QUESTIONS.filter(q => (q.x !== 'played' || played) && s.talkQAvail(kid, q, ctx.date)).map(q => ({ key: 'btalk.q.' + q.id, tone: 'green',
+      next: q.x && q.x !== 'fight' ? prefix + 'pick:' + q.id : ask(q.id) })), back] });   // v3.27: conditional questions; "Who started it?" needs no pick
 }
 /** The kid's words for one answer (no numbers; phrasings by band × root / cause, picked by a seeded roll). */
 function bondTalkText(s, kid, a) {
@@ -762,12 +770,15 @@ function bondTalkText(s, kid, a) {
   if (a.kind === 'none') return L.t(a.qid === 'mates' ? 'bt.a.noMates' : 'bt.a.noHard');
   if (a.kind === 'evade') return L.t(v('bt.a.evade', 3), { x: xn });
   if (a.qid === 'pair') return L.t('bt.a.pair.' + bondClass(a.band), { x: xn, y: yn });
+  if (a.qid === 'who') return a.kind === 'none' ? L.t('bt.a.who.none') : L.t(v('bt.a.who', 2), { x: xn, y: yn });   // v3.27 (a lie looks the same)
+  if (a.qid === 'mediate') return L.t(a.ok ? 'bt.a.med.ok' : 'bt.a.med.fail', { x: xn, y: yn });
+  if (a.qid === 'what' && a.surprised && a.kind === 'honest') return L.t(v('bt.a.what.fine', 2), { x: xn });   // the other side of a hidden grudge
   if (a.qid === 'pitch') return L.t(v('bt.a.pitch.' + a.tone, 2), { x: xn, s: a.signal ? L.t('af.sig.' + a.signal) : '' });
   const band = a.kind === 'lie' ? 'neutral' : a.band;
   let key;
   if (band === 'best' || band === 'mates') key = a.root ? v('bt.a.mates.' + a.root, 2) : band === 'best' ? v('bt.a.best', 2) : a.assist ? v('bt.a.mates.club', 2) : v('bt.a.mates', 3);
   else if (band === 'cold') key = a.cause ? v('bt.a.cold.' + a.cause, 2) : v('bt.a.cold', 2);
-  else if (band === 'war') key = v('bt.a.war', 3);
+  else if (band === 'war') key = a.qid === 'what' && a.cause ? v('bt.a.cold.' + a.cause, 2) : v('bt.a.war', 3);   // v3.27: "What happened?" names it
   else key = v('bt.a.neutral', 3);
   const lead = a.qid === 'mates' ? L.t('bt.who.mates', { x: xn }) + ' ' : a.qid === 'hard' ? L.t('bt.who.hard', { x: xn }) + ' ' : '';
   return lead + L.t(key, { x: xn }) + (a.stirred ? ' ' + L.t('bt.a.stirred') : '');
@@ -803,7 +814,12 @@ class EventEngine {
     if (due && this.find(due.id)?.silent) this.find(due.id).apply(this.state, date);   // v3.22: no dialogue (poolleak)
     else if (due && this.fire(due.id, date, { resume, cont, cast: due.cast })) return true;
     if (!this.enabled) return false;
-    const s = this.state, last = [...s.eventLog].reverse().find(e => this.find(e.id)?.when !== 'manual');   // the coach's own talks don't count
+    const s = this.state;
+    if (s.isOurTraining(date) && s.bonds) {   // v3.27: the clash roll and the bond events have their own cooldowns (CLASH.*), before the 6-day one
+      const b = s.bondEventRoll(date, s.trainedOn?.(date) || []);
+      if (b && this.fire(b.id, date, { resume, cont, cast: b.cast })) return true;
+    }
+    const last = [...s.eventLog].reverse().find(e => !['manual', 'bond'].includes(this.find(e.id)?.when));   // the coach's own talks (and v3.27 bond events) don't count
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
     // v2.4: on a training day the training events are evaluated first (the routine has just run)
     const pool = (s.isOurTraining(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
@@ -818,6 +834,10 @@ class EventEngine {
     const due = this.takeDue(date, true);
     if (due && this.fire(due.id, date, { after: 'matchday', cast: due.cast })) return true;
     if (!this.enabled) return false;
+    if (s.bonds && CLASH.MATCHDAY) {   // v3.27: the warm-up rondo — the clash roll on a match day (clash / fight only)
+      const b = s.clashRoll(date, s.squad.filter(p => p.available));
+      if (b && this.fire(b.id, date, { after: 'matchday', cast: b.cast })) return true;
+    }
     for (const ev of shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'matchday')))
       if (ev.trigger(s, date, ctx) && this.fire(ev.id, date, { after: 'matchday' })) return true;
     return false;
@@ -830,6 +850,7 @@ class EventEngine {
     const keep = preset && Object.values(preset).every(v => [].concat(v).every(pid => this.state.player(pid)));
     const cast = keep ? preset : ev.cast ? ev.cast(this.state) : {};
     if (!cast) return false;
+    if (ev.when === 'bond' && cast.kid && cast.b) this.state.clashStart(id, cast.kid, cast.b, date);   // v3.27: cooldowns, counters, causes
     this.state.pendingEvent = { id, date, cast, resume, after, step: 'start', ...(cont ? { cont } : {}) };
     this.state.save();
     this.open();
@@ -857,6 +878,7 @@ class EventEngine {
     const s = this.state, pe = s.pendingEvent;
     if (!pe || (choice.cost && !s.canAfford(choice.cost)) || choice.blocked || (choice.ap && s.ap < choice.ap)) return;
     if (choice.ap) s.weekState().ap -= choice.ap;   // v3.16: [1 AP] options spend from the weekly wallet
+    if (choice.ap && this.find(pe.id)?.when === 'bond') s.clashMeta().ap = (s.clashMeta().ap || 0) + choice.ap;   // v3.27 harness: AP on conflicts
     if (choice.cost) s.addMoney(-choice.cost, 'event');   // v3.15: ledger category
     if (choice.gain) s.addMoney(choice.gain, 'event');
     if (choice.debt) s.addMoney(-choice.debt, choice.cat || 'event', true);   // v2.2: forced payment, may go below $0 (v3.22: own ledger category)
@@ -873,11 +895,14 @@ class EventEngine {
     if (s.eventLog.length > 60) s.eventLog.shift();
     s.addDiary({ date: pe.date, key: (choice.diary || key) + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : vars.m ?? '' }, cls: 'ev' });
     s.pendingEvent = null;
-    s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
+    // v3.27: a bond event on a training evening leaves the XI alone — ensureAvailableXI would drop the kids who merely skipped
+    // today's training (absentToday) for good; the match-day arrival checks the XI anyway. (Older events keep the v3.24 behaviour.)
+    if (!(this.find(pe.id)?.when === 'bond' && pe.after !== 'matchday')) s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
     s.save();
     this.view.close();
     this.ui.renderAll();
     if (pe.after === 'matchday') this.ui.afterMatchdayEvent();
+    else if (pe.after === 'post') this.ui.afterPostEvent?.(pe);   // v3.27: "It's your fault" → back to the evening windows
     else if (pe.resume && s.phase === 'calendar') this.ui.runCalendar();
     else if (this.find(pe.id)?.when === 'manual') this.ui.afterManualEvent?.();   // v2.6: office / roll call: same day goes on
     else this.ui.morning({ cont: !!pe.cont });   // v2.5: the day loop → the next morning (v3.13: CONTINUE keeps skipping empty days)
@@ -927,7 +952,7 @@ class DialogueView {
         + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain || c.gainLater ? `<span class="tb-money pos"${c.gainLater ? ` title="${esc(L.t('talk.gainLater'))}"` : ''}>+$${c.gain || c.gainLater}</span>` : '');   // v3.24: gainLater = paid by the family later
       const why = c.blocked ? L.t(c.blocked) : broke ? L.t('talk.short', { b: money(s.budget), c: c.cost }) : noAp ? L.t('talk.noAp') : '';
       return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` data-short="1" disabled aria-disabled="true" title="${esc(why)}"` : ''}>
-        <span class="tb-label">${esc(L.t(c.key, c.vars || {}))}</span>${tag}
+        <span class="tb-label">${esc(L.t(c.key, c.vars || {}))}</span>${tag}${c.hint ? `<small class="tb-hint">${esc(L.t('clash.hint'))}</small>` : ''}
         ${short ? `<small class="tb-why">${esc(why)}</small>` : ''}</button>`;
     }).join('');
     this.layer.hidden = false;
@@ -939,7 +964,7 @@ class DialogueView {
   /** v3.21: the buttons as policyPick() sees them (greyed = enabled: false). */
   options() {
     const s = this.ui.state;
-    return (this.choices || []).map(c => ({ key: c.key, enabled: !((c.cost && !s.canAfford(c.cost)) || c.blocked || (c.ap && s.ap < c.ap)), gain: c.gain || 0, cost: c.cost || 0 }));
+    return (this.choices || []).map(c => ({ key: c.key, enabled: !((c.cost && !s.canAfford(c.cost)) || c.blocked || (c.ap && s.ap < c.ap)), gain: c.gain || 0, cost: c.cost || 0, ap: c.ap || 0, hint: !!c.hint }));
   }
   /** v3.21: policy runs — the open dialogue is answered through ui.policyPick('talk:<event id>'). */
   autoPick() {

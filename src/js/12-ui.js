@@ -600,6 +600,7 @@ class UIController {
   autoOpenPost() {
     const s = this.state, rep = s.lastReport;
     if (s.phase !== 'post' || !rep || this.autoOpenedFor === rep || s.talkPending) return;
+    if (this.firePostEvent('open')) return;   // v3.27: "It's your fault" comes first
     if (!s.afterPending && !s.reviewPending) return;
     if (s.afterPending ? this.autoAfter : this.autoReview) return;   // auto-play / smoke decide by themselves at [ CONTINUE ]
     this.autoOpenedFor = rep;
@@ -964,6 +965,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (s.phase === 'matchday') {
       this.modal.close();
       if (!s.dayState().locker?.done) { const lk = s.runLocker(false); lk.done = true; lk.revealed = true; }   // who turned up (no locker window)
+      if (['reference', 'greedy', 'overload', 'empty'].includes(this.autoPolicy)) s.oblKeepXI();   // v3.27: the coach keeps his word ("next to him" / "both start")
       this.onInstantSim();
       if (s.phase === 'post') this.policyPost();
       return;
@@ -983,7 +985,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (!kid || s.talkBlock(kid.id)) return false;
     s.spendAP(); w.talked = true;
     (kid.talk ||= {}).last = s.calendar.date;
-    s.talkAnswer(kid, 'how', pair[1]); s.talkAnswer(kid, 'mates');
+    const conflict = this.autoPolicy !== 'random' && s.knowsConflict?.(pair[0], pair[1]);   // v3.27: reference asks "What happened between you and X?"
+    s.talkAnswer(kid, conflict ? 'what' : 'how', pair[1]); s.talkAnswer(kid, 'mates');
     s.learnTwins(kid);
     const st = (s.stats ||= {}); st.talkAP = (st.talkAP || 0) + TALK.AP;
     s.save();
@@ -997,6 +1000,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       const keys = TEAM_TALK.KEYS;
       s.applyTeamTalk(keys[this.policyPick('word', keys.map(k => ({ key: k, out: talkOutcome(s.lastReport) })))]);
     }
+    if (this.firePostEvent('policy', { anyTalk: true })) return;   // v3.27: the dialogue answers itself (autoPick), the next step goes on
     for (let guard = 0; s.afterPending && guard < 4; guard++) {
       const af = s.after;
       if (af.mode === 'draw') { if (this.policyPick('after', [{ key: 'praise' }, { key: 'listen' }]) === 0) s.afterPraise(); else s.afterListen(); continue; }
@@ -1026,7 +1030,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const pol = this.autoPolicy, ok = i => !!options[i] && options[i].enabled !== false;
     const first = options.findIndex((o, i) => ok(i));
     let i = first < 0 ? 0 : first;
-    if (pol && pol !== 'first') {   // v3.22: greedy overrides a few windows, everything else as reference
+    if (pol === 'random' && windowId.startsWith('talk:')) {   // v3.27: a seeded random enabled button in every event dialogue
+      const en = options.map((o, j) => j).filter(ok), st = (this._rndN = (this._rndN || 0) + 1);
+      if (en.length) i = en[Math.floor(seeded(this.state.calendar.date + '#rndpol#' + windowId + '#' + st)() * en.length)];
+    } else if (pol && pol !== 'first') {   // v3.22: greedy overrides a few windows, everything else as reference
       const fn = (pol === 'greedy' && UIController.POLICY_GREEDY[windowId]) || UIController.POLICY_PICK[windowId];
       const r = fn?.(options, this.state); if (r != null && ok(r)) i = r;
     }
@@ -1049,7 +1056,17 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     'talk:scoutpoach': o => { const t = o.findIndex(x => x.key === 'ev.scoutpoach.b'); return o[t]?.enabled !== false ? t : o.findIndex(x => x.key === 'ev.scoutpoach.a'); },
     'talk:promise': () => 0,   // keep
     'talk:twinmiss': o => { const t = o.findIndex(x => x.key === 'ev.twinmiss.b'); return o[t]?.enabled !== false ? t : o.findIndex(x => x.key === 'ev.twinmiss.c'); },   // v3.25
+    // v3.27 conflicts: a [1 AP] option when it can afford one — the cause-matching one first, then the mediator, then the talk
+    'talk:clash': o => UIController.firstOk(o, [x => x.hint, x => x.key === 'ev.clash.f', x => x.key === 'ev.clash.b']),
+    'talk:blame': o => UIController.firstOk(o, [x => x.key === 'ev.blame.b']),
+    'talk:fight': o => UIController.firstOk(o, [x => x.key === 'ev.fight.e', x => x.key === 'ev.fight.b']),
+    'talk:envy': o => UIController.firstOk(o, [x => x.hint, x => x.key === 'ev.envy.b']),
+    'talk:pairreq': o => UIController.firstOk(o, [x => x.key === 'ev.pairreq.b']),
+    'talk:twinfight': o => UIController.firstOk(o, [x => x.hint, x => x.key === 'ev.twinfight.b', x => x.key === 'ev.twinfight.c']),
+    'talk:fightmum': o => UIController.firstOk(o, [x => x.key === 'ev.fightmum.a']),
   };
+  /** v3.27: the first option (in the given order of tests) that is enabled — or null. */
+  static firstOk(o, tests) { for (const t of tests) { const i = o.findIndex(x => x.enabled !== false && t(x)); if (i >= 0) return i; } return null; }
   /** v3.22 `greedy`: takes every money offer, keeps every promise, accepts the showcase, lets a poached kid go. */
   static POLICY_GREEDY = {
     'talk:dad': o => o.findIndex(x => x.key === 'ev.dad.a'),
@@ -1119,7 +1136,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const good = links.filter(l => l.cls === 'good'), bad = links.filter(l => l.cls === 'bad');
     const tw = p.twinId && s.player(p.twinId);
     const line = (key, list) => list.length ? `<li><b>${L.t(key)}</b> ${list.map(l => `<span class="bn-${l.band}${l.stale ? ' stale' : ''}" title="${esc(L.t('bn.src.' + l.source))}">${BOND_ICONS[l.band] || ''} ${nm(l.id)}${l.confirmed ? ' ' + L.t('clue.confirmed') : ''}</span>`).join(', ')}</li>` : '';
-    const body = (tw ? `<li>${L.t('bn.twin', { x: nm(tw.id) })}</li>` : '') + line('bn.friends', good) + line('bn.cold', bad)
+    const two = links.map(l => this.sidesLine(p.id, l.id)).filter(Boolean).map(x => `<li>${x}</li>`).join('');   // v3.27: the two-sided view
+    const body = (tw ? `<li>${L.t('bn.twin', { x: nm(tw.id) })}</li>` : '') + line('bn.friends', good) + line('bn.cold', bad) + two
       + (s.isLoner(p) && (p.bondNotes || []).some(n => n.band === 'alone') ? `<li>${L.t('bn.alone')}</li>` : '');
     return `<fieldset class="pi-bonds"><legend>${L.t('bn.legend')}</legend>${body ? `<ul>${body}</ul>` : `<p class="pi-none">${L.t('bn.none')}</p>`}</fieldset>`;
   }
@@ -1309,6 +1327,21 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (ev && this.events.rollMatchDay(ev)) return;   // v2.2: match-day event BEFORE kick-off; the matchday dialog follows the choice
     this.showMatchdayDialog();
   }
+  /** v3.27: the post-match conflict ("It's your fault") owed tonight — fired once the Coach's Word is behind us. */
+  firePostEvent(from, { anyTalk = false } = {}) {
+    const s = this.state, m = s.bondMeta?.clash;
+    if (!m?.post || s.phase !== 'post' || (!anyTalk && s.talkPending) || this.events.active) return false;
+    const p = m.post; m.post = null;
+    if (!p.cast || !Object.values(p.cast).every(id => s.player(id))) return false;
+    if (!this.events.fire(p.id, s.calendar.date, { after: 'post', cast: p.cast })) return false;
+    s.pendingEvent.postFrom = from; s.save();
+    return true;
+  }
+  /** v3.27: after "It's your fault" — back where the evening was going (AFTER_GAME / REVIEW / the closing). */
+  afterPostEvent(pe) {
+    if (this.autoPolicy) return;   // the policy loop picks the post-match windows up by itself
+    if (pe.postFrom === 'close') this.closeMatchday(); else this.autoOpenPost();
+  }
   /** v2.2: called by EventEngine.choose() after a match-day event. */
   afterMatchdayEvent() { this.prepareMatch(); this.renderAll(); this.showMatchdayDialog(); }
   showMatchdayDialog() {
@@ -1329,6 +1362,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (!s.lastReport.instant) { this.summary.open(s.lastReport); return; }
       s.skipTeamTalk();
     }
+    if (this.firePostEvent('close')) return;   // v3.27: "It's your fault" — after the Coach's Word, before AFTER_GAME
     if (s.afterPending) {   // v3.20: AFTER_GAME.EXE first (loss: remarks; draw: praise → REVIEW / listen); [ CONTINUE ] waits
       if (!this.autoAfter) { this.afterView.open(); this.renderDash(); return; }
       s.afterAuto();
@@ -1803,6 +1837,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.trackRoles(eng.everPlayed);   // v3.18: roles that played this match now cost morale to change
     s.tickComplaints(s.calendar.date);   // v3.20: parents' "wrong role" complaints count this match (before tonight's talk)
     s.startReview(result, outfield, s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak); v3.23: outfield kids only
+    if (this.events.enabled) s.blameRoll(eng, result); else { const cm = s.clashMeta?.(); if (cm) { cm.post = null; cm.tilt = null; } }   // v3.27: "It's your fault" (before the remarks: it tilts them)
     s.startAfter(result, played.map(p => [p.id, { ...eng.st(p) }]), eng.matchEvents, s.calendar.date, ctx.md);   // v3.20: AFTER_GAME.EXE after a loss / draw
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]), new Set(played.filter(p => eng.isGK(p)).map(p => p.id)));   // v3.24: + who kept goal
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
@@ -1905,10 +1940,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       ${lone.length ? `<fieldset class="bn-lone"><legend>${L.t('bn.loneHead')}</legend><ul>${lone.map(({ p, n }) => `<li class="${stale(n.date) ? 'stale' : ''}">${esc(L.t('bn.note.alone', { a: L.name(p.name) }))} <small>${day(n.date)}</small></li>`).join('')}</ul></fieldset>` : ''}
       <fieldset class="bn-pairs"><legend>${L.t('bn.pairsHead')}</legend>${rows.length ? rows.map(r => `<div class="bn-pair${r.kb?.stale ? ' stale' : ''}">
         <div class="bn-ph"><span class="bn-ico">${BOND_ICONS[r.kb?.band] || BOND_ICONS[r.list[r.list.length - 1].band] || '\u2022'}</span> <b>${nm(r.a)}</b> &amp; <b>${nm(r.b)}</b> — ${esc(L.t('bn.band.' + (r.kb?.band || r.list[r.list.length - 1].band)))}${r.kb?.confirmed ? ` <b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}${r.kb?.stale ? ` <em class="bn-stale">${L.t('bn.staleTag')}</em>` : ''}</div>
-        ${words(r.list)}</div>`).join('') : `<p class="pi-none">${L.t('bn.pairsNone')}</p>`}</fieldset>
+        ${this.sidesLine(r.a, r.b)}${words(r.list)}</div>`).join('') : `<p class="pi-none">${L.t('bn.pairsNone')}</p>`}</fieldset>
       ${yard.length ? `<fieldset class="bn-yard"><legend>${L.t('bn.yardHead')}</legend><ul>${yard.map(n => `<li>${BOND_SRC.yard} ${esc(L.t('bn.note.yard', { a: L.name(s.player(n.owner).name), b: L.name(s.player(n.with).name), y: L.t('yard.street.' + kidRoots(s.player(n.owner)).yard) }))}</li>`).join('')}</ul></fieldset>` : ''}
       ${twins.length ? `<fieldset class="bn-twins"><legend>${L.t('bn.twinsHead')}</legend><ul>${twins.map(p => { const c = twinCowlick(p, s.player(p.twinId)); return `<li>${esc(L.t('twins.line', { k: L.name(c.name) }))}</li>`; }).join('')}</ul></fieldset>` : ''}`;
     return `<div class="nb-locker">${body}</div>`;
+  }
+  /** v3.27: both kids' words side by side — "from Petya: mates · from Kolya: don't get on" (only when both have spoken). */
+  sidesLine(a, b) {
+    const s = this.state, sd = s.pairSides?.(a, b);
+    if (!sd) return '';
+    return `<p class="bn-twoside${sd.two ? ' differ' : ''}">${esc(L.t('bn.sides', { a: L.name(s.player(a).name), wa: L.t('bn.band.' + sd.a), b: L.name(s.player(b).name), wb: L.t('bn.band.' + sd.b) }))}</p>`;
   }
   renderNotebook() {
     const body = this.$('notes-body');

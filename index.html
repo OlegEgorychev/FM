@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.26</title>
+<title>Youth Academy Manager v3.27</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -1962,6 +1962,14 @@ li.mb-cohlow{ color: #7a3a00; }
 /* locker room: the swung-open door (::after, rotateY −100°, opacity 0) still counted as overflow → a 14-px phantom
    scrollbar. 15 lockers = 2 rows always fit the 900-px canvas, so the grid clips instead of scrolling (same clip as before). */
 .lr-grid{ overflow: hidden; }
+/* v3.27 "Clashes": the quiet cause hint under a dialogue option, the two-sided view, DEBUG clash controls */
+.tb-hint{ flex-basis: 100%; font: italic var(--fs-xs)/1.2 var(--ui); text-transform: none; letter-spacing: 0; color: #3f6b3a; }
+.talk-typing .tb-hint{ opacity: .6; }
+.bn-twoside{ margin: 2px 0 0 1.4em; font-size: var(--fs-xs); color: #5a5242; }
+.bn-twoside.differ{ color: #8a3d1f; }
+.pi-bonds .bn-twoside{ margin: 0; }
+.dbg-clash{ display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; font-size: var(--fs-xs); }
+.dbg-clash select{ max-width: 220px; }
 /* =========================================================
    RESPONSIVE
    ========================================================= */
@@ -2590,8 +2598,8 @@ const cohBand = c => COH.BANDS.find(b => (c ?? COH.START) >= b.min).key;
 /** Duel bonus for a side with cohesion c (null / undefined = neutral, so engines built without cohesion are unchanged). */
 const cohBonus = c => { if (c == null) return 0; const x = (clamp(c, 0, 100) - 50) / 50; return x * (x < 0 ? COH.MAX : COH.MAX_UP); };
 /* v3.21 POLICY HARNESS (ui.autoSim({ policy }), test/policy.js) — how each scripted coach plans his week. */
-const POLICY = { NAMES: ['first', 'empty', 'reference', 'overload', 'greedy'],   // v3.22: + greedy (takes every money offer)
-  DAYS: { first: [], empty: [], reference: ['tue', 'thu'], overload: ['mon', 'tue', 'wed', 'thu', 'fri'], greedy: ['tue', 'thu'] } };
+const POLICY = { NAMES: ['first', 'empty', 'reference', 'overload', 'greedy', 'random'],   // v3.22: + greedy (takes every money offer); v3.27: + random (event dialogues)
+  DAYS: { first: [], empty: [], reference: ['tue', 'thu'], overload: ['mon', 'tue', 'wed', 'thu', 'fri'], greedy: ['tue', 'thu'], random: ['tue', 'thu'] } };
 /* v3.13 ATTENDANCE CURVE — chance to turn up for the k-th training of the week (index 0…4), only from the 3rd one.
    chance = curve[k] + (discipline − 10)/10 × DISC − (energy < TIRED ? TIRED_PEN : 0), clamped MIN–MAX; seeded(date + '#load#' + id). */
 const ATTEND_CURVE = [1, 1, 0.7, 0.5, 0.3];
@@ -2936,7 +2944,10 @@ const BOND = {
   RALLY_WAR: -60, STRESS_WAR: 1.25,
   AFTER_W: 2, AFTER_REL: -0.15,
   CAME_V: 40, CAME_P: 0.3, STALE_DAYS: 28,
-  CAUSES: ['position', 'grudge', 'blame', 'envy'],
+  CAUSES: ['position', 'grudge', 'blame', 'envy', 'temper', 'unfair'],   // v3.27: + temper (a clash between hot heads), unfair (the coach sided)
+  // v3.27 skew: kid A (first id of the key) sees v + skew, kid B sees v − skew; match / cohesion / ATMOS use the shared v only
+  SKEW_MAX: 30, SKEW_DECAY: 3, SKEW_HIDDEN: 20, SKEW_START_P: 0.1, SKEW_START: 15,
+  SKEW_ENVY: 4, SKEW_BLAME: 10, SKEW_SIDED: 15,   // tune: weekly envy drift / an "It's your fault" / the coach sided with the other kid
   YARDS: 5, SCHOOLS: 3,
 };
 const TWINS = { PAIRS: 2, LINK: 1.5, FLOOR: -40, DECAY: 2, MIXUP: 0.25, TELL_MATCHES: 3, SKEW: 2,
@@ -2944,7 +2955,8 @@ const TWINS = { PAIRS: 2, LINK: 1.5, FLOOR: -40, DECAY: 2, MIXUP: 0.25, TELL_MAT
 /* v3.25 the talk one-on-one ("Have a word", PLAYER_INFO.EXE): 1 AP for 2 questions, once a week per kid. */
 const TALK = { AP: 1, QUESTIONS: 2, WEEK_CD: 7, REPEAT_DAYS: 21, LIE: 0.1, LIE_DISC: 7, EVADE_COLD: 1.5, EVADE_MATE: 0.5,
   GOSSIP: 0.2, GOSSIP_DAYS: 14, GOSSIP_MORALE: -2, GOSSIP_OPEN: -0.1, STIR: 0.25, STIR_DV: -3, MATE_MORALE: 1, ROLE_REL: 0.003,
-  FREE: ['excuse', 'posreq', 'capobs', 'capbench', 'capresign'] };   // manual dialogues where the kid came by himself → one free question
+  FREE: ['excuse', 'posreq', 'capobs', 'capbench', 'capresign'],   // manual dialogues where the kid came by himself → one free question
+  WHO_DAYS: 14 };   // v3.27: "Who started it?" — asked about the last fight within 14 days
 /* Questions are data (v3.26 / v3.28 add rows): x = who [X] is picked from ('squad' | 'played' | 'pair' = two kids). */
 const TALK_QUESTIONS = [
   { id: 'how', x: 'squad' },
@@ -2952,7 +2964,38 @@ const TALK_QUESTIONS = [
   { id: 'hard', x: null, evade: 1.5 },
   { id: 'pitch', x: 'played' },
   { id: 'pair', x: 'pair' },
+  // v3.27 "Clashes": only offered when their condition holds (GameState.talkQAvail): x = 'conflict' (a kid the coach knows he fell out
+  // with), 'fight' (the last fight, asked of a witness), 'mediate' (a pair in conflict, both known mates of this kid)
+  { id: 'what', x: 'conflict' },
+  { id: 'who', x: 'fight' },
+  { id: 'mediate', x: 'mediate' },
 ];
+/* v3.27 "CLASHES" (test values, "tune" = tuned in test/policy.js). Daily roll over present pairs v ≤ V_FROM:
+   p = BASE + max(0, −v − 20)/100 × V_K + T_K × (T_a + T_b); × OPEN_MULT while the pair has an unresolved clash. Hidden success
+   S = S_BASE + (Squad − 50)/200 + (max leadership − 10)/40 − 0.1 × (T_a + T_b)/2, clamp S_MIN…S_MAX. */
+const CLASH = {
+  BASE: 0.03, V_FROM: -20, V_K: 0.15, T_K: 0.03,          // tune
+  CD_TEAM: 4, CD_PAIR: 10, OPEN_DAYS: 14, OPEN_MULT: 2, MATCHDAY: 1,   // MATCHDAY 0 = no clash roll before kick-off (tuning)
+  S_BASE: 0.45, S_MIN: 0.2, S_MAX: 0.85, S_T: 0.1, CAUSE_S: 0.2, CAUSE_DV: 5, NEXT_S_PEN: 0.1,
+  FIGHT_V: -60, FIGHT_CD: 21, MARK_DAYS: 3, MUM_P: 0.5, MUM_DAYS: [2, 4], BOARD_P: 0.3,
+  BLAME_P: 0.4, BLAME_COMP: 9, BLAME_LEAD: 12,
+  ENVY_P: 0.3, ENVY_CD: 14, PAIRREQ_P: 0.15, PAIRREQ_V: 50, PAIRREQ_CD: 28, OBL_PAIR: 2,
+  TWIN_P: 0.25, TWIN_CD: 21, TWIN_BENCH: 2, TWIN_PRAISE: 2, TWIN_SKEW: 20, TWIN_MUM: 0.3, TWIN_APART: 7,
+  MED_S: 0.2, MED_LEAD: 14, MED_LEAD_S: 0.1, MED_DV: 15, MED_FAIL: -10,
+  QUIET_DV: 4, QUIET_V: 20, WITNESS_LIE_V: 40,
+  // the six events (dv on the shared v, m = morale, sq / par / brd = Squad / Parents / Board)
+  E: {
+    clash: { a: -3, bOk: 15, bOkM: 2, bFail: -5, c: 5, cM: -3, cSq: -1, dOk: 20, dFail: -15, d: 0.5, dT: 0.1, e: -15, eMB: 3, eMA: -8, eSq: -2, wrongM: 5, wrongSq: 1 },
+    blame: { a: -2, aMB: 2, aMA: -1, b: 8, bMA: -2, bMB: 3, bSq: 1, c: -8, cMB: -5, d: -15, dMB: -10, dMA: 2, dSq: -2, eOk: 10, eOkM: 4, eFailM: -6, eFail: -5 },
+    fight: { a: -10, aSq: -2, aBrd: -2, b: 5, bPar: -1, ok: 5, okSq: 1, bad: -20, badM: -10, badSq: -3, badPar: -2, e: 10, ePar: 1, eM: -3 },
+    envy: { a: -5, bOkM: 4, bFailM: -3, cM: 5, cSq: -1, cSharp: 50, dMF: 3, dMA: -5, d: -10, dSq: -1 },
+    pairreq: { keptM: 4, kept: 5, brokenM: -4, cM: -3, oneSidedM: -2 },
+    twinfight: { a: -5, aPar: -1, bOk: 15, bFail: -5, keptV: 10, keptM: 3, brokenV: -10, brokenPar: -2, d: 5, eM: -8, ePar: -1, bS: 0.1 },
+    mum: { truthPar: 1, truthM: -2, noPar: -1, apPar: 2 },
+  },
+};
+/** v3.27 "It's your fault": [A]'s AFTER_GAME remark leans to an `other` remark (× OTHER) about [B] (target weight × ABOUT). */
+const CLASH_TILT = { OTHER: 3, ABOUT: 4 };
 /** v3.25 duel term of one bond value: (|v| − DEAD) / (100 − DEAD) × MAX above 0 (× MAX_NEG below), 0 inside ±DEAD. */
 const bondTerm = v => { const x = Math.max(0, Math.abs(v || 0) - BOND.DEAD) / (100 - BOND.DEAD); return x * (v < 0 ? -BOND.MAX_NEG : BOND.MAX); };
 const bondKey = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
@@ -5084,6 +5127,167 @@ Object.assign(I18N.ru, {
   'bond.loner.0': 'Кажется, {k} на тренировках всё время один.', 'bond.loner.1': 'После тренировки {k} уходит один — никто его не ждёт.', 'bond.loner.2': '{k} снова разминается в одиночку.',
   'bond.cause': '{a} и {b} снова не нашли друг друга пасом — они не разговаривают.',
 });
+/* v3.27 "Clashes" */
+Object.assign(I18N.en, {
+  'clash.hint': 'you know what this is about',
+  'clash.role.clash': '#{n} · {p} · at training', 'clash.role.blame': '#{n} · {p} · the locker room after the loss', 'clash.role.fight': '#{n} · {p} · behind the locker room',
+  'clash.role.envy': '#{n} · {p} · the locker room', 'clash.role.pairreq': '#{n} · {p} · after training', 'clash.role.twinfight': '#{n} · {p} · at training', 'clash.roleWit': '#{n} · {p} · saw it',
+  'ev.clashAsk': 'Ask the others what happened', 'ev.clashWrong': '[A word] "I was wrong back then"',
+  'ev.clashWrong.diary': 'Told the lads I was wrong back then. Players: {a}, {b}.',
+  'ev.clashWit.cause.position': '"It\'s about the place, coach. One plays, the other sits."', 'ev.clashWit.cause.grudge': '"That\'s from their yard. Old stuff."',
+  'ev.clashWit.cause.blame': '"Since that goal. {a} keeps going on about it."', 'ev.clashWit.cause.envy': '"Because you always praise one of them."',
+  'ev.clashWit.cause.temper': '"They\'re both hot-headed. Any little thing."', 'ev.clashWit.cause.unfair': '"Since you took sides that time, coach."',
+  'ev.clashWit.none': '"Dunno, coach. They just don\'t get on."',
+  'ev.clash.text': 'During the rondo {a} loses the ball and shoves {b}. One word leads to another — now they\'re standing nose to nose. The others freeze and look at you.',
+  'ev.clash.surprised': '{b} spreads his hands: "I never did anything to him!"',
+  'ev.clash.a': 'Pull them apart and carry on', 'ev.clash.b': 'Talk to both after training', 'ev.clash.c': 'Five laps each', 'ev.clash.d': 'Pair them up for the rest of the session',
+  'ev.clash.e': 'Side with {b}', 'ev.clash.f': 'Ask {c} to talk to them', 'ev.clash.ok': 'Right', 'ev.clash.toFight': 'Get over there',
+  'ev.clash.bOk': 'After training the three of you sit on the bench. Slowly {a} and {b} talk it through. They leave together.',
+  'ev.clash.bFail': 'You talk, they stare at the floor. "Fine." "Fine." Nothing is fine.',
+  'ev.clash.dOk': 'Ten minutes of passing in a pair and they start calling for each other. By the end {a} even claps {b} on the back.',
+  'ev.clash.dFail': 'It goes from bad to worse. After training there\'s shouting behind the locker room.',
+  'ev.clash.dFailCalm': 'It goes from bad to worse — they don\'t pass to each other once. You send them home separately.',
+  'ev.clash.medOk': '{c} takes them both aside. Five minutes later they\'re laughing about something.', 'ev.clash.medFail': '{c} tried, but now one of them is angry with him too.',
+  'ev.clash.a.diary': 'A clash at training: {a} and {b}. Pulled them apart, carried on.', 'ev.clash.c.diary': 'Five laps each after a clash: {a} and {b}.',
+  'ev.clash.e.diary': 'Took {b}\'s side after a clash with {a}.', 'ev.clash.bOk.diary': 'Talked to {a} and {b} after training: they made it up.',
+  'ev.clash.bFail.diary': 'Talked to {a} and {b} after training: nothing came of it.', 'ev.clash.dOk.diary': 'Paired {a} and {b} up: it worked.',
+  'ev.clash.dFail.diary': 'Paired {a} and {b} up: it got worse.', 'ev.clash.medOk.diary': 'A teammate made peace between {a} and {b}.', 'ev.clash.medFail.diary': 'A teammate tried to make peace between {a} and {b}, but got caught in the middle.',
+  'ev.blame.text': '{a} hurls his boots into the corner: "If {b} hadn\'t passed it straight to them, we wouldn\'t have lost!" {b} says nothing and stares at the floor.',
+  'ev.blame.a': '"The team lost, not one person"', 'ev.blame.b': 'Talk to {a} on his own', 'ev.blame.c': 'Say nothing', 'ev.blame.d': '"He\'s right: it was a bad mistake"',
+  'ev.blame.e': 'Ask {b} to go through the moment himself', 'ev.blame.f': 'Ask {c} to talk to them', 'ev.blame.ok': 'Right',
+  'ev.blame.eOk': '{b} gets up: "My fault. I\'ll look up first next time." The room goes quiet — in a good way.', 'ev.blame.eFail': '{b} starts, stammers and goes red. Somebody snorts.',
+  'ev.blame.medOk': '{c} sits down between them. Soon {a} mutters "sorry".', 'ev.blame.medFail': '{c} tried to calm them, but {a} snapped at him too.',
+  'ev.blame.a.diary': '"The team lost, not one person." {a} blamed {b}.', 'ev.blame.b.diary': 'Had a word with {a} after he blamed {b}.',
+  'ev.blame.c.diary': 'Said nothing when {a} blamed {b}.', 'ev.blame.d.diary': 'Agreed with {a}: {b} made a bad mistake.',
+  'ev.blame.eOk.diary': '{b} went through his mistake in front of everyone.', 'ev.blame.eFail.diary': '{b} couldn\'t go through his mistake.',
+  'ev.blame.medOk.diary': 'A teammate made peace between {a} and {b}.', 'ev.blame.medFail.diary': 'A teammate tried to make peace between {a} and {b}.',
+  'ev.fight.text': 'Noise behind the locker room. {a} and {b} are at each other: {t}. Who started it? {a} says {b} did. {b} says {a} did. The others look away.',
+  'ev.fight.mark.0': 'both shirts are torn', 'ev.fight.mark.1': '{b} has a bruise on his cheek', 'ev.fight.mark.2': '{b} has a split lip', 'ev.fight.mark.3': '{b} has a black eye, {a} a split lip',
+  'ev.fight.markShort.0': 'a torn shirt', 'ev.fight.markShort.1': 'a bruise', 'ev.fight.markShort.2': 'a split lip', 'ev.fight.markShort.3': 'a black eye',
+  'ev.fight.a': '"Cool off. We\'ll talk tomorrow"', 'ev.fight.b': 'Ban both from the next match', 'ev.fight.c': 'Ban {a}', 'ev.fight.d': 'Ban {b}', 'ev.fight.e': 'Call both families',
+  'ev.fight.a.diary': 'A fight behind the locker room: {a} and {b}. Told them to cool off.', 'ev.fight.b.diary': 'A fight: {a} and {b} both banned from the next match.',
+  'ev.fight.c.diary': 'A fight: banned {a}.', 'ev.fight.d.diary': 'A fight: banned {b}.', 'ev.fight.e.diary': 'A fight: {a} and {b}. Called both families.',
+  'ev.fightmum.name': '{k}\'s mum', 'ev.fightmum.mark': '"Coach, {k} came home with {t}. He won\'t say a word. What happened at your club?"',
+  'ev.fightmum.ask': '"Coach, I heard something happened between {k} and {b}. Is everything alright?"',
+  'ev.fightmum.a': 'Tell her the truth', 'ev.fightmum.b': '"It was nothing serious"', 'ev.fightmum.c': 'Ask her to come in and talk',
+  'ev.fightmum.a.diary': 'Told the mum the truth about the fight: {k}.', 'ev.fightmum.b.diary': 'Told the mum it was nothing serious: {k}.', 'ev.fightmum.c.diary': 'Met the mum after the fight: {k}.',
+  'ev.envy.text': 'You hear {a} in the locker room: "Course {f} is the best again. He\'s the coach\'s favourite." A couple of lads laugh.',
+  'ev.envy.a': 'Pretend you didn\'t hear', 'ev.envy.b': 'Ask {a} what\'s wrong', 'ev.envy.c': 'Praise {a} in front of everyone', 'ev.envy.d': '"I praise for a reason"', 'ev.envy.ok': 'Right',
+  'ev.envy.bOk': '{a} picks at his laces. "I just want to play more, coach. Where I\'m good." It\'s out now.', 'ev.envy.bFail': '{a} shrugs. "Nothing. Forget it." He walks off.',
+  'ev.envy.a.diary': 'Heard {a} going on about the favourite. Let it pass.', 'ev.envy.c.diary': 'Praised {a} in front of everyone.',
+  'ev.envy.d.diary': '"I praise for a reason": {a} took it badly.', 'ev.envy.bOk.diary': 'Talked to {a}: he wants more minutes.', 'ev.envy.bFail.diary': 'Tried to talk to {a}: he shut down.',
+  'ev.pairreq.text': '{a} comes over after training: "Coach, can I play next to {b}? We\'re always together in the yard."',
+  'ev.pairreq.a': '"We\'ll see"', 'ev.pairreq.b': '"Alright, let\'s try it"', 'ev.pairreq.c': '"I pick the team"',
+  'ev.pairreq.a.diary': '{a} asked to play next to {b}. "We\'ll see."', 'ev.pairreq.b.diary': 'Promised {a} a game next to {b}.', 'ev.pairreq.c.diary': '{a} asked to play next to {b}. "I pick the team."',
+  'ev.twinfight.text': '{b} hits {a} in the back with a pass, far too hard. "On purpose, was it?" "Everything\'s on purpose to you, you\'re the big boss!" Then it\'s like the kitchen at home — only in front of the whole team.',
+  'ev.twinfight.a': '"Sort it out at home"', 'ev.twinfight.b': 'Talk to {b} about what hurts', 'ev.twinfight.c': '"Both start the next match"', 'ev.twinfight.d': 'Put them in different groups for a week', 'ev.twinfight.e': '"{a} is right"', 'ev.twinfight.ok': 'Right',
+  'ev.twinfight.bOk': '{b} looks away. "He always plays. I always watch. Put me where I\'m good and I\'ll show you."', 'ev.twinfight.bFail': '{b} just shakes his head. "You don\'t get it."',
+  'ev.twinfight.mum': 'The twins\' mum rang: why are her boys fighting at the club?',
+  'ev.twinfight.a.diary': 'The twins quarrelled: {a} and {b}. "Sort it out at home."', 'ev.twinfight.c.diary': 'Promised the twins both start the next match: {a} and {b}.',
+  'ev.twinfight.d.diary': 'Put the twins in different groups for a week: {a} and {b}.', 'ev.twinfight.e.diary': 'Took {a}\'s side in the twins\' quarrel.',
+  'ev.twinfight.bOk.diary': 'Talked to {b}: now I know what hurts.', 'ev.twinfight.bFail.diary': 'Tried to talk to {b}: he wouldn\'t open up.',
+  'obl.kept.pair': 'Kept my word: {a} played next to {b}.', 'obl.broken.pair': 'Didn\'t keep my word: {a} never got to play next to {b}.',
+  'obl.kept.start': 'Kept my word: both brothers started — {a} and {b}.', 'obl.broken.start': 'Didn\'t keep my word: the brothers didn\'t both start — {a} and {b}.',
+  'quiet.assist': '{a} set up {b} — they hugged.', 'quiet.home': '{a} walked {b} home after the knock.',
+  'bn.note.event.clash': '{a} and {b} clashed ({d}).', 'bn.note.event.fight': '{a} and {b} had a fight ({d}).', 'bn.note.event.blame': '{a} blamed {b} for the goal ({d}).',
+  'bn.note.event.envy': '{a} is jealous of {b} ({d}).', 'bn.note.event.pairreq': '{a} asked to play next to {b} ({d}).', 'bn.note.event.twinfight': 'The brothers quarrelled: {a} and {b} ({d}).',
+  'bn.note.event.med': '{a} and {b} made it up ({d}).', 'bn.note.event.inst': '{a} started the fight with {b} — the families told me ({d}).',
+  'bn.note.event.quiet.assist': '{a} set up {b} — they hugged ({d}).', 'bn.note.event.quiet.home': '{a} walked {b} home ({d}).',
+  'bn.note.who': '{k} says {a} started it with {b}.',
+  'bn.src.event': 'It happened', 'bn.src.who': 'A witness',
+  'bn.sides': 'From {a}: {wa} · from {b}: {wb}',
+  'btalk.q.what': 'What happened between you and…?', 'btalk.q.who': 'Who started the fight?', 'btalk.q.mediate': 'Will you help me make … friends again?',
+  'btalk.pickMed': 'Who should make it up?', 'btalk.kid2': '{x} and {y}',
+  'bt.a.who.0': '"It was {x}, coach. {y} only shoved back."', 'bt.a.who.1': 'He lowers his voice. "{x} went first. Don\'t say I told you."', 'bt.a.who.none': '"What fight?"',
+  'bt.a.med.ok': '"Alright, I\'ll talk to {x} and {y}." Later you see the three of them laughing.', 'bt.a.med.fail': '"I tried, coach. Now they\'re both angry with me."',
+  'bt.a.what.fine.0': '"Me and {x}? Nothing. I never did anything to him!"', 'bt.a.what.fine.1': '"Did he say something? I don\'t get what his problem is."',
+  'bt.a.cold.temper.0': '"He\'s a nutter. Touch him and he shoves."', 'bt.a.cold.temper.1': '"He goes off over nothing. Every time."',
+  'bt.a.cold.unfair.0': '"You took his side that time. Why ask now?"', 'bt.a.cold.unfair.1': '"You blamed me, coach. And it was him."',
+  'bn.say.cold.temper': '{b} flies off the handle', 'bn.say.cold.unfair': 'you sided with {b} back then',
+  'clue.voice.lead.own': 'Owned up to his mistake in front of everyone.', 'clue.voice.lead.med': 'Got two lads talking again — the others listen to him.',
+  'dbg.ev.clash': 'Clash at training', 'dbg.ev.blame': '"It\'s your fault"', 'dbg.ev.fight': 'Fight', 'dbg.ev.envy': 'Coach\'s favourite', 'dbg.ev.pairreq': '"Can I play with him?"', 'dbg.ev.twinfight': 'Brothers fell out', 'dbg.ev.fightmum': 'The mum calls', 'dbg.ev.twinmiss': 'Misses his brother',
+  'dbg.clashForce': 'FORCE',
+});
+Object.assign(I18N.ru, {
+  'clash.hint': 'ты знаешь, в чём дело',
+  'clash.role.clash': '#{n} · {p} · на тренировке', 'clash.role.blame': '#{n} · {p} · раздевалка после поражения', 'clash.role.fight': '#{n} · {p} · за раздевалкой',
+  'clash.role.envy': '#{n} · {p} · раздевалка', 'clash.role.pairreq': '#{n} · {p} · после тренировки', 'clash.role.twinfight': '#{n} · {p} · на тренировке', 'clash.roleWit': '#{n} · {p} · видел',
+  'ev.clashAsk': 'Спросить ребят, что случилось', 'ev.clashWrong': '[Разговор] «Я тогда был неправ»',
+  'ev.clashWrong.diary': 'Признал при ребятах, что тогда был неправ. Игроки: {a}, {b}.',
+  'ev.clashWit.cause.position': '«Из-за места, тренер. Один играет, другой сидит».', 'ev.clashWit.cause.grudge': '«Это у них ещё со двора. Старое».',
+  'ev.clashWit.cause.blame': '«С того гола. {a} всё никак не успокоится».', 'ev.clashWit.cause.envy': '«Потому что вы одного всё время хвалите».',
+  'ev.clashWit.cause.temper': '«Они оба психованные. Чуть что — и понеслось».', 'ev.clashWit.cause.unfair': '«С тех пор, как вы тогда за одного встали».',
+  'ev.clashWit.none': '«Не знаю, тренер. Не ладят, и всё».',
+  'ev.clash.text': 'Во время квадрата {a} теряет мяч и толкает соседа. {b} отвечает тем же — слово за слово, и они уже стоят лоб в лоб. Остальные замерли и смотрят на тебя.',
+  'ev.clash.surprised': '{b} разводит руками: «Да я ему ничего не сделал!»',
+  'ev.clash.a': 'Развести и продолжить', 'ev.clash.b': 'Поговорить с обоими после тренировки', 'ev.clash.c': 'Обоим по пять кругов', 'ev.clash.d': 'Поставить их в пару до конца тренировки',
+  'ev.clash.e': 'Встать на сторону: {b}', 'ev.clash.f': 'Попросить поговорить с ними: {c}', 'ev.clash.ok': 'Ясно', 'ev.clash.toFight': 'Бежать туда',
+  'ev.clash.bOk': 'После тренировки вы втроём сидите на скамейке. Слово за слово — разобрались. Ушли вместе. Игроки: {a}, {b}.',
+  'ev.clash.bFail': 'Ты говоришь, они смотрят в пол. «Ладно». «Ладно». Ничего не ладно.',
+  'ev.clash.dOk': 'Десять минут в паре — и они уже зовут друг друга на передачу. В конце {a} даже хлопает напарника по плечу.',
+  'ev.clash.dFail': 'Становится только хуже. После тренировки за раздевалкой крики.',
+  'ev.clash.dFailCalm': 'Становится только хуже — друг другу ни одного паса. Домой ты отпускаешь их порознь.',
+  'ev.clash.medOk': '{c} отводит обоих в сторону. Через пять минут они уже над чем-то смеются.', 'ev.clash.medFail': '{c} пытался, но теперь один из них злится и на него.',
+  'ev.clash.a.diary': 'Стычка на тренировке: развёл и продолжили. Игроки: {a}, {b}.', 'ev.clash.c.diary': 'После стычки обоим по пять кругов. Игроки: {a}, {b}.',
+  'ev.clash.e.diary': 'После стычки встал на сторону одного. Прав: {b}, виноват: {a}.', 'ev.clash.bOk.diary': 'Поговорили после тренировки — помирились. Игроки: {a}, {b}.',
+  'ev.clash.bFail.diary': 'Поговорили после тренировки — без толку. Игроки: {a}, {b}.', 'ev.clash.dOk.diary': 'Поставил в пару — сработало. Игроки: {a}, {b}.',
+  'ev.clash.dFail.diary': 'Поставил в пару — стало хуже. Игроки: {a}, {b}.', 'ev.clash.medOk.diary': 'Товарищ по команде помирил. Игроки: {a}, {b}.', 'ev.clash.medFail.diary': 'Товарищ пытался помирить, но сам попал под горячую руку. Игроки: {a}, {b}.',
+  'ev.blame.text': '{a} швыряет бутсы в угол: — Если бы он не отдал мяч прямо им в ноги, мы бы не проиграли! {b} молчит и смотрит в пол.',
+  'ev.blame.a': '«Проиграла команда, а не один человек»', 'ev.blame.b': 'Поговорить отдельно: {a}', 'ev.blame.c': 'Промолчать', 'ev.blame.d': '«Согласен: ошибка была грубая»',
+  'ev.blame.e': 'Пусть сам разберёт момент: {b}', 'ev.blame.f': 'Попросить поговорить с ними: {c}', 'ev.blame.ok': 'Ясно',
+  'ev.blame.eOk': '{b} встаёт: «Моя вина. В следующий раз сначала голову подниму». В раздевалке тихо — по-хорошему.', 'ev.blame.eFail': '{b} начинает, сбивается и краснеет. Кто-то хмыкает.',
+  'ev.blame.medOk': '{c} садится между ними. Вскоре {a} бурчит «извини».', 'ev.blame.medFail': '{c} пытался их успокоить, но {a} огрызнулся и на него.',
+  'ev.blame.a.diary': '«Проиграла команда, а не один человек». Обвинял: {a}, виноватым сделали: {b}.', 'ev.blame.b.diary': 'Поговорил отдельно с тем, кто обвинял. Игроки: {a}, {b}.',
+  'ev.blame.c.diary': 'Промолчал, когда один обвинял другого. Игроки: {a}, {b}.', 'ev.blame.d.diary': 'Согласился, что ошибка была грубая. Ошибся: {b}.',
+  'ev.blame.eOk.diary': 'Сам разобрал свою ошибку при всех. Игрок: {b}.', 'ev.blame.eFail.diary': 'Не смог разобрать свою ошибку. Игрок: {b}.',
+  'ev.blame.medOk.diary': 'Товарищ по команде помирил. Игроки: {a}, {b}.', 'ev.blame.medFail.diary': 'Товарищ пытался помирить. Игроки: {a}, {b}.',
+  'ev.fight.text': 'За раздевалкой шум. {a} и {b} сцепились: {t}. Кто начал? Каждый говорит, что другой. Остальные отводят глаза.',
+  'ev.fight.mark.0': 'у обоих порваны футболки', 'ev.fight.mark.1': '{b} с синяком на скуле', 'ev.fight.mark.2': '{b} с разбитой губой', 'ev.fight.mark.3': '{b} с синяком под глазом, {a} с разбитой губой',
+  'ev.fight.markShort.0': 'порванной футболкой', 'ev.fight.markShort.1': 'синяком', 'ev.fight.markShort.2': 'разбитой губой', 'ev.fight.markShort.3': 'синяком под глазом',
+  'ev.fight.a': '«Пусть остынут, завтра поговорим»', 'ev.fight.b': 'Отстранить обоих от ближайшего матча', 'ev.fight.c': 'Отстранить: {a}', 'ev.fight.d': 'Отстранить: {b}', 'ev.fight.e': 'Позвонить родителям обоих',
+  'ev.fight.a.diary': 'Драка за раздевалкой: велел остыть. Игроки: {a}, {b}.', 'ev.fight.b.diary': 'Драка: оба отстранены от ближайшего матча. Игроки: {a}, {b}.',
+  'ev.fight.c.diary': 'Драка: отстранил одного. Игрок: {a}.', 'ev.fight.d.diary': 'Драка: отстранил одного. Игрок: {b}.', 'ev.fight.e.diary': 'Драка: позвонил родителям обоих. Игроки: {a}, {b}.',
+  'ev.fightmum.name': 'Мама. Сын: {k}', 'ev.fightmum.mark': '«Тренер, мой сын пришёл домой с {t}. Молчит. Что у вас там случилось?» Сын: {k}.',
+  'ev.fightmum.ask': '«Тренер, говорят, у моего сына что-то вышло с другим мальчиком. Всё в порядке?» Сын: {k}, второй: {b}.',
+  'ev.fightmum.a': 'Рассказать как есть', 'ev.fightmum.b': '«Ничего серьёзного»', 'ev.fightmum.c': 'Пригласить её поговорить',
+  'ev.fightmum.a.diary': 'Рассказал маме, как было. Сын: {k}.', 'ev.fightmum.b.diary': 'Сказал маме, что ничего серьёзного. Сын: {k}.', 'ev.fightmum.c.diary': 'Поговорили с мамой после драки. Сын: {k}.',
+  'ev.envy.text': 'Из раздевалки доносится: — Конечно, {f} опять лучший. Он же у тренера любимчик. Пара ребят смеются. Голос узнаёшь сразу — это {a}.',
+  'ev.envy.a': 'Сделать вид, что не слышал', 'ev.envy.b': 'Поговорить, что не так: {a}', 'ev.envy.c': 'Похвалить при всех: {a}', 'ev.envy.d': 'Сказать при всех: «Хвалю за дело»', 'ev.envy.ok': 'Ясно',
+  'ev.envy.bOk': '{a} теребит шнурок. «Я просто хочу больше играть, тренер. Там, где у меня получается». Вот оно что.', 'ev.envy.bFail': '{a} пожимает плечами. «Ничего. Забудьте». Уходит.',
+  'ev.envy.a.diary': 'Слышал, как ворчат про любимчика. Пропустил мимо ушей. Ворчал: {a}.', 'ev.envy.c.diary': 'Похвалил при всех. Игрок: {a}.',
+  'ev.envy.d.diary': '«Хвалю за дело» — обиделся. Игрок: {a}.', 'ev.envy.bOk.diary': 'Поговорили: хочет больше играть. Игрок: {a}.', 'ev.envy.bFail.diary': 'Пытался поговорить — замкнулся. Игрок: {a}.',
+  'ev.pairreq.text': '{a} подходит после тренировки: — Тренер, а можно мне играть рядом с ним? Мы во дворе всегда вместе. Он кивает на друга — это {b}.',
+  'ev.pairreq.a': '«Посмотрим»', 'ev.pairreq.b': '«Хорошо, попробуем»', 'ev.pairreq.c': '«Состав решаю я»',
+  'ev.pairreq.a.diary': 'Просился играть рядом с другом. «Посмотрим». Игроки: {a}, {b}.', 'ev.pairreq.b.diary': 'Пообещал поставить рядом. Игроки: {a}, {b}.', 'ev.pairreq.c.diary': 'Просился играть рядом с другом. «Состав решаю я». Игроки: {a}, {b}.',
+  'ev.twinfight.text': '{b} отдаёт брату мяч слишком сильно, прямо в спину. — Специально, да? — А тебе всё специально, ты же у нас главный! Дальше — как дома на кухне, только при всей команде. Второй брат: {a}.',
+  'ev.twinfight.a': '«Дома разберётесь»', 'ev.twinfight.b': 'Поговорить о том, что обидно: {b}', 'ev.twinfight.c': '«В следующем матче оба с первой минуты»', 'ev.twinfight.d': 'Развести по разным группам на неделю', 'ev.twinfight.e': '«Рассудить: прав {a}»', 'ev.twinfight.ok': 'Ясно',
+  'ev.twinfight.bOk': '{b} отводит глаза. «Он всегда играет. Я всегда смотрю. Поставьте меня туда, где у меня получается, — я покажу»', 'ev.twinfight.bFail': '{b} только мотает головой. «Вы не поймёте».',
+  'ev.twinfight.mum': 'Звонила мама близнецов: почему её мальчики дерутся в клубе?',
+  'ev.twinfight.a.diary': 'Близнецы поссорились. «Дома разберётесь». Братья: {a}, {b}.', 'ev.twinfight.c.diary': 'Пообещал близнецам: в следующем матче оба с первой минуты. Братья: {a}, {b}.',
+  'ev.twinfight.d.diary': 'Развёл близнецов по разным группам на неделю. Братья: {a}, {b}.', 'ev.twinfight.e.diary': 'В ссоре близнецов встал на сторону одного. Прав: {a}.',
+  'ev.twinfight.bOk.diary': 'Поговорили — теперь знаю, что обидно. Игрок: {b}.', 'ev.twinfight.bFail.diary': 'Пытался поговорить — не раскрылся. Игрок: {b}.',
+  'obl.kept.pair': 'Сдержал слово: играли рядом. Игроки: {a}, {b}.', 'obl.broken.pair': 'Не сдержал слово: рядом так и не сыграли. Игроки: {a}, {b}.',
+  'obl.kept.start': 'Сдержал слово: оба брата вышли с первой минуты. Братья: {a}, {b}.', 'obl.broken.start': 'Не сдержал слово: братья не вышли вдвоём. Братья: {a}, {b}.',
+  'quiet.assist': 'Голевой пас — и обнялись. Отдал: {a}, забил: {b}.', 'quiet.home': 'Проводил друга до дома после ушиба. Проводил: {a}, ушибся: {b}.',
+  'bn.note.event.clash': '{a} и {b} поругались ({d}).', 'bn.note.event.fight': '{a} и {b} подрались ({d}).', 'bn.note.event.blame': 'Обвинил в пропущенном голе: {a} → {b} ({d}).',
+  'bn.note.event.envy': 'Завидует любимчику: {a} → {b} ({d}).', 'bn.note.event.pairreq': 'Просился играть рядом: {a} и {b} ({d}).', 'bn.note.event.twinfight': 'Братья поссорились: {a} и {b} ({d}).',
+  'bn.note.event.med': '{a} и {b} помирились ({d}).', 'bn.note.event.inst': 'Драку начал {a}, второй — {b}; рассказали родители ({d}).',
+  'bn.note.event.quiet.assist': 'Голевой пас — и обнялись: {a} и {b} ({d}).', 'bn.note.event.quiet.home': 'Проводил до дома: {a} → {b} ({d}).',
+  'bn.note.who': '{k} говорит: начал {a}, второй — {b}.',
+  'bn.src.event': 'Случай', 'bn.src.who': 'Свидетель',
+  'bn.sides': 'по словам: {a} — {wa} · {b} — {wb}',
+  'btalk.q.what': 'Что у вас с … случилось?', 'btalk.q.who': 'Кто начал драку?', 'btalk.q.mediate': 'Поможешь помирить … и …?',
+  'btalk.pickMed': 'Кого мирим?', 'btalk.kid2': '{x} и {y}',
+  'bt.a.who.0': '«Начал {x}, тренер. {y} только сдачи дал».', 'bt.a.who.1': 'Понижает голос: «Первым полез {x}. Только не говорите, что от меня».', 'bt.a.who.none': '«Какая драка?»',
+  'bt.a.med.ok': '«Ладно, поговорю с ними». Позже ты видишь, как они втроём над чем-то смеются. Мирил: {x} и {y}.', 'bt.a.med.fail': '«Я пытался, тренер. Теперь оба на меня злятся».',
+  'bt.a.what.fine.0': '«У нас? Ничего. Да я ему ничего не сделал!»', 'bt.a.what.fine.1': '«А он что-то сказал? Не понимаю, что ему не так».',
+  'bt.a.cold.temper.0': '«Он психованный, чуть что — толкается».', 'bt.a.cold.temper.1': '«Заводится с полоборота. Каждый раз».',
+  'bt.a.cold.unfair.0': '«Вы же тогда за него встали. Чего теперь спрашивать?»', 'bt.a.cold.unfair.1': '«Вы меня тогда виноватым сделали, тренер. А это был он».',
+  'bn.say.cold.temper': 'чуть что — толкается: {b}', 'bn.say.cold.unfair': 'ты тогда встал на сторону: {b}',
+  'clue.voice.lead.own': 'При всех признал свою ошибку.', 'clue.voice.lead.med': 'Помирил двоих — ребята его слушают.',
+  'dbg.ev.clash': 'Стычка на тренировке', 'dbg.ev.blame': '«Это ты виноват»', 'dbg.ev.fight': 'Драка', 'dbg.ev.envy': 'Любимчик тренера', 'dbg.ev.pairreq': '«Можно мне с ним?»', 'dbg.ev.twinfight': 'Братья поссорились', 'dbg.ev.fightmum': 'Звонок мамы', 'dbg.ev.twinmiss': 'Скучает по брату',
+  'dbg.clashForce': 'ЗАПУСТИТЬ',
+});
 class Lang {
   static KEY = 'yam_lang';
   constructor() {
@@ -5313,7 +5517,8 @@ const PortraitGenerator = (() => {
     roll: () => SIZES.map(n => Math.floor(Math.random() * n)),
     valid: f => Array.isArray(f) && f.length === SIZES.length && f.every((v, i) => Number.isInteger(v) && v >= 0 && v < SIZES[i]),
     hashFace,
-    svg([bg, head, skin, eyes, mouth, hair, hairC], kit = 'home') {
+    /** v3.27 mark: 'bruise' (cheek) · 'lip' (split lip) · 'eye' (black eye) · 'eyelip' (both) — a few pixels, drawn last. */
+    svg([bg, head, skin, eyes, mouth, hair, hairC], kit = 'home', mark = null) {
       const s = SKIN[skin], sd = dark(s, 0.78), hc = HAIRC[hairC], j = KIT[kit] || KIT.home;
       const rain = [0, 1, 2, 3].map(i => [(bg * 7 + i * 9 + head * 5) % 30 + 1, (i * 11 + skin * 3) % 20 + 1, 1, 2]);
       const [brows, eye, bags] = EYES[eyes];
@@ -5325,6 +5530,9 @@ const PortraitGenerator = (() => {
         + rects(bags, sd) + rects(eye, '#15120f') + rects(brows, dark(hc, 0.85))                                  // eyes / brows
         + rects(MOUTH[mouth], mouth === 2 ? '#2a1a16' : dark(s, 0.55)) + (mouth === 2 ? rects([[14, 17, 4, 1]], '#cfc6b0') : '')
         + rects(HAIR[hair], hc, hair === 3 ? '.55' : '')
+        + (mark === 'bruise' ? rects([[19, 16, 2, 2]], '#6b4a7a', '.85') : '')
+        + (mark === 'eye' || mark === 'eyelip' ? rects([[17, 13, 4, 1], [17, 15, 4, 1], [21, 14, 1, 1]], '#5a3a6e', '.9') : '')
+        + (mark === 'lip' || mark === 'eyelip' ? rects([[15, 19, 2, 1]], '#9e2b25') : '')
         + '</svg>';
     },
   };
@@ -5425,6 +5633,7 @@ class Player {
       if (Array.isArray(o.praiseLog)) this.praiseLog = o.praiseLog.filter(d => typeof d === 'string');
       if (Array.isArray(o.bondNotes)) this.bondNotes = o.bondNotes.filter(n => n && typeof n.band === 'string' && typeof n.source === 'string');
       if (o.talk && typeof o.talk === 'object') this.talk = { ...o.talk, asked: { ...(o.talk.asked || {}) } };
+      if (o.faceMark && typeof o.faceMark.until === 'string') this.faceMark = { kind: o.faceMark.kind, until: o.faceMark.until };   // v3.27: a bruise / split lip
     }
     // ---- v1.8 attribute groups (HIDDEN — never rendered outside DEBUG.EXE) ----
     const fresh = SKILL_KEYS.every(g => AttrGen.validGroup(o[g], g)) && AttrGen.validGroup(o.psych, 'psych') ? null
@@ -5480,7 +5689,7 @@ class Player {
   /** v3.0: what the UI calls the position — the coach's tag for academy kids, the (scouted) role for opponents. */
   get position() { return this.tags ? this.tag : this.archetype; }
   /** v3.0: the keeper kit follows the coach's tag (academy) or the role (opponents). */
-  refreshPortrait() { this.portraitSvg = PortraitGenerator.svg(this.face, this.position === 'GK' ? 'gk' : this.tags ? 'home' : 'away'); }
+  refreshPortrait() { this.portraitSvg = PortraitGenerator.svg(this.face, this.position === 'GK' ? 'gk' : this.tags ? 'home' : 'away', this.faceMark?.kind || null); }
   get surname() { return this.name.split(' ').slice(-1)[0]; }
   get age() { return this.bio.age; }
   /** `energy` is the old name of dyn.condition — kept so every v1.1–v1.7 system keeps working. */
@@ -6401,10 +6610,12 @@ class GameState {
       w = { self: W.self, other: mates.length ? W.other : 0, blame: W.blame, excuse: W.excuse };
       for (const k in extra) if (w[k]) w[k] *= extra[k];
     }
+    const tilt = this.bondMeta?.clash?.tilt, tiltOn = !sp.parent && tilt && tilt.a === kid.id && tilt.date === af.date && mates.includes(tilt.b);   // v3.27: "It's your fault"
+    if (tiltOn && w.other) w.other *= CLASH_TILT.OTHER;
     let x = r() * Object.values(w).reduce((a, b) => a + b, 0), type = Object.keys(w)[0];
     for (const k in w) { if (!w[k]) continue; type = k; if ((x -= w[k]) < 0) break; }
     // v3.25: a kid is twice as likely to talk about a mate he doesn't get on with (one r() either way)
-    const wt = mates.map(id => this.bondV?.(kid.id, id) <= -20 ? BOND.AFTER_W : 1), wsum = wt.reduce((a, b) => a + b, 0);
+    const wt = mates.map(id => (this.bondV?.(kid.id, id) <= -20 ? BOND.AFTER_W : 1) * (tiltOn && id === tilt.b ? CLASH_TILT.ABOUT : 1)), wsum = wt.reduce((a, b) => a + b, 0);
     let target = null;
     if (type === 'other') {
       if (wsum === mates.length) target = this.player(mates[Math.floor(r() * mates.length)]);
@@ -6741,6 +6952,8 @@ class GameState {
   dayEditable(date) { const t = this.calendar.date; return !this.matchOn(date) && (date > t || (date === t && !this.weekState().confirmed)); }
   plannableDays() { return this.weekDays().filter(d => this.dayEditable(d.date)); }
   /** Does OUR club train on this day? (the weekly plan; AI clubs keep isTrainingDay) */
+  /** v3.27: the kids who trained on `date` (the day's routine has run), for the clash roll. */
+  trainedOn(date) { return this._trained?.date === date ? this._trained.ids.map(id => this.player(id)).filter(Boolean) : []; }
   isOurTraining(date) {
     if (!date) return false;
     const w = this.weekState();
@@ -7078,6 +7291,8 @@ class GameState {
       p.dyn.morale += Math.sign(MORALE.DRIFT_TO - p.dyn.morale);
     }
     if (training && date) this.bondTraining(date, trained);   // v3.25: neighbours + the pair drill
+    if (date) { this._trained = { date, ids: training ? trained.map(p => p.id) : [] }; this.tickMarks(date); }   // v3.27: who trained (the clash roll), face marks fade
+    if (training && date && hurt.length && this.bonds) this.bondQuietHurt(date, hurt, trained);   // v3.27: a mate walks him home
     for (const p of hurt) { const t = p.twinId && this.player(p.twinId); if (t) t.dyn.morale = clamp(t.dyn.morale + TWINS.HURT_MORALE, 0, 100); }   // v3.25 shared fate
     if (thisWeek && attended) {   // v3.21 cohesion: the share of the squad that trained; a kid present ends the empty-week streak
       this.week.teff = (this.week.teff || 0) + attended / Math.max(1, this.squad.length);
@@ -7617,6 +7832,10 @@ const BondsMixin = {
         else if (seeded('yardgame#' + k)() < BOND.YARD_GAME) st = [st[0] + BOND.YARD_GAME_DV, st[1]];   // the yard match: opposite sides, one scored
       }
       if (st) this.bonds[k] = { v: st[0], root: st[1], cause, since: date, last: date, ...(cause ? { cd: st[0], cdate: date } : {}) };
+      if (st && !cause && !areTwins(a, b)) {   // v3.27: a one-sided friendship (one of them thinks they're closer) — its own stream
+        const r = seeded('skew#' + k);
+        if (r() < BOND.SKEW_START_P) this.bonds[k].skew = r() < 0.5 ? BOND.SKEW_START : -BOND.SKEW_START;
+      }
     }
     return this.bonds;
   },
@@ -7633,12 +7852,12 @@ const BondsMixin = {
   /** Training day: XI neighbours who both trained +TRAIN; 2 seeded "pair drill" pairs among the trainees +DRILL. */
   bondTraining(date, trained) {
     if (!this.bonds || !trained?.length) return;
-    const ids = new Set(trained.map(p => p.id));
-    for (const [a, b] of this.lineupNeighbours()) if (ids.has(a) && ids.has(b)) this.addBond(a, b, BOND.TRAIN, null, date);
+    const ids = new Set(trained.map(p => p.id)), apart = (a, b) => { const e = this.bond(a, b); return !!e?.apart && date <= e.apart; };   // v3.27: twins in separate groups
+    for (const [a, b] of this.lineupNeighbours()) if (ids.has(a) && ids.has(b) && !apart(a, b)) this.addBond(a, b, BOND.TRAIN, null, date);
     const list = trained.map(p => p.id).sort(), r = seeded(date + '#drill');
     for (let k = 0; k < BOND.DRILL_PAIRS && list.length >= 2; k++) {
       const i = Math.floor(r() * list.length); let j = Math.floor(r() * (list.length - 1)); if (j >= i) j++;
-      this.addBond(list[i], list[j], BOND.DRILL, null, date);
+      if (!apart(list[i], list[j])) this.addBond(list[i], list[j], BOND.DRILL, null, date);
     }
   },
   /** After a match (visual and Quick Sim): side by side, assists, a win, the error before a goal, the fight for a place, twins. */
@@ -7648,13 +7867,16 @@ const BondsMixin = {
     for (const e of side.entries) if (e.p && !eng.subs.some(s => s.in === e.p.id)) mins.set(e.p.id, 90);
     for (const s of eng.subs) { mins.set(s.out, s.minute); mins.set(s.in, 90 - s.minute); }
     for (const [a, b] of this.lineupNeighbours()) if ((mins.get(a) || 0) >= BOND.SIDE_MIN && (mins.get(b) || 0) >= BOND.SIDE_MIN) this.addBond(a, b, BOND.SIDE, null, date);
-    for (const ev of eng.matchEvents) if (ev.type === 'goal' && ev.side === 0 && ev.assistId && this.player(ev.assistId)) this.addBond(ev.assistId, ev.playerId, BOND.ASSIST, null, date);
+    for (const ev of eng.matchEvents) if (ev.type === 'goal' && ev.side === 0 && ev.assistId && this.player(ev.assistId)) {
+      this.addBond(ev.assistId, ev.playerId, BOND.ASSIST, null, date);
+      this.bondQuiet?.(date, ev.assistId, ev.playerId, 'assist');   // v3.27: "Lee set up Finn — they hugged" (mates only, one a day)
+    }
     const played = [...eng.everPlayed].filter(id => this.player(id));
     if (result === 'W') for (let i = 0; i < played.length; i++) for (let j = i + 1; j < played.length; j++) if (this.bondV(played[i], played[j]) > 0) this.addBond(played[i], played[j], BOND.WIN, null, date);
     for (const bl of eng.blames || []) {   // the erring kid and a hot-headed neighbour
       const err = this.player(bl.id); if (!err) continue;
       for (const q of this.lineupNeighbours().filter(([a, b]) => a === err.id || b === err.id).map(([a, b]) => this.player(a === err.id ? b : a)))
-        if (q && bondTemper(q) >= BOND.BLAME_T) this.addBond(err.id, q.id, BOND.BLAME, 'blame', date);
+        if (q && bondTemper(q) >= BOND.BLAME_T) { this.addBond(err.id, q.id, BOND.BLAME, 'blame', date); this.addSkew?.(err.id, q.id, BOND.SKEW_BLAME / 2, date); }   // v3.27: the blamed kid takes it worse
     }
     const starters = this.squad.filter(p => eng.everPlayed.has(p.id) && p.tag);   // the fight for a place (same position tag)
     for (const b of this.squad.filter(p => !eng.everPlayed.has(p.id) && p.tag && p.available && (p.benchStreak || 0) >= BOND.BENCH_RUN))
@@ -7667,6 +7889,7 @@ const BondsMixin = {
       if (tw.matches[k] >= TWINS.TELL_MATCHES) this.learnTwins(p, date);
     }
     for (const id of eng.injured || []) { const p = this.player(id), t = p?.twinId && this.player(p.twinId); if (t) t.dyn.morale = clamp(t.dyn.morale + TWINS.HURT_MORALE, 0, 100); }
+    this.oblCheck?.(eng, date);   // v3.27: "play next to him" / "both start" — kept or broken
     this.bondMatchNotes(eng, date);
   },
   /** A praise for one kid (Coach's Word praise → the man of the match, a REVIEW card, the armband, the office praise). */
@@ -7681,7 +7904,11 @@ const BondsMixin = {
     for (const p of this.squad) {   // the favourite
       const n = (p.praiseLog || []).filter(d => isoDays(d, date) < BOND.FAV_WEEKS * 7).length;
       if (n < BOND.FAV_PRAISES) continue;
-      for (const q of this.squad) if (q !== p && q.psych.discipline <= BOND.FAV_DISC) this.addBond(p.id, q.id, BOND.FAV, 'envy', date);
+      for (const q of this.squad) if (q !== p && q.psych.discipline <= BOND.FAV_DISC) { this.addBond(p.id, q.id, BOND.FAV, 'envy', date); this.addSkew?.(q.id, p.id, BOND.SKEW_ENVY, date); }   // v3.27: only the envious kid is hurt
+    }
+    for (const e of Object.values(this.bonds)) if (e.skew) {   // v3.27: the skew fades SKEW_DECAY a week towards 0
+      e.skew = e.skew > 0 ? Math.max(0, e.skew - BOND.SKEW_DECAY) : Math.min(0, e.skew + BOND.SKEW_DECAY);
+      if (!e.skew) delete e.skew;
     }
     for (const k of Object.keys(this.bonds)) {   // decay towards the root (twins faster)
       const e = this.bonds[k]; if (e.last && e.last >= start) continue;
@@ -7787,7 +8014,7 @@ const BondsMixin = {
     let owner = p, mix = null;
     const tw = n.with && this.mixTwin(p, (n.source || '') + '#' + n.with + '#' + n.date);
     if (tw && tw.id !== n.with) { mix = p.id; owner = tw; }
-    const note = { with: n.with || null, band: n.band, source: n.source, date: n.date, by: n.by || null, ...(n.cause ? { cause: n.cause } : {}), ...(n.root ? { root: n.root } : {}), ...(mix ? { mix } : {}) };
+    const note = { with: n.with || null, band: n.band, source: n.source, date: n.date, by: n.by || null, ...(n.cause ? { cause: n.cause } : {}), ...(n.root ? { root: n.root } : {}), ...(n.ev ? { ev: n.ev } : {}), ...(mix ? { mix } : {}) };
     owner.bondNotes = [...(owner.bondNotes || []), note].slice(-24);
     return note;
   },
@@ -7937,23 +8164,26 @@ const BondsMixin = {
       about = top.id;
     }
     if (qid === 'pair') return this.talkRumour(kid, xId, yId, r, date, by);
+    if (qid === 'who') return this.talkWho(kid, r, date, by);   // v3.27
+    if (qid === 'mediate') return this.talkMediate(kid, xId, yId, date);   // v3.27
     v = this.bondV(kid.id, about);
-    const e = this.bond(kid.id, about);
+    const e = this.bond(kid.id, about), vv = this.bondViewV(kid.id, about);   // v3.27: the answer is the pair as HE sees it (skew)
     if (qid === 'pitch') return this.talkPitch(kid, this.player(about), v, r, date, by);
     let evade = 1 - O;
     if (q.evade) evade *= q.evade;
-    if (v <= -20) evade *= TALK.EVADE_COLD; else if (v >= 20) evade *= TALK.EVADE_MATE;
+    if (vv <= -20) evade *= TALK.EVADE_COLD; else if (vv >= 20) evade *= TALK.EVADE_MATE;
     const res = { qid, about };
     if (r() < clamp(evade, 0, 1)) Object.assign(res, this.talkEvade(kid, qid, about, date));
-    else if (v <= -20 && kid.psych.discipline <= TALK.LIE_DISC && r() < (this.talkForceLie ?? TALK.LIE)) {
+    else if (vv <= -20 && kid.psych.discipline <= TALK.LIE_DISC && r() < (this.talkForceLie ?? TALK.LIE)) {
       Object.assign(res, { kind: 'lie', band: 'neutral' });
       this.addBondNote(kid, { with: about, band: 'neutral', source: 'talk', date, by });
     } else {
-      const band = bondBand(v), root = e?.root ? (areTwins(kid, this.player(about)) ? 'twins' : sameYard(kid, this.player(about)) ? 'yard' : 'school') : null;
-      Object.assign(res, { kind: 'honest', band, root, cause: v <= -20 ? e?.cause || null : null, assist: v >= 20 && !root });
-      this.addBondNote(kid, { with: about, band, source: 'talk', date, by, ...(res.cause ? { cause: res.cause } : {}), ...(root ? { root } : {}) });
+      const band = bondBand(vv), root = e?.root ? (areTwins(kid, this.player(about)) ? 'twins' : sameYard(kid, this.player(about)) ? 'yard' : 'school') : null;
+      const cause = vv <= -20 || (qid === 'what' && v <= -20) ? e?.cause || null : null;   // "What happened?" always names the cause he sees
+      Object.assign(res, { kind: 'honest', band, root, cause, assist: vv >= 20 && !root, surprised: qid === 'what' && vv > -20 });
+      this.addBondNote(kid, { with: about, band, source: 'talk', date, by, ...(cause ? { cause } : {}), ...(root ? { root } : {}) });
     }
-    if (res.kind !== 'evade' && v >= 20) kid.dyn.morale = clamp(kid.dyn.morale + TALK.MATE_MORALE, 0, 100);   // asked about a mate
+    if (res.kind !== 'evade' && vv >= 20) kid.dyn.morale = clamp(kid.dyn.morale + TALK.MATE_MORALE, 0, 100);   // asked about a mate
     if (v <= -60 && bondTemper(kid) >= 1 && r() < TALK.STIR) { this.addBond(kid.id, about, TALK.STIR_DV, null, date); res.stirred = true; }   // «растравил»
     if (v <= -20) this.talkGossip(kid, about, r, date);
     return res;
@@ -7970,6 +8200,41 @@ const BondsMixin = {
     (x.talk ||= {}).closedUntil = isoAdd(date, TALK.GOSSIP_DAYS);
     this.addDiary({ date, key: 'btalk.gossip', vars: { k: { pid: x.id } }, cls: 'ev' });
     return true;
+  },
+  /** v3.27 "Who started it?" — to a witness of the last fight: the instigator; a witness who is a mate (v ≥ WITNESS_LIE_V) of the
+      instigator names the other kid with TALK.LIE (talkForceLie). Evasive with 1 − openness. */
+  talkWho(kid, r, date, by) {
+    const f = this.lastFight(date);
+    if (!f) return { kind: 'none', qid: 'who' };
+    if (r() >= this.openness(kid, date)) return { kind: 'evade', qid: 'who', about: f.inst };
+    const other = f.inst === f.a ? f.b : f.a;
+    const lies = this.bondV(kid.id, f.inst) >= CLASH.WITNESS_LIE_V && this.bondV(kid.id, f.inst) > this.bondV(kid.id, other) && r() < (this.talkForceLie ?? TALK.LIE);
+    const named = lies ? other : f.inst, victim = named === f.a ? f.b : f.a;
+    f.told = { by: kid.id, inst: named };
+    this.addBondNote(this.player(named), { with: victim, band: bondBand(this.bondV(named, victim)), source: 'who', date, by });
+    return { kind: lies ? 'lie' : 'honest', qid: 'who', about: named, y: victim };
+  },
+  /** v3.27 "Will you help me make X and Y friends again?" — the mediator attempt (GameState.mediate). */
+  talkMediate(kid, xId, yId, date) {
+    const res = this.mediate(kid, xId, yId, date, 'talk');
+    return res ? { kind: res.ok ? 'honest' : 'fail', qid: 'mediate', about: xId, y: yId, ok: res.ok, side: res.side || null } : null;
+  },
+  /** v3.27: is the question on offer for this kid now (only when its condition holds)? */
+  talkQAvail(kid, q, date = this.calendar?.date) {
+    if (q.x === 'conflict') return this.knownConflicts(kid.id).length > 0;
+    if (q.x === 'fight') { const f = this.lastFight(date); return !!f && f.a !== kid.id && f.b !== kid.id && f.present.includes(kid.id); }
+    if (q.x === 'mediate') return this.talkMedPairs(kid).length > 0;
+    return true;
+  },
+  /** Pairs [a, b] the coach knows are in conflict, where he knows `kid` is mates+ with both. */
+  talkMedPairs(kid) {
+    const out = [];
+    for (let i = 0; i < this.squad.length; i++) for (let j = i + 1; j < this.squad.length; j++) {
+      const a = this.squad[i].id, b = this.squad[j].id;
+      if (a === kid.id || b === kid.id || !this.knowsConflict(a, b)) continue;
+      if (this.knownBond(kid.id, a)?.cls === 'good' && this.knownBond(kid.id, b)?.cls === 'good') out.push([a, b]);
+    }
+    return out;
   },
   /** "And X and Y?" — a rumour, wrong with 2 × CLUES.WRONG; always gossip-prone. */
   talkRumour(kid, xId, yId, r, date, by) {
@@ -7998,7 +8263,7 @@ const BondsMixin = {
 const bondClass = band => (band === 'best' || band === 'mates' ? 'good' : band === 'cold' || band === 'war' ? 'bad' : band);
 Object.assign(GameState.prototype, BondsMixin);
 const BOND_ICONS = { best: '\u{1F91D}', mates: '\u{1F642}', cold: '\u{1F620}', war: '⚡', neutral: '·', alone: '…', evade: '\u{1F910}', yard: '\u{1F3E0}' };
-const BOND_SRC = { came: '\u{1F6AA}', obs: '\u{1F3C3}', after: '\u{1F5E3}', loner: '…', yard: '\u{1F3E0}', talk: '\u{1F4AC}', rumour: '\u{1F442}' };
+const BOND_SRC = { came: '\u{1F6AA}', obs: '\u{1F3C3}', after: '\u{1F5E3}', loner: '…', yard: '\u{1F3E0}', talk: '\u{1F4AC}', rumour: '\u{1F442}', event: '\u{1F4A2}', who: '\u{1F50E}' };   // v3.27: + event, who
 /** One bond note as the coach wrote it ("From Petya: Kolya took his place"). n.owner = the kid whose list holds it. */
 function bondNoteText(s, n) {
   const a = s.player(n.owner), b = n.with && s.player(n.with), an = a ? L.name(a.name) : '', bn = b ? L.name(b.name) : '';
@@ -8010,9 +8275,414 @@ function bondNoteText(s, n) {
   else if (n.source === 'yard') t = L.t('bn.note.yard', { a: an, b: bn, y: L.t('yard.street.' + kidRoots(a).yard) });
   else if (n.band === 'evade') t = L.t('bn.note.evade', { a: an, b: bn });
   else if (n.source === 'rumour') t = L.t('bn.note.rumour', { k: n.by?.name ? L.name(n.by.name) : '', a: an, b: bn, w: L.t('bn.band.' + n.band) });
+  else if (n.source === 'event') t = L.t('bn.note.event.' + (n.ev || 'clash'), { a: an, b: bn, d: n.date ? fmtDate(n.date, { day: 'numeric', month: 'short' }) : '' });   // v3.27
+  else if (n.source === 'who') t = L.t('bn.note.who', { k: n.by?.name ? L.name(n.by.name) : '', a: an, b: bn });   // v3.27
   else t = (n.by?.name ? L.t('bn.by', { k: L.name(n.by.name) }) + ': ' : '') + say();
   return n.mix ? L.t('twins.mix', { k: an }) + ' ' + t : t;
 }
+/* =========================================================
+   v3.27 "CLASHES" — bonds start to produce stories (GameState mixin, data side; the six dialogues live in 11m-clash-events.js).
+   Pair entry extras: skew (−SKEW_MAX…+SKEW_MAX: kid A of the sorted key sees v + skew, kid B sees v − skew), open (date until
+   which an unresolved clash doubles the pair's clash chance), clash (date of its last clash), apart (twins kept apart until).
+   bondMeta.clash = { last, fight, twin, envy, pairreq: {key: date}, sPen: {id: 1}, fights: [...], post, quiet, n: [dates], ap }.
+   bondMeta.obl   = [{ kind: 'pair' | 'start', a, b, left, date }] — the coach's word to the kids (checked after every match).
+   The coach never sees v, skew or S. All randomness is seeded(); Math.random is never touched.
+   ========================================================= */
+const ClashMixin = {
+  /* ---------- skew: the two-sided view ---------- */
+  /** v as kid `a` sees it (shared v + his side of the skew). */
+  bondViewV(a, b) {
+    const ia = a?.id ?? a, ib = b?.id ?? b, e = this.bond(ia, ib);
+    if (!e) return 0;
+    return clamp((e.v || 0) + (ia < ib ? 1 : -1) * (e.skew || 0), -100, 100);
+  },
+  /** The band as kid `a` sees the pair (talk answers, event casting, notes). Match / cohesion / ATMOS keep the shared v. */
+  bondView(a, b) { return bondBand(this.bondViewV(a, b)); },
+  /** The pair entry (created at v 0 when missing) — for writes that are not a v change. */
+  bondEntry(a, b, date = this.calendar?.date) {
+    const ia = a?.id ?? a, ib = b?.id ?? b;
+    if (!ia || !ib || ia === ib) return null;
+    this.bonds ||= {};
+    return (this.bonds[bondKey(ia, ib)] ||= { v: 0, root: 0, cause: null, since: date, last: date });
+  },
+  /** `hurt` takes it worse than `other`: his view drops by amt (skew moves towards him). */
+  addSkew(hurt, other, amt, date = this.calendar?.date) {
+    const ih = hurt?.id ?? hurt, io = other?.id ?? other, e = this.bondEntry(ih, io, date);
+    if (!e || !amt) return 0;
+    e.skew = clamp(Math.round((e.skew || 0) - (ih < io ? 1 : -1) * amt), -BOND.SKEW_MAX, BOND.SKEW_MAX);
+    if (!e.skew) delete e.skew;
+    return e.skew || 0;
+  },
+  skewReset(a, b) { const e = this.bond(a, b); if (e) delete e.skew; },
+  /** The kid who carries a hidden grudge (|skew| ≥ SKEW_HIDDEN) — or null. */
+  skewHurt(a, b) {
+    const ia = a?.id ?? a, ib = b?.id ?? b, e = this.bond(ia, ib);
+    if (!e || Math.abs(e.skew || 0) < BOND.SKEW_HIDDEN) return null;
+    const [ka, kb] = ia < ib ? [ia, ib] : [ib, ia];
+    return e.skew < 0 ? ka : kb;
+  },
+  /** Sets the pair's cause without a v change (an event that is itself the hurt). */
+  setCause(a, b, cause, date = this.calendar?.date) {
+    const e = this.bondEntry(a, b, date);
+    if (!e || !cause) return;
+    e.cause = cause; e.cd = Math.min(-1, e.v || 0); e.cdate = date;
+  },
+
+  /* ---------- meta ---------- */
+  clashMeta() {
+    const m = (this.bondMeta ||= { known: {}, matches: {} });
+    return (m.clash ||= { last: null, fight: null, twin: null, envy: null, pairreq: {}, sPen: {}, fights: [], post: null, quiet: null, n: [], ap: 0 });
+  },
+  obligations() { return ((this.bondMeta ||= { known: {}, matches: {} }).obl ||= []); },
+  /** Harness / DEBUG counters (clash dates, fights, AP spent on conflicts). */
+  clashCount(kind, date = this.calendar?.date) {
+    const m = this.clashMeta();
+    if (kind === 'clash' || kind === 'fight') m.n = [...(m.n || []), date].slice(-200);
+    if (kind === 'fight') m.fightsN = (m.fightsN || 0) + 1;
+  },
+
+  /* ---------- the hidden success roll S ---------- */
+  clashS(a, b, bonus = 0) {
+    if (this.clashForceS != null) return this.clashForceS;
+    const pa = this.player(a?.id ?? a), pb = this.player(b?.id ?? b);
+    if (!pa || !pb) return CLASH.S_MIN;
+    const lead = Math.max(pa.leadership ?? 10, pb.leadership ?? 10), T = (bondTemper(pa) + bondTemper(pb)) / 2;
+    let S = CLASH.S_BASE + ((this.rep?.squad ?? 50) - 50) / 200 + (lead - 10) / 40 - CLASH.S_T * T;
+    const m = this.clashMeta();
+    for (const p of [pa, pb]) if (m.sPen?.[p.id]) S -= CLASH.NEXT_S_PEN;   // he still remembers the coach sided against him
+    return clamp(S + bonus, CLASH.S_MIN, CLASH.S_MAX);
+  },
+  /** One seeded success roll (salt = event#option). The sPen of both kids is used up. */
+  clashSucceeds(a, b, salt, bonus = 0, date = this.calendar?.date) {
+    const S = this.clashS(a, b, bonus), m = this.clashMeta();
+    for (const id of [a?.id ?? a, b?.id ?? b]) if (m.sPen?.[id]) delete m.sPen[id];
+    if (this.clashForceS != null) return this.clashForceS >= 0.5;
+    return seeded(date + '#S#' + salt + '#' + bondKey(a?.id ?? a, b?.id ?? b))() < S;
+  },
+
+  /* ---------- what the coach knows ---------- */
+  /** The cause the coach has written down for the pair (latest note with a cause) — or null. */
+  knownCause(a, b) {
+    const n = this.pairNotes(a, b).filter(x => x.cause && !x.mix).pop();
+    return n ? n.cause : null;
+  },
+  /** The coach knows a conflict between a and b: a 'bad' note or an event note. */
+  knowsConflict(a, b) {
+    return this.knownBond(a, b)?.cls === 'bad' || this.pairNotes(a, b).some(n => n.source === 'event' && !n.mix && n.band !== 'best' && n.band !== 'mates');
+  },
+  /** Both kids' own words about each other (their latest talk notes) — { a: band, b: band } or null when one side is missing. */
+  pairSides(a, b) {
+    const own = (x, y) => [...(this.player(x)?.bondNotes || [])].reverse().find(n => n.with === y && n.source === 'talk' && n.by?.pid === x && !n.mix && n.band !== 'evade');
+    const na = own(a, b), nb = own(b, a);
+    return na && nb ? { a: na.band, b: nb.band, two: bondClass(na.band) !== bondClass(nb.band) } : null;
+  },
+  /** Kids the coach knows `id` fell out with. */
+  knownConflicts(id) { return this.squad.filter(q => q.id !== id && this.knowsConflict(id, q.id)).map(q => q.id); },
+  /** Possible mediators for (a, b): kids the coach KNOWS are mates+ with both. */
+  mediatorsFor(a, b) {
+    return this.squad.filter(q => q.id !== a && q.id !== b && this.knownBond(q.id, a)?.cls === 'good' && this.knownBond(q.id, b)?.cls === 'good')
+      .sort((x, y) => (y.leadership ?? 0) - (x.leadership ?? 0) || x.id.localeCompare(y.id)).map(q => q.id);
+  },
+  /** The cause → the matching option per event (the hint "you know what this is about" + S +CAUSE_S, or +CAUSE_DV without a roll). */
+  causeOption(eventId, a, b) {
+    const c = this.knownCause(a, b);
+    return c && CLASH_CAUSE_OPT[eventId]?.[c] || null;
+  },
+
+  /* ---------- the daily roll ---------- */
+  /** Clash chance of one pair today (0 when out of the roll). */
+  clashP(e, a, b, date) {
+    if (!e || e.v > CLASH.V_FROM) return 0;
+    const pa = this.player(a), pb = this.player(b);
+    if (!pa || !pb || areTwins(pa, pb)) return 0;   // twins quarrel like brothers (twinfight), never a clash / a fight
+    if (e.clash && isoDays(e.clash, date) < CLASH.CD_PAIR) return 0;
+    let p = CLASH.BASE + Math.max(0, -e.v - 20) / 100 * CLASH.V_K + CLASH.T_K * (bondTemper(pa) + bondTemper(pb));
+    if (e.open && date <= e.open) p *= CLASH.OPEN_MULT;
+    return clamp(p, 0, 1);
+  },
+  /** Once per training / match day: the first pair (sorted keys) whose seeded roll comes up → clash (or a fight at v ≤ FIGHT_V). */
+  clashRoll(date, present) {
+    if (!this.bonds || !date) return null;
+    const m = this.clashMeta();
+    if (m.last && isoDays(m.last, date) < CLASH.CD_TEAM) return null;
+    const ids = new Set(present.map(p => p?.id ?? p));
+    for (const k of Object.keys(this.bonds).sort()) {
+      const [a, b] = k.split('|'), e = this.bonds[k];
+      if (!ids.has(a) || !ids.has(b)) continue;
+      const base = this.clashP(e, a, b, date), p = base && (this.clashForceP ?? base);   // (a forced p keeps the v / twin / cooldown rules)
+      if (!p || seeded(date + '#clash#' + k)() >= p) continue;
+      const fight = e.v <= CLASH.FIGHT_V && !(m.fight && isoDays(m.fight, date) < CLASH.FIGHT_CD);
+      return { id: fight ? 'fight' : 'clash', cast: this.clashCast(a, b) };
+    }
+    return null;
+  },
+  /** [A] = the hotter kid, or the hurt one when the skew hides a grudge (he starts it, the other is surprised). */
+  clashCast(a, b) {
+    const hurt = this.skewHurt(a, b);
+    if (hurt) return { kid: hurt, b: hurt === a ? b : a };
+    const ta = bondTemper(this.player(a)), tb = bondTemper(this.player(b));
+    return ta > tb || (ta === tb && a < b) ? { kid: a, b } : { kid: b, b: a };
+  },
+  /** Bookkeeping when a conflict event opens (cooldowns, counters, the `open` flag, causes). */
+  clashStart(id, a, b, date = this.calendar?.date) {
+    const m = this.clashMeta(), e = this.bondEntry(a, b, date);
+    if (id === 'clash' || id === 'fight') {
+      m.last = date; e.clash = date; this.clashCount(id, date);
+      const hot = bondTemper(this.player(a)) >= 1 || bondTemper(this.player(b)) >= 1;   // a clash between hot heads: the cause is temper
+      if (hot && (!e.cause || e.cause === 'grudge' || e.cause === 'temper')) this.setCause(a, b, 'temper', date);   // a sharper cause stays
+    }
+    if (id === 'fight') m.fight = date;
+    if (id === 'envy') { m.envy = date; m.last = date; }
+    if (id === 'twinfight') { m.twin = date; m.last = date; }
+    if (id === 'pairreq') (m.pairreq ||= {})[bondKey(a, b)] = date;
+  },
+  /** The pair has an unresolved clash for OPEN_DAYS (its chance × OPEN_MULT); resolved = cleared. */
+  clashOpen(a, b, open, date = this.calendar?.date) {
+    const e = this.bondEntry(a, b, date);
+    if (!e) return;
+    if (open) e.open = isoAdd(date, CLASH.OPEN_DAYS); else delete e.open;
+  },
+  /** Training day (after the routine): clash / fight → brothers fell out → the favourite → "Can I play with him?". One a day. */
+  bondEventRoll(date, present, matchDay = false) {
+    if (!this.bonds || !date || !present?.length) return null;
+    const c = this.clashRoll(date, present);
+    if (c || matchDay) return c;
+    return this.twinfightRoll(date, present) || this.envyRoll(date, present) || this.pairreqRoll(date, present);
+  },
+  twinfightRoll(date, present) {
+    const m = this.clashMeta();
+    if ((m.twin && isoDays(m.twin, date) < CLASH.TWIN_CD) || (m.last && isoDays(m.last, date) < CLASH.CD_TEAM)) return null;
+    const ids = new Set(present.map(p => p.id));
+    for (const p of [...this.squad].sort((x, y) => x.id.localeCompare(y.id))) {
+      const t = p.twinId && this.player(p.twinId);
+      if (!t || p.id > t.id || !ids.has(p.id) || !ids.has(t.id)) continue;
+      const hurtOf = () => {   // the one on the bench (2+ matches in a row while his brother starts) or the one praised less
+        for (const [x, y] of [[p, t], [t, p]]) if ((x.benchStreak || 0) >= CLASH.TWIN_BENCH && this.isStarter(y.id)) return x;
+        const n = q => (q.praiseLog || []).filter(d => isoDays(d, date) < BOND.FAV_WEEKS * 7).length;
+        return n(p) - n(t) >= CLASH.TWIN_PRAISE ? t : n(t) - n(p) >= CLASH.TWIN_PRAISE ? p : null;
+      };
+      const hurt = hurtOf();
+      if (!hurt || seeded(date + '#twinfight#' + p.id)() >= (this.clashForceP ?? CLASH.TWIN_P)) continue;
+      const other = hurt === p ? t : p;
+      return { id: 'twinfight', cast: { kid: other.id, b: hurt.id } };   // [A] the favoured brother, [B] the hurt one
+    }
+    return null;
+  },
+  envyRoll(date, present) {
+    const m = this.clashMeta();
+    if ((m.envy && isoDays(m.envy, date) < CLASH.ENVY_CD) || (m.last && isoDays(m.last, date) < CLASH.CD_TEAM)) return null;
+    const ids = new Set(present.map(p => p.id)), sl = this.slots(), lineOfKid = q => { const i = this.lineup.indexOf(q.id); return i >= 0 ? sl[i].line : NATURAL_LINE[q.position] || null; };
+    const favs = this.squad.filter(p => ids.has(p.id) && (p.praiseLog || []).filter(d => isoDays(d, date) < BOND.FAV_WEEKS * 7).length >= BOND.FAV_PRAISES).sort((a, b) => a.id.localeCompare(b.id));
+    for (const f of favs) {
+      const rivals = this.squad.filter(q => q !== f && ids.has(q.id) && !areTwins(q, f) && q.psych.discipline <= BOND.FAV_DISC
+        && (lineOfKid(q) === lineOfKid(f) || (q.tag && q.tag === f.tag))).sort((a, b) => a.id.localeCompare(b.id));
+      if (!rivals.length || seeded(date + '#envy#' + f.id)() >= (this.clashForceP ?? CLASH.ENVY_P)) continue;
+      const a = rivals[Math.floor(seeded(date + '#envywho#' + f.id)() * rivals.length)];
+      return { id: 'envy', cast: { kid: a.id, b: f.id } };
+    }
+    return null;
+  },
+  pairreqRoll(date, present) {
+    const m = this.clashMeta(), ids = new Set(present.map(p => p.id)), nb = new Set(this.lineupNeighbours().map(([a, b]) => bondKey(a, b)));
+    for (const k of Object.keys(this.bonds).sort()) {
+      const e = this.bonds[k], [a, b] = k.split('|');
+      if (e.v < CLASH.PAIRREQ_V || !ids.has(a) || !ids.has(b) || areTwins(this.player(a), this.player(b))) continue;
+      if (m.pairreq?.[k] && isoDays(m.pairreq[k], date) < CLASH.PAIRREQ_CD) continue;
+      if (this.obligations().some(o => o.kind === 'pair' && bondKey(o.a, o.b) === k)) continue;
+      const bench = !this.isStarter(a) || !this.isStarter(b);
+      if (nb.has(k) && !bench) continue;
+      if (seeded(date + '#pairreq#' + k)() >= (this.clashForceP ?? CLASH.PAIRREQ_P)) continue;
+      const va = this.bondViewV(a, b), vb = this.bondViewV(b, a);   // the one who believes it more asks
+      return { id: 'pairreq', cast: va > vb || (va === vb && !this.isStarter(a)) ? { kid: a, b } : { kid: b, b: a } };
+    }
+    return null;
+  },
+  /** After a loss: [B] erred before a goal against, a neighbour [A] with composure ≤ BLAME_COMP or v ≤ −20 (40 %) → "It's your fault"
+      after the Coach's Word. [A]'s AFTER_GAME remark leans to [B] (afterTilt). Returns the post event or null. */
+  blameRoll(eng, result, date = this.calendar?.date) {
+    const m = this.clashMeta();
+    m.post = null; m.tilt = null;
+    if (!this.bonds || result !== 'L' || !eng?.blames?.length) return null;
+    const nbs = this.lineupNeighbours();
+    for (const bl of eng.blames) {
+      const b = this.player(bl.id);
+      if (!b) continue;
+      const cand = nbs.filter(([x, y]) => x === b.id || y === b.id).map(([x, y]) => this.player(x === b.id ? y : x))
+        .filter(a => a && eng.everPlayed.has(a.id) && !areTwins(a, b) && (a.psych.composure <= CLASH.BLAME_COMP || this.bondV(a.id, b.id) <= CLASH.V_FROM))
+        .sort((x, y) => bondTemper(y) - bondTemper(x) || x.id.localeCompare(y.id));
+      const a = cand[0];
+      if (!a || seeded(date + '#blame#' + b.id)() >= (this.clashForceP ?? CLASH.BLAME_P)) continue;
+      this.setCause(a.id, b.id, 'blame', date);
+      this.addSkew(b.id, a.id, BOND.SKEW_BLAME, date);
+      m.post = { id: 'blame', cast: { kid: a.id, b: b.id } };
+      m.tilt = { a: a.id, b: b.id, date };
+      return m.post;
+    }
+    return null;
+  },
+
+  /* ---------- the fight ---------- */
+  /** The fight's hidden facts: the instigator (likelier the hotter kid), the mark ({след}), who was there. Seeded, saved. */
+  fightFacts(a, b, date = this.calendar?.date) {
+    const m = this.clashMeta(), k = bondKey(a, b);
+    let f = (m.fights ||= []).find(x => x.key === k && x.date === date);
+    if (f) return f;
+    const pa = this.player(a), pb = this.player(b), r = seeded(date + '#fight#' + k);
+    const pA = clamp(0.5 + 0.25 * (bondTemper(pa) - bondTemper(pb)), 0.2, 0.8);
+    const inst = r() < pA ? a : b, T = (bondTemper(pa) + bondTemper(pb)) / 2;
+    const mark = clamp(Math.floor(r() * (2 + T * 2)), 0, 3);   // 0 shirts · 1 bruise on B's cheek · 2 B's split lip · 3 B's black eye + A's split lip
+    const present = (this.dayState?.().locker ? this.squad.filter(p => !this.dayState().locker.absent?.[p.id]) : this.squad).map(p => p.id).filter(id => id !== a && id !== b);
+    f = { key: k, a, b, date, inst, mark, present, told: null, mumRoll: r() };
+    m.fights.push(f);
+    if (m.fights.length > 8) m.fights.shift();
+    if (mark === 1) this.markFace(pb, 'bruise', date);
+    else if (mark === 2) this.markFace(pb, 'lip', date);
+    else if (mark === 3) { this.markFace(pb, 'eye', date); this.markFace(pa, 'lip', date); }
+    return f;
+  },
+  /** "Ask the others what happened" (a clash): the witness names the pair's cause (openness decides if he talks). A rumour note. */
+  witnessWhat(w, a, b, date = this.calendar?.date) {
+    const r = seeded(date + '#witwhat#' + w.id + '#' + bondKey(a, b));
+    if (r() >= this.openness(w, date)) return { kind: 'evade' };
+    const e = this.bond(a, b), cause = e?.v <= CLASH.V_FROM ? e.cause || null : null;
+    this.addBondNote(this.player(a), { with: b, band: bondBand(e?.v || 0), source: 'rumour', date, by: { pid: w.id, name: w.name }, ...(cause ? { cause } : {}) });
+    return { kind: 'honest', cause };
+  },
+  lastFight(date = this.calendar?.date) {
+    const f = [...(this.clashMeta().fights || [])].reverse().find(x => this.player(x.a) && this.player(x.b));
+    return f && isoDays(f.date, date) <= TALK.WHO_DAYS ? f : null;
+  },
+  /** A face mark for MARK_DAYS (shown on the portrait; cleared by tickMarks). */
+  markFace(p, kind, date = this.calendar?.date) {
+    if (!p) return;
+    p.faceMark = { kind, until: isoAdd(date, CLASH.MARK_DAYS) };
+    p.refreshPortrait?.();
+  },
+  tickMarks(date) {
+    for (const p of this.squad) if (p.faceMark && date > p.faceMark.until) { delete p.faceMark; p.refreshPortrait?.(); }
+  },
+
+  /* ---------- mediator ---------- */
+  /** Kid `med` tries to make a and b friends again. S + MED_S (+ MED_LEAD_S with leadership ≥ MED_LEAD).
+      Success: v +MED_DV, skew 0, his morale +2, a hidden leadership clue. Fail: caught in the middle — his v with one of them −10. */
+  mediate(med, a, b, date = this.calendar?.date, salt = 'med') {
+    const m = this.player(med?.id ?? med), pa = this.player(a), pb = this.player(b);
+    if (!m || !pa || !pb) return null;
+    const bonus = CLASH.MED_S + ((m.leadership ?? 10) >= CLASH.MED_LEAD ? CLASH.MED_LEAD_S : 0);
+    const ok = this.clashSucceeds(pa.id, pb.id, salt + '#' + m.id, bonus, date);
+    if (ok) {
+      this.addBond(pa.id, pb.id, CLASH.MED_DV, null, date); this.skewReset(pa.id, pb.id); this.clashOpen(pa.id, pb.id, false, date);
+      m.dyn.morale = clamp(m.dyn.morale + 2, 0, 100);
+      this.addClue(m, { date, source: 'voice', ref: 'clash', signal: null, textKey: 'clue.voice.lead.med', kind: 'leadership', claim: 'high', by: null });
+      this.addBondNote(pa, { with: pb.id, band: bondBand(this.bondV(pa.id, pb.id)), source: 'event', date, ev: 'med' });
+      return { ok: true, med: m.id };
+    }
+    const side = seeded(date + '#medside#' + m.id)() < 0.5 ? pa : pb;
+    this.addBond(m.id, side.id, CLASH.MED_FAIL, null, date);
+    return { ok: false, med: m.id, side: side.id };
+  },
+
+  /* ---------- obligations (the coach's word: "play next to him", "both start") ---------- */
+  oblAdd(kind, a, b, matches, date = this.calendar?.date) {
+    const list = this.obligations().filter(o => !(o.kind === kind && bondKey(o.a, o.b) === bondKey(a, b)));
+    list.push({ kind, a, b, left: matches, date });
+    this.bondMeta.obl = list;
+  },
+  /** After a match (bondMatch): kept → the reward and gone; not kept → one match fewer; 0 left → broken. A kid who couldn't
+      play (injured, banned, away) doesn't count against the coach that match. */
+  oblCheck(eng, date = this.calendar?.date) {
+    const list = this.obligations(), out = [];
+    if (!list.length) return out;
+    const starters = new Set(eng.sides[0].entries.filter(e => e.p).map(e => e.p.id).filter(id => !eng.subs.some(s => s.in === id)));
+    const nb = new Set(this.lineupNeighbours().map(([a, b]) => bondKey(a, b))), E = CLASH.E;
+    for (const o of list) {
+      const a = this.player(o.a), b = this.player(o.b);
+      if (!a || !b) { o.left = 0; o.void = true; continue; }
+      const could = q => eng.everPlayed.has(q.id) || q.available;
+      if (!could(a) || !could(b)) continue;   // not his fault this time
+      const kept = o.kind === 'pair' ? starters.has(a.id) && starters.has(b.id) && nb.has(bondKey(a.id, b.id)) : starters.has(a.id) && starters.has(b.id);
+      if (kept) {
+        if (o.kind === 'pair') { for (const q of [a, b]) q.dyn.morale = clamp(q.dyn.morale + E.pairreq.keptM, 0, 100); this.addBond(a.id, b.id, E.pairreq.kept, null, date); }
+        else { for (const q of [a, b]) q.dyn.morale = clamp(q.dyn.morale + E.twinfight.keptM, 0, 100); this.addBond(a.id, b.id, E.twinfight.keptV, null, date); }
+        this.addDiary({ date, key: 'obl.kept.' + o.kind, vars: { a: { pid: a.id }, b: { pid: b.id } }, cls: 'ev' });
+        o.left = 0; o.done = 'kept'; out.push(o);
+        continue;
+      }
+      o.left--;
+      if (o.left <= 0) {
+        if (o.kind === 'pair') a.dyn.morale = clamp(a.dyn.morale + E.pairreq.brokenM, 0, 100);
+        else { this.addBond(a.id, b.id, E.twinfight.brokenV, null, date); this.addRep('parents', E.twinfight.brokenPar); }
+        this.addDiary({ date, key: 'obl.broken.' + o.kind, vars: { a: { pid: a.id }, b: { pid: b.id } }, cls: 'ev' });
+        o.done = 'broken'; out.push(o);
+      }
+    }
+    this.bondMeta.obl = list.filter(o => o.left > 0);
+    return out;
+  },
+  /** The coach keeps his word before kick-off (reference policy; never the hidden v): `start` → both in the XI (promiseStart's
+      line swap), `pair` → [B] moved next to [A] (a swap inside the XI, else from the bench into a slot of his line next to [A]). */
+  oblKeepXI() {
+    let n = 0;
+    for (const o of this.obligations()) {
+      const a = this.player(o.a), b = this.player(o.b);
+      if (!a || !b || !a.available || !b.available) continue;
+      if (o.kind === 'start') { for (const q of [a, b]) if (!this.isStarter(q.id) && this.promiseStart(q)) n++; continue; }
+      if (this.lineupNeighbours().some(([x, y]) => bondKey(x, y) === bondKey(a.id, b.id))) continue;
+      if (!this.isStarter(a.id) && this.promiseStart(a)) n++;
+      const i = this.lineup.indexOf(a.id);
+      if (i < 0) continue;
+      const sl = this.slots(), nbr = bondNeighbours(this.formation).filter(([x, y]) => x === i || y === i).map(([x, y]) => (x === i ? y : x)).filter(j => j > 0);
+      const bi = this.lineup.indexOf(b.id), line = bi >= 0 ? sl[bi].line : NATURAL_LINE[b.position];
+      const j = nbr.find(j => sl[j].line === line) ?? nbr[0];
+      if (j == null) continue;
+      if (bi >= 0) { [this.lineup[bi], this.lineup[j]] = [this.lineup[j], this.lineup[bi]]; }
+      else this.lineup[j] = b.id;
+      n++;
+    }
+    return n;
+  },
+
+  /* ---------- quiet moments (a diary line, no window) ---------- */
+  bondQuiet(date, a, b, kind) {
+    const m = this.clashMeta();
+    if (!this.bonds || m.quiet === date || !this.player(a) || !this.player(b) || this.bondV(a, b) < CLASH.QUIET_V) return false;
+    m.quiet = date;
+    this.addBond(a, b, CLASH.QUIET_DV, null, date);
+    this.addBondNote(this.player(a), { with: b, band: bondBand(this.bondV(a, b)), source: 'event', date, ev: 'quiet.' + kind });
+    this.addDiary({ date, key: 'quiet.' + kind, vars: { a: { pid: a }, b: { pid: b } }, cls: 'ev' });
+    return true;
+  },
+  /** A training knock: a mate (v ≥ 40, trained today) walks the hurt kid home. */
+  bondQuietHurt(date, hurt, trained) {
+    for (const p of hurt) {
+      const mate = this.bondsOf(p.id).filter(x => x.v >= BOND.MATE_V && trained.some(t => t.id === x.id)).sort((x, y) => y.v - x.v || x.id.localeCompare(y.id))[0];
+      if (mate && this.bondQuiet(date, mate.id, p.id, 'home')) return true;
+    }
+    return false;
+  },
+
+  /* ---------- DEBUG.EXE ---------- */
+  /** A cast for a forced event: the given pair (or the worst / best stored pair that fits). */
+  debugClashCast(id, key = null) {
+    const pairs = Object.entries(this.bonds || {}).filter(([k]) => k.split('|').every(x => this.player(x)));
+    if (key) { const [a, b] = key.split('|'); return id === 'pairreq' || id === 'envy' ? { kid: a, b } : this.clashCast(a, b); }
+    if (id === 'twinfight') { const p = this.squad.find(q => q.twinId && this.player(q.twinId)); return p ? { kid: p.id, b: p.twinId } : null; }
+    const sorted = pairs.filter(([k]) => { const [a, b] = k.split('|'); return !areTwins(this.player(a), this.player(b)); }).sort((x, y) => (id === 'pairreq' ? y[1].v - x[1].v : x[1].v - y[1].v));
+    const k = sorted[0]?.[0] || (this.squad.length > 1 ? bondKey(this.squad[0].id, this.squad[1].id) : null);
+    if (!k) return null;
+    const [a, b] = k.split('|');
+    return id === 'pairreq' || id === 'envy' ? { kid: a, b } : this.clashCast(a, b);
+  },
+};
+/** v3.27 the cause → the matching option per event (see the design notes; grudge waits for v3.28 teambuilding). */
+const CLASH_CAUSE_OPT = {
+  clash: { temper: 'c', blame: 'b', unfair: 'g', position: 'b', envy: 'b' },
+  blame: { blame: 'b', unfair: 'g' },
+  fight: { temper: 'b', unfair: 'g' },
+  envy: { envy: 'c', unfair: 'g' },
+  twinfight: { position: 'c', envy: 'b' },
+};
+Object.assign(GameState.prototype, ClashMixin);
 /* =========================================================
    MATCH ENGINE
    Zones are relative to the team in possession:
@@ -8875,8 +9545,24 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.26';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.27';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.27', name: { en: 'Clashes', ru: 'Стычки' },
+    en: [
+      'Kids who don\'t get on now clash at training, blame each other after a loss and sometimes end up in a scuffle behind the locker room. Each time you choose what to do — and every choice has a price.',
+      'Six new situations: a clash at training, "It\'s your fault", a fight, the coach\'s favourite, "Can I play with him?" and twins who fell out. The first button is always the cautious one; it rarely solves anything.',
+      'Two kids don\'t always see it the same way: one may think they\'re friends while the other doesn\'t. The Notebook shows both kids\' words side by side.',
+      'Know why they fell out and you\'ll see a quiet hint on the option that fits. New questions in a one-on-one: "What happened between you and…?", "Who started the fight?", "Will you help me make them friends again?"',
+      'Keep your word: if you promise to put two friends together or to start both brothers, the kids remember whether you did.',
+    ],
+    ru: [
+      'Ребята, которые не ладят, теперь сцепляются на тренировке, винят друг друга после поражения и иногда дерутся за раздевалкой. Каждый раз решаешь ты — и у каждого решения есть цена.',
+      'Шесть новых ситуаций: стычка на тренировке, «Это ты виноват», драка, любимчик тренера, «Можно мне с ним?» и поссорившиеся близнецы. Первая кнопка всегда осторожная — и редко что-то решает.',
+      'Двое не всегда видят одно и то же: один считает, что они друзья, а другой нет. В Блокноте слова обоих теперь рядом.',
+      'Знаешь, из-за чего поссорились, — увидишь тихую подсказку на подходящем варианте. Новые вопросы в разговоре один на один: «Что у вас с … случилось?», «Кто начал драку?», «Поможешь помирить?»',
+      'Держи слово: пообещал поставить друзей рядом или выпустить обоих братьев — ребята запомнят, сдержал ли.',
+    ],
+  },
   { v: '3.26', name: { en: 'Holst', ru: 'Холст' },
     en: [
       'The whole game is now drawn on one canvas that scales to your browser window: from 1366×768 to 2560×1440 the taskbar is always visible and the page never scrolls.',
@@ -10709,11 +11395,17 @@ class DebugConsole {
     const nm = id => esc(squadName(s.player(id), s.squad));
     const rows = Object.entries(s.bonds).filter(([k]) => k.split('|').every(id => s.player(id))).sort((a, b) => b[1].v - a[1].v).map(([k, e]) => {
       const [a, b] = k.split('|'), kb = s.knownBond(a, b);
-      return `<tr><td>${nm(a)}</td><td>${nm(b)}</td><td class="${e.v >= 20 ? 'hi' : e.v <= -20 ? 'lo' : ''}">${e.v}</td><td>${e.root}</td><td>${e.cause || '—'}</td><td>${bondBand(e.v)}</td><td>${kb ? kb.band + ' · ' + kb.source + (kb.confirmed ? ' ✓' : '') : '—'}</td></tr>`;
+      const open = e.open && e.open >= s.calendar.date ? '⚑ ' + e.open.slice(5) : '—';   // v3.27: skew, the open clash, the last clash
+      return `<tr><td>${nm(a)}</td><td>${nm(b)}</td><td class="${e.v >= 20 ? 'hi' : e.v <= -20 ? 'lo' : ''}">${e.v}</td><td>${e.skew ? (e.skew > 0 ? '+' : '') + e.skew : '0'}</td><td>${e.root}</td><td>${e.cause || '—'}</td><td>${bondBand(e.v)}</td><td>${open}</td><td>${e.clash ? e.clash.slice(5) : '—'}</td><td>${kb ? kb.band + ' · ' + kb.source + (kb.confirmed ? ' ✓' : '') : '—'}</td></tr>`;
     }).join('');
+    const keys = Object.keys(s.bonds).filter(k => k.split('|').every(id => s.player(id))).sort((x, y) => s.bonds[x].v - s.bonds[y].v);
+    const cm = s.clashMeta(), force = `<div class="dbg-clash"><b>CLASHES</b> last ${cm.last || '—'} · fight ${cm.fight || '—'} · n ${(cm.n || []).length} · AP ${cm.ap || 0} · obligations ${s.obligations().map(o => o.kind + ':' + o.left).join(', ') || '—'}
+      <span class="dbg-world"><select id="dbg-clash-pair" aria-label="pair">${keys.map(k => `<option value="${k}">${k.split('|').map(nm).join(' / ')} (${s.bonds[k].v})</option>`).join('')}</select>
+      <select id="dbg-clash-ev" aria-label="event">${['clash', 'fight', 'blame', 'envy', 'pairreq', 'twinfight', 'fightmum'].map(id => `<option value="${id}">${esc(L.t('dbg.ev.' + id))}</option>`).join('')}</select>
+      <button class="btn" type="button" data-cheat="clashforce">${L.t('dbg.clashForce')}</button></span></div>`;
     const tw = s.squad.filter(p => p.twinId && s.player(p.twinId) && p.id < p.twinId).map(p => `${nm(p.id)} + ${nm(p.twinId)} ${s.twinsKnown(p) ? '(told apart)' : '(MIX ' + TWINS.MIXUP + ')'}`).join(' · ');
     return `<details class="dbg-bonds" id="dbg-bonds"><summary><b>BONDS</b> — ${Object.keys(s.bonds).length} pairs${tw ? ' · twins: ' + tw : ''}</summary>
-      <div class="dbg-scroll"><table class="dbg-pairs"><thead><tr><th>A</th><th>B</th><th>v</th><th>root</th><th>cause</th><th>band</th><th>coach knows</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
+      ${force}<div class="dbg-scroll"><table class="dbg-pairs"><thead><tr><th>A</th><th>B</th><th>v</th><th title="v3.27: A (first id) sees v + skew, B sees v − skew">skew</th><th>root</th><th>cause</th><th>band</th><th title="v3.27 unresolved clash (×2) until">open</th><th>clash</th><th>coach knows</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
   }
 
   godHTML() {
@@ -10731,7 +11423,7 @@ class DebugConsole {
         `<option value="${e.id}"${this.ui.state.worldEvent?.id === e.id ? ' selected' : ''}>${esc(L.t('world.name.' + e.id))}</option>`).join('')}</select>
         <button class="btn" type="button" data-cheat="world">${L.t('dbg.world')}</button></span><span>${L.t('dbg.worldD')}</span></div>
       ${btn('money', L.t('dbg.money') + ` <b class="dbg-flag">[${money(this.ui.state.budget)}]</b>`, L.t('dbg.moneyD'))}
-      ${NARRATIVE_EVENTS.filter(e => e.when !== 'manual').map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
+      ${NARRATIVE_EVENTS.filter(e => e.when !== 'manual' && e.when !== 'bond' && e.id !== 'fightmum').map(e => btn('fire:' + e.id, L.t('dbg.fire', { e: L.t('dbg.ev.' + e.id) }), L.t('dbg.fireD'))).join('')}
       ${btn('events', L.t('dbg.events') + ` <b class="dbg-flag ${ev ? '' : 'on'}">[${L.t(ev ? 'dbg.forceOn' : 'dbg.forceOff')}]</b>`, L.t('dbg.eventsD'))}
       <div class="dbg-queue"><b>EVENT_QUEUE</b> ${this.ui.state.eventQueue.length ? this.ui.state.eventQueue.map(q => `<code>${esc(q.id)} @ ${q.due}${q.matchDay ? ' (match day)' : ''}${q.from ? ' ← ' + esc(q.from) : ''}</code>`).join(' ') : '<i>empty</i>'}</div>
     </div>`;
@@ -10777,6 +11469,15 @@ class DebugConsole {
       ui.events.enabled = !ui.events.enabled;
       s.excusesOff = !ui.events.enabled;   // v2.8: morning requests follow the same switch
       this.msg = L.t('dbg.events') + ': ' + L.t(ui.events.enabled ? 'dbg.forceOn' : 'dbg.forceOff');
+    } else if (id === 'clashforce') {   // v3.27: a conflict event for the chosen pair (playtesting)
+      if (eng || ui.events.active || ui.cal.running) { this.msg = L.t('dbg.busy'); this.render(); return; }
+      const key = document.getElementById('dbg-clash-pair')?.value, eid = document.getElementById('dbg-clash-ev')?.value || 'clash';
+      const cast = s.debugClashCast(eid === 'fightmum' ? 'fight' : eid, key || null);
+      if (!cast) { this.msg = L.t('dbg.busy'); this.render(); return; }
+      this.close();
+      if (eid === 'fightmum') s.fightFacts(cast.kid, cast.b, s.calendar.date);   // (the mum asks about a fight: make one up)
+      ui.events.fire(eid, s.calendar.date, { cast: eid === 'fightmum' ? { kid: cast.b, b: cast.kid } : cast });
+      return;
     } else if (id.startsWith('fire:')) {
       if (eng || ui.events.active || ui.cal.running) { this.msg = L.t('dbg.busy'); this.render(); return; }
       this.close();
@@ -11533,10 +12234,17 @@ function bondTalkStep(ctx, step, prefix) {
       choices: t.left > 0 ? [{ key: 'btalk.more', tone: 'green', next: prefix + 'menu' }, back] : [back] });
     return;
   }
+  if (step.startsWith('pick:') && TALK_QUESTIONS.find(r => r.id === step.split(':')[1])?.x === 'mediate') {   // v3.27: a pair in conflict
+    ctx.show({ face, name, role, text: L.t('btalk.pickMed'),
+      choices: [...s.talkMedPairs(kid).map(([a, b]) => ({ key: 'btalk.kid2', vars: { x: nm(s.player(a)), y: nm(s.player(b)) }, tone: 'gray', next: ask('mediate', a, b) })),
+        { key: 'btalk.cancel', tone: 'gray', next: prefix + 'menu' }] });
+    return;
+  }
   if (step.startsWith('pick:') || step.startsWith('pick2:')) {
     const [, qid, x] = step.split(':'), q = TALK_QUESTIONS.find(r => r.id === qid);
     const pool = step.startsWith('pick2:') ? others.filter(p => p.id !== x)
-      : q.x === 'played' ? others.filter(p => (s.seasonOf(p.id).apps || 0) >= 1) : others;
+      : q.x === 'played' ? others.filter(p => (s.seasonOf(p.id).apps || 0) >= 1)
+      : q.x === 'conflict' ? others.filter(p => s.knownConflicts(kid.id).includes(p.id)) : others;   // v3.27
     ctx.show({ face, name, role, text: L.t(step.startsWith('pick2:') ? 'btalk.pick2' : 'btalk.pick', { x: x ? nm(s.player(x)) : '' }),
       choices: [...pool.map(p => ({ key: 'btalk.kid', vars: { x: nm(p) }, tone: 'gray',
         next: qid === 'pair' && !step.startsWith('pick2:') ? prefix + 'pick2:pair:' + p.id : ask(qid, qid === 'pair' ? x : p.id, qid === 'pair' ? p.id : null) })),
@@ -11545,7 +12253,8 @@ function bondTalkStep(ctx, step, prefix) {
   }
   const played = others.some(p => (s.seasonOf(p.id).apps || 0) >= 1);
   ctx.show({ face, name, role, text: L.t(pe.ans ? 'btalk.again' : t.free ? 'btalk.introFree' : 'btalk.intro', { k: name, n: t.left }),
-    choices: [...TALK_QUESTIONS.filter(q => q.x !== 'played' || played).map(q => ({ key: 'btalk.q.' + q.id, tone: 'green', next: q.x ? prefix + 'pick:' + q.id : ask(q.id) })), back] });
+    choices: [...TALK_QUESTIONS.filter(q => (q.x !== 'played' || played) && s.talkQAvail(kid, q, ctx.date)).map(q => ({ key: 'btalk.q.' + q.id, tone: 'green',
+      next: q.x && q.x !== 'fight' ? prefix + 'pick:' + q.id : ask(q.id) })), back] });   // v3.27: conditional questions; "Who started it?" needs no pick
 }
 /** The kid's words for one answer (no numbers; phrasings by band × root / cause, picked by a seeded roll). */
 function bondTalkText(s, kid, a) {
@@ -11556,12 +12265,15 @@ function bondTalkText(s, kid, a) {
   if (a.kind === 'none') return L.t(a.qid === 'mates' ? 'bt.a.noMates' : 'bt.a.noHard');
   if (a.kind === 'evade') return L.t(v('bt.a.evade', 3), { x: xn });
   if (a.qid === 'pair') return L.t('bt.a.pair.' + bondClass(a.band), { x: xn, y: yn });
+  if (a.qid === 'who') return a.kind === 'none' ? L.t('bt.a.who.none') : L.t(v('bt.a.who', 2), { x: xn, y: yn });   // v3.27 (a lie looks the same)
+  if (a.qid === 'mediate') return L.t(a.ok ? 'bt.a.med.ok' : 'bt.a.med.fail', { x: xn, y: yn });
+  if (a.qid === 'what' && a.surprised && a.kind === 'honest') return L.t(v('bt.a.what.fine', 2), { x: xn });   // the other side of a hidden grudge
   if (a.qid === 'pitch') return L.t(v('bt.a.pitch.' + a.tone, 2), { x: xn, s: a.signal ? L.t('af.sig.' + a.signal) : '' });
   const band = a.kind === 'lie' ? 'neutral' : a.band;
   let key;
   if (band === 'best' || band === 'mates') key = a.root ? v('bt.a.mates.' + a.root, 2) : band === 'best' ? v('bt.a.best', 2) : a.assist ? v('bt.a.mates.club', 2) : v('bt.a.mates', 3);
   else if (band === 'cold') key = a.cause ? v('bt.a.cold.' + a.cause, 2) : v('bt.a.cold', 2);
-  else if (band === 'war') key = v('bt.a.war', 3);
+  else if (band === 'war') key = a.qid === 'what' && a.cause ? v('bt.a.cold.' + a.cause, 2) : v('bt.a.war', 3);   // v3.27: "What happened?" names it
   else key = v('bt.a.neutral', 3);
   const lead = a.qid === 'mates' ? L.t('bt.who.mates', { x: xn }) + ' ' : a.qid === 'hard' ? L.t('bt.who.hard', { x: xn }) + ' ' : '';
   return lead + L.t(key, { x: xn }) + (a.stirred ? ' ' + L.t('bt.a.stirred') : '');
@@ -11597,7 +12309,12 @@ class EventEngine {
     if (due && this.find(due.id)?.silent) this.find(due.id).apply(this.state, date);   // v3.22: no dialogue (poolleak)
     else if (due && this.fire(due.id, date, { resume, cont, cast: due.cast })) return true;
     if (!this.enabled) return false;
-    const s = this.state, last = [...s.eventLog].reverse().find(e => this.find(e.id)?.when !== 'manual');   // the coach's own talks don't count
+    const s = this.state;
+    if (s.isOurTraining(date) && s.bonds) {   // v3.27: the clash roll and the bond events have their own cooldowns (CLASH.*), before the 6-day one
+      const b = s.bondEventRoll(date, s.trainedOn?.(date) || []);
+      if (b && this.fire(b.id, date, { resume, cont, cast: b.cast })) return true;
+    }
+    const last = [...s.eventLog].reverse().find(e => !['manual', 'bond'].includes(this.find(e.id)?.when));   // the coach's own talks (and v3.27 bond events) don't count
     if (last && last.season === s.season && isoDays(last.date, date) < EVENTS_CFG.COOLDOWN) return false;
     // v2.4: on a training day the training events are evaluated first (the routine has just run)
     const pool = (s.isOurTraining(date) ? shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'training')) : [])
@@ -11612,6 +12329,10 @@ class EventEngine {
     const due = this.takeDue(date, true);
     if (due && this.fire(due.id, date, { after: 'matchday', cast: due.cast })) return true;
     if (!this.enabled) return false;
+    if (s.bonds && CLASH.MATCHDAY) {   // v3.27: the warm-up rondo — the clash roll on a match day (clash / fight only)
+      const b = s.clashRoll(date, s.squad.filter(p => p.available));
+      if (b && this.fire(b.id, date, { after: 'matchday', cast: b.cast })) return true;
+    }
     for (const ev of shuffle(NARRATIVE_EVENTS.filter(e => e.when === 'matchday')))
       if (ev.trigger(s, date, ctx) && this.fire(ev.id, date, { after: 'matchday' })) return true;
     return false;
@@ -11624,6 +12345,7 @@ class EventEngine {
     const keep = preset && Object.values(preset).every(v => [].concat(v).every(pid => this.state.player(pid)));
     const cast = keep ? preset : ev.cast ? ev.cast(this.state) : {};
     if (!cast) return false;
+    if (ev.when === 'bond' && cast.kid && cast.b) this.state.clashStart(id, cast.kid, cast.b, date);   // v3.27: cooldowns, counters, causes
     this.state.pendingEvent = { id, date, cast, resume, after, step: 'start', ...(cont ? { cont } : {}) };
     this.state.save();
     this.open();
@@ -11651,6 +12373,7 @@ class EventEngine {
     const s = this.state, pe = s.pendingEvent;
     if (!pe || (choice.cost && !s.canAfford(choice.cost)) || choice.blocked || (choice.ap && s.ap < choice.ap)) return;
     if (choice.ap) s.weekState().ap -= choice.ap;   // v3.16: [1 AP] options spend from the weekly wallet
+    if (choice.ap && this.find(pe.id)?.when === 'bond') s.clashMeta().ap = (s.clashMeta().ap || 0) + choice.ap;   // v3.27 harness: AP on conflicts
     if (choice.cost) s.addMoney(-choice.cost, 'event');   // v3.15: ledger category
     if (choice.gain) s.addMoney(choice.gain, 'event');
     if (choice.debt) s.addMoney(-choice.debt, choice.cat || 'event', true);   // v2.2: forced payment, may go below $0 (v3.22: own ledger category)
@@ -11667,11 +12390,14 @@ class EventEngine {
     if (s.eventLog.length > 60) s.eventLog.shift();
     s.addDiary({ date: pe.date, key: (choice.diary || key) + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : vars.m ?? '' }, cls: 'ev' });
     s.pendingEvent = null;
-    s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
+    // v3.27: a bond event on a training evening leaves the XI alone — ensureAvailableXI would drop the kids who merely skipped
+    // today's training (absentToday) for good; the match-day arrival checks the XI anyway. (Older events keep the v3.24 behaviour.)
+    if (!(this.find(pe.id)?.when === 'bond' && pe.after !== 'matchday')) s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
     s.save();
     this.view.close();
     this.ui.renderAll();
     if (pe.after === 'matchday') this.ui.afterMatchdayEvent();
+    else if (pe.after === 'post') this.ui.afterPostEvent?.(pe);   // v3.27: "It's your fault" → back to the evening windows
     else if (pe.resume && s.phase === 'calendar') this.ui.runCalendar();
     else if (this.find(pe.id)?.when === 'manual') this.ui.afterManualEvent?.();   // v2.6: office / roll call: same day goes on
     else this.ui.morning({ cont: !!pe.cont });   // v2.5: the day loop → the next morning (v3.13: CONTINUE keeps skipping empty days)
@@ -11721,7 +12447,7 @@ class DialogueView {
         + (pay ? `<span class="tb-money neg">−$${pay}</span>` : c.gain || c.gainLater ? `<span class="tb-money pos"${c.gainLater ? ` title="${esc(L.t('talk.gainLater'))}"` : ''}>+$${c.gain || c.gainLater}</span>` : '');   // v3.24: gainLater = paid by the family later
       const why = c.blocked ? L.t(c.blocked) : broke ? L.t('talk.short', { b: money(s.budget), c: c.cost }) : noAp ? L.t('talk.noAp') : '';
       return `<button type="button" class="talk-btn tone-${c.tone}${c.ap ? ' has-ap' : ''}" data-i="${i}"${short ? ` data-short="1" disabled aria-disabled="true" title="${esc(why)}"` : ''}>
-        <span class="tb-label">${esc(L.t(c.key, c.vars || {}))}</span>${tag}
+        <span class="tb-label">${esc(L.t(c.key, c.vars || {}))}</span>${tag}${c.hint ? `<small class="tb-hint">${esc(L.t('clash.hint'))}</small>` : ''}
         ${short ? `<small class="tb-why">${esc(why)}</small>` : ''}</button>`;
     }).join('');
     this.layer.hidden = false;
@@ -11733,7 +12459,7 @@ class DialogueView {
   /** v3.21: the buttons as policyPick() sees them (greyed = enabled: false). */
   options() {
     const s = this.ui.state;
-    return (this.choices || []).map(c => ({ key: c.key, enabled: !((c.cost && !s.canAfford(c.cost)) || c.blocked || (c.ap && s.ap < c.ap)), gain: c.gain || 0, cost: c.cost || 0 }));
+    return (this.choices || []).map(c => ({ key: c.key, enabled: !((c.cost && !s.canAfford(c.cost)) || c.blocked || (c.ap && s.ap < c.ap)), gain: c.gain || 0, cost: c.cost || 0, ap: c.ap || 0, hint: !!c.hint }));
   }
   /** v3.21: policy runs — the open dialogue is answered through ui.policyPick('talk:<event id>'). */
   autoPick() {
@@ -12797,6 +13523,248 @@ class AfterGameView {
   }
 }
 /* =========================================================
+   v3.27 "CLASHES" — the six conflict dialogues (+ the mum's call). when: 'bond' = rolled by GameState.bondEventRoll /
+   clashRoll / blameRoll (own cooldowns, CLASH.*), never by the random day pool and never counted by the 6-day event cooldown.
+   Rules for all: the v3.17 typewriter; the FIRST button is the neutral, weak, free one (the `first` script can't solve a
+   conflict blindly); [1 AP] options use `ap: 1`; every event writes an exact bond note (source 'event'); a cause the coach
+   knows marks its matching option with a quiet hint (S + CAUSE_S, or v + CAUSE_DV for an option without a roll). No numbers.
+   Rolls happen in `next` (saved as the step: a reload can't re-roll them); effects run on the result step's button.
+   ========================================================= */
+const clashMor = (p, d) => { if (p && d) p.dyn.morale = clamp(p.dyn.morale + d, 0, 100); };
+const clashDisc = (p, d) => { if (p && d) p.psych.discipline = clamp(p.psych.discipline + d, 1, 20); };
+/** The exact note every event leaves (the pair's band after the effects). */
+function clashNote(s, a, b, ev, date) { s.addBondNote(a, { with: b.id, band: bondBand(s.bondV(a.id, b.id)), source: 'event', date, ev }); }
+/** Shared parts of a conflict dialogue: names, the role line, the cause option, the mediator, the witness. */
+function clashCtx(ctx, id) {
+  const s = ctx.state, pe = s.pendingEvent, A = ctx.cast.kid, B = ctx.cast.b, date = ctx.date;
+  const an = L.name(A.name), bn = L.name(B.name), vars = { a: { pid: A.id }, b: { pid: B.id } };
+  const co = s.causeOption(id, A.id, B.id), meds = s.mediatorsFor(A.id, B.id), med = meds.length ? s.player(meds[0]) : null;
+  const bonus = k => (co === k ? CLASH.CAUSE_S : 0), dvB = k => (co === k ? CLASH.CAUSE_DV : 0);
+  const role = L.t('clash.role.' + id, { n: A.number, p: L.pos(A.position) });
+  return { s, pe, A, B, date, an, bn, vars, co, med, bonus, dvB, role, face: A.portraitSvg,
+    show: (text, choices, who = A) => ctx.show({ face: who.portraitSvg, name: L.name(who.name), role, text, choices }),
+    /** A result step: one button that applies `run` and writes the diary of `as`. */
+    result: (stepKey, run, as, who = A) => ctx.show({ face: who.portraitSvg, name: L.name(who.name), role, text: L.t('ev.' + id + '.' + stepKey, { a: an, b: bn, c: med ? L.name(med.name) : '' }),
+      choices: [{ key: 'ev.' + id + '.ok', tone: 'gray', as: 'ev.' + id + '.' + stepKey, who: A.id, run: () => { run(); clashNote(s, A, B, id, date); return vars; } }] }) };
+}
+/** The mediator option ([1 AP], only when the coach knows [C] is mates+ with both). → step 'medOk' / 'medFail'. */
+function clashMedOpt(c, id) {
+  if (!c.med) return null;
+  return { key: 'ev.' + id + '.f', vars: { c: squadName(c.med, c.s.squad) }, tone: 'green', ap: 1, who: c.A.id,
+    next: () => { const r = c.s.mediate(c.med.id, c.A.id, c.B.id, c.date, 'ev#' + id); c.pe.medRes = r; return r?.ok ? 'medOk' : 'medFail'; } };
+}
+/** "Ask the others what happened" — one free question to a seeded witness (clash: what happened; fight: who started it). */
+function clashWitnessOpt(c, id) {
+  if (c.pe.witDone) return null;
+  const here = c.s.trainedOn(c.date).length ? c.s.trainedOn(c.date) : c.s.squad.filter(p => p.available);   // (a match day: whoever is fit)
+  const pool = (id === 'fight' ? c.s.fightFacts(c.A.id, c.B.id, c.date).present : here.map(p => p.id)).filter(x => x !== c.A.id && x !== c.B.id && c.s.player(x)).sort();
+  if (!pool.length) return null;
+  return { key: 'ev.clashAsk', tone: 'gray', next: () => { c.pe.wit = pool[Math.floor(seeded(c.date + '#witness#' + bondKey(c.A.id, c.B.id))() * pool.length)]; c.pe.witDone = true; return 'witness'; } };
+}
+/** The witness's answer (rolled once; the answer is saved on the pending event). */
+function clashWitnessStep(ctx, c, id) {
+  const s = c.s, w = s.player(c.pe.wit);
+  if (!w) { ctx.show({ face: c.face, name: c.an, role: c.role, text: L.t('bt.a.evade.0'), choices: [{ key: 'btalk.back', tone: 'gray', next: 'start' }] }); return; }
+  if (!c.pe.witAns) c.pe.witAns = id === 'fight' ? s.talkAnswer(w, 'who', null, null, c.date) : s.witnessWhat(w, c.A.id, c.B.id, c.date);
+  const a = c.pe.witAns, text = id === 'fight' ? bondTalkText(s, w, a) : a.kind === 'honest' && a.cause ? L.t('ev.clashWit.cause.' + a.cause, { a: c.an, b: c.bn }) : a.kind === 'honest' ? L.t('ev.clashWit.none', { a: c.an, b: c.bn }) : L.t('bt.a.evade.1');
+  ctx.show({ face: w.portraitSvg, name: L.name(w.name), role: L.t('clash.roleWit', { n: w.number, p: L.pos(w.position) }), text,
+    choices: [{ key: 'btalk.back', tone: 'gray', next: () => { delete c.pe.witAns; return 'start'; } }] });
+}
+
+NARRATIVE_EVENTS.push(
+  /* ---------- 1. CLASH AT TRAINING ---------- */
+  {
+    id: 'clash', when: 'bond', trigger: () => false,
+    cast: s => s.debugClashCast('clash'),
+    execute(ctx) {
+      const c = clashCtx(ctx, 'clash'), { s, A, B, date, an, bn } = c, E = CLASH.E.clash;
+      const done = (open, fx) => () => { fx(); s.clashOpen(A.id, B.id, open, date); clashNote(s, A, B, 'clash', date); return c.vars; };
+      switch (ctx.step) {
+        case 'witness': clashWitnessStep(ctx, c, 'clash'); return;
+        case 'bOk': c.result('bOk', () => { s.addBond(A.id, B.id, E.bOk, null, date); clashMor(A, E.bOkM); clashMor(B, E.bOkM); s.clashOpen(A.id, B.id, false, date); }); return;
+        case 'bFail': c.result('bFail', () => { s.addBond(A.id, B.id, E.bFail, 'temper', date); s.clashOpen(A.id, B.id, true, date); }); return;
+        case 'dOk': c.result('dOk', () => { s.addBond(A.id, B.id, E.dOk, null, date); s.clashOpen(A.id, B.id, false, date); }); return;
+        case 'dFail': {   // it gets worse — straight into a fight (unless one happened in the last FIGHT_CD days)
+          const m = s.clashMeta(), canFight = !(m.fight && isoDays(m.fight, date) < CLASH.FIGHT_CD);
+          ctx.show({ face: c.face, name: an, role: c.role, text: L.t(canFight ? 'ev.clash.dFail' : 'ev.clash.dFailCalm', { a: an, b: bn }),
+            choices: [{ key: canFight ? 'ev.clash.toFight' : 'ev.clash.ok', tone: 'gray', as: 'ev.clash.dFail', who: A.id,
+              run: () => { s.addBond(A.id, B.id, E.dFail, 'temper', date); s.clashOpen(A.id, B.id, true, date); clashNote(s, A, B, 'clash', date); return c.vars; },
+              ...(canFight ? { next: () => { const pe = s.pendingEvent; pe.id = 'fight'; delete pe.witDone; s.clashStart('fight', A.id, B.id, date); return 'start'; } } : {}) }] });
+          return;
+        }
+        case 'medOk': c.result('medOk', () => {}); return;
+        case 'medFail': c.result('medFail', () => { s.clashOpen(A.id, B.id, true, date); }); return;
+      }
+      const hidden = s.skewHurt(A.id, B.id) === A.id;   // a hidden grudge: [B] has no idea why
+      const ch = [
+        { key: 'ev.clash.a', tone: 'gray', who: A.id, run: done(true, () => s.addBond(A.id, B.id, E.a, null, date)) },
+        { key: 'ev.clash.b', tone: 'green', ap: 1, who: A.id, hint: c.co === 'b', next: () => (s.clashSucceeds(A, B, 'clash#b', c.bonus('b'), date) ? 'bOk' : 'bFail') },
+        { key: 'ev.clash.c', tone: 'red', who: A.id, hint: c.co === 'c', run: done(false, () => { clashDisc(A, 1); clashDisc(B, 1); clashMor(A, E.cM); clashMor(B, E.cM); s.addBond(A.id, B.id, E.c + c.dvB('c'), null, date); s.addRep('squad', E.cSq); }) },
+        { key: 'ev.clash.d', tone: 'green', ap: 1, who: A.id,
+          next: () => { const T = (bondTemper(A) + bondTemper(B)) / 2, p = s.clashForceS ?? clamp(E.d - E.dT * T, 0.1, 0.9); return seeded(date + '#clashpair#' + bondKey(A.id, B.id))() < p ? 'dOk' : 'dFail'; } },
+        { key: 'ev.clash.e', vars: { b: squadName(B, s.squad) }, tone: 'red', who: B.id,
+          run: done(true, () => { clashMor(B, E.eMB); clashMor(A, E.eMA); s.addBond(A.id, B.id, E.e, 'unfair', date); s.addRep('squad', E.eSq); s.addSkew(A.id, B.id, BOND.SKEW_SIDED, date); s.clashMeta().sPen[A.id] = 1; }) },
+        clashMedOpt(c, 'clash'),
+        c.co === 'g' || s.knownCause(A.id, B.id) === 'unfair' ? { key: 'ev.clashWrong', tone: 'green', ap: 1, who: A.id, hint: true,
+          run: done(false, () => { const h = s.player(s.skewHurt(A.id, B.id)) || A; clashMor(h, E.wrongM); s.skewReset(A.id, B.id); s.addRep('squad', E.wrongSq); s.addBond(A.id, B.id, CLASH.CAUSE_DV, null, date); }) } : null,
+        clashWitnessOpt(c, 'clash'),
+      ].filter(Boolean);
+      c.show(L.t('ev.clash.text', { a: an, b: bn }) + (hidden ? ' ' + L.t('ev.clash.surprised', { a: an, b: bn }) : ''), ch);
+    },
+  },
+
+  /* ---------- 2. "IT'S YOUR FAULT" — after a loss, in the locker after the Coach's Word ---------- */
+  {
+    id: 'blame', when: 'bond', trigger: () => false,
+    cast: s => s.debugClashCast('blame'),
+    execute(ctx) {
+      const c = clashCtx(ctx, 'blame'), { s, A, B, date, an, bn } = c, E = CLASH.E.blame;
+      const done = fx => () => { fx(); clashNote(s, A, B, 'blame', date); return c.vars; };
+      switch (ctx.step) {
+        case 'eOk': c.result('eOk', () => { s.addBond(A.id, B.id, E.eOk, null, date); clashMor(B, E.eOkM);
+          s.addClue(B, { date, source: 'talk', ref: 'clash', signal: null, textKey: 'clue.voice.lead.own', kind: 'leadership', claim: 'high', by: null }); }, undefined, B); return;
+        case 'eFail': c.result('eFail', () => { clashMor(B, E.eFailM); s.addBond(A.id, B.id, E.eFail, 'blame', date); }, undefined, B); return;
+        case 'medOk': c.result('medOk', () => {}); return;
+        case 'medFail': c.result('medFail', () => {}); return;
+      }
+      c.show(L.t('ev.blame.text', { a: an, b: bn }), [
+        { key: 'ev.blame.a', tone: 'gray', who: A.id, run: done(() => { s.addBond(A.id, B.id, E.a, 'blame', date); clashMor(B, E.aMB); clashMor(A, E.aMA); }) },
+        { key: 'ev.blame.b', vars: { a: squadName(A, s.squad) }, tone: 'green', ap: 1, who: A.id, hint: c.co === 'b',
+          run: done(() => { s.addBond(A.id, B.id, E.b + c.dvB('b'), null, date); clashMor(A, E.bMA); clashMor(B, E.bMB); s.addRep('squad', E.bSq); }) },
+        { key: 'ev.blame.c', tone: 'gray', who: A.id, run: done(() => { s.addBond(A.id, B.id, E.c, 'blame', date); clashMor(B, E.cMB); }) },
+        { key: 'ev.blame.d', tone: 'red', who: B.id, run: done(() => { clashMor(B, E.dMB); clashMor(A, E.dMA); s.addBond(A.id, B.id, E.d, 'blame', date); s.addRep('squad', E.dSq); s.addSkew(B.id, A.id, BOND.SKEW_SIDED, date); }) },
+        { key: 'ev.blame.e', vars: { b: squadName(B, s.squad) }, tone: 'green', ap: 1, who: B.id, next: () => ((B.leadership ?? 10) >= CLASH.BLAME_LEAD || s.clashForceS === 1) && s.clashForceS !== 0 ? 'eOk' : 'eFail' },
+        clashMedOpt(c, 'blame'),
+      ].filter(Boolean));
+    },
+  },
+
+  /* ---------- 3. FIGHT — behind the locker room after training (or a clash that went wrong) ---------- */
+  {
+    id: 'fight', when: 'bond', trigger: () => false,
+    cast: s => s.debugClashCast('fight'),
+    execute(ctx) {
+      const c = clashCtx(ctx, 'fight'), { s, A, B, date, an, bn } = c, E = CLASH.E.fight, f = s.fightFacts(A.id, B.id, date);
+      const after = opt => {   // the mum's call: a face mark → 50 % the next day (not after calling the parents); else after A / B in 2–4 days
+        if (s.clashMeta().mumFor === f.key + f.date) return;
+        const mark = f.mark >= 1 && (s.clashForceMum ?? f.mumRoll) < CLASH.MUM_P;
+        if (opt !== 'e' && mark) { f.mum = 'mark'; ctx.schedule('fightmum', { days: 1, cast: { kid: B.id, b: A.id } }); }
+        else if (opt === 'a' || opt === 'b') { f.mum = 'ask'; ctx.schedule('fightmum', { days: CLASH.MUM_DAYS[0] + Math.floor(seeded(date + '#mumdays#' + f.key)() * (CLASH.MUM_DAYS[1] - CLASH.MUM_DAYS[0] + 1)), cast: { kid: B.id, b: A.id } }); }
+        s.clashMeta().mumFor = f.key + f.date;
+      };
+      const done = (opt, fx) => () => { fx(); after(opt); s.clashOpen(A.id, B.id, opt === 'a', date); clashNote(s, A, B, 'fight', date); return c.vars; };
+      const guess = (who, opt) => done(opt, () => {
+        const inn = who === A ? B : A, right = f.inst === who.id;
+        who.suspensionMatches = Math.max(who.suspensionMatches || 0, 1);
+        if (right) { s.addBond(A.id, B.id, E.ok + c.dvB(opt), null, date); s.addRep('squad', E.okSq); clashDisc(who, 1); }
+        else { s.addBond(A.id, B.id, E.bad, 'unfair', date); clashMor(inn, E.badM); s.addRep('squad', E.badSq); s.addRep('parents', E.badPar); s.addSkew(who.id, inn.id, BOND.SKEW_SIDED, date); }
+      });
+      if (ctx.step === 'witness') { clashWitnessStep(ctx, c, 'fight'); return; }
+      const trace = L.t('ev.fight.mark.' + f.mark, { a: an, b: bn });
+      c.show(L.t('ev.fight.text', { a: an, b: bn, t: trace }), [
+        { key: 'ev.fight.a', tone: 'gray', who: A.id, run: done('a', () => { s.addBond(A.id, B.id, E.a, null, date); s.addRep('squad', E.aSq); if (seeded(date + '#fightboard#' + f.key)() < CLASH.BOARD_P) s.addRep('board', E.aBrd); }) },
+        { key: 'ev.fight.b', tone: 'red', who: A.id, hint: c.co === 'b',
+          run: done('b', () => { for (const p of [A, B]) { p.suspensionMatches = Math.max(p.suspensionMatches || 0, 1); clashDisc(p, 1); } s.addRep('parents', E.bPar); s.addBond(A.id, B.id, E.b + c.dvB('b'), null, date); }) },
+        { key: 'ev.fight.c', vars: { a: squadName(A, s.squad) }, tone: 'red', who: A.id, run: guess(A, 'c') },
+        { key: 'ev.fight.d', vars: { b: squadName(B, s.squad) }, tone: 'red', who: B.id, run: guess(B, 'd') },
+        { key: 'ev.fight.e', tone: 'green', ap: 1, who: A.id,
+          run: done('e', () => { s.addRep('parents', E.ePar); s.addBond(A.id, B.id, E.e, null, date); clashMor(A, E.eM); clashMor(B, E.eM);
+            const inst = s.player(f.inst), oth = inst === A ? B : A; s.addBondNote(inst, { with: oth.id, band: bondBand(s.bondV(A.id, B.id)), source: 'event', date, ev: 'inst' }); f.told = { by: 'parents', inst: f.inst }; }) },
+        c.co === 'g' ? { key: 'ev.clashWrong', tone: 'green', ap: 1, who: A.id, hint: true,
+          run: done('g', () => { const h = s.player(s.skewHurt(A.id, B.id)) || A; clashMor(h, CLASH.E.clash.wrongM); s.skewReset(A.id, B.id); s.addRep('squad', CLASH.E.clash.wrongSq); }) } : null,
+        clashWitnessOpt(c, 'fight'),
+      ].filter(Boolean));
+    },
+  },
+
+  /* ---------- 4. COACH'S FAVOURITE ---------- */
+  {
+    id: 'envy', when: 'bond', trigger: () => false,
+    cast: s => { const f = [...s.squad].sort((a, b) => (b.praiseLog || []).length - (a.praiseLog || []).length)[0], a = s.squad.find(q => q !== f && !areTwins(q, f)); return f && a ? { kid: a.id, b: f.id } : null; },
+    execute(ctx) {
+      const c = clashCtx(ctx, 'envy'), { s, A, B, date, an, bn } = c, E = CLASH.E.envy;   // A = the envious kid, B = the favourite [F]
+      const done = fx => () => { fx(); clashNote(s, A, B, 'envy', date); return c.vars; };
+      if (ctx.step === 'bOk' || ctx.step === 'bFail') {
+        c.result(ctx.step, () => {
+          if (ctx.step === 'bFail') { clashMor(A, E.bFailM); return; }
+          s.skewReset(A.id, B.id); const e = s.bond(A.id, B.id); if (e?.cause === 'envy') e.cause = null;
+          clashMor(A, E.bOkM);
+          const sig = trueSignals(A)[0] || null;   // what he wants: his place / more minutes
+          if (sig) s.addClue(A, { date, source: 'talk', ref: 'talk', signal: sig, textKey: 'clue.voice.self', kind: 'role', claim: null, by: { pid: A.id, name: A.name } });
+        });
+        return;
+      }
+      c.show(L.t('ev.envy.text', { a: an, f: bn }), [
+        { key: 'ev.envy.a', tone: 'gray', who: A.id, run: done(() => s.addBond(A.id, B.id, E.a, 'envy', date)) },
+        { key: 'ev.envy.b', vars: { a: squadName(A, s.squad) }, tone: 'green', ap: 1, who: A.id, hint: c.co === 'b', next: () => (s.clashSucceeds(A, B, 'envy#b', c.bonus('b'), date) ? 'bOk' : 'bFail') },
+        { key: 'ev.envy.c', vars: { a: squadName(A, s.squad) }, tone: 'green', who: A.id, hint: c.co === 'c',
+          run: done(() => { clashMor(A, E.cM); B.praiseLog = []; if (A.dyn.sharpness < E.cSharp) s.addRep('squad', E.cSq); if (c.dvB('c')) s.addBond(A.id, B.id, c.dvB('c'), null, date); }) },
+        { key: 'ev.envy.d', tone: 'red', who: B.id, run: done(() => { clashMor(B, E.dMF); clashMor(A, E.dMA); s.addBond(A.id, B.id, E.d, 'envy', date); s.addRep('squad', E.dSq); s.addSkew(A.id, B.id, BOND.SKEW_SIDED, date); }) },
+      ]);
+    },
+  },
+
+  /* ---------- 5. "CAN I PLAY WITH HIM?" (positive) ---------- */
+  {
+    id: 'pairreq', when: 'bond', trigger: () => false,
+    cast: s => s.debugClashCast('pairreq'),
+    execute(ctx) {
+      const c = clashCtx(ctx, 'pairreq'), { s, A, B, date, an, bn } = c, E = CLASH.E.pairreq;
+      const note = () => clashNote(s, A, B, 'pairreq', date);
+      c.show(L.t('ev.pairreq.text', { a: an, b: bn }), [
+        { key: 'ev.pairreq.a', tone: 'gray', who: A.id, run: () => { note(); return c.vars; } },
+        { key: 'ev.pairreq.b', tone: 'green', who: A.id,
+          run: () => { s.oblAdd('pair', A.id, B.id, CLASH.OBL_PAIR, date); if (s.bondViewV(B.id, A.id) < 20) clashMor(B, E.oneSidedM); note(); return c.vars; } },   // one-sided: [B] doesn't think so
+        { key: 'ev.pairreq.c', tone: 'red', who: A.id, run: () => { clashMor(A, E.cM); note(); return c.vars; } },
+      ]);
+    },
+  },
+
+  /* ---------- 6. BROTHERS FELL OUT ---------- */
+  {
+    id: 'twinfight', when: 'bond', trigger: () => false,
+    cast: s => s.debugClashCast('twinfight'),
+    execute(ctx) {
+      const c = clashCtx(ctx, 'twinfight'), { s, A, B, date, an, bn } = c, E = CLASH.E.twinfight;   // A = the favoured brother, B = the hurt one
+      const done = fx => () => { fx(); clashNote(s, A, B, 'twinfight', date); return c.vars; };
+      if (ctx.step === 'bOk' || ctx.step === 'bFail') {
+        c.result(ctx.step, () => {
+          if (ctx.step === 'bFail') { s.addBond(A.id, B.id, E.bFail, null, date); return; }
+          s.addBond(A.id, B.id, E.bOk, null, date);
+          const sig = trueSignals(B)[0] || null;
+          if (sig) s.addClue(B, { date, source: 'talk', ref: 'talk', signal: sig, textKey: 'clue.voice.self', kind: 'role', claim: null, by: { pid: B.id, name: B.name } });
+        }, undefined, B);
+        return;
+      }
+      c.show(L.t('ev.twinfight.text', { a: an, b: bn }), [
+        { key: 'ev.twinfight.a', tone: 'gray', who: A.id,
+          run: done(() => { s.addBond(A.id, B.id, E.a, null, date); if (seeded(date + '#twinmum#' + A.id)() < CLASH.TWIN_MUM) { s.addRep('parents', E.aPar); s.addDiary({ date, key: 'ev.twinfight.mum', vars: c.vars, cls: 'ev' }); } }) },
+        { key: 'ev.twinfight.b', vars: { b: squadName(B, s.squad) }, tone: 'green', ap: 1, who: B.id, hint: c.co === 'b', next: () => (s.clashSucceeds(A, B, 'twin#b', E.bS + c.bonus('b'), date) ? 'bOk' : 'bFail') },
+        { key: 'ev.twinfight.c', tone: 'green', who: B.id, hint: c.co === 'c', run: done(() => { s.oblAdd('start', A.id, B.id, 1, date); if (c.dvB('c')) s.addBond(A.id, B.id, c.dvB('c'), null, date); }) },
+        { key: 'ev.twinfight.d', tone: 'gray', who: A.id, run: done(() => { s.addBond(A.id, B.id, E.d, null, date); s.bondEntry(A.id, B.id, date).apart = isoAdd(date, CLASH.TWIN_APART); }) },
+        { key: 'ev.twinfight.e', vars: { a: squadName(A, s.squad) }, tone: 'red', who: A.id, run: done(() => { clashMor(B, E.eM); s.addSkew(B.id, A.id, CLASH.TWIN_SKEW, date); s.addRep('parents', E.ePar); }) },
+      ], B);
+    },
+  },
+
+  /* ---------- the mum's call after a fight (scheduled; short) ---------- */
+  {
+    id: 'fightmum', when: 'scheduled', trigger: () => false, cast: () => null,
+    execute(ctx) {
+      const s = ctx.state, son = ctx.cast.kid, other = ctx.cast.b, E = CLASH.E.mum;
+      const f = [...(s.clashMeta().fights || [])].reverse().find(x => x.key === bondKey(son.id, other.id));
+      const vars = { k: { pid: son.id }, b: { pid: other.id } }, mark = f?.mum === 'mark';
+      ctx.show({ face: PortraitGenerator.silhouette('#4a3b5c'), name: L.t('ev.fightmum.name', { k: L.name(son.name) }), role: L.t('talk.rolePhone'),
+        text: L.t(mark ? 'ev.fightmum.mark' : 'ev.fightmum.ask', { k: L.name(son.name), b: L.name(other.name), t: f ? L.t('ev.fight.markShort.' + f.mark) : '' }),
+        choices: [
+          { key: 'ev.fightmum.b', tone: 'gray', who: son.id, run: () => { s.addRep('parents', E.noPar); return vars; } },
+          { key: 'ev.fightmum.a', tone: 'green', who: son.id, run: () => { s.addRep('parents', E.truthPar); clashMor(son, E.truthM); return vars; } },
+          { key: 'ev.fightmum.c', tone: 'green', ap: 1, who: son.id, run: () => { s.addRep('parents', E.apPar); return vars; } },
+        ] });
+    },
+  },
+);
+/* =========================================================
    UI CONTROLLER
    ========================================================= */
 class UIController {
@@ -13398,6 +14366,7 @@ class UIController {
   autoOpenPost() {
     const s = this.state, rep = s.lastReport;
     if (s.phase !== 'post' || !rep || this.autoOpenedFor === rep || s.talkPending) return;
+    if (this.firePostEvent('open')) return;   // v3.27: "It's your fault" comes first
     if (!s.afterPending && !s.reviewPending) return;
     if (s.afterPending ? this.autoAfter : this.autoReview) return;   // auto-play / smoke decide by themselves at [ CONTINUE ]
     this.autoOpenedFor = rep;
@@ -13762,6 +14731,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (s.phase === 'matchday') {
       this.modal.close();
       if (!s.dayState().locker?.done) { const lk = s.runLocker(false); lk.done = true; lk.revealed = true; }   // who turned up (no locker window)
+      if (['reference', 'greedy', 'overload', 'empty'].includes(this.autoPolicy)) s.oblKeepXI();   // v3.27: the coach keeps his word ("next to him" / "both start")
       this.onInstantSim();
       if (s.phase === 'post') this.policyPost();
       return;
@@ -13781,7 +14751,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (!kid || s.talkBlock(kid.id)) return false;
     s.spendAP(); w.talked = true;
     (kid.talk ||= {}).last = s.calendar.date;
-    s.talkAnswer(kid, 'how', pair[1]); s.talkAnswer(kid, 'mates');
+    const conflict = this.autoPolicy !== 'random' && s.knowsConflict?.(pair[0], pair[1]);   // v3.27: reference asks "What happened between you and X?"
+    s.talkAnswer(kid, conflict ? 'what' : 'how', pair[1]); s.talkAnswer(kid, 'mates');
     s.learnTwins(kid);
     const st = (s.stats ||= {}); st.talkAP = (st.talkAP || 0) + TALK.AP;
     s.save();
@@ -13795,6 +14766,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       const keys = TEAM_TALK.KEYS;
       s.applyTeamTalk(keys[this.policyPick('word', keys.map(k => ({ key: k, out: talkOutcome(s.lastReport) })))]);
     }
+    if (this.firePostEvent('policy', { anyTalk: true })) return;   // v3.27: the dialogue answers itself (autoPick), the next step goes on
     for (let guard = 0; s.afterPending && guard < 4; guard++) {
       const af = s.after;
       if (af.mode === 'draw') { if (this.policyPick('after', [{ key: 'praise' }, { key: 'listen' }]) === 0) s.afterPraise(); else s.afterListen(); continue; }
@@ -13824,7 +14796,10 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const pol = this.autoPolicy, ok = i => !!options[i] && options[i].enabled !== false;
     const first = options.findIndex((o, i) => ok(i));
     let i = first < 0 ? 0 : first;
-    if (pol && pol !== 'first') {   // v3.22: greedy overrides a few windows, everything else as reference
+    if (pol === 'random' && windowId.startsWith('talk:')) {   // v3.27: a seeded random enabled button in every event dialogue
+      const en = options.map((o, j) => j).filter(ok), st = (this._rndN = (this._rndN || 0) + 1);
+      if (en.length) i = en[Math.floor(seeded(this.state.calendar.date + '#rndpol#' + windowId + '#' + st)() * en.length)];
+    } else if (pol && pol !== 'first') {   // v3.22: greedy overrides a few windows, everything else as reference
       const fn = (pol === 'greedy' && UIController.POLICY_GREEDY[windowId]) || UIController.POLICY_PICK[windowId];
       const r = fn?.(options, this.state); if (r != null && ok(r)) i = r;
     }
@@ -13847,7 +14822,17 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     'talk:scoutpoach': o => { const t = o.findIndex(x => x.key === 'ev.scoutpoach.b'); return o[t]?.enabled !== false ? t : o.findIndex(x => x.key === 'ev.scoutpoach.a'); },
     'talk:promise': () => 0,   // keep
     'talk:twinmiss': o => { const t = o.findIndex(x => x.key === 'ev.twinmiss.b'); return o[t]?.enabled !== false ? t : o.findIndex(x => x.key === 'ev.twinmiss.c'); },   // v3.25
+    // v3.27 conflicts: a [1 AP] option when it can afford one — the cause-matching one first, then the mediator, then the talk
+    'talk:clash': o => UIController.firstOk(o, [x => x.hint, x => x.key === 'ev.clash.f', x => x.key === 'ev.clash.b']),
+    'talk:blame': o => UIController.firstOk(o, [x => x.key === 'ev.blame.b']),
+    'talk:fight': o => UIController.firstOk(o, [x => x.key === 'ev.fight.e', x => x.key === 'ev.fight.b']),
+    'talk:envy': o => UIController.firstOk(o, [x => x.hint, x => x.key === 'ev.envy.b']),
+    'talk:pairreq': o => UIController.firstOk(o, [x => x.key === 'ev.pairreq.b']),
+    'talk:twinfight': o => UIController.firstOk(o, [x => x.hint, x => x.key === 'ev.twinfight.b', x => x.key === 'ev.twinfight.c']),
+    'talk:fightmum': o => UIController.firstOk(o, [x => x.key === 'ev.fightmum.a']),
   };
+  /** v3.27: the first option (in the given order of tests) that is enabled — or null. */
+  static firstOk(o, tests) { for (const t of tests) { const i = o.findIndex(x => x.enabled !== false && t(x)); if (i >= 0) return i; } return null; }
   /** v3.22 `greedy`: takes every money offer, keeps every promise, accepts the showcase, lets a poached kid go. */
   static POLICY_GREEDY = {
     'talk:dad': o => o.findIndex(x => x.key === 'ev.dad.a'),
@@ -13917,7 +14902,8 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     const good = links.filter(l => l.cls === 'good'), bad = links.filter(l => l.cls === 'bad');
     const tw = p.twinId && s.player(p.twinId);
     const line = (key, list) => list.length ? `<li><b>${L.t(key)}</b> ${list.map(l => `<span class="bn-${l.band}${l.stale ? ' stale' : ''}" title="${esc(L.t('bn.src.' + l.source))}">${BOND_ICONS[l.band] || ''} ${nm(l.id)}${l.confirmed ? ' ' + L.t('clue.confirmed') : ''}</span>`).join(', ')}</li>` : '';
-    const body = (tw ? `<li>${L.t('bn.twin', { x: nm(tw.id) })}</li>` : '') + line('bn.friends', good) + line('bn.cold', bad)
+    const two = links.map(l => this.sidesLine(p.id, l.id)).filter(Boolean).map(x => `<li>${x}</li>`).join('');   // v3.27: the two-sided view
+    const body = (tw ? `<li>${L.t('bn.twin', { x: nm(tw.id) })}</li>` : '') + line('bn.friends', good) + line('bn.cold', bad) + two
       + (s.isLoner(p) && (p.bondNotes || []).some(n => n.band === 'alone') ? `<li>${L.t('bn.alone')}</li>` : '');
     return `<fieldset class="pi-bonds"><legend>${L.t('bn.legend')}</legend>${body ? `<ul>${body}</ul>` : `<p class="pi-none">${L.t('bn.none')}</p>`}</fieldset>`;
   }
@@ -14107,6 +15093,21 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     if (ev && this.events.rollMatchDay(ev)) return;   // v2.2: match-day event BEFORE kick-off; the matchday dialog follows the choice
     this.showMatchdayDialog();
   }
+  /** v3.27: the post-match conflict ("It's your fault") owed tonight — fired once the Coach's Word is behind us. */
+  firePostEvent(from, { anyTalk = false } = {}) {
+    const s = this.state, m = s.bondMeta?.clash;
+    if (!m?.post || s.phase !== 'post' || (!anyTalk && s.talkPending) || this.events.active) return false;
+    const p = m.post; m.post = null;
+    if (!p.cast || !Object.values(p.cast).every(id => s.player(id))) return false;
+    if (!this.events.fire(p.id, s.calendar.date, { after: 'post', cast: p.cast })) return false;
+    s.pendingEvent.postFrom = from; s.save();
+    return true;
+  }
+  /** v3.27: after "It's your fault" — back where the evening was going (AFTER_GAME / REVIEW / the closing). */
+  afterPostEvent(pe) {
+    if (this.autoPolicy) return;   // the policy loop picks the post-match windows up by itself
+    if (pe.postFrom === 'close') this.closeMatchday(); else this.autoOpenPost();
+  }
   /** v2.2: called by EventEngine.choose() after a match-day event. */
   afterMatchdayEvent() { this.prepareMatch(); this.renderAll(); this.showMatchdayDialog(); }
   showMatchdayDialog() {
@@ -14127,6 +15128,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       if (!s.lastReport.instant) { this.summary.open(s.lastReport); return; }
       s.skipTeamTalk();
     }
+    if (this.firePostEvent('close')) return;   // v3.27: "It's your fault" — after the Coach's Word, before AFTER_GAME
     if (s.afterPending) {   // v3.20: AFTER_GAME.EXE first (loss: remarks; draw: praise → REVIEW / listen); [ CONTINUE ] waits
       if (!this.autoAfter) { this.afterView.open(); this.renderDash(); return; }
       s.afterAuto();
@@ -14601,6 +15603,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.trackRoles(eng.everPlayed);   // v3.18: roles that played this match now cost morale to change
     s.tickComplaints(s.calendar.date);   // v3.20: parents' "wrong role" complaints count this match (before tonight's talk)
     s.startReview(result, outfield, s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak); v3.23: outfield kids only
+    if (this.events.enabled) s.blameRoll(eng, result); else { const cm = s.clashMeta?.(); if (cm) { cm.post = null; cm.tilt = null; } }   // v3.27: "It's your fault" (before the remarks: it tilts them)
     s.startAfter(result, played.map(p => [p.id, { ...eng.st(p) }]), eng.matchEvents, s.calendar.date, ctx.md);   // v3.20: AFTER_GAME.EXE after a loss / draw
     s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]), new Set(played.filter(p => eng.isGK(p)).map(p => p.id)));   // v3.24: + who kept goal
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
@@ -14703,10 +15706,16 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       ${lone.length ? `<fieldset class="bn-lone"><legend>${L.t('bn.loneHead')}</legend><ul>${lone.map(({ p, n }) => `<li class="${stale(n.date) ? 'stale' : ''}">${esc(L.t('bn.note.alone', { a: L.name(p.name) }))} <small>${day(n.date)}</small></li>`).join('')}</ul></fieldset>` : ''}
       <fieldset class="bn-pairs"><legend>${L.t('bn.pairsHead')}</legend>${rows.length ? rows.map(r => `<div class="bn-pair${r.kb?.stale ? ' stale' : ''}">
         <div class="bn-ph"><span class="bn-ico">${BOND_ICONS[r.kb?.band] || BOND_ICONS[r.list[r.list.length - 1].band] || '\u2022'}</span> <b>${nm(r.a)}</b> &amp; <b>${nm(r.b)}</b> — ${esc(L.t('bn.band.' + (r.kb?.band || r.list[r.list.length - 1].band)))}${r.kb?.confirmed ? ` <b class="cl-ok">${L.t('clue.confirmed')}</b>` : ''}${r.kb?.stale ? ` <em class="bn-stale">${L.t('bn.staleTag')}</em>` : ''}</div>
-        ${words(r.list)}</div>`).join('') : `<p class="pi-none">${L.t('bn.pairsNone')}</p>`}</fieldset>
+        ${this.sidesLine(r.a, r.b)}${words(r.list)}</div>`).join('') : `<p class="pi-none">${L.t('bn.pairsNone')}</p>`}</fieldset>
       ${yard.length ? `<fieldset class="bn-yard"><legend>${L.t('bn.yardHead')}</legend><ul>${yard.map(n => `<li>${BOND_SRC.yard} ${esc(L.t('bn.note.yard', { a: L.name(s.player(n.owner).name), b: L.name(s.player(n.with).name), y: L.t('yard.street.' + kidRoots(s.player(n.owner)).yard) }))}</li>`).join('')}</ul></fieldset>` : ''}
       ${twins.length ? `<fieldset class="bn-twins"><legend>${L.t('bn.twinsHead')}</legend><ul>${twins.map(p => { const c = twinCowlick(p, s.player(p.twinId)); return `<li>${esc(L.t('twins.line', { k: L.name(c.name) }))}</li>`; }).join('')}</ul></fieldset>` : ''}`;
     return `<div class="nb-locker">${body}</div>`;
+  }
+  /** v3.27: both kids' words side by side — "from Petya: mates · from Kolya: don't get on" (only when both have spoken). */
+  sidesLine(a, b) {
+    const s = this.state, sd = s.pairSides?.(a, b);
+    if (!sd) return '';
+    return `<p class="bn-twoside${sd.two ? ' differ' : ''}">${esc(L.t('bn.sides', { a: L.name(s.player(a).name), wa: L.t('bn.band.' + sd.a), b: L.name(s.player(b).name), wb: L.t('bn.band.' + sd.b) }))}</p>`;
   }
   renderNotebook() {
     const body = this.$('notes-body');

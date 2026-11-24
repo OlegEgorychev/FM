@@ -102,6 +102,10 @@ const BondsMixin = {
         else if (seeded('yardgame#' + k)() < BOND.YARD_GAME) st = [st[0] + BOND.YARD_GAME_DV, st[1]];   // the yard match: opposite sides, one scored
       }
       if (st) this.bonds[k] = { v: st[0], root: st[1], cause, since: date, last: date, ...(cause ? { cd: st[0], cdate: date } : {}) };
+      if (st && !cause && !areTwins(a, b)) {   // v3.27: a one-sided friendship (one of them thinks they're closer) — its own stream
+        const r = seeded('skew#' + k);
+        if (r() < BOND.SKEW_START_P) this.bonds[k].skew = r() < 0.5 ? BOND.SKEW_START : -BOND.SKEW_START;
+      }
     }
     return this.bonds;
   },
@@ -118,12 +122,12 @@ const BondsMixin = {
   /** Training day: XI neighbours who both trained +TRAIN; 2 seeded "pair drill" pairs among the trainees +DRILL. */
   bondTraining(date, trained) {
     if (!this.bonds || !trained?.length) return;
-    const ids = new Set(trained.map(p => p.id));
-    for (const [a, b] of this.lineupNeighbours()) if (ids.has(a) && ids.has(b)) this.addBond(a, b, BOND.TRAIN, null, date);
+    const ids = new Set(trained.map(p => p.id)), apart = (a, b) => { const e = this.bond(a, b); return !!e?.apart && date <= e.apart; };   // v3.27: twins in separate groups
+    for (const [a, b] of this.lineupNeighbours()) if (ids.has(a) && ids.has(b) && !apart(a, b)) this.addBond(a, b, BOND.TRAIN, null, date);
     const list = trained.map(p => p.id).sort(), r = seeded(date + '#drill');
     for (let k = 0; k < BOND.DRILL_PAIRS && list.length >= 2; k++) {
       const i = Math.floor(r() * list.length); let j = Math.floor(r() * (list.length - 1)); if (j >= i) j++;
-      this.addBond(list[i], list[j], BOND.DRILL, null, date);
+      if (!apart(list[i], list[j])) this.addBond(list[i], list[j], BOND.DRILL, null, date);
     }
   },
   /** After a match (visual and Quick Sim): side by side, assists, a win, the error before a goal, the fight for a place, twins. */
@@ -133,13 +137,16 @@ const BondsMixin = {
     for (const e of side.entries) if (e.p && !eng.subs.some(s => s.in === e.p.id)) mins.set(e.p.id, 90);
     for (const s of eng.subs) { mins.set(s.out, s.minute); mins.set(s.in, 90 - s.minute); }
     for (const [a, b] of this.lineupNeighbours()) if ((mins.get(a) || 0) >= BOND.SIDE_MIN && (mins.get(b) || 0) >= BOND.SIDE_MIN) this.addBond(a, b, BOND.SIDE, null, date);
-    for (const ev of eng.matchEvents) if (ev.type === 'goal' && ev.side === 0 && ev.assistId && this.player(ev.assistId)) this.addBond(ev.assistId, ev.playerId, BOND.ASSIST, null, date);
+    for (const ev of eng.matchEvents) if (ev.type === 'goal' && ev.side === 0 && ev.assistId && this.player(ev.assistId)) {
+      this.addBond(ev.assistId, ev.playerId, BOND.ASSIST, null, date);
+      this.bondQuiet?.(date, ev.assistId, ev.playerId, 'assist');   // v3.27: "Lee set up Finn — they hugged" (mates only, one a day)
+    }
     const played = [...eng.everPlayed].filter(id => this.player(id));
     if (result === 'W') for (let i = 0; i < played.length; i++) for (let j = i + 1; j < played.length; j++) if (this.bondV(played[i], played[j]) > 0) this.addBond(played[i], played[j], BOND.WIN, null, date);
     for (const bl of eng.blames || []) {   // the erring kid and a hot-headed neighbour
       const err = this.player(bl.id); if (!err) continue;
       for (const q of this.lineupNeighbours().filter(([a, b]) => a === err.id || b === err.id).map(([a, b]) => this.player(a === err.id ? b : a)))
-        if (q && bondTemper(q) >= BOND.BLAME_T) this.addBond(err.id, q.id, BOND.BLAME, 'blame', date);
+        if (q && bondTemper(q) >= BOND.BLAME_T) { this.addBond(err.id, q.id, BOND.BLAME, 'blame', date); this.addSkew?.(err.id, q.id, BOND.SKEW_BLAME / 2, date); }   // v3.27: the blamed kid takes it worse
     }
     const starters = this.squad.filter(p => eng.everPlayed.has(p.id) && p.tag);   // the fight for a place (same position tag)
     for (const b of this.squad.filter(p => !eng.everPlayed.has(p.id) && p.tag && p.available && (p.benchStreak || 0) >= BOND.BENCH_RUN))
@@ -152,6 +159,7 @@ const BondsMixin = {
       if (tw.matches[k] >= TWINS.TELL_MATCHES) this.learnTwins(p, date);
     }
     for (const id of eng.injured || []) { const p = this.player(id), t = p?.twinId && this.player(p.twinId); if (t) t.dyn.morale = clamp(t.dyn.morale + TWINS.HURT_MORALE, 0, 100); }
+    this.oblCheck?.(eng, date);   // v3.27: "play next to him" / "both start" — kept or broken
     this.bondMatchNotes(eng, date);
   },
   /** A praise for one kid (Coach's Word praise → the man of the match, a REVIEW card, the armband, the office praise). */
@@ -166,7 +174,11 @@ const BondsMixin = {
     for (const p of this.squad) {   // the favourite
       const n = (p.praiseLog || []).filter(d => isoDays(d, date) < BOND.FAV_WEEKS * 7).length;
       if (n < BOND.FAV_PRAISES) continue;
-      for (const q of this.squad) if (q !== p && q.psych.discipline <= BOND.FAV_DISC) this.addBond(p.id, q.id, BOND.FAV, 'envy', date);
+      for (const q of this.squad) if (q !== p && q.psych.discipline <= BOND.FAV_DISC) { this.addBond(p.id, q.id, BOND.FAV, 'envy', date); this.addSkew?.(q.id, p.id, BOND.SKEW_ENVY, date); }   // v3.27: only the envious kid is hurt
+    }
+    for (const e of Object.values(this.bonds)) if (e.skew) {   // v3.27: the skew fades SKEW_DECAY a week towards 0
+      e.skew = e.skew > 0 ? Math.max(0, e.skew - BOND.SKEW_DECAY) : Math.min(0, e.skew + BOND.SKEW_DECAY);
+      if (!e.skew) delete e.skew;
     }
     for (const k of Object.keys(this.bonds)) {   // decay towards the root (twins faster)
       const e = this.bonds[k]; if (e.last && e.last >= start) continue;
@@ -272,7 +284,7 @@ const BondsMixin = {
     let owner = p, mix = null;
     const tw = n.with && this.mixTwin(p, (n.source || '') + '#' + n.with + '#' + n.date);
     if (tw && tw.id !== n.with) { mix = p.id; owner = tw; }
-    const note = { with: n.with || null, band: n.band, source: n.source, date: n.date, by: n.by || null, ...(n.cause ? { cause: n.cause } : {}), ...(n.root ? { root: n.root } : {}), ...(mix ? { mix } : {}) };
+    const note = { with: n.with || null, band: n.band, source: n.source, date: n.date, by: n.by || null, ...(n.cause ? { cause: n.cause } : {}), ...(n.root ? { root: n.root } : {}), ...(n.ev ? { ev: n.ev } : {}), ...(mix ? { mix } : {}) };
     owner.bondNotes = [...(owner.bondNotes || []), note].slice(-24);
     return note;
   },
@@ -422,23 +434,26 @@ const BondsMixin = {
       about = top.id;
     }
     if (qid === 'pair') return this.talkRumour(kid, xId, yId, r, date, by);
+    if (qid === 'who') return this.talkWho(kid, r, date, by);   // v3.27
+    if (qid === 'mediate') return this.talkMediate(kid, xId, yId, date);   // v3.27
     v = this.bondV(kid.id, about);
-    const e = this.bond(kid.id, about);
+    const e = this.bond(kid.id, about), vv = this.bondViewV(kid.id, about);   // v3.27: the answer is the pair as HE sees it (skew)
     if (qid === 'pitch') return this.talkPitch(kid, this.player(about), v, r, date, by);
     let evade = 1 - O;
     if (q.evade) evade *= q.evade;
-    if (v <= -20) evade *= TALK.EVADE_COLD; else if (v >= 20) evade *= TALK.EVADE_MATE;
+    if (vv <= -20) evade *= TALK.EVADE_COLD; else if (vv >= 20) evade *= TALK.EVADE_MATE;
     const res = { qid, about };
     if (r() < clamp(evade, 0, 1)) Object.assign(res, this.talkEvade(kid, qid, about, date));
-    else if (v <= -20 && kid.psych.discipline <= TALK.LIE_DISC && r() < (this.talkForceLie ?? TALK.LIE)) {
+    else if (vv <= -20 && kid.psych.discipline <= TALK.LIE_DISC && r() < (this.talkForceLie ?? TALK.LIE)) {
       Object.assign(res, { kind: 'lie', band: 'neutral' });
       this.addBondNote(kid, { with: about, band: 'neutral', source: 'talk', date, by });
     } else {
-      const band = bondBand(v), root = e?.root ? (areTwins(kid, this.player(about)) ? 'twins' : sameYard(kid, this.player(about)) ? 'yard' : 'school') : null;
-      Object.assign(res, { kind: 'honest', band, root, cause: v <= -20 ? e?.cause || null : null, assist: v >= 20 && !root });
-      this.addBondNote(kid, { with: about, band, source: 'talk', date, by, ...(res.cause ? { cause: res.cause } : {}), ...(root ? { root } : {}) });
+      const band = bondBand(vv), root = e?.root ? (areTwins(kid, this.player(about)) ? 'twins' : sameYard(kid, this.player(about)) ? 'yard' : 'school') : null;
+      const cause = vv <= -20 || (qid === 'what' && v <= -20) ? e?.cause || null : null;   // "What happened?" always names the cause he sees
+      Object.assign(res, { kind: 'honest', band, root, cause, assist: vv >= 20 && !root, surprised: qid === 'what' && vv > -20 });
+      this.addBondNote(kid, { with: about, band, source: 'talk', date, by, ...(cause ? { cause } : {}), ...(root ? { root } : {}) });
     }
-    if (res.kind !== 'evade' && v >= 20) kid.dyn.morale = clamp(kid.dyn.morale + TALK.MATE_MORALE, 0, 100);   // asked about a mate
+    if (res.kind !== 'evade' && vv >= 20) kid.dyn.morale = clamp(kid.dyn.morale + TALK.MATE_MORALE, 0, 100);   // asked about a mate
     if (v <= -60 && bondTemper(kid) >= 1 && r() < TALK.STIR) { this.addBond(kid.id, about, TALK.STIR_DV, null, date); res.stirred = true; }   // «растравил»
     if (v <= -20) this.talkGossip(kid, about, r, date);
     return res;
@@ -455,6 +470,41 @@ const BondsMixin = {
     (x.talk ||= {}).closedUntil = isoAdd(date, TALK.GOSSIP_DAYS);
     this.addDiary({ date, key: 'btalk.gossip', vars: { k: { pid: x.id } }, cls: 'ev' });
     return true;
+  },
+  /** v3.27 "Who started it?" — to a witness of the last fight: the instigator; a witness who is a mate (v ≥ WITNESS_LIE_V) of the
+      instigator names the other kid with TALK.LIE (talkForceLie). Evasive with 1 − openness. */
+  talkWho(kid, r, date, by) {
+    const f = this.lastFight(date);
+    if (!f) return { kind: 'none', qid: 'who' };
+    if (r() >= this.openness(kid, date)) return { kind: 'evade', qid: 'who', about: f.inst };
+    const other = f.inst === f.a ? f.b : f.a;
+    const lies = this.bondV(kid.id, f.inst) >= CLASH.WITNESS_LIE_V && this.bondV(kid.id, f.inst) > this.bondV(kid.id, other) && r() < (this.talkForceLie ?? TALK.LIE);
+    const named = lies ? other : f.inst, victim = named === f.a ? f.b : f.a;
+    f.told = { by: kid.id, inst: named };
+    this.addBondNote(this.player(named), { with: victim, band: bondBand(this.bondV(named, victim)), source: 'who', date, by });
+    return { kind: lies ? 'lie' : 'honest', qid: 'who', about: named, y: victim };
+  },
+  /** v3.27 "Will you help me make X and Y friends again?" — the mediator attempt (GameState.mediate). */
+  talkMediate(kid, xId, yId, date) {
+    const res = this.mediate(kid, xId, yId, date, 'talk');
+    return res ? { kind: res.ok ? 'honest' : 'fail', qid: 'mediate', about: xId, y: yId, ok: res.ok, side: res.side || null } : null;
+  },
+  /** v3.27: is the question on offer for this kid now (only when its condition holds)? */
+  talkQAvail(kid, q, date = this.calendar?.date) {
+    if (q.x === 'conflict') return this.knownConflicts(kid.id).length > 0;
+    if (q.x === 'fight') { const f = this.lastFight(date); return !!f && f.a !== kid.id && f.b !== kid.id && f.present.includes(kid.id); }
+    if (q.x === 'mediate') return this.talkMedPairs(kid).length > 0;
+    return true;
+  },
+  /** Pairs [a, b] the coach knows are in conflict, where he knows `kid` is mates+ with both. */
+  talkMedPairs(kid) {
+    const out = [];
+    for (let i = 0; i < this.squad.length; i++) for (let j = i + 1; j < this.squad.length; j++) {
+      const a = this.squad[i].id, b = this.squad[j].id;
+      if (a === kid.id || b === kid.id || !this.knowsConflict(a, b)) continue;
+      if (this.knownBond(kid.id, a)?.cls === 'good' && this.knownBond(kid.id, b)?.cls === 'good') out.push([a, b]);
+    }
+    return out;
   },
   /** "And X and Y?" — a rumour, wrong with 2 × CLUES.WRONG; always gossip-prone. */
   talkRumour(kid, xId, yId, r, date, by) {
@@ -483,7 +533,7 @@ const BondsMixin = {
 const bondClass = band => (band === 'best' || band === 'mates' ? 'good' : band === 'cold' || band === 'war' ? 'bad' : band);
 Object.assign(GameState.prototype, BondsMixin);
 const BOND_ICONS = { best: '\u{1F91D}', mates: '\u{1F642}', cold: '\u{1F620}', war: '⚡', neutral: '·', alone: '…', evade: '\u{1F910}', yard: '\u{1F3E0}' };
-const BOND_SRC = { came: '\u{1F6AA}', obs: '\u{1F3C3}', after: '\u{1F5E3}', loner: '…', yard: '\u{1F3E0}', talk: '\u{1F4AC}', rumour: '\u{1F442}' };
+const BOND_SRC = { came: '\u{1F6AA}', obs: '\u{1F3C3}', after: '\u{1F5E3}', loner: '…', yard: '\u{1F3E0}', talk: '\u{1F4AC}', rumour: '\u{1F442}', event: '\u{1F4A2}', who: '\u{1F50E}' };   // v3.27: + event, who
 /** One bond note as the coach wrote it ("From Petya: Kolya took his place"). n.owner = the kid whose list holds it. */
 function bondNoteText(s, n) {
   const a = s.player(n.owner), b = n.with && s.player(n.with), an = a ? L.name(a.name) : '', bn = b ? L.name(b.name) : '';
@@ -495,6 +545,8 @@ function bondNoteText(s, n) {
   else if (n.source === 'yard') t = L.t('bn.note.yard', { a: an, b: bn, y: L.t('yard.street.' + kidRoots(a).yard) });
   else if (n.band === 'evade') t = L.t('bn.note.evade', { a: an, b: bn });
   else if (n.source === 'rumour') t = L.t('bn.note.rumour', { k: n.by?.name ? L.name(n.by.name) : '', a: an, b: bn, w: L.t('bn.band.' + n.band) });
+  else if (n.source === 'event') t = L.t('bn.note.event.' + (n.ev || 'clash'), { a: an, b: bn, d: n.date ? fmtDate(n.date, { day: 'numeric', month: 'short' }) : '' });   // v3.27
+  else if (n.source === 'who') t = L.t('bn.note.who', { k: n.by?.name ? L.name(n.by.name) : '', a: an, b: bn });   // v3.27
   else t = (n.by?.name ? L.t('bn.by', { k: L.name(n.by.name) }) + ': ' : '') + say();
   return n.mix ? L.t('twins.mix', { k: an }) + ' ' + t : t;
 }

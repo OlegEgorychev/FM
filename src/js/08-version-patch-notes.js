@@ -2,8 +2,24 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.26';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.27';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.27', name: { en: 'Clashes', ru: 'Стычки' },
+    en: [
+      'Kids who don\'t get on now clash at training, blame each other after a loss and sometimes end up in a scuffle behind the locker room. Each time you choose what to do — and every choice has a price.',
+      'Six new situations: a clash at training, "It\'s your fault", a fight, the coach\'s favourite, "Can I play with him?" and twins who fell out. The first button is always the cautious one; it rarely solves anything.',
+      'Two kids don\'t always see it the same way: one may think they\'re friends while the other doesn\'t. The Notebook shows both kids\' words side by side.',
+      'Know why they fell out and you\'ll see a quiet hint on the option that fits. New questions in a one-on-one: "What happened between you and…?", "Who started the fight?", "Will you help me make them friends again?"',
+      'Keep your word: if you promise to put two friends together or to start both brothers, the kids remember whether you did.',
+    ],
+    ru: [
+      'Ребята, которые не ладят, теперь сцепляются на тренировке, винят друг друга после поражения и иногда дерутся за раздевалкой. Каждый раз решаешь ты — и у каждого решения есть цена.',
+      'Шесть новых ситуаций: стычка на тренировке, «Это ты виноват», драка, любимчик тренера, «Можно мне с ним?» и поссорившиеся близнецы. Первая кнопка всегда осторожная — и редко что-то решает.',
+      'Двое не всегда видят одно и то же: один считает, что они друзья, а другой нет. В Блокноте слова обоих теперь рядом.',
+      'Знаешь, из-за чего поссорились, — увидишь тихую подсказку на подходящем варианте. Новые вопросы в разговоре один на один: «Что у вас с … случилось?», «Кто начал драку?», «Поможешь помирить?»',
+      'Держи слово: пообещал поставить друзей рядом или выпустить обоих братьев — ребята запомнят, сдержал ли.',
+    ],
+  },
   { v: '3.26', name: { en: 'Holst', ru: 'Холст' },
     en: [
       'The whole game is now drawn on one canvas that scales to your browser window: from 1366×768 to 2560×1440 the taskbar is always visible and the page never scrolls.',
