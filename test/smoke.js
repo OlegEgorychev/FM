@@ -649,12 +649,12 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
       noAp: !document.querySelector(`#lr-grid .lk.empty[data-pid="${t}"]`).classList.contains('can'), note: !!document.querySelector(`#lr-grid .lk.empty[data-pid="${id}"] .lk-note.open`) }), [lr0.lazy, lr0.tired]);
     await page.click('#lr-proceed');
     const lr4 = await page.evaluate(id => ({ open: !document.getElementById('locker-room-view').hidden, lazyStarter: YAM.game.isStarter(id), btn: document.getElementById('btn-sim').disabled,
-      swap: YAM.game.swapPlayers(YAM.game.lineup[1], id), on: document.querySelector('#today-box .plan-btn.on')?.dataset.plan,
-      need: !!document.querySelector('#today-box .td-req.need'), plans: document.querySelectorAll('#today-box .plan-btn').length }), lr0.lazy);
+      swap: (b => b ? YAM.game.swapPlayers(YAM.game.lineup[1], b.id) : 'unavail_absent')(YAM.game.bench().find(p => p.unavailableReason === 'absent')), on: document.querySelector('#today-box .plan-btn.on')?.dataset.plan,
+      need: !!document.querySelector('#today-box .td-req.need'), plans: document.querySelectorAll('#today-box .plan-btn').length }), lr0.lazy);   // v3.28: the skipping starter stays in the XI; a bench absentee still can't come in
     check('locker room: START DAY opens it, absences = exhausted / skipped / injured (empty lockers), absent kids locked out, roll call = 1 AP + fine, Proceed → today\'s regime from the plan, CONTINUE ready',
       !lr0.btn && lr0.need && lr0.plans === 0 && lr0.lazyStarter && lr1.open && lr1.cells === lr1.n && lr1.empty.length === 3 + lr0.pre && lr1.faces === lr1.n - 3 - lr0.pre
       && lr1.why.join() === 'exhausted,skipped,injury' && lr1.skipFlag && lr4.swap === 'unavail_absent' && lr2.ap === 0 && lr2.talk && lr2.n === 2
-      && lr3.b === lr2.b - 10 && lr3.disc === disc0 + 2 && lr3.still && lr3.noAp && lr3.note && !lr4.open && !lr4.lazyStarter && !lr4.btn && !lr4.need && lr4.plans === 4 && lr4.on === 'cardio',
+      && lr3.b === lr2.b - 10 && lr3.disc === disc0 + 2 && lr3.still && lr3.noAp && lr3.note && !lr4.open && lr4.lazyStarter && !lr4.btn && !lr4.need && lr4.plans === 4 && lr4.on === 'cardio',
       JSON.stringify({ lr0, lr1, lr2, lr3, lr4 }));
     // today's regime can still change on the day (not Rest ↔ Training); past days are locked, future days re-plannable
     await page.click('#today-box .plan-btn[data-plan="tech"]');
@@ -3866,6 +3866,67 @@ const BAL_V324_COH = 'f0a0e298d0c0044c';   // v3.25: sha256 (16) of the v3.24 `b
         return out;
       });
       check('v3.27 policies: `random` exists (event dialogues only); the reference lineup keeps "play next to him" (oblKeepXI)', Object.values(c12).every(Boolean), JSON.stringify(c12));
+
+      // ===== v3.28 HINTS: the absentToday fix, regime tooltips, swap highlight by slot =====
+      const c28a = await page.evaluate(() => {
+        const s = YAM.game, ph = s.phase, lu = s.lineup.slice(), out = {};
+        const kid = s.player(s.lineup[3]), was = kid.absentToday;
+        const benchOk = s.bench().some(b => b.available && !b.hasFlag('Promised_Start'));
+        kid.absentToday = 'skipped';
+        s.phase = 'calendar'; out.keptOffDay = s.ensureAvailableXI().length === 0 && s.lineup[3] === kid.id;
+        s.phase = 'matchday'; const ch = s.ensureAvailableXI(); out.droppedMatchday = !benchOk || (ch.some(c => c.out.id === kid.id) && s.lineup[3] !== kid.id);
+        kid.absentToday = was; s.lineup = lu; s.phase = ph;
+        return out;
+      });
+      check('v3.28 fix: a kid who skipped training (absentToday) stays in the XI on a non-match day; on match day he is replaced', Object.values(c28a).every(Boolean), JSON.stringify(c28a));
+      const c28b = await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui, pl = ui.planner, out = {};
+        out.texts = REGIME_KEYS.every(k => ['.do', '.hint'].every(x => I18N.en['plan.' + k + x] && I18N.ru['plan.' + k + x]));
+        out.noNum = REGIME_KEYS.every(k => ['en', 'ru'].every(c => !/\d|%/.test(I18N[c]['plan.' + k + '.do'] + I18N[c]['plan.' + k + '.hint'])));
+        const ph = s.phase; s.phase = 'calendar';
+        const w = s.weekState(), keep = JSON.stringify(w.plan), conf = w.confirmed;
+        const day = WEEK.PLAN_KEYS.find((k, i) => !s.matchOn(isoAdd(w.start, WEEK.KEYS.indexOf(k))));
+        const hintOf = () => pl.grid.querySelector(`.pl-opt[data-day="${day}"]`)?.closest('.pl-col')?.querySelector('.pl-hint')?.textContent || '';
+        w.plan[day] = 'tech'; pl.render(); out.hintTech = hintOf() === L.t('plan.tech.hint');
+        w.plan[day] = 'match'; pl.render(); out.hintMatch = hintOf() === L.t('plan.match.hint');
+        const b = pl.grid.querySelector(`.pl-opt[data-day="${day}"][data-reg="cardio"]`);
+        b.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+        out.tip = !pl.tip.hidden && pl.tip.textContent.includes(L.t('plan.cardio.hint')) && b.getAttribute('aria-describedby') === 'pl-tip';
+        b.dispatchEvent(new FocusEvent('focusout', { bubbles: true })); out.hidden = pl.tip.hidden;
+        w.plan = JSON.parse(keep); w.confirmed = conf; s.phase = ph; pl.render();
+        return out;
+      });
+      check('v3.28 PLANNER.EXE: every regime has a tooltip + hint (EN + RU, no numbers); the hint under the day follows the chosen regime; focus shows / blur hides the tooltip', Object.values(c28b).every(Boolean), JSON.stringify(c28b));
+      const c28c = await page.evaluate(() => {
+        const s = YAM.game, ui = YAM.ui, out = {}, lu = s.lineup.slice();
+        const keep = s.squad.map(p => ({ id: p.id, tag: p.tag, yn: p.yardNotes })), stats = JSON.stringify(s.seasonStats);
+        const xi = s.starters(), bench = s.bench();
+        const fwd = xi[1], tagMate = xi[2], none = xi[3], gk = xi[4], hands = xi[5], bk = bench[0];   // targets can be starters too: the hint only reads the selected kid's slot
+        const tag = (p, t) => { p.tag = t; };
+        tag(fwd, 'FWD'); tag(tagMate, 'FWD'); tag(gk, 'GK'); tag(hands, 'DEF'); hands.yardNotes = ['hands']; tag(none, 'MID'); none.yardNotes = [];
+        delete s.seasonStats[none.id];
+        const i = s.lineup.indexOf(fwd.id), j = 0; [s.lineup[i], s.lineup[j]] = [s.lineup[j], s.lineup[i]];   // the FWD stands in goal
+        ui.selected = fwd.id;
+        out.gk = ui.swapClass(gk) === 'suggested-swap';
+        out.hands = ui.swapClass(hands) === 'maybe-swap';
+        out.notFwd = ui.swapClass(tagMate) !== 'suggested-swap';
+        out.none = ui.swapClass(none) === 'dimmed-swap';
+        s.recordSeasonStats([[none.id, MatchEngine.blankStats()]], new Set([none.id]), new Map([[none.id, 'GK']]));   // finished a match in goal → fits GK
+        out.played = s.playedLine(none.id, 'GK') === 1 && ui.swapClass(none) === 'maybe-swap';
+        s.seasonStats = JSON.parse(stats);
+        const d0 = s.seasonOf(none.id).lines?.DEF || 0;
+        s.recordSeasonStats([[none.id, MatchEngine.blankStats()]], null, new Map([[none.id, 'DEF']]));
+        out.lineRec = s.seasonStats[none.id].lines?.DEF === d0 + 1;
+        s.seasonStats = JSON.parse(stats);
+        if (bk) { const t0 = bk.tag; tag(bk, 'GK'); ui.selected = bk.id; out.benchByTag = ui.swapClass(fwd) === 'dimmed-swap' && ui.swapClass(gk) === 'suggested-swap' && ui.swapClass(hands) === 'dimmed-swap'; bk.tag = t0; }   // bench: by tag, no dashes
+        ui.selected = null; ui.renderTeam();
+        const dot = document.querySelector(`#tac-board .pl[data-pid="${fwd.id}"]`);
+        out.title = !!dot && dot.title.includes(L.t('tac.tagSlot', { t: L.pos('FWD'), l: L.line('GK') }));
+        for (const k of keep) { const p = s.player(k.id); p.tag = k.tag; if (k.yn === undefined) delete p.yardNotes; else p.yardNotes = k.yn; }
+        s.lineup = lu; ui.renderTeam();
+        return out;
+      });
+      check('v3.28 swap highlight: a FWD in goal suggests GK tags (not FWDs), dashed = "hands" / played the line this season, else dimmed; a bench kid still by tag; the board dot says "Tag · Playing"; seasonStats count lines', Object.values(c28c).every(Boolean), JSON.stringify(c28c));
 
       // (11) the balance harness: default and --cohesion tables identical to v3.24, --bonds on target
       const bb = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, 'balance.js'), '--cohesion', '--bonds'], { encoding: 'utf8' });

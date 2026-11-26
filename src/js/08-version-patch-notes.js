@@ -2,8 +2,24 @@
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.27';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.28';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.28', name: { en: 'Hints', ru: 'Подсказки' },
+    en: [
+      'PLANNER.EXE: hover (or tab to) a training regime to see what the kids do and what they will pick up. The chosen regime\'s hint is also written under the buttons — handy on a touch screen.',
+      'Swaps: select a kid on the pitch and the green highlight now follows the line he stands on, not his tag. A forward in goal lights up your keepers.',
+      'A faint dashed outline marks kids you have seen fit that line: "safe hands" from the yard match for goal, or anyone who has already played there this season.',
+      'Hover a dot on the tactics board to see "Tag: FWD · Playing: GK" when the two differ.',
+      'Fix: a kid who skipped a training no longer drops out of the starting XI for good after an evening event. Only match day checks who turned up.',
+    ],
+    ru: [
+      'PLANNER.EXE: наведи на режим тренировки (или выбери его с клавиатуры) — подсказка скажет, чем ребята займутся и что у них подтянется. Под кнопками дня тоже написан намёк для выбранного режима — удобно на тачскрине.',
+      'Замены: выбери ребёнка на поле — зелёным подсветятся те, кто подходит для линии, где он стоит, а не для его тега. Нападающий в воротах подсветит вратарей.',
+      'Бледный пунктир — те, кого ты уже видел на этой линии: «надёжные руки» с дворового матча для ворот или кто уже играл там в этом сезоне.',
+      'Наведи на точку на тактической доске — если тег и место не совпадают, увидишь «Тег: НАП · Стоит: ВРТ».',
+      'Исправлено: ребёнок, пропустивший тренировку, больше не выпадает из стартового состава насовсем после вечернего события. Кто пришёл, проверяется только в день матча.',
+    ],
+  },
   { v: '3.27', name: { en: 'Clashes', ru: 'Стычки' },
     en: [
       'Kids who don\'t get on now clash at training, blame each other after a loss and sometimes end up in a scuffle behind the locker room. Each time you choose what to do — and every choice has a price.',

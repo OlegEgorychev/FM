@@ -451,7 +451,8 @@ class UIController {
       const status = eng?.sentOff.has(p.id) ? 'sent' : eng?.subbedOff.has(p.id) ? 'off' : '';
       const out = !pitch && !p.available;   // v2.2: can't come on
       const disabled = over || !!status || out;
-      const hint = selP && p.id !== selP.id && !disabled ? (p.position && p.position === selP.position ? ' suggested-swap' : ' dimmed-swap') : '';
+      const selI = selP ? onIds.indexOf(selP.id) : -1, hc = !disabled ? this.swapHint(selP, p, selI >= 0 ? lines[selI] : null) : '';   // v3.28: by slot
+      const hint = hc ? ' ' + hc : '';
       const sub = status ? L.t('lr.' + status) : out ? L.t('st.short.' + p.unavailableReason) : pitch ? L.line(lines[i]) : L.t('team.onBench');
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
@@ -1453,7 +1454,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       const hint = this.swapClass(p);
       const out = !p.available;   // v2.2: injured / suspended → locked out of the XI
       return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}${out ? ' unavail' : ''}" data-id="${p.id}"
-          role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
+          role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' || hint === 'maybe-swap' ? ` aria-description="${esc(L.t(hint === 'maybe-swap' ? 'team.maybeAria' : 'team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
         <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.clueBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×' + fatigueMult(e).toFixed(2) : ''}</span></div>
@@ -1537,8 +1538,15 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       (still clickable — out-of-position swaps are allowed, just not recommended). */
   swapClass(p) {
     const selP = this.selected ? this.state.player(this.selected) : null;
+    return this.swapHint(selP, p, selP ? this.state.slotLine(selP.id) : null);
+  }
+  /** v3.28: a kid ON THE PITCH (selLine = his slot's line) suggests that line's tag, not his own — a FWD in goal lights up
+      the keepers; a faint dashed hint marks kids the coach has seen fit there (state.fitsLine). Bench kid (no line): by tag. */
+  swapHint(selP, p, selLine) {
     if (!selP || p.id === selP.id) return '';
-    return p.position && p.position === selP.position ? 'suggested-swap' : 'dimmed-swap';
+    const want = selLine ? LINE_POS[selLine] : selP.position;
+    if (want && p.position === want) return 'suggested-swap';
+    return selLine && this.state.fitsLine(p, selLine) ? 'maybe-swap' : 'dimmed-swap';
   }
 
   /** Unified swap: select one player (list row or pitch dot), then pick another (row or dot). */
@@ -1839,7 +1847,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.startReview(result, outfield, s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak); v3.23: outfield kids only
     if (this.events.enabled) s.blameRoll(eng, result); else { const cm = s.clashMeta?.(); if (cm) { cm.post = null; cm.tilt = null; } }   // v3.27: "It's your fault" (before the remarks: it tilts them)
     s.startAfter(result, played.map(p => [p.id, { ...eng.st(p) }]), eng.matchEvents, s.calendar.date, ctx.md);   // v3.20: AFTER_GAME.EXE after a loss / draw
-    s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]), new Set(played.filter(p => eng.isGK(p)).map(p => p.id)));   // v3.24: + who kept goal
+    s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]), new Set(played.filter(p => eng.isGK(p)).map(p => p.id)), eng.lineOf);   // v3.24: + who kept goal; v3.28: + line
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);
