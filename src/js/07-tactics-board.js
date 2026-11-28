@@ -31,6 +31,7 @@ class RadarView {
       d.className = `pl ${si === 0 ? 'home' : 'away'}${e.line === 'GK' ? ' gk' : ''}`;
       d.innerHTML = `<b>${e.p.number ?? idx + 1}</b>${this.labels ? `<span class="pl-pos ${e.p.position}">${L.pos(e.p.position)}</span><span class="pl-nm">${esc(squadName(e.p, si === 0 && this.squadOf ? this.squadOf() : side.entries.map(x => x.p)))}</span>` : ''}`;
       d.title = `${L.name(e.p.name)} · ${L.line(e.line === 'GK' ? 'GK' : e.line)}`;
+      if (board && si === 0 && e.p.position && e.p.position !== LINE_POS[e.line]) d.title += '\n' + L.t('tac.tagSlot', { t: L.pos(e.p.position), l: L.line(e.line) });   // v3.28
       d.dataset.pid = e.p.id;   // v1.5: right-click → Player Profile Card
       if (this.onDotClick) { d.type = 'button'; d.dataset.slot = idx; d.addEventListener('click', () => this.onDotClick(idx)); }
       if (this.onDrop) {
@@ -57,11 +58,11 @@ class RadarView {
 
   place(el, x, y) { el.style.left = x + '%'; el.style.top = y + '%'; }
   select(id) { this.highlight(id); }
-  /** sel = the chosen player; clsFor(id) returns 'suggested-swap' | 'dimmed-swap' | '' for every other dot. */
+  /** sel = the chosen player; clsFor(id) returns 'suggested-swap' | 'maybe-swap' | 'dimmed-swap' | '' for every other dot. */
   highlight(selId, clsFor) {
     for (const [pid, d] of this.dots) {
       d.el.classList.toggle('sel', pid === selId);
-      d.el.classList.remove('suggested-swap', 'dimmed-swap');
+      d.el.classList.remove('suggested-swap', 'dimmed-swap', 'maybe-swap');
       const c = selId && clsFor ? clsFor(pid) : '';
       if (c) d.el.classList.add(c);
     }

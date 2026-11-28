@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Youth Academy Manager v3.27</title>
+<title>Youth Academy Manager v3.28</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Mono&display=swap" rel="stylesheet">
 <style>
@@ -693,6 +693,10 @@ body.fx .crt-scan{ opacity: .9; }
 .r-row.suggested-swap{ opacity: 1; outline: 2px dashed #39ff14; outline-offset: -4px; background: rgba(57,255,20,.07); animation: phosphorOutline 1s steps(2) infinite; }
 .r-row.suggested-swap .pos{ box-shadow: 0 0 6px rgba(57,255,20,.8); }
 .pitch.board .pl.suggested-swap{ opacity: 1; outline: 2px dashed #39ff14; outline-offset: 3px; animation: phosphorGlow 1s ease-in-out infinite; z-index: 4; }
+
+/* v3.28 maybe: not his tag, but the coach has seen him fit this line (yard "hands" / played there) — faint, static dashes */
+.r-row.maybe-swap{ opacity: .85; outline: 1px dashed rgba(57,255,20,.55); outline-offset: -4px; }
+.pitch.board .pl.maybe-swap{ opacity: .85; outline: 1px dashed rgba(57,255,20,.6); outline-offset: 3px; z-index: 3; }
 
 /* dimmed: different position — recedes, but stays clickable */
 .r-row.dimmed-swap{ opacity: .4; filter: grayscale(.9); }
@@ -1644,6 +1648,13 @@ body.modal-lock #startmenu{ display: none; }
 
 /* Locker: kept home by the weekly load — a school-notebook slip instead of the yellow note (no roll call) */
 .lk.empty.load .lk-note.open{ background: repeating-linear-gradient(#f4f1e6 0 9px, #b9cde6 9px 10px); color: #1f3a5f; }
+
+/* v3.28: what a regime gives — Win98 yellow tooltip (hover / focus) + the selected regime's hint under the buttons */
+.pl-tip{ position: absolute; z-index: var(--z-tool); max-width: 260px; padding: 4px 6px; display: flex; flex-direction: column; gap: 2px;
+  font: var(--fs-xs)/1.3 var(--ui); color: #000; background: #ffffe1; border: 1px solid #000; box-shadow: 2px 2px 0 rgba(0,0,0,.35); pointer-events: none; }
+.pl-tip[hidden]{ display: none; }
+.pl-tip b{ font-size: var(--fs-s); } .pl-tip i{ font-style: normal; color: #4a3a00; }
+.pl-hint{ font-size: var(--fs-xs); line-height: 1.25; color: #3a3a3a; font-style: italic; }
 /* =========================================================
    v3.14 — WORLD EVENTS: briefing news line, planner day marker, DEBUG select
    ========================================================= */
@@ -3212,7 +3223,7 @@ Object.assign(I18N.en, {
   'lr.off': 'subbed off', 'lr.sent': 'sent off',
   'lr.help.pre': 'Before kick-off: click two players to change the line-up. Right-click or [i] = profile.',
   'lr.help.live': 'Click a player on the pitch, then one on the bench (or the other way round) to make a substitution.',
-  'lr.help.sel': '{n} selected → pick who swaps with him. Green = same position. Esc to cancel.',
+  'lr.help.sel': '{n} selected → pick who swaps with him. Green = fits his line · dashed = has played there. Esc to cancel.',
   'lr.help.over': 'No changes possible right now. Right-click or [i] still opens a profile.',
   'sub.err.title': 'Substitution not possible', 'sub.err.limit': 'All {m} substitutions have been used.',
   'sub.err.sentOff': 'A sent-off player cannot be replaced.', 'sub.err.used': 'A substituted player cannot come back on.',
@@ -3242,7 +3253,7 @@ Object.assign(I18N.ru, {
   'lr.off': 'заменён', 'lr.sent': 'удалён',
   'lr.help.pre': 'До начала матча: щёлкни двух игроков, чтобы изменить состав. Правый клик или [i] — профиль.',
   'lr.help.live': 'Щёлкни игрока на поле, затем запасного (или наоборот), чтобы сделать замену.',
-  'lr.help.sel': 'Выбран {n} → выбери, кем его заменить. Зелёные — та же позиция. Esc — отмена.',
+  'lr.help.sel': 'Выбран {n} → выбери, кем его заменить. Зелёные — подходят для его линии · пунктир — уже играли там. Esc — отмена.',
   'lr.help.over': 'Сейчас изменения невозможны. Правый клик или [i] всё равно открывает профиль.',
   'sub.err.title': 'Замена невозможна', 'sub.err.limit': 'Все {m} замен уже использованы.',
   'sub.err.sentOff': 'Удалённого игрока заменить нельзя.', 'sub.err.used': 'Заменённый игрок не может вернуться на поле.',
@@ -3321,11 +3332,11 @@ Object.assign(I18N.en, {
   'nav.team': 'Team Management', 'team.title': 'TEAM.EXE — Team Management', 'team.roster': 'Squad · {n} players',
   'team.legendShort': 'Energy: >70 · 30–70 · <30', 'team.colName': 'Player · position', 'team.colPos': 'Pos',
   'team.hintSel': 'Select a highlighted player to swap, or click anywhere to cancel.',
-  'team.suggestedAria': 'Suggested: same position', 'team.posTitle': 'Natural position: {p}', 'team.colEnergy': 'Energy', 'team.colRole': 'Role',
+  'team.suggestedAria': 'Suggested: fits this line', 'team.maybeAria': 'Might fit this line', 'tac.tagSlot': 'Tag: {t} · Playing: {l}', 'team.posTitle': 'Natural position: {p}', 'team.colEnergy': 'Energy', 'team.colRole': 'Role',
   'team.xi': 'STARTING XI · {f}', 'team.bench': 'BENCH', 'team.slot': 'in the XI as {l}', 'team.onBench': 'on the bench',
   'team.clear': '&#10005; Cancel selection', 'team.done': 'Swapped: {a} ⇄ {b}',
   'team.help.idle': 'Click a player in the list or on the pitch, then click where he should go. Drag and drop works too. Right-click or [i] = profile.',
-  'team.help.sel': '{n} ({p}) selected. Green = same position (recommended) · faded = different position (allowed, −15% out of line). Esc or empty space to cancel.',
+  'team.help.sel': '{n} ({p}) selected. Green = fits the line he stands on (recommended) · dashed = has played there · faded = different position (allowed, −15% out of line). Esc or empty space to cancel.',
   'team.err.title': 'Cannot swap', 'team.err.gkSlot': 'The goalkeeper stays in goal.<br>Swap him with the bench goalkeeper instead.',
   'team.err.gkOnly': 'Only a goalkeeper can play in goal.', 'team.err.gkTwo': 'A second goalkeeper cannot play in the outfield.',
   'team.err.bench': 'Pick at least one player from the starting XI.',
@@ -3338,11 +3349,11 @@ Object.assign(I18N.ru, {
   'nav.team': 'Команда', 'team.title': 'TEAM.EXE — Управление командой', 'team.roster': 'Состав · {n} игроков',
   'team.legendShort': 'Энергия: >70 · 30–70 · <30', 'team.colName': 'Игрок · позиция', 'team.colPos': 'Поз.',
   'team.hintSel': 'Выбери подсвеченного игрока для замены или щёлкни в любом месте, чтобы отменить.',
-  'team.suggestedAria': 'Рекомендуется: та же позиция', 'team.posTitle': 'Родная позиция: {p}', 'team.colEnergy': 'Энергия', 'team.colRole': 'Роль',
+  'team.suggestedAria': 'Рекомендуется: подходит для этой линии', 'team.maybeAria': 'Может подойти для этой линии', 'tac.tagSlot': 'Тег: {t} · Стоит: {l}', 'team.posTitle': 'Родная позиция: {p}', 'team.colEnergy': 'Энергия', 'team.colRole': 'Роль',
   'team.xi': 'ОСНОВА · {f}', 'team.bench': 'ЗАПАС', 'team.slot': 'в основе: {l}', 'team.onBench': 'в запасе',
   'team.clear': '&#10005; Отменить выбор', 'team.done': 'Замена: {a} ⇄ {b}',
   'team.help.idle': 'Щёлкни игрока в списке или на поле, затем — куда его поставить. Можно и перетащить. Правый клик или [i] — профиль.',
-  'team.help.sel': 'Выбран {n} ({p}). Зелёные — та же позиция (рекомендуется) · блёклые — другая позиция (можно, но −15% вне линии). Esc или пустое место — отмена.',
+  'team.help.sel': 'Выбран {n} ({p}). Зелёные — подходят для линии, где он стоит (рекомендуется) · пунктир — уже играли там · блёклые — другая позиция (можно, но −15% вне линии). Esc или пустое место — отмена.',
   'team.err.title': 'Замена невозможна', 'team.err.gkSlot': 'Вратарь остаётся в воротах.<br>Замени его на запасного вратаря.',
   'team.err.gkOnly': 'В ворота может встать только вратарь.', 'team.err.gkTwo': 'Второй вратарь не может играть в поле.',
   'team.err.bench': 'Выбери хотя бы одного игрока из основы.',
@@ -3800,6 +3811,10 @@ Object.assign(I18N.en, {
   'plan.match': 'Match Practice', 'plan.match.d': '++sharpness, −energy, small injury risk',
   'plan.tech': 'Technical Drills', 'plan.tech.d': 'technique grows slowly, −−energy',
   'plan.tactics': 'Tactics Room', 'plan.tactics.d': 'tactics grow, restless kids skip',
+  'plan.cardio.do': 'Laps, sprints, shuttle runs.', 'plan.cardio.hint': 'Legs won’t turn to jelly late in the match, and they get their breath back. Boring, though: spirits drop.',
+  'plan.tech.do': 'Passing, first touch, dribbling, shooting.', 'plan.tech.hint': 'The ball stops bouncing off their feet. Drains them more than anything else.',
+  'plan.tactics.do': 'Board, cones, walk-throughs.', 'plan.tactics.hint': 'Everyone learns where to stand and when to drop back. Fidgety kids may slip away.',
+  'plan.match.do': 'An eleven-a-side practice game.', 'plan.match.hint': 'Sharp for Saturday, and easier to see who’s good at what and who sticks with whom. Nobody learns new tricks; a knock is possible.',
   'cal.training': 'Training ({p}): {a} turned up. Skipped: {s}.', 'cal.trainingAll': 'Training ({p}): all {a} turned up.',
   'tr.plateau.physical': 'Runs as hard as anyone, but his legs don\'t get any quicker: {s}. Maybe that\'s his limit.',
   'tr.plateau.technical': 'The drills come easy, yet nothing new sticks: {s}. Looks like he has hit his ceiling with the ball.',
@@ -3832,6 +3847,10 @@ Object.assign(I18N.ru, {
   'plan.match': 'Игровая практика', 'plan.match.d': '++тонус, −энергия, небольшой риск травмы',
   'plan.tech': 'Техника', 'plan.tech.d': 'техника медленно растёт, −−энергия',
   'plan.tactics': 'Тактический класс', 'plan.tactics.d': 'тактика растёт, непоседы прогуливают',
+  'plan.cardio.do': 'Кросс, рывки, челноки.', 'plan.cardio.hint': 'К концу матча ноги не будут ватными, и ребята отдохнут от нагрузки. Но скучно — настроение падает.',
+  'plan.tech.do': 'Пас, приём, обводка, удар.', 'plan.tech.hint': 'Мяч перестанет отскакивать от ноги. Выматывает сильнее всего.',
+  'plan.tactics.do': 'Доска, фишки, разбор по шагам.', 'plan.tactics.hint': 'Каждый поймёт, где ему стоять и когда отходить назад. Непоседы могут сбежать.',
+  'plan.match.do': 'Двусторонка.', 'plan.match.hint': 'В тонусе к субботе, и легче заметить, кто на что годится и кто с кем держится. Нового не выучат, можно ушибиться.',
   'cal.training': 'Тренировка ({p}): пришли {a}. Прогуляли: {s}.', 'cal.trainingAll': 'Тренировка ({p}): пришли все {a}.',
   'tr.plateau.physical': 'Пашет наравне со всеми, но быстрее не становится: {s}. Похоже, это его предел.',
   'tr.plateau.technical': 'Упражнения даются легко, но ничего нового не прибавляется: {s}. Кажется, с мячом он упёрся в потолок.',
@@ -6296,6 +6315,10 @@ class GameState {
   yardNotesOf(p) { return p.yardNotes || (typeof DraftView !== 'undefined' ? DraftView.notes(p) : []); }
   /** League matches he finished in goal this season. */
   keptGoal(id) { return this.seasonStats?.[id]?.kept || 0; }
+  /** v3.28: matches he finished on `line` this season (GK = kept goal). */
+  playedLine(id, line) { return line === 'GK' ? this.keptGoal(id) : this.seasonStats?.[id]?.lines?.[line] || 0; }
+  /** v3.28: what the coach can SEE that fits p for `line` (no hidden skills): GK — yard note "hands" or kept goal; else — played there. */
+  fitsLine(p, line) { return (line === 'GK' && this.yardNotesOf(p).includes('hands')) || this.playedLine(p.id, line) > 0; }
   /** 3 = tagged GK, 2 = yard note "hands" ("safe hands in goal"), 1 = has kept goal this season, 0 = nothing visible. */
   keeperTier(p) { return p.position === 'GK' ? 3 : this.yardNotesOf(p).includes('hands') ? 2 : this.keptGoal(p.id) > 0 ? 1 : 0; }
   /** The best visible keeper among `cands` (their order breaks the last ties), or null → the caller's old rule. */
@@ -7344,9 +7367,11 @@ class GameState {
   }
   ensureAvailableXI() {
     const changes = [];
+    // v3.28: skipping today's training (absentToday) only matters on match day; on any other day it would drop the kid for good
+    const out = p => !p.available && (this.phase === 'matchday' || p.unavailableReason !== 'absent');
     this.lineup.forEach((id, i) => {
       const p = this.player(id);
-      if (!p || p.available) return;
+      if (!p || !out(p)) return;
       if (i === 0 && this.keeperSwap(p, changes)) return;   // v3.24: the keeper by what the coach can see
       const best = this.bestBenchFor(i);
       if (!best) return;
@@ -7460,12 +7485,14 @@ class GameState {
   }
 
   /** Adds one match to every player's season totals. pairs: [[id, stats], ...] */
-  recordSeasonStats(pairs, keepers = null) {
+  recordSeasonStats(pairs, keepers = null, lineOf = null) {
     for (const [id, st] of pairs) {
       const acc = this.seasonStats[id] || (this.seasonStats[id] = { ...MatchEngine.blankStats(), apps: 0 });
       for (const k in st) acc[k] = (acc[k] || 0) + st[k];
       acc.apps++;
       if (keepers?.has(id)) acc.kept = (acc.kept || 0) + 1;   // v3.24: finished the match in goal (the auto lineup's keeper rule)
+      const ln = lineOf?.get(id);
+      if (ln) (acc.lines ||= {})[ln] = (acc.lines[ln] || 0) + 1;   // v3.28: the line he finished the match on (swap hints)
     }
   }
   /** v1.5: remember the notes shown in the Notebook so the Profile Card can quote them later. */
@@ -9504,6 +9531,7 @@ class RadarView {
       d.className = `pl ${si === 0 ? 'home' : 'away'}${e.line === 'GK' ? ' gk' : ''}`;
       d.innerHTML = `<b>${e.p.number ?? idx + 1}</b>${this.labels ? `<span class="pl-pos ${e.p.position}">${L.pos(e.p.position)}</span><span class="pl-nm">${esc(squadName(e.p, si === 0 && this.squadOf ? this.squadOf() : side.entries.map(x => x.p)))}</span>` : ''}`;
       d.title = `${L.name(e.p.name)} · ${L.line(e.line === 'GK' ? 'GK' : e.line)}`;
+      if (board && si === 0 && e.p.position && e.p.position !== LINE_POS[e.line]) d.title += '\n' + L.t('tac.tagSlot', { t: L.pos(e.p.position), l: L.line(e.line) });   // v3.28
       d.dataset.pid = e.p.id;   // v1.5: right-click → Player Profile Card
       if (this.onDotClick) { d.type = 'button'; d.dataset.slot = idx; d.addEventListener('click', () => this.onDotClick(idx)); }
       if (this.onDrop) {
@@ -9530,11 +9558,11 @@ class RadarView {
 
   place(el, x, y) { el.style.left = x + '%'; el.style.top = y + '%'; }
   select(id) { this.highlight(id); }
-  /** sel = the chosen player; clsFor(id) returns 'suggested-swap' | 'dimmed-swap' | '' for every other dot. */
+  /** sel = the chosen player; clsFor(id) returns 'suggested-swap' | 'maybe-swap' | 'dimmed-swap' | '' for every other dot. */
   highlight(selId, clsFor) {
     for (const [pid, d] of this.dots) {
       d.el.classList.toggle('sel', pid === selId);
-      d.el.classList.remove('suggested-swap', 'dimmed-swap');
+      d.el.classList.remove('suggested-swap', 'dimmed-swap', 'maybe-swap');
       const c = selId && clsFor ? clsFor(pid) : '';
       if (c) d.el.classList.add(c);
     }
@@ -9545,8 +9573,24 @@ class RadarView {
    VERSION & PATCH NOTES
    RULE: every update increments APP_VERSION and adds a new entry at the TOP of PATCH_NOTES (EN + RU).
    ========================================================= */
-const APP_VERSION = '3.27';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
+const APP_VERSION = '3.28';   // ← single source of truth: <title>, taskbar title, tray badge, ReadMe
 const PATCH_NOTES = [
+  { v: '3.28', name: { en: 'Hints', ru: 'Подсказки' },
+    en: [
+      'PLANNER.EXE: hover (or tab to) a training regime to see what the kids do and what they will pick up. The chosen regime\'s hint is also written under the buttons — handy on a touch screen.',
+      'Swaps: select a kid on the pitch and the green highlight now follows the line he stands on, not his tag. A forward in goal lights up your keepers.',
+      'A faint dashed outline marks kids you have seen fit that line: "safe hands" from the yard match for goal, or anyone who has already played there this season.',
+      'Hover a dot on the tactics board to see "Tag: FWD · Playing: GK" when the two differ.',
+      'Fix: a kid who skipped a training no longer drops out of the starting XI for good after an evening event. Only match day checks who turned up.',
+    ],
+    ru: [
+      'PLANNER.EXE: наведи на режим тренировки (или выбери его с клавиатуры) — подсказка скажет, чем ребята займутся и что у них подтянется. Под кнопками дня тоже написан намёк для выбранного режима — удобно на тачскрине.',
+      'Замены: выбери ребёнка на поле — зелёным подсветятся те, кто подходит для линии, где он стоит, а не для его тега. Нападающий в воротах подсветит вратарей.',
+      'Бледный пунктир — те, кого ты уже видел на этой линии: «надёжные руки» с дворового матча для ворот или кто уже играл там в этом сезоне.',
+      'Наведи на точку на тактической доске — если тег и место не совпадают, увидишь «Тег: НАП · Стоит: ВРТ».',
+      'Исправлено: ребёнок, пропустивший тренировку, больше не выпадает из стартового состава насовсем после вечернего события. Кто пришёл, проверяется только в день матча.',
+    ],
+  },
   { v: '3.27', name: { en: 'Clashes', ru: 'Стычки' },
     en: [
       'Kids who don\'t get on now clash at training, blame each other after a loss and sometimes end up in a scuffle behind the locker room. Each time you choose what to do — and every choice has a price.',
@@ -12390,9 +12434,8 @@ class EventEngine {
     if (s.eventLog.length > 60) s.eventLog.shift();
     s.addDiary({ date: pe.date, key: (choice.diary || key) + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : vars.m ?? '' }, cls: 'ev' });
     s.pendingEvent = null;
-    // v3.27: a bond event on a training evening leaves the XI alone — ensureAvailableXI would drop the kids who merely skipped
-    // today's training (absentToday) for good; the match-day arrival checks the XI anyway. (Older events keep the v3.24 behaviour.)
-    if (!(this.find(pe.id)?.when === 'bond' && pe.after !== 'matchday')) s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
+    // v3.28: ensureAvailableXI itself ignores absentToday outside match day (was a v3.27 bond-only workaround)
+    s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
     s.save();
     this.view.close();
     this.ui.renderAll();
@@ -13096,6 +13139,14 @@ class WeekPlanner {
       if (!b || b.disabled) return;
       if (this.state.setWeekPlan(b.dataset.day, b.dataset.reg === 'rest' ? null : b.dataset.reg)) { this.render(); this.ui.renderAll(); }
     });
+    // v3.28: Win98 tooltip for the regime buttons (hover + keyboard focus); one element on the canvas so the grid's overflow never clips it
+    this.tip = document.createElement('div');
+    this.tip.className = 'pl-tip'; this.tip.setAttribute('role', 'tooltip'); this.tip.id = 'pl-tip'; this.tip.hidden = true;
+    (document.getElementById('screen') || document.body).appendChild(this.tip);
+    const show = e => { const b = e.target.closest?.('.pl-opt[data-reg]'); if (b && b.dataset.reg !== 'rest') this.showTip(b); };
+    const hide = e => { if (e.target.closest?.('.pl-opt[data-reg]')) this.hideTip(); };
+    this.grid.addEventListener('mouseover', show); this.grid.addEventListener('focusin', show);
+    this.grid.addEventListener('mouseout', hide); this.grid.addEventListener('focusout', hide);
     this.grid.addEventListener('change', e => {   // v3.16: the evening lesson — kid / focus
       const kid = e.target.closest('[data-lkid]'), foc = e.target.closest('[data-lfocus]'), s = this.state;
       if (!kid && !foc) return;
@@ -13105,6 +13156,22 @@ class WeekPlanner {
       this.render(); this.ui.renderAll();
     });
   }
+  /** v3.28: name · what we do · what the kids will pick up (words only, matches REGIMES). */
+  static tipHTML(reg) { return `<b>${esc(L.t('plan.' + reg))}</b><span>${esc(L.t('plan.' + reg + '.do'))}</span><i>${esc(L.t('plan.' + reg + '.hint'))}</i>`; }
+  showTip(b) {
+    const t = this.tip;
+    t.innerHTML = WeekPlanner.tipHTML(b.dataset.reg); t.hidden = false;
+    // canvas px: #screen is zoomed / scaled (v3.26) — client rects are on-screen px, offset sizes are logical px
+    const host = t.parentElement, hr = host.getBoundingClientRect(), k = hr.width / (host.offsetWidth || hr.width) || 1;
+    const br = b.getBoundingClientRect(), W = host.offsetWidth || innerWidth, H = host.offsetHeight || innerHeight, w = t.offsetWidth, h = t.offsetHeight;
+    const r = { left: (br.left - hr.left) / k, top: (br.top - hr.top) / k, bottom: (br.bottom - hr.top) / k };
+    const x = Math.min(Math.max(4, r.left), W - w - 4);
+    let y = r.bottom + 4;
+    if (y + h > H - 42) y = Math.max(4, r.top - h - 4);   // 38-px taskbar
+    t.style.left = x + 'px'; t.style.top = y + 'px';
+    b.setAttribute('aria-describedby', 'pl-tip');
+  }
+  hideTip() { this.tip.hidden = true; this.grid.querySelectorAll('[aria-describedby="pl-tip"]').forEach(b => b.removeAttribute('aria-describedby')); }
   get isOpen() { return !this.layer.hidden; }
   get state() { return this.ui.state; }
 
@@ -13120,7 +13187,7 @@ class WeekPlanner {
     this.layer.hidden = false;
     document.getElementById('pl-confirm').focus();
   }
-  close() { this.layer.hidden = true; this.ui.renderAll(); }
+  close() { this.hideTip(); this.layer.hidden = true; this.ui.renderAll(); }
 
   /** Qualitative warning for the n-th training of the week (1-based), or ''. */
   static warnKey(n) { return n >= WEEK.WARN_OVER ? 'pl.warn.over' : n >= WEEK.WARN_HEAVY ? 'pl.warn.heavy' : ''; }
@@ -13145,6 +13212,7 @@ class WeekPlanner {
   }
 
   render() {
+    this.hideTip?.();
     this.renderMonday();
     const s = this.state, w = s.weekState(), today = s.calendar.date;
     let nth = 0;
@@ -13167,6 +13235,7 @@ class WeekPlanner {
       };
       return `<div class="${cls}${cur ? ' t' : ''}" data-date="${date}"${we ? ` title="${esc(wtip)}"` : ''}>${head}<div class="pl-opts">${opt('rest', L.t('pl.rest'))}`
         + REGIME_KEYS.map(r => opt(r, L.t('plan.' + r))).join('') + `</div>`
+        + (cur ? `<div class="pl-hint">${esc(L.t('plan.' + cur + '.hint'))}</div>` : '')   // v3.28: touch screens have no hover
         + `<div class="pl-warn${warn === 'pl.warn.over' ? ' over' : ''}">${warn ? esc(L.t(warn)) : ''}</div>${cur ? '' : this.lessonHTML(k, editable)}</div>`;
     }).join('');
     const n = s.trainingsPlanned(), src = w.apSources || {};
@@ -14217,7 +14286,8 @@ class UIController {
       const status = eng?.sentOff.has(p.id) ? 'sent' : eng?.subbedOff.has(p.id) ? 'off' : '';
       const out = !pitch && !p.available;   // v2.2: can't come on
       const disabled = over || !!status || out;
-      const hint = selP && p.id !== selP.id && !disabled ? (p.position && p.position === selP.position ? ' suggested-swap' : ' dimmed-swap') : '';
+      const selI = selP ? onIds.indexOf(selP.id) : -1, hc = !disabled ? this.swapHint(selP, p, selI >= 0 ? lines[selI] : null) : '';   // v3.28: by slot
+      const hint = hc ? ' ' + hc : '';
       const sub = status ? L.t('lr.' + status) : out ? L.t('st.short.' + p.unavailableReason) : pitch ? L.line(lines[i]) : L.t('team.onBench');
       return `<div class="r-row lr${pitch ? ' starter' : ' bench'}${this.liveSel === p.id ? ' sel' : ''}${hint}${disabled ? ' disabled' : ''}"
           data-id="${p.id}" role="option" tabindex="${disabled ? -1 : 0}" aria-selected="${this.liveSel === p.id}" aria-disabled="${disabled}">
@@ -15219,7 +15289,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       const hint = this.swapClass(p);
       const out = !p.available;   // v2.2: injured / suspended → locked out of the XI
       return `<div class="r-row ${starter ? 'starter' : 'bench'}${sel ? ' sel' : ''}${hint ? ' ' + hint : ''}${live ? ' locked' : ''}${out ? ' unavail' : ''}" data-id="${p.id}"
-          role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' ? ` aria-description="${esc(L.t('team.suggestedAria'))}"` : ''}>
+          role="option" tabindex="0" aria-selected="${sel}" draggable="${!live}"${hint === 'suggested-swap' || hint === 'maybe-swap' ? ` aria-description="${esc(L.t(hint === 'maybe-swap' ? 'team.maybeAria' : 'team.suggestedAria'))}"` : ''}>
         <span class="num">${p.number}</span>
         <span class="r-name"><span class="r-line"><span class="pos ${p.position || 'none'}" title="${esc(L.t(p.position ? 'team.posTitle' : 'team.posNone', { p: L.pos(p.position) }))}">${L.pos(p.position)}</span><b>${esc(L.name(p.name))}</b>${this.dutyBadges(p)}${this.statusBadge(p)}${this.clueBadge(p)}${this.infoBtn(p)}</span>${sub}</span>
         <div class="energy ${this.energyClass(e)}" title="${e}%"><i style="width:${e}%"></i><span>${e}%${e < ENERGY.TIRED ? ' ×' + fatigueMult(e).toFixed(2) : ''}</span></div>
@@ -15303,8 +15373,15 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
       (still clickable — out-of-position swaps are allowed, just not recommended). */
   swapClass(p) {
     const selP = this.selected ? this.state.player(this.selected) : null;
+    return this.swapHint(selP, p, selP ? this.state.slotLine(selP.id) : null);
+  }
+  /** v3.28: a kid ON THE PITCH (selLine = his slot's line) suggests that line's tag, not his own — a FWD in goal lights up
+      the keepers; a faint dashed hint marks kids the coach has seen fit there (state.fitsLine). Bench kid (no line): by tag. */
+  swapHint(selP, p, selLine) {
     if (!selP || p.id === selP.id) return '';
-    return p.position && p.position === selP.position ? 'suggested-swap' : 'dimmed-swap';
+    const want = selLine ? LINE_POS[selLine] : selP.position;
+    if (want && p.position === want) return 'suggested-swap';
+    return selLine && this.state.fitsLine(p, selLine) ? 'maybe-swap' : 'dimmed-swap';
   }
 
   /** Unified swap: select one player (list row or pitch dot), then pick another (row or dot). */
@@ -15605,7 +15682,7 @@ ${line}</div>` + PATCH_NOTES.map((n, i) => `
     s.startReview(result, outfield, s.calendar.date, ctx.md);   // v3.19: REVIEW.EXE owed after a win / draw (loss → streak); v3.23: outfield kids only
     if (this.events.enabled) s.blameRoll(eng, result); else { const cm = s.clashMeta?.(); if (cm) { cm.post = null; cm.tilt = null; } }   // v3.27: "It's your fault" (before the remarks: it tilts them)
     s.startAfter(result, played.map(p => [p.id, { ...eng.st(p) }]), eng.matchEvents, s.calendar.date, ctx.md);   // v3.20: AFTER_GAME.EXE after a loss / draw
-    s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]), new Set(played.filter(p => eng.isGK(p)).map(p => p.id)));   // v3.24: + who kept goal
+    s.recordSeasonStats(played.map(p => [p.id, eng.st(p)]), new Set(played.filter(p => eng.isGK(p)).map(p => p.id)), eng.lineOf);   // v3.24: + who kept goal; v3.28: + line
     s.league.recordKids(b.all.map(p => [p.id, eng.st(p)]));
     s.league.aiAfterMatch(ctx.opp, new Map(b.all.map(p => [p.id, eng.energy.get(p.id)])));   // v3.4: the opponent keeps his tired legs   // v1.7: opponent kids feed the league leaders
     s.recordCoachNotes(s.lastReport);

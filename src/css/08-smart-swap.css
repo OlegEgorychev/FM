@@ -17,6 +17,10 @@
 .r-row.suggested-swap .pos{ box-shadow: 0 0 6px rgba(57,255,20,.8); }
 .pitch.board .pl.suggested-swap{ opacity: 1; outline: 2px dashed #39ff14; outline-offset: 3px; animation: phosphorGlow 1s ease-in-out infinite; z-index: 4; }
 
+/* v3.28 maybe: not his tag, but the coach has seen him fit this line (yard "hands" / played there) — faint, static dashes */
+.r-row.maybe-swap{ opacity: .85; outline: 1px dashed rgba(57,255,20,.55); outline-offset: -4px; }
+.pitch.board .pl.maybe-swap{ opacity: .85; outline: 1px dashed rgba(57,255,20,.6); outline-offset: 3px; z-index: 3; }
+
 /* dimmed: different position — recedes, but stays clickable */
 .r-row.dimmed-swap{ opacity: .4; filter: grayscale(.9); }
 .pitch.board .pl.dimmed-swap{ opacity: .4; filter: grayscale(1); }

@@ -21,6 +21,14 @@ class WeekPlanner {
       if (!b || b.disabled) return;
       if (this.state.setWeekPlan(b.dataset.day, b.dataset.reg === 'rest' ? null : b.dataset.reg)) { this.render(); this.ui.renderAll(); }
     });
+    // v3.28: Win98 tooltip for the regime buttons (hover + keyboard focus); one element on the canvas so the grid's overflow never clips it
+    this.tip = document.createElement('div');
+    this.tip.className = 'pl-tip'; this.tip.setAttribute('role', 'tooltip'); this.tip.id = 'pl-tip'; this.tip.hidden = true;
+    (document.getElementById('screen') || document.body).appendChild(this.tip);
+    const show = e => { const b = e.target.closest?.('.pl-opt[data-reg]'); if (b && b.dataset.reg !== 'rest') this.showTip(b); };
+    const hide = e => { if (e.target.closest?.('.pl-opt[data-reg]')) this.hideTip(); };
+    this.grid.addEventListener('mouseover', show); this.grid.addEventListener('focusin', show);
+    this.grid.addEventListener('mouseout', hide); this.grid.addEventListener('focusout', hide);
     this.grid.addEventListener('change', e => {   // v3.16: the evening lesson — kid / focus
       const kid = e.target.closest('[data-lkid]'), foc = e.target.closest('[data-lfocus]'), s = this.state;
       if (!kid && !foc) return;
@@ -30,6 +38,22 @@ class WeekPlanner {
       this.render(); this.ui.renderAll();
     });
   }
+  /** v3.28: name · what we do · what the kids will pick up (words only, matches REGIMES). */
+  static tipHTML(reg) { return `<b>${esc(L.t('plan.' + reg))}</b><span>${esc(L.t('plan.' + reg + '.do'))}</span><i>${esc(L.t('plan.' + reg + '.hint'))}</i>`; }
+  showTip(b) {
+    const t = this.tip;
+    t.innerHTML = WeekPlanner.tipHTML(b.dataset.reg); t.hidden = false;
+    // canvas px: #screen is zoomed / scaled (v3.26) — client rects are on-screen px, offset sizes are logical px
+    const host = t.parentElement, hr = host.getBoundingClientRect(), k = hr.width / (host.offsetWidth || hr.width) || 1;
+    const br = b.getBoundingClientRect(), W = host.offsetWidth || innerWidth, H = host.offsetHeight || innerHeight, w = t.offsetWidth, h = t.offsetHeight;
+    const r = { left: (br.left - hr.left) / k, top: (br.top - hr.top) / k, bottom: (br.bottom - hr.top) / k };
+    const x = Math.min(Math.max(4, r.left), W - w - 4);
+    let y = r.bottom + 4;
+    if (y + h > H - 42) y = Math.max(4, r.top - h - 4);   // 38-px taskbar
+    t.style.left = x + 'px'; t.style.top = y + 'px';
+    b.setAttribute('aria-describedby', 'pl-tip');
+  }
+  hideTip() { this.tip.hidden = true; this.grid.querySelectorAll('[aria-describedby="pl-tip"]').forEach(b => b.removeAttribute('aria-describedby')); }
   get isOpen() { return !this.layer.hidden; }
   get state() { return this.ui.state; }
 
@@ -45,7 +69,7 @@ class WeekPlanner {
     this.layer.hidden = false;
     document.getElementById('pl-confirm').focus();
   }
-  close() { this.layer.hidden = true; this.ui.renderAll(); }
+  close() { this.hideTip(); this.layer.hidden = true; this.ui.renderAll(); }
 
   /** Qualitative warning for the n-th training of the week (1-based), or ''. */
   static warnKey(n) { return n >= WEEK.WARN_OVER ? 'pl.warn.over' : n >= WEEK.WARN_HEAVY ? 'pl.warn.heavy' : ''; }
@@ -70,6 +94,7 @@ class WeekPlanner {
   }
 
   render() {
+    this.hideTip?.();
     this.renderMonday();
     const s = this.state, w = s.weekState(), today = s.calendar.date;
     let nth = 0;
@@ -92,6 +117,7 @@ class WeekPlanner {
       };
       return `<div class="${cls}${cur ? ' t' : ''}" data-date="${date}"${we ? ` title="${esc(wtip)}"` : ''}>${head}<div class="pl-opts">${opt('rest', L.t('pl.rest'))}`
         + REGIME_KEYS.map(r => opt(r, L.t('plan.' + r))).join('') + `</div>`
+        + (cur ? `<div class="pl-hint">${esc(L.t('plan.' + cur + '.hint'))}</div>` : '')   // v3.28: touch screens have no hover
         + `<div class="pl-warn${warn === 'pl.warn.over' ? ' over' : ''}">${warn ? esc(L.t(warn)) : ''}</div>${cur ? '' : this.lessonHTML(k, editable)}</div>`;
     }).join('');
     const n = s.trainingsPlanned(), src = w.apSources || {};

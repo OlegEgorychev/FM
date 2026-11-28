@@ -173,6 +173,10 @@ class GameState {
   yardNotesOf(p) { return p.yardNotes || (typeof DraftView !== 'undefined' ? DraftView.notes(p) : []); }
   /** League matches he finished in goal this season. */
   keptGoal(id) { return this.seasonStats?.[id]?.kept || 0; }
+  /** v3.28: matches he finished on `line` this season (GK = kept goal). */
+  playedLine(id, line) { return line === 'GK' ? this.keptGoal(id) : this.seasonStats?.[id]?.lines?.[line] || 0; }
+  /** v3.28: what the coach can SEE that fits p for `line` (no hidden skills): GK — yard note "hands" or kept goal; else — played there. */
+  fitsLine(p, line) { return (line === 'GK' && this.yardNotesOf(p).includes('hands')) || this.playedLine(p.id, line) > 0; }
   /** 3 = tagged GK, 2 = yard note "hands" ("safe hands in goal"), 1 = has kept goal this season, 0 = nothing visible. */
   keeperTier(p) { return p.position === 'GK' ? 3 : this.yardNotesOf(p).includes('hands') ? 2 : this.keptGoal(p.id) > 0 ? 1 : 0; }
   /** The best visible keeper among `cands` (their order breaks the last ties), or null → the caller's old rule. */
@@ -1221,9 +1225,11 @@ class GameState {
   }
   ensureAvailableXI() {
     const changes = [];
+    // v3.28: skipping today's training (absentToday) only matters on match day; on any other day it would drop the kid for good
+    const out = p => !p.available && (this.phase === 'matchday' || p.unavailableReason !== 'absent');
     this.lineup.forEach((id, i) => {
       const p = this.player(id);
-      if (!p || p.available) return;
+      if (!p || !out(p)) return;
       if (i === 0 && this.keeperSwap(p, changes)) return;   // v3.24: the keeper by what the coach can see
       const best = this.bestBenchFor(i);
       if (!best) return;
@@ -1337,12 +1343,14 @@ class GameState {
   }
 
   /** Adds one match to every player's season totals. pairs: [[id, stats], ...] */
-  recordSeasonStats(pairs, keepers = null) {
+  recordSeasonStats(pairs, keepers = null, lineOf = null) {
     for (const [id, st] of pairs) {
       const acc = this.seasonStats[id] || (this.seasonStats[id] = { ...MatchEngine.blankStats(), apps: 0 });
       for (const k in st) acc[k] = (acc[k] || 0) + st[k];
       acc.apps++;
       if (keepers?.has(id)) acc.kept = (acc.kept || 0) + 1;   // v3.24: finished the match in goal (the auto lineup's keeper rule)
+      const ln = lineOf?.get(id);
+      if (ln) (acc.lines ||= {})[ln] = (acc.lines[ln] || 0) + 1;   // v3.28: the line he finished the match on (swap hints)
     }
   }
   /** v1.5: remember the notes shown in the Notebook so the Profile Card can quote them later. */

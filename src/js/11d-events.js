@@ -895,9 +895,8 @@ class EventEngine {
     if (s.eventLog.length > 60) s.eventLog.shift();
     s.addDiary({ date: pe.date, key: (choice.diary || key) + '.diary', vars: { ...vars, m: delta ? (delta > 0 ? '+$' : '−$') + Math.abs(delta) : vars.m ?? '' }, cls: 'ev' });
     s.pendingEvent = null;
-    // v3.27: a bond event on a training evening leaves the XI alone — ensureAvailableXI would drop the kids who merely skipped
-    // today's training (absentToday) for good; the match-day arrival checks the XI anyway. (Older events keep the v3.24 behaviour.)
-    if (!(this.find(pe.id)?.when === 'bond' && pe.after !== 'matchday')) s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
+    // v3.28: ensureAvailableXI itself ignores absentToday outside match day (was a v3.27 bond-only workaround)
+    s.xiAutoDiary(s.ensureAvailableXI(), pe.date);
     s.save();
     this.view.close();
     this.ui.renderAll();
